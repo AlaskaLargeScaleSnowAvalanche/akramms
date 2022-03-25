@@ -1,0 +1,160 @@
+March 25, 2022
+==============
+Present:
+Gabriel Wolken gabriel.wolken@alaska.gov
+Yves Bühler buehler@slf.ch
+Richard Lader Jr. rtladerjr@alaska.edu
+Elizabeth Fischer eafischer2@alaska.edu
+Marc Christen christen@slf.ch
+
+
+
+Rick Lader: background is atmospheric sciences, working on graduate work, advancing to research associate at IARC, involved with regional modeling / dynamic downscaling for Alaska.  Produced downscaled dataset for SE Alaska, will use to force additional modeling.
+
+Yves Buehler: WOrking at Davos for 30 years, RAMS modeling, always focusing on remote sensing.  Leading new Alpine remote sensing group for last year, stay involvedi n RAMS stuff too, made large-scale xxx mapping chain, which will apply to this project ot model avalanches at large scale.
+
+Marc Christen: ALso at SLF a few years longer than Yves, I'm a Civil / software engineer, RAMS developer, doing all software stuff, with Yves the large scale applications, everything having to do with software with RAMS.
+
+Gabriel Wolken: Welcome to Elizabeth, fortunate to have her on board, getting up to speed.  Task for this meeting is to start a discussion about efficiency.  Wanted to get this group together to address quesiton of how do we address SE Alaska project for efficiency (human and computational), that are really demanding for such a large area to work on.  Applying this really great processing chain that Yves and Mark developed to a really large area of hte world; and birng in a specfiic Alaska use case, to force RAMS modeling with downscaled climate modeling, which is only option we have right now for avalancehs between current climatology and future.  Start a conversation to begin thinking about efficiencies and how to optimize that, with some key people here who know more about this than I do.
+
+The Canoton grison is largest application I know of that the RAMS folks have addressed, along 7100 km^2.  Maybe you've done something larger in India.  Area of SE Alaska we're trying toaddress here is 65,000 km^2, a lot larger.  That size demands a different approach.  How to move forward to be as efficient as possible.  Limitations RAMS might have with file sizes, how to integrate climate modeling output in ways automized for RAMS production, moving through mapping, other ways we can automate processing in ways that make it easier.  Opportunities to advance in ways we can apply elsewhere.
+
+In our mind this is the start.  265 km^2 in SE Alaska, we will move north.  S Central Alaska (Kenai peninsula) is next.  We want to do for entire mountainous areasof state, where avalanches exist.
+
+E: What's the automation problem?
+
+Yves: We did entire Switzerland, about 40,000.  We had to tile it up in different tiles.  Run Grison in one tile, it all depends on the RAM we have available.  It was something we could run in one round.  It takes a lot of manual steps.  Severeal software involved in processing chain.
+
+E: What are the steps?
+
+Yves:
+1. Based on DEM, identify release areas, raster-based.  Do with entire area in ArcGIS with Python scripts.  We need ArcGIS on the computer.  This step is not crticial, we can do it already for our servers in a reasonable time, it's all automated already.
+
+2a. Produce the polygons.  I use econition, a commercial product for object-based image classification.  From that raster layer I produce release polygons.  We need to automate this, or replace by different software.
+
+2b. For every release area, you need to deliniate a calculation domain.  Also an ArcGIS thing... but this is not very efficient.  It's a python step.
+
+2c. Python scripting to produce release depth.  (Attribute of each polygon).  Will be defined with Rick's data.  (Uses downscaled WRF climatology).
+
+4. Put release polygons and release depth into RAMS.
+
+
+---
+
+In alaska will we use your servers in Schweitz or set up our own servers?
+Gabe: 
+
+ECognition use for:
+ 1. Converting release area rasters to polygons.
+
+ArcGIS used for:
+ 1. Produce raster-based release areas.  Manipulate DEM to find curvature, slope, roughness, etc.
+ 1. Deliniate a calculation domain from release areas.  (Just a buffer around the flow path starting at thecenter of the release zone).
+ 1. Produce release depths from WRF climatology.  Grab value from raster, inform polygon with values.  Currently coded in ArcGIS, based on input from station measurements.  Will need ot change to input from WRF.
+
+
+RAMS: Batch process, prepare data needed for RAMS simulation, run in parallel, run 200,300,400 simulations in parallel.  Get simulation results, read them in, analyze them to get runout simulations (TIFF rasters).  All done in IDL.
+
+IDL, start instances of C program to run simulations, read back in, create TIFF files.
+There's an interface for RAMS, in this interface you start the large-scale application where we input... we need thse folders with DEM, forest, etc.  Then RAMS does the batch process to create the input data for every single avalanche and then starting it.
+
+Yves: Several scenarios.  If we calculate just once we can do it as now on SLF servers.  But if you do 5 times i don't see how we could do that.
+
+Start with upper part...
+
+Yves and Gabe agree.
+
+Marc: i agree too.  If we improve the first part then we still have a running system.  I just don't want to change everything at once.  I know we can improve the RAMS part tremendously.  I think we have to that step by step, and then trying to do the RAMS part.
+
+Yves: Build your own system to reproduce what we do, but more efficient.  Build it on YOUR resources and YOUR system, trying to produce the same stuff we do.
+Polygon thing is KEY.  We spent a lot of time with different experts until we were happy with polygon deliniation.
+
+Marc: We could also help pay for such systems from RAMMS.  Servers, or whatever you have to buy... we would benefit from that too, so we could also pay for it or help pay.
+
+Elizabeth will contact Yves, Marc and Rick with questions...
+
+GitHub repo.
+All developed at SLF, no source code repos.
+Also none for RAMMS.  Marc: I don't use git, but I do have some repos for my code stuff.  I use subversion on our servers, not on any cloud or stuff or something.
+
+GitHub organization:
+  ** Let me send you the name
+  Alaska Large Scale Snow Avalanche
+
+ 1. Converting release area rasters to polygons.
+
+ArcGIS used for:
+ 1. Produce raster-based release areas.  Manipulate DEM to find curvature, slope, roughness, etc.
+ 1. Deliniate a calculation domain from release areas.  (Just a buffer around the flow path starting at thecenter of the release zone).
+ 1. Produce release depths from WRF climatology.  Grab value from raster, inform polygon with values.  Currently coded in ArcGIS, based on input from station measurements.  Will need ot change to input from WRF.
+
+
+RAMS: Batch process, prepare data needed for RAMS simulation, run in parallel, run 200,300,400 simulations in parallel.  Get simulation results, read them in, analyze them to get runout simulations (TIFF rasters).  All done in IDL.
+
+IDL, start instances of C program to run simulations, read back in, create TIFF files.
+There's an interface for RAMS, in this interface you start the large-scale application where we input... we need thse folders with DEM, forest, etc.  Then RAMS does the batch process to create the input data for every single avalanche and then starting it.
+
+Yves: Several scenarios.  If we calculate just once we can do it as now on SLF servers.  But if you do 5 times i don't see how we could do that.
+
+Start with upper part...
+
+Yves and Gabe agree.
+
+Marc: i agree too.  If we improve the first part then we still have a running system.  I just don't want to change everything at once.  I know we can improve the RAMS part tremendously.  I think we have to that step by step, and then trying to do the RAMS part.
+
+Yves: Build your own system to reproduce what we do, but more efficient.  Build it on YOUR resources and YOUR system, trying to produce the same stuff we do.
+Polygon thing is KEY.  We spent a lot of time with different experts until we were happy with polygon deliniation.
+
+Marc: We could also help pay for such systems from RAMMS.  Servers, or whatever you have to buy... we would benefit from that too, so we could also pay for it or help pay.
+
+Elizabeth will contact Yves, Marc and Rick with questions...
+
+GitHub repo.
+All developed at SLF, no source code repos.
+Also none for RAMMS.  Marc: I don't use git, but I do have some repos for my code stuff.  I use subversion on our servers, not on any cloud or stuff or something.
+
+GitHub organization:
+  ** Let me send you the name
+  Alaska Large Scale Snow Avalanche
+
+ 1. Converting release area rasters to polygons.
+
+ArcGIS used for:
+ 1. Produce raster-based release areas.  Manipulate DEM to find curvature, slope, roughness, etc.
+ 1. Deliniate a calculation domain from release areas.  (Just a buffer around the flow path starting at thecenter of the release zone).
+ 1. Produce release depths from WRF climatology.  Grab value from raster, inform polygon with values.  Currently coded in ArcGIS, based on input from station measurements.  Will need ot change to input from WRF.
+
+
+RAMS: Batch process, prepare data needed for RAMS simulation, run in parallel, run 200,300,400 simulations in parallel.  Get simulation results, read them in, analyze them to get runout simulations (TIFF rasters).  All done in IDL.
+
+IDL, start instances of C program to run simulations, read back in, create TIFF files.
+There's an interface for RAMS, in this interface you start the large-scale application where we input... we need thse folders with DEM, forest, etc.  Then RAMS does the batch process to create the input data for every single avalanche and then starting it.
+
+Yves: Several scenarios.  If we calculate just once we can do it as now on SLF servers.  But if you do 5 times i don't see how we could do that.
+
+Start with upper part...
+
+Yves and Gabe agree.
+
+Marc: i agree too.  If we improve the first part then we still have a running system.  I just don't want to change everything at once.  I know we can improve the RAMS part tremendously.  I think we have to that step by step, and then trying to do the RAMS part.
+
+Yves: Build your own system to reproduce what we do, but more efficient.  Build it on YOUR resources and YOUR system, trying to produce the same stuff we do.
+Polygon thing is KEY.  We spent a lot of time with different experts until we were happy with polygon deliniation.
+
+Marc: We could also help pay for such systems from RAMMS.  Servers, or whatever you have to buy... we would benefit from that too, so we could also pay for it or help pay.
+
+Elizabeth will contact Yves, Marc and Rick with questions...
+
+GitHub repo.
+All developed at SLF, no source code repos.
+Also none for RAMMS.  Marc: I don't use git, but I do have some repos for my code stuff.  I use subversion on our servers, not on any cloud or stuff or something.
+
+GitHub organization:
+  ** Let me send you the name
+  Alaska Large Scale Snow Avalanche
+
+Yves Buehler: buehlery1
+Include schematic in the Markdown doc...
+In case any corrections need to be made, the group can make them.
+
+Will wait to hear from Gabe on computing resources.
