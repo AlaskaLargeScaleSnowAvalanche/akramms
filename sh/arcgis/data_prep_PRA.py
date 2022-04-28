@@ -2,14 +2,17 @@
 # data_prep_PRA_finder.py
 # Created on: January 2018
 # © Yves Buehler, Daniel von Rickenbach SLF Davos
+# Modified by Elizabeth Fischer, University of Alaska, Fairbanks
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 # Import system modules
-import sys, string, os
+import sys,os
+
+import string,json
 import arcpy
 from arcpy import env
 from arcpy.sa import *
-import traceback
+import argparse
 
 # Check out any necessary licenses
 arcpy.CheckOutExtension("spatial")
@@ -17,24 +20,65 @@ arcpy.CheckOutExtension("spatial")
 arcpy.CheckOutExtension("3d")
 
 #-------------------------------------------------------------------------------
-# Script varibles...
-Workspace =                 arcpy.GetParameterAsText(0) + "\\"
-inDEM =                     arcpy.GetParameterAsText(1)
-inForest =                  arcpy.GetParameterAsText(2)
-resampCellSize =            arcpy.GetParameterAsText(3)
-inPerimeter =               arcpy.GetParameterAsText(4)
-Slope_lowerlimit_frequent = arcpy.GetParameterAsText(5)
-Slope_lowerlimit_extreme =  arcpy.GetParameterAsText(6)
-Slope_upperlimit =          arcpy.GetParameterAsText(7)
-Curv_upperlimit =           arcpy.GetParameterAsText(8)
-Rugged_neighborhood =       arcpy.GetParameterAsText(9)
-Rugged_upperlimit =         arcpy.GetParameterAsText(10)
-outCoordSystem =            arcpy.GetParameter(11)
-Weightingkernel =           arcpy.GetParameterAsText(12)
+# Obtain script variables
 
+SCRIPT_VARS = [
+    ('Workspace', arcpy.GetParameterAsText),
+    ('inDEM', arcpy.GetParameterAsText),
+    ('inForest', arcpy.GetParameterAsText),
+    ('resampCellSize', arcpy.GetParameterAsText),
+    ('inPerimeter', arcpy.GetParameterAsText),
+    ('Slope_lowerlimit_frequent', arcpy.GetParameterAsText),
+    ('Slope_lowerlimit_extreme', arcpy.GetParameterAsText),
+    ('Slope_upperlimit', arcpy.GetParameterAsText),
+    ('Curv_upperlimit', arcpy.GetParameterAsText),
+    ('Rugged_neighborhood', arcpy.GetParameterAsText),
+    ('Rugged_upperlimit', arcpy.GetParameterAsText),
+    ('outCoordSystem', arcpy.GetParameter),
+    ('Weightingkernel', arcpy.GetParameterAsText),
+]
+
+if len(sys.argv) > 0:
+    # We are calling from Python
+
+    # Read script variables as JSON from file specified on command line
+    args_json = sys.argv[1]
+    with open(args_json, 'r') as fin:
+        args = json.load(fin)
+
+    # Copy script variables out of args and into 
+    for vname in SCRIPT_VARS:
+        globals[vname] = args[vname]
+        del args[vname]
+
+    if len(args) > 0:
+        raise TypeError("{} got unexpected JSON arguments: {}".format(
+            __file__, list(args.keys())))
+
+else:
+    # We are calling from ArcGIS GUI
+
+    # Eg: C:\Users\efischer\git\akramms\SampleProjects\PRA_ElizabethAK
+    Workspace =                 arcpy.GetParameterAsText(0) + "\\"
+    inDEM =                     arcpy.GetParameterAsText(1)
+    inForest =                  arcpy.GetParameterAsText(2)
+    resampCellSize =            arcpy.GetParameterAsText(3)
+    inPerimeter =               arcpy.GetParameterAsText(4)
+    Slope_lowerlimit_frequent = arcpy.GetParameterAsText(5)
+    Slope_lowerlimit_extreme =  arcpy.GetParameterAsText(6)
+    Slope_upperlimit =          arcpy.GetParameterAsText(7)
+    Curv_upperlimit =           arcpy.GetParameterAsText(8)
+    Rugged_neighborhood =       arcpy.GetParameterAsText(9)
+    Rugged_upperlimit =         arcpy.GetParameterAsText(10)
+    outCoordSystem =            arcpy.GetParameter(11)
+    Weightingkernel =           arcpy.GetParameterAsText(12)
+
+Workpace += '\\'
 #-------------------------------------------------------------------------------
 # Local variables:
+# Name of project, Eg: PRA_ElizabethAK
 Name = os.path.basename(os.path.normpath(Workspace))
+
 path_base_data = Workspace + "base_data\\" + Name + "_"
 path_eCog = Workspace + "eCog\\" + Name + "_"
 DEM_eCog = path_eCog + "DEM.tif"
