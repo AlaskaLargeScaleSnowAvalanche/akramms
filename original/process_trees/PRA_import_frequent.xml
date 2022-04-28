@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ImportDefinitions>
+	<ImportDefinition name="PRA_import_frequent" description="">
+		<LcnsIds></LcnsIds>
+		<SceneSearch folders-from-file-system="yes" bdi-driver="" scene-name="T2_Evolene" map-name="">
+			<TagString>{{root}\{scene}_{tile}_{layer}}.tif</TagString>
+			<SiteInfo x-coo="decimal" y-coo="decimal">
+				<TagString></TagString>
+			</SiteInfo>
+		</SceneSearch>
+		<SceneDefinition force-fitting="0" geo-coding="from-file" scene-extent="union" scene-unit="auto" pixel-size="auto">
+			<ImageLayer channel="1" alias="Aspect_sectors_Nmax" driver="GDAL">
+				<TagString>{{root}\{scene}_{tile}_Aspect_sectors_Nmax}.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="Aspect_sectors_N0" driver="GDAL">
+				<TagString>{{root}\{scene}_{tile}_Aspect_sectors_N0}.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="Curv_plan" driver="GDAL">
+				<TagString>{{root}\{scene}_{tile}_Curv_plan}.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="Curv_profile" driver="GDAL">
+				<TagString>{{root}\{scene}_{tile}_Curv_profile}.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="DEM" driver="GDAL">
+				<TagString>{{root}\{scene}_{tile}_DEM}.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="Hillshade" driver="GDAL">
+				<TagString>{{root}\{scene}_{tile}_Hillshade}.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="Slope" driver="GDAL">
+				<TagString>{{root}\{scene}_{tile}_Slope}.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="PRA_raw" driver="GDAL">
+				<TagString>{{root}\{scene}_{tile}__PRA_raw_frequent_Forest}.tif</TagString>
+			</ImageLayer>
+		</SceneDefinition>
+	</ImportDefinition>
+</ImportDefinitions>
