@@ -7,11 +7,11 @@ import numpy as np
 PARAMS = paramutil.parse([
     ('name', None, 'str', True,
         """Root name of scene; to use for filenames, plotting, etc"""),
-    ('dem', None, 'path', True,
+    ('dem', None, 'input_file', True,
         """Name of DEM file to use (GeoTIFF)"""),
-    ('forest', None, 'path', True,
+    ('forest', None, 'input_file', True,
         """Name of forest cover file to use (GeoTIFF)"""),
-    ('clip', None, 'path', False,
+    ('clip', None, 'input_file', False,
         """Clip domain to this region (Shapefile)"""),
     ('resample_cell_size', 'm', 'int', True,
         """Resample DEM and forest files to this resolution for computation"""),
@@ -102,26 +102,10 @@ def prepare_scene(scene_dir, defaults=dict(), **kwargs):
     # Assemble the scene args, using default params if provided
     if isinstance(defaults, str):    # Lookup pre-loaded defaults
         defaults = DEFAULTS[defaults]
-    scene_args = {**defaults, **kwargs}
+    scene_args = paramutil.validate_args({**defaults, **kwargs}, params=PARAMS)
 
-#    # Store the overall scene parameters
-#    scene_json = os.path.join(scene_dir, 'scene.json')
-#    with open(scene_json, 'w') as out:
-#        json.dump(kwargs, out)
-    save_scene(scene_dir, scene_args)
-
-def save_scene(scene_dir, scene_args):
-    """Writes the scene arguments to a file in the scene directory"""
+    # Store the overall scene parameters
     paramutil.dump_nc(os.path.join(scene_dir, 'scene.nc'), scene_args, params=PARAMS)
-#    with netCDF4.Dataset(scene_nc, 'w') as nc:
-#        for vname,val in scene_args.items():
-#            ncv = nc.createVariable(vname, 'i', [])
-#            param = PARAMS[vname]
-#            ncv.setncattr('value', val)
-#            if param.units is not None:
-#                ncv.units = param.units
-#            ncv.required = 1 if param.required else 0
-#            ncv.description = param.description
 
 def load_scene(scene_dir):
     """Reads the scene """
@@ -142,21 +126,3 @@ def prepare_data(scene_dir):
             for row in kernel_vals:
                 out.write(' '.join(str(x) for x in row))
                 out.write('\n')
-
-
-
-
-
-    ('Workspace', 'GetParameterAsText'),
-    ('inDEM', 'GetParameterAsText'),
-    ('inForest', 'GetParameterAsText'),
-    ('resampCellSize', 'GetParameterAsText'),
-    ('inPerimeter', 'GetParameterAsText'),
-    ('Slope_lowerlimit_frequent', 'GetParameterAsText'),
-    ('Slope_lowerlimit_extreme', 'GetParameterAsText'),
-    ('Slope_upperlimit', 'GetParameterAsText'),
-    ('Curv_upperlimit', 'GetParameterAsText'),
-    ('Rugged_neighborhood', 'GetParameterAsText'),
-    ('Rugged_upperlimit', 'GetParameterAsText'),
-    ('outCoordSystem', 'GetParameter'),
-    ('Weightingkernel', 'GetParameterAsText'),
