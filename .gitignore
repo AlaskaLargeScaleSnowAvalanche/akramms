@@ -1,5 +1,8 @@
 SampleProjects/
 SE_Alaska/
+*~
+*#
+.#*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

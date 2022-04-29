@@ -5,9 +5,13 @@
 # Modified by Elizabeth Fischer, University of Alaska, Fairbanks
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
-# Import system modules
+# Add akramms to PYTHONPATH, and import utilities therein
 import sys,os
+sys.path.append(os.path.abspath(os.path.join(os.path.abspath(__file__), '..', '..', '..')))
+import dggs.arcgis
+import dggs.avalanche_script_vars
 
+# Import system modules
 import string,json
 import arcpy
 from arcpy import env
@@ -22,56 +26,22 @@ arcpy.CheckOutExtension("3d")
 #-------------------------------------------------------------------------------
 # Obtain script variables
 
-SCRIPT_VARS = [
-    ('Workspace', arcpy.GetParameterAsText),
-    ('inDEM', arcpy.GetParameterAsText),
-    ('inForest', arcpy.GetParameterAsText),
-    ('resampCellSize', arcpy.GetParameterAsText),
-    ('inPerimeter', arcpy.GetParameterAsText),
-    ('Slope_lowerlimit_frequent', arcpy.GetParameterAsText),
-    ('Slope_lowerlimit_extreme', arcpy.GetParameterAsText),
-    ('Slope_upperlimit', arcpy.GetParameterAsText),
-    ('Curv_upperlimit', arcpy.GetParameterAsText),
-    ('Rugged_neighborhood', arcpy.GetParameterAsText),
-    ('Rugged_upperlimit', arcpy.GetParameterAsText),
-    ('outCoordSystem', arcpy.GetParameter),
-    ('Weightingkernel', arcpy.GetParameterAsText),
-]
-
-if len(sys.argv) > 0:
-    # We are calling from Python
-
-    # Read script variables as JSON from file specified on command line
-    args_json = sys.argv[1]
-    with open(args_json, 'r') as fin:
-        args = json.load(fin)
-
-    # Copy script variables out of args and into 
-    for vname in SCRIPT_VARS:
-        globals[vname] = args[vname]
-        del args[vname]
-
-    if len(args) > 0:
-        raise TypeError("{} got unexpected JSON arguments: {}".format(
-            __file__, list(args.keys())))
-
-else:
-    # We are calling from ArcGIS GUI
-
-    # Eg: C:\Users\efischer\git\akramms\SampleProjects\PRA_ElizabethAK
-    Workspace =                 arcpy.GetParameterAsText(0) + "\\"
-    inDEM =                     arcpy.GetParameterAsText(1)
-    inForest =                  arcpy.GetParameterAsText(2)
-    resampCellSize =            arcpy.GetParameterAsText(3)
-    inPerimeter =               arcpy.GetParameterAsText(4)
-    Slope_lowerlimit_frequent = arcpy.GetParameterAsText(5)
-    Slope_lowerlimit_extreme =  arcpy.GetParameterAsText(6)
-    Slope_upperlimit =          arcpy.GetParameterAsText(7)
-    Curv_upperlimit =           arcpy.GetParameterAsText(8)
-    Rugged_neighborhood =       arcpy.GetParameterAsText(9)
-    Rugged_upperlimit =         arcpy.GetParameterAsText(10)
-    outCoordSystem =            arcpy.GetParameter(11)
-    Weightingkernel =           arcpy.GetParameterAsText(12)
+dggs.arcgis.get_script_vars((
+    ('Workspace', 'GetParameterAsText'),
+    ('inDEM', 'GetParameterAsText'),
+    ('inForest', 'GetParameterAsText'),
+    ('resampCellSize', 'GetParameterAsText'),
+    ('inPerimeter', 'GetParameterAsText'),
+    ('Slope_lowerlimit_frequent', 'GetParameterAsText'),
+    ('Slope_lowerlimit_extreme', 'GetParameterAsText'),
+    ('Slope_upperlimit', 'GetParameterAsText'),
+    ('Curv_upperlimit', 'GetParameterAsText'),
+    ('Rugged_neighborhood', 'GetParameterAsText'),
+    ('Rugged_upperlimit', 'GetParameterAsText'),
+    ('outCoordSystem', 'GetParameter'),
+    ('Weightingkernel', 'GetParameterAsText'),
+))
+sys.exit(0)
 
 Workpace += '\\'
 #-------------------------------------------------------------------------------
