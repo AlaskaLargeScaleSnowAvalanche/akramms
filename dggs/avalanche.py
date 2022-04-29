@@ -1,4 +1,4 @@
-from dggs import paramutil
+from dggs import paramutil,arcgis
 import os,pathlib
 import netCDF4
 import numpy as np
@@ -9,7 +9,7 @@ PARAMS = paramutil.parse([
         """Root name of scene; to use for filenames, plotting, etc"""),
     ('dem', None, 'input_file', True,
         """Name of DEM file to use (GeoTIFF)"""),
-    ('forest', None, 'input_file', True,
+    ('forest', None, 'input_file', False,
         """Name of forest cover file to use (GeoTIFF)"""),
     ('clip', None, 'input_file', False,
         """Clip domain to this region (Shapefile)"""),
@@ -107,7 +107,9 @@ def prepare_scene(scene_dir, defaults=dict(), **kwargs):
     # Store the overall scene parameters
     paramutil.dump_nc(os.path.join(scene_dir, 'scene.nc'), scene_args, params=PARAMS)
 
-def load_scene(scene_dir):
+    return scene_dir
+
+def load_scene_args(scene_dir):
     """Reads the scene """
     return paramutil.load_nc(os.path.join(scene_dir, 'scene.nc'))
 
@@ -115,14 +117,38 @@ def load_scene(scene_dir):
 def prepare_data(scene_dir):
     """Runs the data_prep_PRA.py script on a scene"""
 
+    scene_args = load_scene_args(scene_dir)
+
+    # Assemble script args
+    script_args = {'Workspace': scene_dir}
+    for script_arg, scene_arg in [
+        ('inDEM', 'dem'),
+        ('resampleCellSize', 'resample_cell_size'),
+        ('Slope_lowerlimit_frequent', 'slope_lowerlimit_frequent'),
+        ('Slope_lowerlimit_extreme', 'slope_lowerlimit_extreme'),
+        ('Slope_upperlimit', 'slope_upperlimit'),
+        ('Curv_upperlimit', 'curve_upperlimit'),
+        ('Rugged_neighborhood', 'rugged_neighborhood'),
+        ('Rugged_upperlimit', 'rugged_upperlimit'),
+        ('outCoordSystem', 'coordinate_system')]:
+        script_args[script_arg] = scene_args[scene_arg]
+
+    # Optional arguments...
+    for script_arg, scene_arg in [
+        ('inForest', 'forest'),
+        ('inPerimeter', 'clip')]:
+        if scene_arg in scene_args:
+            script_args[script_arg] = scene_args[scene_arg]
+
     # Generate the weighting kernel file
-    if kernel_vals is not None:
-        kernel_txt = os.path.join(scene_dir, 'weighting_kernel.txt')
-        kwargs['Weightingkernel'] = kernel_txt
-        with open(kernel_txt, 'w') as out:
-            nrow = len(kernel_vals)
-            ncol = len(kernel_vals[0])
-            out.write('{} {}\n'.format(nrow,ncol))
-            for row in kernel_vals:
-                out.write(' '.join(str(x) for x in row))
-                out.write('\n')
+    kernel_txt = os.path.join(scene_dir, 'stats_kernel.txt')
+    script_args['Weightingkernel'] = kernel_txt
+    kernel = scene_args['stats_kernel']
+    with open(kernel_txt, 'w') as out:
+        out.write('{} {}\n'.format(*kernel.shape))
+        for irow in range(kernel.shape[0]):
+            out.write(' '.join(str(x) for x in kernel[irow,:]))
+            out.write('\n')
+
+    arcgis.run_script('data_prep_PRA.py', script_args, cwd=scene_dir, dry_run=True)
+
