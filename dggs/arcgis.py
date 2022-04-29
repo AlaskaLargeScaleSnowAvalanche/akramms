@@ -1,6 +1,7 @@
 # Stuff related to using ArcGIS
-import os,sys,json
+import os,sys,pickle
 import subprocess
+import importlib
 
 # ------------------------------------------------------------------
 # Paths to the ArcGIS installation.
@@ -27,11 +28,24 @@ SCRIPT_DIR = os.path.abspath(os.path.join(os.path.abspath(__file__), '..', '..',
 
 # ------------------------------------------------------------------
 
+class Lambda:
+    def __init__(self, module_name, fn_name, *args, **kwargs):
+        self.module_name = module_name
+        self.fn_name = fn_name
+        self.args = args
+        self.kwargs = kwargs
+
+    def __call__(self):
+        mod = importlib.import_module(self.module_name)
+        return getattr(mod, self.fn_name)(*self.args, **self.kwargs)
 
 # ---------------------------------------------------
-def get_script_vars(script_vars, set_globals=True):
+def get_script_vars(namespace, script_vars):
     """Determines the script variables for an ArcGIS script
     script_vars: [(vname, get_param, ...]
+        namespace: dict
+            Place to store variables returned.
+            Typically scripts will use globals()
         vname: Name of variable
         get_param:
             Name of arcpy function used to obtain parameter if running within GUI
@@ -42,20 +56,34 @@ def get_script_vars(script_vars, set_globals=True):
         # ------- We are called from external Python.
         # The (one) command line arg indicates a 
 
-        # Read script variables as JSON from file specified on command line
-        args_json = sys.argv[1]
-        with open(args_json, 'r') as fin:
-            args = json.load(fin)
+        # Read script variables as Pickle from file specified on command line
+        args_pik = sys.argv[1]
+        with open(args_pik, 'rb') as fin:
+            args = pickle.load(fin)
 
-        # Copy script variables out of args and into 
+        # Run any lambdas in the args
+        args0 = args
+        args = dict()
+        for name,val in args0.items():
+#            print(type(val), Lambda, val)
+            if isinstance(val, Lambda):
+                args[name] = val()
+            else:
+                args[name] = val
+
+        # Copy script variables out of args and into  globals
         _globals = globals()
-        for vname,_ in SCRIPT_VARS:
-            ret[vname] = args[vname]
-            del args[vname]
+        for vname,_ in script_vars:
+            if vname in args:
+                ret[vname] = args[vname]
+                del args[vname]
+            else:
+                # Missing args get coded as empty string for ArcGIS scripts
+                ret[vname] = ''
 
         # Check for extra script vars
         if len(args) > 0:
-            raise TypeError("{} got unexpected JSON arguments: {}".format(
+            raise TypeError("{} got unexpected Pickled arguments: {}".format(
                 __file__, list(args.keys())))
 
     else:
@@ -65,14 +93,13 @@ def get_script_vars(script_vars, set_globals=True):
         for ix,(vname,get_param) in enumerate(script_vars):
             ret[vname] = getattr(arcpy, get_param)(ix)
 
+    # Display script variables
+    for vname,val in ret.items():
+        namespace[vname] = val
+        print("{} = {}".format(vname,val))
+    print('-----------------------------------')
+    sys.stdout.flush()
 
-    if set_globals:
-        _globals = globals()
-        for vname,val in ret.items():
-            _globals[vname] = val
-
-    print(ret)
-    return ret
 # ------------------------------------------------------    
 def run_script(script_file, args, cwd=None, dry_run=False):
     """Runs and ArcGIS Python script
@@ -89,31 +116,32 @@ def run_script(script_file, args, cwd=None, dry_run=False):
     # Determine actual script file
     if not os.path.exists(script_file):
         file2 = os.path.join(SCRIPT_DIR, script_file)
-        print(file2)
         if os.path.exists(file2):
             script_file = file2
         else:
             raise ValueError('Cannot locate ArcGIS script: {}'.format(script_file))
 
-    # Convert all args to string
-    args = {k:str(v) for k,v in args.items()}
+#    # Convert all args to string
+#    args = {k:str(v) for k,v in args.items()}
 
-    # Write args to JSON file in the output directory
-#    args_json = os.path.splitext(script_file)[0] + '_args.json'
-    args_json = os.path.join(cwd,
-        os.path.splitext(os.path.split(script_file)[1])[0] + '_args.json')
-    with open(args_json, 'w') as out:
-        json.dump(args, out)
+    # Write args to Pickle file in the output directory
+    args_pik = os.path.join(cwd,
+        os.path.splitext(os.path.split(script_file)[1])[0] + '_args.pik')
+    with open(args_pik, 'wb') as out:
+        pickle.dump(args, out)
 
     # Run the script using ArcGIS Conda environment
-    cmd = [PYTHON_EXE, script_file, args_json]
+    cmd = [PYTHON_EXE, script_file, args_pik]
     kwargs = {}
     if cwd is not None:
         kwargs['cwd'] = cwd
     env = dict(os.environ.items())
     del env['PYTHONPATH']    # Avoid polluting ArcGIS Python
-    if dry_run:
-        print('cwd: {}'.format(cwd))
-        print('cmd: {}'.format(cmd))
-    else:
+    print('cwd: {}'.format(cwd))
+    print('cmd: {}'.format(' '.join(x for x in cmd)))
+    if not dry_run:
+        print('============== BEGIN {}'.format(script_file))
+        sys.stdout.flush()
         subprocess.run(cmd, check=True, env=env, **kwargs)
+        sys.stdout.flush()
+        print('============== END {}'.format(script_file))

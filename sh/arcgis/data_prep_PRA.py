@@ -9,13 +9,13 @@
 import sys,os
 sys.path.append(os.path.abspath(os.path.join(os.path.abspath(__file__), '..', '..', '..')))
 import dggs.arcgis
-import dggs.avalanche_script_vars
 
 # Import system modules
 import string,json
 import arcpy
 from arcpy import env
-from arcpy.sa import *
+#from arcpy.sa import *
+import arcpy.sa
 import argparse
 
 # Check out any necessary licenses
@@ -26,7 +26,7 @@ arcpy.CheckOutExtension("3d")
 #-------------------------------------------------------------------------------
 # Obtain script variables
 
-dggs.arcgis.get_script_vars((
+dggs.arcgis.get_script_vars(globals(), (
     ('Workspace', 'GetParameterAsText'),
     ('inDEM', 'GetParameterAsText'),
     ('inForest', 'GetParameterAsText'),
@@ -41,9 +41,8 @@ dggs.arcgis.get_script_vars((
     ('outCoordSystem', 'GetParameter'),
     ('Weightingkernel', 'GetParameterAsText'),
 ))
-sys.exit(0)
 
-Workpace += '\\'
+Workspace += '\\'
 #-------------------------------------------------------------------------------
 # Local variables:
 # Name of project, Eg: PRA_ElizabethAK
@@ -56,9 +55,9 @@ Forest = path_base_data + "Forest.tif"
 Perimeter = path_base_data + "Perimeter.shp"
 Perimeter_Envelope = path_base_data + "Perimeter_Envelope.shp"
 Perimeter_Envelope_Buffer = path_base_data + "Perimeter_Envelope_Buffer.shp"
-Slope = path_base_data + "Slope.tif"
+Slope_tif = path_base_data + "Slope.tif"
 Slope_eCog = path_eCog + "Slope.tif"
-Aspect = path_base_data + "Aspect.tif"
+Aspect_tif = path_base_data + "Aspect.tif"
 Aspect_sectors_N0_eCog = path_eCog + "Aspect_sectors_N0.tif"
 Aspect_sectors_Nmax_eCog = path_eCog + "Aspect_sectors_Nmax.tif"
 Curv = path_base_data + "Curv.tif"
@@ -82,13 +81,17 @@ arcpy.AddMessage("Resampling resolution = " + resampCellSize)
 
 #-------------------------------------------------------------------------------
 # Set geoprocessing environments
-arcpy.overwriteOutput = False
+
+# Needed for memory/PRA_raw_NoForest and memory/PRA_raw_Forest.
+# Because data_prep_PRA() is called twice.
+arcpy.env.overwriteOutput = True
+#arcpy.overwriteOutput = False
 
 if outCoordSystem.name == "":
     outCoordSystem = arcpy.Describe(inDEM).spatialReference
 
 arcpy.env.outputCoordinateSystem = outCoordSystem
-arcpy.env.snapRaster = Raster(inDEM)
+arcpy.env.snapRaster = arcpy.sa.Raster(inDEM)
 
 arcpy.CreateFolder_management(Workspace, "base_data")
 arcpy.CreateFolder_management(Workspace, "eCog")
@@ -110,7 +113,7 @@ with open("%s_DataPrep_InputParameters.csv" % Name_csv_file,"w") as f:
 #-------------------------------------------------------------------------------
 # Check extent of inDEM
 arcpy.AddMessage("checking inDEM...")
-extent_inDEM = Raster(inDEM).extent
+extent_inDEM = arcpy.sa.Raster(inDEM).extent
 XMin_inDEM = int(round(extent_inDEM.XMin))
 YMin_inDEM = int(round(extent_inDEM.YMin))
 XMax_inDEM = int(round(extent_inDEM.XMax))
@@ -186,7 +189,7 @@ else:
     DEM = DEM_smooth
 
 arcpy.ClearEnvironment("snapRaster")
-arcpy.env.snapRaster = Raster(DEM)
+arcpy.env.snapRaster = arcpy.sa.Raster(DEM)
 
 
 # Check and Prepare inForest if specified
@@ -218,15 +221,15 @@ if inForest != "":
 
 # Create Slope
 arcpy.AddMessage("creating Slope...")
-arcpy.gp.Slope_sa(DEM, Slope, 'DEGREE', '1')
+arcpy.gp.Slope_sa(DEM, Slope_tif, 'DEGREE', '1')
 
 # Create Aspect
 arcpy.AddMessage("creating Aspect...")
-arcpy.gp.Aspect_sa(DEM, Aspect)
+arcpy.gp.Aspect_sa(DEM, Aspect_tif)
 
 # Classify Aspect into sectors
-arcpy.gp.Reclassify_sa(Aspect, 'VALUE', '-1 0 NODATA; 0 22.5 0; 22.5 67.5 100; 67.5 112.5 200; 112.5 157.5 100; 157.5 202.5 0; 202.5 247.5 -100; 247.5 292.5 -200; 292.5 337.5 -100; 337.5 360 0', "memory/Aspect_sectors_N0_eCog", 'DATA')
-arcpy.gp.Reclassify_sa(Aspect, 'VALUE', '-1 0 NODATA; 0 22.5 200; 22.5 67.5 100; 67.5 112.5 0; 112.5 157.5 -100; 157.5 202.5 -200; 202.5 247.5 -100; 247.5 292.5 0; 292.5 337.5 100; 337.5 360 200', "memory/Aspect_sectors_Nmax_eCog", 'DATA')
+arcpy.gp.Reclassify_sa(Aspect_tif, 'VALUE', '-1 0 NODATA; 0 22.5 0; 22.5 67.5 100; 67.5 112.5 200; 112.5 157.5 100; 157.5 202.5 0; 202.5 247.5 -100; 247.5 292.5 -200; 292.5 337.5 -100; 337.5 360 0', "memory/Aspect_sectors_N0_eCog", 'DATA')
+arcpy.gp.Reclassify_sa(Aspect_tif, 'VALUE', '-1 0 NODATA; 0 22.5 200; 22.5 67.5 100; 67.5 112.5 0; 112.5 157.5 -100; 157.5 202.5 -200; 202.5 247.5 -100; 247.5 292.5 0; 292.5 337.5 100; 337.5 360 200', "memory/Aspect_sectors_Nmax_eCog", 'DATA')
 
 # Create Curvature
 arcpy.AddMessage("creating Curvature...")
@@ -241,7 +244,12 @@ min_value = float(arcpy.GetRasterProperties_management(Curv_profile, "MINIMUM").
 min_factor = 200/((-1)*min_value)
 max_value = float(arcpy.GetRasterProperties_management(Curv_profile, "MAXIMUM").getOutput(0))
 max_factor = 200/max_value
-arcpy.gp.RasterCalculator_sa('Con("%s" <= 0, "%s" * %s, "%s" * %s)' % (Curv_profile, Curv_profile, min_factor, Curv_profile, max_factor), Curv_profile_eCog_temp) # expand value range from -200 to 200
+# This command mysteriously resets the script-global variable Slope to arcpy.sa.Slope()
+# Same for Aspect.
+# Hence the variables Slope and Aspect were renamed to Slope_tif and Aspect_tif
+rstr = 'arcpy.sa.Con("%s" <= 0, "%s" * %s, "%s" * %s)' % (Curv_profile, Curv_profile, min_factor, Curv_profile, max_factor)
+print('rstr = ', rstr)
+arcpy.gp.RasterCalculator_sa(rstr, Curv_profile_eCog_temp) # expand value range from -200 to 200
 
 # Create Plan Curvature
 # for dataPrep in ArcGIS
@@ -269,8 +277,8 @@ Rad = (math.pi/180)
 n = int(Rugged_neighborhood)
 
 # Convert Slope and Aspect to radians
-SlopeRad = Times(Slope, Rad)
-AspectRad = Times(Aspect, Rad)
+SlopeRad = arcpy.sa.Times(Slope_tif, Rad)
+AspectRad = arcpy.sa.Times(Aspect_tif, Rad)
 
 SlopeRad.save(path_base_data + "SlopeRad.tif")
 AspectRad.save(path_base_data + "AspectRad.tif")
@@ -320,7 +328,7 @@ else:
     Mask = DEM
 
 arcpy.gp.ExtractByMask_sa(DEM, Mask, DEM_eCog)
-arcpy.gp.ExtractByMask_sa(Slope, Mask, Slope_eCog)
+arcpy.gp.ExtractByMask_sa(Slope_tif, Mask, Slope_eCog)
 arcpy.gp.ExtractByMask_sa("memory/Aspect_sectors_N0_eCog", Mask, Aspect_sectors_N0_eCog)
 arcpy.gp.ExtractByMask_sa("memory/Aspect_sectors_Nmax_eCog", Mask, Aspect_sectors_Nmax_eCog)
 arcpy.gp.ExtractByMask_sa(Curv_profile_eCog_temp, Mask, Curv_profile_eCog)
@@ -358,11 +366,11 @@ def data_prep_PRA(Slope_lowerlimit, name_scenario):
     arcpy.AddMessage("creating binary layers...")
 
     # create Slope binary
-    SlopeBinary = Con((Raster(Slope) < float(Slope_lowerlimit)) | (Raster(Slope) > float(Slope_upperlimit)), 0, 1)
+    SlopeBinary = Con((arcpy.sa.Raster(Slope_tif) < float(Slope_lowerlimit)) | (arcpy.sa.Raster(Slope_tif) > float(Slope_upperlimit)), 0, 1)
     SlopeBinary.save(path_temp_model + "Slope_binary.tif")
 
     # create Curvature binary
-    CurvBinary = Con((Raster(Curv_plan) < (-1*float(Curv_upperlimit))) | (Raster(Curv_plan) > float(Curv_upperlimit)), 0, 1)
+    CurvBinary = Con((arcpy.sa.Raster(Curv_plan) < (-1*float(Curv_upperlimit))) | (arcpy.sa.Raster(Curv_plan) > float(Curv_upperlimit)), 0, 1)
     CurvBinary.save(path_temp_model + "Curv_binary.tif")
 
     # create Ruggedness binary
@@ -379,7 +387,7 @@ def data_prep_PRA(Slope_lowerlimit, name_scenario):
     if inForest != "":
         # Boolean Overlay: Slope AND Curvature AND Ruggedness AND Forest
         SlopeCurvRuggednessForestBinary = path_temp_model + "Slope_Curv_Ruggedness_Forest_binary.tif"
-        SlopeCurvRuggednessForestBinary = SlopeBinary * CurvBinary * RuggednessBinary * BooleanNot(Raster(inForest))
+        SlopeCurvRuggednessForestBinary = SlopeBinary * CurvBinary * RuggednessBinary * BooleanNot(arcpy.sa.Raster(inForest))
         SlopeCurvRuggednessForestBinary.save(path_temp_model + "Slope_Curv_Ruggedness_Forest_binary.tif")
 
     #-------------------------------------------------------------------------------
