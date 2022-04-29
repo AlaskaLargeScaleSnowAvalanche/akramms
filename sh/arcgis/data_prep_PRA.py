@@ -11,10 +11,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.abspath(__file__), '..', '.
 import dggs.arcgis
 
 # Import system modules
-import string,json
+import string
 import arcpy
-from arcpy import env
-#from arcpy.sa import *
 import arcpy.sa
 import argparse
 
