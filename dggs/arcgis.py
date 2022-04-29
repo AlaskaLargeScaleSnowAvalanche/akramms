@@ -23,7 +23,7 @@ PYTHON_EXE = os.path.join(CONDA_ENV, 'python.exe')
 PROPY_BAT = os.path.join(ROOT, 'Pro', 'bin', 'Python', 'Scripts', 'propy.bat')
 
 # Where ArcGIS scripts are stored in the akramms code tree
-SCRIPT_DIR = os.path.abspath(os.path.join(os.path.abspath(__file__), '..', '..'))
+SCRIPT_DIR = os.path.abspath(os.path.join(os.path.abspath(__file__), '..', '..', 'sh', 'arcgis'))
 
 # ------------------------------------------------------------------
 
@@ -74,7 +74,7 @@ def get_script_vars(script_vars, set_globals=True):
     print(ret)
     return ret
 # ------------------------------------------------------    
-def run_script(script_file, args, cwd=None):
+def run_script(script_file, args, cwd=None, dry_run=False):
     """Runs and ArcGIS Python script
     script_file: xxx.py
         Name of script to run.
@@ -82,11 +82,14 @@ def run_script(script_file, args, cwd=None):
     args: dict
         Arguments to pass to the script
     cwd: str
-        Directory to run in"""
+        Directory to run in
+    dry_run: bool
+        If True, don't ACTUALLY run the script"""
 
     # Determine actual script file
     if not os.path.exists(script_file):
         file2 = os.path.join(SCRIPT_DIR, script_file)
+        print(file2)
         if os.path.exists(file2):
             script_file = file2
         else:
@@ -96,7 +99,9 @@ def run_script(script_file, args, cwd=None):
     args = {k:str(v) for k,v in args.items()}
 
     # Write args to JSON file in the output directory
-    args_json = os.path.splitext(script_file)[0] + '_args.json'
+#    args_json = os.path.splitext(script_file)[0] + '_args.json'
+    args_json = os.path.join(cwd,
+        os.path.splitext(os.path.split(script_file)[1])[0] + '_args.json')
     with open(args_json, 'w') as out:
         json.dump(args, out)
 
@@ -107,4 +112,8 @@ def run_script(script_file, args, cwd=None):
         kwargs['cwd'] = cwd
     env = dict(os.environ.items())
     del env['PYTHONPATH']    # Avoid polluting ArcGIS Python
-    subprocess.run(cmd, check=True, env=env, **kwargs)
+    if dry_run:
+        print('cwd: {}'.format(cwd))
+        print('cmd: {}'.format(cmd))
+    else:
+        subprocess.run(cmd, check=True, env=env, **kwargs)
