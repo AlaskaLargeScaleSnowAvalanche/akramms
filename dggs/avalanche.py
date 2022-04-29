@@ -1,7 +1,8 @@
-from dggs import paramutil,arcgis
-import os,pathlib
+import os,pathlib,shutil
 import netCDF4
 import numpy as np
+from dggs import paramutil,arcgis
+from uafgi import make
 
 # List of all parameters involved in an overall run.
 PARAMS = paramutil.parse([
@@ -97,6 +98,7 @@ def prepare_scene(scene_dir, defaults=dict(), **kwargs):
     """
 
     # Create the directory
+    scene_dir = os.path.abspath(scene_dir)
     os.makedirs(scene_dir, exist_ok=True)
 
     # Assemble the scene args, using default params if provided
@@ -114,41 +116,66 @@ def load_scene_args(scene_dir):
     return paramutil.load_nc(os.path.join(scene_dir, 'scene.nc'))
 
 
-def prepare_data(scene_dir):
+def prepare_data_rule(scene_dir):
     """Runs the data_prep_PRA.py script on a scene"""
 
     scene_args = load_scene_args(scene_dir)
 
-    # Assemble script args
-    script_args = {'Workspace': scene_dir}
-    for script_arg, scene_arg in [
-        ('inDEM', 'dem'),
-        ('resampleCellSize', 'resample_cell_size'),
-        ('Slope_lowerlimit_frequent', 'slope_lowerlimit_frequent'),
-        ('Slope_lowerlimit_extreme', 'slope_lowerlimit_extreme'),
-        ('Slope_upperlimit', 'slope_upperlimit'),
-        ('Curv_upperlimit', 'curve_upperlimit'),
-        ('Rugged_neighborhood', 'rugged_neighborhood'),
-        ('Rugged_upperlimit', 'rugged_upperlimit'),
-        ('outCoordSystem', 'coordinate_system')]:
-        script_args[script_arg] = scene_args[scene_arg]
+    inputs = [scene_dir]
+    outputs = [
+        os.path.join(scene_dir, 'eCog'),
+        os.path.join(scene_dir, 'stats_kernel.txt'),
+        os.path.join(scene_dir, '{}_DataPrep_InputParameters.csv'.format(scene_args['name']))]
 
-    # Optional arguments...
-    for script_arg, scene_arg in [
-        ('inForest', 'forest'),
-        ('inPerimeter', 'clip')]:
-        if scene_arg in scene_args:
-            script_args[script_arg] = scene_args[scene_arg]
+    def action(tdir):
 
-    # Generate the weighting kernel file
-    kernel_txt = os.path.join(scene_dir, 'stats_kernel.txt')
-    script_args['Weightingkernel'] = kernel_txt
-    kernel = scene_args['stats_kernel']
-    with open(kernel_txt, 'w') as out:
-        out.write('{} {}\n'.format(*kernel.shape))
-        for irow in range(kernel.shape[0]):
-            out.write(' '.join(str(x) for x in kernel[irow,:]))
-            out.write('\n')
+        temporaries = [
+            os.path.join(scene_dir, 'base_data'),
+            os.path.join(scene_dir, 'temp_model_frequent'),
+            os.path.join(scene_dir, 'temp_model_extreme')]
 
-    arcgis.run_script('data_prep_PRA.py', script_args, cwd=scene_dir, dry_run=True)
+        # Delete all output files/folders
+        # (otherwise ArcGIS complains)
+        for dir in (temporaries + outputs):
+            shutil.rmtree(dir, ignore_errors=True)
 
+        # Assemble script args
+        script_args = {'Workspace': scene_dir}
+        for script_arg, scene_arg in [
+            ('inDEM', 'dem'),
+            ('resampCellSize', 'resample_cell_size'),
+            ('Slope_lowerlimit_frequent', 'slope_lowerlimit_frequent'),
+            ('Slope_lowerlimit_extreme', 'slope_lowerlimit_extreme'),
+            ('Slope_upperlimit', 'slope_upperlimit'),
+            ('Curv_upperlimit', 'curve_upperlimit'),
+            ('Rugged_neighborhood', 'rugged_neighborhood'),
+            ('Rugged_upperlimit', 'rugged_upperlimit')]:
+            script_args[script_arg] = str(scene_args[scene_arg])
+
+        # Optional arguments...
+        for script_arg, scene_arg in [
+            ('inForest', 'forest'),
+            ('inPerimeter', 'clip')]:
+            if scene_arg in scene_args:
+                script_args[script_arg] = str(scene_args[scene_arg])
+
+        # Generate the weighting kernel file
+        kernel_txt = os.path.join(scene_dir, 'stats_kernel.txt')
+        script_args['Weightingkernel'] = kernel_txt
+        kernel = scene_args['stats_kernel']
+        with open(kernel_txt, 'w') as out:
+            out.write('{} {}\n'.format(*kernel.shape))
+            for irow in range(kernel.shape[0]):
+                out.write(' '.join(str(x) for x in kernel[irow,:]))
+                out.write('\n')
+
+        # Obtain ArcGIS SpatialReference object (script needs as a script variable)
+        script_args['outCoordSystem'] = arcgis.Lambda('arcpy', 'SpatialReference', scene_args['coordinate_system'])
+
+        arcgis.run_script('data_prep_PRA.py', script_args, cwd=scene_dir, dry_run=False)
+
+        # Clean up temporary files
+        for dir in temporaries:
+            shutil.rmtree(dir, ignore_errors=True)
+
+    return make.Rule(action, inputs, outputs)
