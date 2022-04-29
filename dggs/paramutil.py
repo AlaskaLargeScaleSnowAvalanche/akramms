@@ -3,18 +3,47 @@ import pathlib
 import textwrap
 import os
 import netCDF4
+import numpy as np
 
 class Type:
-    def __init__(self, parse_fn):
-        self.parse = parse_fn
+    def __init__(self, typ):
+        self.typ = typ
+
+    def validate(self, val):
+        val = self.typ(val)
+        assert isinstance(val, self.typ)
+        return val
+
     def write_nc(self, nc, vname, val):
         ncv = nc.createVariable(vname, 'i', [])
         ncv.setncattr('value', val)
         return ncv
+
     def read_nc(self, ncv):
         return ncv.value
 
+class PathType(Type):
+    def __init__(self):
+        super().__init__(str)
+
+    def validate(self, val):
+        return os.path.abspath(val)
+
+class InputFileType(Type):
+    def __init__(self):
+        super().__init__(str)
+
+    def validate(self, val):
+        val = os.path.abspath(val)
+        if not os.path.exists(val):
+            raise FileNotFoundError(val)
+        return val
+
 class ListType:
+    def validate(self, val):
+        assert isinstance(val, list)
+        return val
+
     def write_nc(self, nc, vname, val):
         ncv = nc.createVariable(vname, 'i', [])
         ncv.setncattr('value', val)
@@ -24,6 +53,10 @@ class ListType:
         return list(ncv.value)
 
 class ArrayType:
+    def validate(self, val):
+        assert isinstance(val, np.ndarray)
+        return val
+
     def write_nc(self, nc, vname, val):
         dims = list()
         for ix,length in enumerate(val.shape):
@@ -42,7 +75,8 @@ TYPES = {
     'str': Type(str),
     'int': Type(int),
     'float': Type(float),
-    'path': Type(pathlib.Path),
+    'path': PathType(),
+    'input_file': InputFileType(),
     'list': ListType(),
     'array': ArrayType(),
 }
@@ -81,3 +115,21 @@ def load_nc(ifname):
             typ = TYPES[ncv.type]
             args[vname] = typ.read_nc(ncv)
     return args
+# -------------------------------------------------------------
+def validate_args(args, params=None):
+    """Checks that arguments are of right type, exist if they should, no extra, etc."""
+
+    ret = dict()
+    remain_args = dict(args.items())
+    for name,param in params.items():
+        if name in remain_args:
+            typ = TYPES[param.type]
+            ret[name] = typ.validate(remain_args[name])
+            print('**** ',ret[name])
+            del remain_args[name]
+        elif param.required:
+            raise ValueError('Missing REQUIRED argument: {}'.format(name))
+
+    if len(remain_args) > 0:
+        raise ValueError('Extra arguments: {}'.format(list(remain_args.keys())))
+    return ret
