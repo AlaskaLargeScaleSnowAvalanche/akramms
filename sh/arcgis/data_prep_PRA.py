@@ -248,7 +248,6 @@ max_factor = 200/max_value
 # Same for Aspect.
 # Hence the variables Slope and Aspect were renamed to Slope_tif and Aspect_tif
 rstr = 'arcpy.sa.Con("%s" <= 0, "%s" * %s, "%s" * %s)' % (Curv_profile, Curv_profile, min_factor, Curv_profile, max_factor)
-print('rstr = ', rstr)
 arcpy.gp.RasterCalculator_sa(rstr, Curv_profile_eCog_temp) # expand value range from -200 to 200
 
 # Create Plan Curvature
