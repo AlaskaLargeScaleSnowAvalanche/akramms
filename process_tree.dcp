@@ -62,18 +62,15 @@
 		<MapLvlProxyCntnr>
 			<MapLvlProxies>
 				<MapLvlProxy strName="L fine" bVrbl="0">
-					<Assignment MapLvl="1" MapName="main"></Assignment>
 					<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 				</MapLvlProxy>
 				<MapLvlProxy strName="L pixel" bVrbl="0">
 					<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 				</MapLvlProxy>
 				<MapLvlProxy strName="L fine long small" bVrbl="0">
-					<Assignment MapLvl="2" MapName="main"></Assignment>
 					<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 				</MapLvlProxy>
 				<MapLvlProxy strName="L fine long tiny" bVrbl="0">
-					<Assignment MapLvl="3" MapName="main"></Assignment>
 					<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 				</MapLvlProxy>
 			</MapLvlProxies>
@@ -433,7 +430,7 @@
 	<CustProcAlgrList></CustProcAlgrList>
 	<ExternalCustProcAlgrList></ExternalCustProcAlgrList>
 	<ProcessList>
-		<ProcBase Name="Process tree 30y_For" bLoopChg="0" bExpand="1" bActive="1" bAutoName="0" bSubrtn="0">
+		<ProcBase Name="Process tree 30y_NoFor" bLoopChg="0" bExpand="1" bActive="1" bAutoName="0" bSubrtn="0">
 			<LcnsInfo sLcnsId="" sPwd=""></LcnsInfo>
 			<vrblValMaxCycle>
 				<DValue value="1." type="double"></DValue>
@@ -930,7 +927,6 @@
 									<DValue value="1" type="bool" name="bDoOverwrite"></DValue>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine" bVrbl="0">
-									<Assignment MapLvl="1" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1081,7 +1077,6 @@
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine" bVrbl="0">
-									<Assignment MapLvl="1" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1168,7 +1163,6 @@
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine" bVrbl="0">
-									<Assignment MapLvl="1" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1240,7 +1234,6 @@
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine" bVrbl="0">
-									<Assignment MapLvl="1" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1291,7 +1284,6 @@
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine" bVrbl="0">
-									<Assignment MapLvl="1" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1377,7 +1369,6 @@
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine" bVrbl="0">
-									<Assignment MapLvl="1" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1453,7 +1444,6 @@
 									<DValue value="1" type="bool" name="bDoOverwrite"></DValue>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine long small" bVrbl="0">
-									<Assignment MapLvl="2" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1527,7 +1517,6 @@
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine" bVrbl="0">
-									<Assignment MapLvl="1" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1589,7 +1578,6 @@
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine long small" bVrbl="0">
-									<Assignment MapLvl="2" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1636,7 +1624,6 @@
 									<DValue value="1" type="bool" name="bDoOverwrite"></DValue>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine long tiny" bVrbl="0">
-									<Assignment MapLvl="3" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1710,7 +1697,6 @@
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine long small" bVrbl="0">
-									<Assignment MapLvl="2" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1772,7 +1758,6 @@
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine long tiny" bVrbl="0">
-									<Assignment MapLvl="3" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1847,9 +1832,9 @@
 									<DValue value="2" type="int" name="eExportMode"></DValue>
 									<DValue value="ObjectShapes001" type="string" name="strExportItem"></DValue>
 									<DValue value="-1" type="procVarId" name="vrblExportItem"></DValue>
-									<DValue value="D:\LSHM\GHK_GR\PRA_final\PRA_30y\PRA_30y_For_new" type="string" name="strExportPath"></DValue>
+									<DValue value="D:\LSHM\GHK_GR\PRA_final\PRA_30y\PRA_30y_NoFor_new" type="string" name="strExportPath"></DValue>
 									<DValue value="0" type="bool" name="bExportSeries"></DValue>
-									<DValue value="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?>&#xA;&lt;ExportInfo SingleFilePerWksp=&quot;0&quot; SingleFilePerItem=&quot;1&quot; ExportItem=&quot;ExportList&quot; ExportType=&quot;ExpList&quot; DriverID=&quot;ELS&quot; ExportPath=&quot;D:\LSHM\GHK_GR\PRA_final\PRA_30y\PRA_30y_For_new&quot;>&lt;/ExportInfo>" type="string" name="strExportItemInfo"></DValue>
+									<DValue value="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?>&#xA;&lt;ExportInfo SingleFilePerWksp=&quot;0&quot; SingleFilePerItem=&quot;1&quot; ExportItem=&quot;ExportList&quot; ExportType=&quot;ExpList&quot; DriverID=&quot;ELS&quot; ExportPath=&quot;D:\LSHM\GHK_GR\PRA_final\PRA_30y\PRA_30y_NoFor_new&quot;>&lt;/ExportInfo>" type="string" name="strExportItemInfo"></DValue>
 									<DValue value="temporary" type="string" name="valExportTempLayer"></DValue>
 									<DValue type="vector" name="vColInfo">
 									<Values>
@@ -1907,7 +1892,7 @@
 									<DValue value="1" type="bool" name="bShpUseGeocoding"></DValue>
 									<DValue value="0" type="int" name="eCoordOrient"></DValue>
 									<DValue value="SHP" type="string" name="eExprtFormat"></DValue>
-									<DValue value="PRA_30y_For_new" type="string" name="featClassName"></DValue>
+									<DValue value="PRA_30y_NoFor_new" type="string" name="featClassName"></DValue>
 									<DValue type="img_chnl" value="" name="pRefChnl"></DValue>
 									<DValue value="{:ArcSDE.Connect.Dir}\default.das" type="string" name="exprtStorageLocFile"></DValue>
 									<DValue value="2000000,1000000" type="string" name="spatDomainOffset"></DValue>
@@ -1918,7 +1903,6 @@
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine long tiny" bVrbl="0">
-									<Assignment MapLvl="3" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1982,7 +1966,7 @@
 		</ProcBase>
 	</ProcessList>
 	<ExportedItems>
-		<item name="ExportList" type="ExpList" driver="ELS" ext="xml" path="D:\LSHM\GHK_GR\PRA_final\PRA_30y\PRA_30y_For_new"></item>
+		<item name="ExportList" type="ExpList" driver="ELS" ext="xml" path="D:\LSHM\GHK_GR\PRA_final\PRA_30y\PRA_30y_NoFor_new"></item>
 	</ExportedItems>
 	<LcnsIds></LcnsIds>
 </eCog.Proc>
