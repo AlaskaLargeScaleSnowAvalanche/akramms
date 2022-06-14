@@ -2,7 +2,7 @@ import subprocess
 import os,pathlib,shutil
 import netCDF4
 import numpy as np
-from dggs import paramutil,arcgis
+from dggs.util import paramutil,arcgisutil
 from uafgi import make
 
 # List of all parameters involved in an overall run.
@@ -232,9 +232,9 @@ def prepare_data_rule(scene_dir):
                 out.write('\n')
 
         # Obtain ArcGIS SpatialReference object (script needs as a script variable)
-        script_args['outCoordSystem'] = arcgis.Lambda('arcpy', 'SpatialReference', scene_args['coordinate_system'])
+        script_args['outCoordSystem'] = arcgisutil.Lambda('arcpy', 'SpatialReference', scene_args['coordinate_system'])
 
-        arcgis.run_script('data_prep_PRA.py', script_args, cwd=scene_dir, dry_run=False)
+        arcgisutil.run_script('data_prep_PRA.py', script_args, cwd=scene_dir, dry_run=False)
 
         # Clean up temporary files
         for dir in temporaries:
