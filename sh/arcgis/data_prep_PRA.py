@@ -40,34 +40,40 @@ dggs.arcgis.get_script_vars(globals(), (
     ('Weightingkernel', 'GetParameterAsText'),
 ))
 
-Workspace += '\\'
+#Workspace += '\\'
 #-------------------------------------------------------------------------------
+# Convenience for constructing filenames
+Name = os.path.basename(os.path.normpath(Workspace))
+def BASE_DATA(leaf):
+    return os.path.join(Workspace, 'base_data', leaf)
+def ECOG(leaf):
+    return os.path.join(Workspace, 'eCog', leaf)
+
+
+
 # Local variables:
 # Name of project, Eg: PRA_ElizabethAK
-Name = os.path.basename(os.path.normpath(Workspace))
 
-path_base_data = Workspace + "base_data\\" + Name + "_"
-path_eCog = Workspace + "eCog\\" + Name + "_"
-DEM_eCog = path_eCog + "DEM.tif"
-Forest = path_base_data + "Forest.tif"
-Perimeter = path_base_data + "Perimeter.shp"
-Perimeter_Envelope = path_base_data + "Perimeter_Envelope.shp"
-Perimeter_Envelope_Buffer = path_base_data + "Perimeter_Envelope_Buffer.shp"
-Slope_tif = path_base_data + "Slope.tif"
-Slope_eCog = path_eCog + "Slope.tif"
-Aspect_tif = path_base_data + "Aspect.tif"
-Aspect_sectors_N0_eCog = path_eCog + "Aspect_sectors_N0.tif"
-Aspect_sectors_Nmax_eCog = path_eCog + "Aspect_sectors_Nmax.tif"
-Curv = path_base_data + "Curv.tif"
-Curv_profile_temp = path_base_data + "Curv_profile_temp.tif"
-Curv_profile = path_base_data + "Curv_profile.tif"
-Curv_plan_temp = path_base_data + "Curv_plan_temp.tif"
-Curv_plan = path_base_data + "Curv_plan.tif"
-Curv_profile_eCog_temp = path_eCog + "Curv_profile_temp.tif"
-Curv_profile_eCog = path_eCog + "Curv_profile.tif"
-Curv_plan_eCog_temp = path_eCog + "Curv_plan_temp.tif"
-Curv_plan_eCog = path_eCog + "Curv_plan.tif"
-Hillshade_eCog = path_eCog + "Hillshade.tif"
+DEM_eCog = ECOG(f"{Name}_DEM.tif")
+Forest = BASE_DATA(f"{Name}_Forest.tif")
+Perimeter = BASE_DATA(f"{Name}_Perimeter.shp")
+Perimeter_Envelope = BASE_DATA(f"{Name}_Perimeter_Envelope.shp")
+Perimeter_Envelope_Buffer = BASE_DATA(f"{Name}_Perimeter_Envelope_Buffer.shp")
+Slope_tif = BASE_DATA(f"{Name}_Slope.tif")
+Slope_eCog = ECOG(f"{Name}_Slope.tif")
+Aspect_tif = BASE_DATA(f"{Name}_Aspect.tif")
+Aspect_sectors_N0_eCog = ECOG(f"{Name}_Aspect_sectors_N0.tif")
+Aspect_sectors_Nmax_eCog = ECOG(f"{Name}_Aspect_sectors_Nmax.tif")
+Curv = BASE_DATA(f"{Name}_Curv.tif")
+Curv_profile_temp = BASE_DATA(f"{Name}_Curv_profile_temp.tif")
+Curv_profile = BASE_DATA(f"{Name}_Curv_profile.tif")
+Curv_plan_temp = BASE_DATA(f"{Name}_Curv_plan_temp.tif")
+Curv_plan = BASE_DATA(f"{Name}_Curv_plan.tif")
+Curv_profile_eCog_temp = ECOG(f"{Name}_Curv_profile_temp.tif")
+Curv_profile_eCog = ECOG(f"{Name}_Curv_profile.tif")
+Curv_plan_eCog_temp = ECOG(f"{Name}_Curv_plan_temp.tif")
+Curv_plan_eCog = ECOG(f"{Name}_Curv_plan.tif")
+Hillshade_eCog = ECOG(f"{Name}_Hillshade.tif")
 
 #-------------------------------------------------------------------------------
 # Give Messages
@@ -91,8 +97,8 @@ if outCoordSystem.name == "":
 arcpy.env.outputCoordinateSystem = outCoordSystem
 arcpy.env.snapRaster = arcpy.sa.Raster(inDEM)
 
-arcpy.CreateFolder_management(Workspace, "base_data")
-arcpy.CreateFolder_management(Workspace, "eCog")
+arcpy.CreateFolder_management(Workspace, 'base_data')
+arcpy.CreateFolder_management(Workspace, 'eCog')
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
@@ -130,7 +136,7 @@ YMax_RasterDomain = int(round(extent_RasterDomain.YMax))
 # Apply Clip if extent of Raster Domain smaller than inDEM
 if (XMin_inDEM > XMin_RasterDomain) or (YMin_inDEM > YMin_RasterDomain) or (XMax_inDEM > XMax_RasterDomain) or (YMax_inDEM > YMax_RasterDomain):
     arcpy.AddMessage("clip DEM to raster domain, because extent of DEM bigger than raster domain...")
-    inDEM_RasterDomain = path_base_data + "DEM_ExtentRasterDomain.tif"
+    inDEM_RasterDomain = BASE_DATA(f"{Name}_DEM_ExtentRasterDomain.tif")
     arcpy.Clip_management(inDEM, '%s %s %s %s' %(XMin_RasterDomain, YMin_RasterDomain, XMax_RasterDomain, YMax_RasterDomain), inDEM_RasterDomain, "in_memory/inDEM_RasterDomain_Buffer", '#', 'NONE', 'NO_MAINTAIN_EXTENT')
     inDEM_RasterDomainChecked = inDEM_RasterDomain
 
@@ -154,7 +160,7 @@ def PerimeterClip():
     YMin_Perimeter = extent_Perimeter.YMin
     XMax_Perimeter = extent_Perimeter.XMax
     YMax_Perimeter = extent_Perimeter.YMax
-    inDEM_Perimeter = DEM = path_base_data + "DEM_Perimeter.tif"
+    inDEM_Perimeter = DEM = BASE_DATA(f"{Name}_DEM_Perimeter.tif")
     arcpy.Clip_management("in_memory/inDEM_resamp", '%s %s %s %s' %(XMin_Perimeter, YMin_Perimeter, XMax_Perimeter, YMax_Perimeter), inDEM_Perimeter, Perimeter_Envelope_Buffer, '#', 'NONE', 'NO_MAINTAIN_EXTENT')
 
 #-------------------------------------------------------------------------------
@@ -166,12 +172,12 @@ if DEM_res != resampCellSize:
     if inPerimeter != "":
         arcpy.AddMessage("clipping DEM to Perimeter")
         PerimeterClip()
-        inDEM_Perimeter = DEM = path_base_data + "DEM_Perimeter.tif"
+        inDEM_Perimeter = DEM = BASE_DATA(f"{Name}_DEM_Perimeter.tif")
         inDEM_RasterDomainChecked_PerimeterChecked = inDEM_Perimeter
     else:
         inDEM_RasterDomainChecked_PerimeterChecked = "in_memory/inDEM_resamp"
 
-    DEM_resamp_smooth = path_base_data + "DEM_resamp_smooth.tif"
+    DEM_resamp_smooth = BASE_DATA(f"{Name}_DEM_resamp_smooth.tif")
     arcpy.gp.FocalStatistics_sa(inDEM_RasterDomainChecked_PerimeterChecked, DEM_resamp_smooth, 'Weight %s' % Weightingkernel, 'MEAN', 'NODATA')
     DEM = DEM_resamp_smooth
 
@@ -182,7 +188,7 @@ else:
     else:
         inDEM_RasterDomainChecked_PerimeterChecked = inDEM_RasterDomainChecked
 
-    DEM_smooth = path_base_data + "DEM_smooth.tif"
+    DEM_smooth = BASE_DATA(f"{Name}_DEM_smooth.tif")
     arcpy.gp.FocalStatistics_sa(inDEM_RasterDomainChecked_PerimeterChecked, DEM_smooth, 'Weight %s' % Weightingkernel, 'MEAN', 'NODATA')
     DEM = DEM_smooth
 
@@ -277,8 +283,8 @@ n = int(Rugged_neighborhood)
 SlopeRad = arcpy.sa.Times(Slope_tif, Rad)
 AspectRad = arcpy.sa.Times(Aspect_tif, Rad)
 
-SlopeRad.save(path_base_data + "SlopeRad.tif")
-AspectRad.save(path_base_data + "AspectRad.tif")
+SlopeRad.save(BASE_DATA(f"{Name}_SlopeRad.tif"))
+AspectRad.save(BASE_DATA(f"{Name}_AspectRad.tif"))
 
 # Calculate x, y, and z Rasters
 xyRaster = Sin(SlopeRad)
@@ -287,25 +293,25 @@ SinAspectRad = Sin(AspectRad)
 CosAspectRad = Cos(AspectRad)
 xRaster = Con((AspectRad == -1), 0, (Times(SinAspectRad, xyRaster)))
 yRaster = Con((AspectRad == -1), 0, (Times(CosAspectRad, xyRaster)))
-xyRaster.save(path_base_data + "xyRaster.tif")
-zRaster.save(path_base_data + "zRaster.tif")
-SinAspectRad.save(path_base_data + "SinAspectRad.tif")
-CosAspectRad .save(path_base_data + "CosAspectRad.tif")
-xRaster.save(path_base_data + "xRaster.tif")
-yRaster.save(path_base_data + "yRaster.tif")
+xyRaster.save(BASE_DATA(f"{Name}_xyRaster.tif"))
+zRaster.save(BASE_DATA(f"{Name}_zRaster.tif"))
+SinAspectRad.save(BASE_DATA(f"{Name}_SinAspectRad.tif"))
+CosAspectRad .save(BASE_DATA(f"{Name}_CosAspectRad.tif"))
+xRaster.save(BASE_DATA(f"{Name}_xRaster.tif"))
+yRaster.save(BASE_DATA(f"{Name}_yRaster.tif"))
 
 # Calculate sums of x, y, and z rasters for selected neighborhood size
 xSumRaster = FocalStatistics(xRaster, NbrRectangle(n, n, "CELL"), "SUM", "NODATA")
 ySumRaster = FocalStatistics(yRaster, NbrRectangle(n, n, "CELL"), "SUM", "NODATA")
 zSumRaster = FocalStatistics(zRaster, NbrRectangle(n, n, "CELL"), "SUM", "NODATA")
-xSumRaster.save(path_base_data + "xSumRaster.tif")
-ySumRaster.save(path_base_data + "ySumRaster.tif")
-zSumRaster.save(path_base_data + "zSumRaster.tif")
+xSumRaster.save(BASE_DATA(f"{Name}_xSumRaster.tif"))
+ySumRaster.save(BASE_DATA(f"{Name}_ySumRaster.tif"))
+zSumRaster.save(BASE_DATA(f"{Name}_zSumRaster.tif"))
 
 # Calculate the resultant vector (local variablility of the orientation of the vector)
 RRaster = SquareRoot(Square(xSumRaster) + Square(ySumRaster) + Square(zSumRaster))
-RRaster.save(path_base_data + "RRaster.tif")
 
+RRaster.save(BASE_DATA(f"{Name}_RRaster.tif"))
 # Divide the vector through the number of cell in the neighbourhood and substrate of 1
 Ruggedness1 = 1 - (RRaster / Square(n))
 
@@ -313,7 +319,7 @@ Ruggedness1 = 1 - (RRaster / Square(n))
 Ruggedness = Ruggedness1*100
 
 # Save the output
-Ruggedness.save(path_base_data + "Ruggedness_n" + Rugged_neighborhood + ".tif")
+Ruggedness.save(BASE_DATA(f"{Name}_Ruggedness_n" + Rugged_neighborhood + ".tif"))
 
 #-------------------------------------------------------------------------------
 # Clip eCog files to the same extent
@@ -357,35 +363,38 @@ arcpy.Delete_management(RRaster)
 def data_prep_PRA(Slope_lowerlimit, name_scenario):
     arcpy.AddMessage("executing Scenario_" + name_scenario + "...")
 
-    path_temp_model = Workspace + "temp_model_" + name_scenario + "\\" + Name + "_"
-    arcpy.CreateFolder_management(Workspace, "temp_model_" + name_scenario)
+    tdir = f"temp_model_{name_scenario}"
+    arcpy.CreateFolder_management(Workspace, tdir)
+    def TDIR(leaf):
+        return os.path.join(Workspace, tdir, leaf)
+
     #-------------------------------------------------------------------------------
     arcpy.AddMessage("creating binary layers...")
 
     # create Slope binary
     SlopeBinary = Con((arcpy.sa.Raster(Slope_tif) < float(Slope_lowerlimit)) | (arcpy.sa.Raster(Slope_tif) > float(Slope_upperlimit)), 0, 1)
-    SlopeBinary.save(path_temp_model + "Slope_binary.tif")
+    SlopeBinary.save(TDIR(f"{Name}_Slope_binary.tif"))
 
     # create Curvature binary
     CurvBinary = Con((arcpy.sa.Raster(Curv_plan) < (-1*float(Curv_upperlimit))) | (arcpy.sa.Raster(Curv_plan) > float(Curv_upperlimit)), 0, 1)
-    CurvBinary.save(path_temp_model + "Curv_binary.tif")
+    CurvBinary.save(TDIR(f"{Name}_Curv_binary.tif"))
 
     # create Ruggedness binary
     RuggednessBinary = Con((Ruggedness > float(Rugged_upperlimit)), 0, 1)
-    RuggednessBinary.save(path_temp_model + "Ruggedness_n" + Rugged_neighborhood + "_binary.tif")
+    RuggednessBinary.save(TDIR(f"{Name}_Ruggedness_n{Rugged_neighborhood}_binary.tif"))
 
     #-------------------------------------------------------------------------------
     arcpy.AddMessage("combining binary layers...")
 
     # Boolean Overlay: Slope AND Curvature AND Ruggedness
     SlopeCurvRuggednessBinary = SlopeBinary * CurvBinary * RuggednessBinary
-    SlopeCurvRuggednessBinary.save(path_temp_model + "Slope_Curv_Ruggedness_binary.tif")
+    SlopeCurvRuggednessBinary.save(TDIR(f"{Name}_Slope_Curv_Ruggedness_binary.tif"))
 
     if inForest != "":
         # Boolean Overlay: Slope AND Curvature AND Ruggedness AND Forest
-        SlopeCurvRuggednessForestBinary = path_temp_model + "Slope_Curv_Ruggedness_Forest_binary.tif"
+        SlopeCurvRuggednessForestBinary = TDIR(f"{Name}_Slope_Curv_Ruggedness_Forest_binary.tif")
         SlopeCurvRuggednessForestBinary = SlopeBinary * CurvBinary * RuggednessBinary * BooleanNot(arcpy.sa.Raster(inForest))
-        SlopeCurvRuggednessForestBinary.save(path_temp_model + "Slope_Curv_Ruggedness_Forest_binary.tif")
+        SlopeCurvRuggednessForestBinary.save(TDIR(f"{Name}_Slope_Curv_Ruggedness_Forest_binary.tif"))
 
     #-------------------------------------------------------------------------------
     arcpy.AddMessage("writing out PRA_raw...")
@@ -393,13 +402,13 @@ def data_prep_PRA(Slope_lowerlimit, name_scenario):
     # Boolean Overlay Raster to PRA_raw Raster
 
     # NoForest
-    PRA_raw_NoForest = path_eCog + "_PRA_raw_" + name_scenario + "_NoForest.tif"
+    PRA_raw_NoForest = ECOG(f"{Name}__PRA_raw_{name_scenario}_NoForest.tif")
     arcpy.gp.Reclassify_sa(SlopeCurvRuggednessBinary, 'Value', '1 200;0 0', "memory/PRA_raw_NoForest", 'DATA')
     arcpy.gp.ExtractByMask_sa("memory/PRA_raw_NoForest", Mask, PRA_raw_NoForest)
 
     # Forest
     if inForest != "":
-        PRA_raw_Forest = path_eCog + "_PRA_raw_" + name_scenario + "_Forest.tif"
+        PRA_raw_Forest = ECOG(f"{Name}__PRA_raw_{name_scenario}_Forest.tif")
         arcpy.gp.Reclassify_sa(SlopeCurvRuggednessForestBinary, 'Value', '1 200;0 0', "memory/PRA_raw_Forest", 'DATA')
         arcpy.gp.ExtractByMask_sa("memory/PRA_raw_Forest", Mask, PRA_raw_Forest)
 
