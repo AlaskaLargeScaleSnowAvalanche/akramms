@@ -125,7 +125,6 @@ def validate_args(args, params=None):
         if name in remain_args:
             typ = TYPES[param.type]
             ret[name] = typ.validate(remain_args[name])
-#            print('**** ',ret[name])
             del remain_args[name]
         elif param.required:
             raise ValueError('Missing REQUIRED argument: {}'.format(name))

@@ -1,3 +1,4 @@
+import subprocess
 import os,pathlib,shutil
 import netCDF4
 import numpy as np
@@ -6,7 +7,7 @@ from uafgi import make
 
 # List of all parameters involved in an overall run.
 PARAMS = paramutil.parse([
-    ('name', None, 'str', True,
+    ('name', None, 'str', False,
         """Root name of scene; to use for filenames, plotting, etc"""),
     ('dem', None, 'input_file', True,
         """Name of DEM file to use (GeoTIFF)"""),
@@ -74,27 +75,25 @@ DEFAULTS = {
         [0.625, 0.625, 0.625, 0.625, 0.625]])),
 }
 
+# -----------------------------------------------------------------------
+# ---------------------------------------------------------------------------
 def prepare_scene(scene_dir, defaults=dict(), **kwargs):
-    """scene_dir,
-        Top-level directory for all project files
 
+    """Sets up a new scene by creating a directory with all
+    parameters required for processing.
 
-    scene_args: dict
-        All params needed for all aspects of the computation
+    scene_dir:
+        Top-level directory for all project files.
+        The file `scene.nc` is created in this directory.
+    defaults: dict or str
+        dict:
+            Default values for parameters, if they are not set in kwargs.
+        str: 'schweitz' | 'alaska'
+            Use pre-built set of defaults, appropriate for given project.
+    kwargs:
+        parameters to set for this scene.    
+        See PARAMS variable above for a list and description.
 
-        weighting_kernel: [[float, ...], ...]
-            2D convolution kernel, reprented as a row major nested list of lists
-
-        dem: 'xxx.tif'
-            File for Digital Elevation Model (DEM)
-        forest: 'xxx.tif'
-            File for forest cover
-        resample_cell-size: int
-            Resolution to run at
-            (dem and forest should be at least as fine as this)
-        in_perimeter: file (OPTIONAL)
-            
-        ...
     """
 
     # Create the directory
@@ -106,16 +105,79 @@ def prepare_scene(scene_dir, defaults=dict(), **kwargs):
         defaults = DEFAULTS[defaults]
     scene_args = paramutil.validate_args({**defaults, **kwargs}, params=PARAMS)
 
+    # Get the scene name as the leaf of the scene_dir
+    if 'name' not in scene_args:
+        scene_args['name'] = os.path.split(scene_dir)[1]
+
     # Store the overall scene parameters
     paramutil.dump_nc(os.path.join(scene_dir, 'scene.nc'), scene_args, params=PARAMS)
+    cmd = ['ncdump', os.path.join(scene_dir, 'scene.nc')]
+    with open(os.path.join(scene_dir, 'scene.cdl'), 'w') as out:
+        subprocess.run(cmd, stdout=out)
 
     return scene_dir
 
+# ---------------------------------------------------------------------------
 def load_scene_args(scene_dir):
     """Reads the scene """
-    return paramutil.load_nc(os.path.join(scene_dir, 'scene.nc'))
+    ret = paramutil.load_nc(os.path.join(scene_dir, 'scene.nc'))
+    ret['scene_dir'] = scene_dir
+    return ret
 
 
+# ---------------------------------------------------------------------------
+import_xml_tpl = """<?xml version="1.0" encoding="UTF-8"?>
+<ImportDefinitions>
+	<ImportDefinition name="PRA_import_{freq}" description="">
+		<LcnsIds></LcnsIds>
+		<SceneSearch folders-from-file-system="yes" bdi-driver="" scene-name="{scene_name}" map-name="">
+			<TagString>{froot}_{layer}.tif</TagString>
+			<SiteInfo x-coo="decimal" y-coo="decimal">
+				<TagString></TagString>
+			</SiteInfo>
+		</SceneSearch>
+		<SceneDefinition force-fitting="0" geo-coding="from-file" scene-extent="union" scene-unit="auto" pixel-size="auto">
+			<ImageLayer channel="1" alias="Aspect_sectors_Nmax" driver="GDAL">
+				<TagString>{froot}_Aspect_sectors_Nmax.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="Aspect_sectors_N0" driver="GDAL">
+				<TagString>{froot}_Aspect_sectors_N0.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="Curv_plan" driver="GDAL">
+				<TagString>{froot}_Curv_plan.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="Curv_profile" driver="GDAL">
+				<TagString>{froot}_Curv_profile.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="DEM" driver="GDAL">
+				<TagString>{froot}_DEM.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="Hillshade" driver="GDAL">
+				<TagString>{froot}_Hillshade.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="Slope" driver="GDAL">
+				<TagString>{froot}_Slope.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="PRA_raw" driver="GDAL">
+				<TagString>{froot}__PRA_raw_{freq}_Forest.tif</TagString>
+			</ImageLayer>
+		</SceneDefinition>
+	</ImportDefinition>
+</ImportDefinitions>
+"""
+def import_xml_str(scene_args, freq):
+    """Generates text for the ...import....xml file
+    freq: 'frequent' | 'extreme'
+    """
+
+    args = {
+        'froot': os.path.join(scene_args['scene_dir'], 'eCog', scene_args['name']),
+        'scene_name': scene_args['name'],
+        'freq': freq,
+        'layer': '{layer}',    # Leave this for eCognition
+    }
+    return import_xml_tpl.format(**args)
+# ---------------------------------------------------------------------------
 def prepare_data_rule(scene_dir):
     """Runs the data_prep_PRA.py script on a scene"""
 
@@ -178,4 +240,15 @@ def prepare_data_rule(scene_dir):
         for dir in temporaries:
             shutil.rmtree(dir, ignore_errors=True)
 
+        # Copy DEM to eCog folder
+        ecog_dir = os.path.join(scene_dir, 'eCog')
+        os.makedirs(ecog_dir, exist_ok=True)
+        shutil.copy(scene_args['dem'], ecog_dir)
+
+        # Write import...xml files 
+        for freq in ('frequent', 'extreme'):
+            with open(os.path.join(scene_args['scene_dir'], 'eCog', f'PRA_import_{freq}.xml'), 'w') as out:
+                out.write(import_xml_str(scene_args, freq))
+
     return make.Rule(action, inputs, outputs)
+
