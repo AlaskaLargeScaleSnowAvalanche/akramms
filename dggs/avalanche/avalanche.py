@@ -4,76 +4,10 @@ import netCDF4
 import numpy as np
 from dggs.util import paramutil,arcgisutil
 from uafgi import make
-
-# List of all parameters involved in an overall run.
-PARAMS = paramutil.parse([
-    ('name', None, 'str', False,
-        """Root name of scene; to use for filenames, plotting, etc"""),
-    ('dem', None, 'input_file', True,
-        """Name of DEM file to use (GeoTIFF)"""),
-    ('forest', None, 'input_file', False,
-        """Name of forest cover file to use (GeoTIFF)"""),
-    ('clip', None, 'input_file', False,
-        """Clip domain to this region (Shapefile)"""),
-    ('resample_cell_size', 'm', 'int', True,
-        """Resample DEM and forest files to this resolution for computation"""),
-    ('slope_lowerlimit_frequent', 'angular_degree', 'float', True,
-        """Slope angle, frequent scenario"""),
-    ('slope_lowerlimit_extreme', 'angular_degree', 'float', True,
-        """Slope angle, extreme scenario"""),
-    ('slope_upperlimit', 'angular_degree', 'float', True,
-        """TODO"""),
-    ('curve_upperlimit', 'rad 100-1 m-1', 'float', True,
-        """TODO"""),
-    ('rugged_neighborhood', None, 'int', True,
-        """(pixels) TODO"""),
-    ('rugged_upperlimit', '', 'float', True,
-        """TODO"""),
-    ('coordinate_system', None, 'str', True,
-        """Coordinate system to use for intermediate and output files.
-        Can be WKT string, EPS designator, etc.
-        Eg: CH1903+_LV95 for Switzerland."""),
-    ('return_periods', 'y', 'list', True,
-        """List of return periods (years) to compute avalanche risk for"""),
-    ('stats_kernel', None, 'array', True,
-        """2D kernel used for statistics on DEM in ArcGIS data prep"""),
-    ])
+from dggs.avalanche import process_tree,params
 
 
-DEFAULTS = {
-    'schweitz': dict(
-    resample_cell_size=5,
-    slope_lowerlimit_frequent=30,
-    slope_lowerlimit_extreme=28,
-    slope_upperlimit=55,
-    curve_upperlimit=5.5,
-    rugged_neighborhood=7,
-    rugged_upperlimit=3.5,
-    coordinate_system='CH1903+_LV95',
-    return_periods=[10,30,100,300],
-    stats_kernel=np.array([
-        [0.625, 0.625, 0.625, 0.625, 0.625],
-        [0.625, 1.5, 1.5, 1.5, 0.625],
-        [0.625, 1.5, 3, 1.5, 0.625],
-        [0.625, 1.5, 1.5, 1.5, 0.625],
-        [0.625, 0.625, 0.625, 0.625, 0.625]])),
 
-    'alaska': dict(
-    resample_cell_size=5,
-    slope_lowerlimit_frequent=30,
-    slope_lowerlimit_extreme=28,
-    slope_upperlimit=55,
-    curve_upperlimit=5.5,
-    rugged_neighborhood=7,
-    rugged_upperlimit=3.5,
-    coordinate_system='CH1903+_LV95',
-    stats_kernel=np.array([
-        [0.625, 0.625, 0.625, 0.625, 0.625],
-        [0.625, 1.5, 1.5, 1.5, 0.625],
-        [0.625, 1.5, 3, 1.5, 0.625],
-        [0.625, 1.5, 1.5, 1.5, 0.625],
-        [0.625, 0.625, 0.625, 0.625, 0.625]])),
-}
 
 # -----------------------------------------------------------------------
 # ---------------------------------------------------------------------------
@@ -102,15 +36,15 @@ def prepare_scene(scene_dir, defaults=dict(), **kwargs):
 
     # Assemble the scene args, using default params if provided
     if isinstance(defaults, str):    # Lookup pre-loaded defaults
-        defaults = DEFAULTS[defaults]
-    scene_args = paramutil.validate_args({**defaults, **kwargs}, params=PARAMS)
+        defaults = params.DEFAULTS[defaults]
+    scene_args = paramutil.validate_args({**defaults, **kwargs}, params=params.ALL)
 
     # Get the scene name as the leaf of the scene_dir
     if 'name' not in scene_args:
         scene_args['name'] = os.path.split(scene_dir)[1]
 
     # Store the overall scene parameters
-    paramutil.dump_nc(os.path.join(scene_dir, 'scene.nc'), scene_args, params=PARAMS)
+    paramutil.dump_nc(os.path.join(scene_dir, 'scene.nc'), scene_args, params=params.ALL)
     cmd = ['ncdump', os.path.join(scene_dir, 'scene.nc')]
     with open(os.path.join(scene_dir, 'scene.cdl'), 'w') as out:
         subprocess.run(cmd, stdout=out)
@@ -118,11 +52,6 @@ def prepare_scene(scene_dir, defaults=dict(), **kwargs):
     return scene_dir
 
 # ---------------------------------------------------------------------------
-def load_scene_args(scene_dir):
-    """Reads the scene """
-    ret = paramutil.load_nc(os.path.join(scene_dir, 'scene.nc'))
-    ret['scene_dir'] = scene_dir
-    return ret
 
 
 # ---------------------------------------------------------------------------
@@ -178,10 +107,19 @@ def import_xml_str(scene_args, freq):
     }
     return import_xml_tpl.format(**args)
 # ---------------------------------------------------------------------------
+def return_period_category(return_period):
+    """Returns 'frequent' or 'extreme', depending on the return_period.
+    100y and up is considered 'extreme'.  """
+    if return_period < 100:
+        return 'frequent'
+    else:
+        return 'extreme'
+
+# ---------------------------------------------------------------------------
 def prepare_data_rule(scene_dir):
     """Runs the data_prep_PRA.py script on a scene"""
 
-    scene_args = load_scene_args(scene_dir)
+    scene_args = params.load(scene_dir)
 
     inputs = [scene_dir]
     outputs = [
@@ -234,21 +172,34 @@ def prepare_data_rule(scene_dir):
         # Obtain ArcGIS SpatialReference object (script needs as a script variable)
         script_args['outCoordSystem'] = arcgisutil.Lambda('arcpy', 'SpatialReference', scene_args['coordinate_system'])
 
-        arcgisutil.run_script('data_prep_PRA.py', script_args, cwd=scene_dir, dry_run=False)
+#        arcgisutil.run_script('data_prep_PRA.py', script_args, cwd=scene_dir, dry_run=False)
 
-        # Clean up temporary files
+        # Clean up temporary files from ArcGIS step
         for dir in temporaries:
             shutil.rmtree(dir, ignore_errors=True)
 
         # Copy DEM to eCog folder
         ecog_dir = os.path.join(scene_dir, 'eCog')
         os.makedirs(ecog_dir, exist_ok=True)
-        shutil.copy(scene_args['dem'], ecog_dir)
+        shutil.copy(scene_args['dem'], os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name'])))
 
         # Write import...xml files 
         for freq in ('frequent', 'extreme'):
-            with open(os.path.join(scene_args['scene_dir'], 'eCog', f'PRA_import_{freq}.xml'), 'w') as out:
+            with open(os.path.join(ecog_dir, f'PRA_import_{freq}.xml'), 'w') as out:
                 out.write(import_xml_str(scene_args, freq))
+
+        # Add process trees to the eCog/ workspace
+        ptdir = os.path.join(ecog_dir, 'process_trees')
+        os.makedirs(ptdir, exist_ok=True)
+        for leaf in process_tree.list_all():
+            tpl = process_tree.load_tpl(leaf)
+            with open(os.path.join(ecog_dir, 'process_trees', leaf), 'w') as out:
+                args = {'scene_dir': scene_dir}
+                out.write(tpl.format(**args))
+
+        # Create PRA_frequent/ and PRA_extreme/ directories for process trees to write into
+        for subdir in ('PRA_frequent', 'PRA_extreme'):
+            os.makedirs(os.path.join(scene_dir, subdir), exist_ok=True)
 
     return make.Rule(action, inputs, outputs)
 

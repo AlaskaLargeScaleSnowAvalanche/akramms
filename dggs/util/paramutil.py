@@ -58,6 +58,19 @@ class ArrayType:
         return val
 
     def write_nc(self, nc, vname, val):
+        ncv = nc.createVariable(vname, 'i', [])
+        ncv.setncattr('value', 1 if val else 0)
+        return ncv
+
+    def read_nc(self, ncv):
+        return ncv[:]
+
+class BoolType:
+    def validate(self, val):
+        assert isinstance(val, bool)
+        return val
+
+    def write_nc(self, nc, vname, val):
         dims = list()
         for ix,length in enumerate(val.shape):
             dims.append('{}_{}'.format(vname,ix))
@@ -67,14 +80,14 @@ class ArrayType:
         return ncv
 
     def read_nc(self, ncv):
-        return ncv[:]
-
+        return (ncv.value != 0)
 
 
 TYPES = {
     'str': Type(str),
     'int': Type(int),
     'float': Type(float),
+    'bool': BoolType(),
     'path': PathType(),
     'input_file': InputFileType(),
     'list': ListType(),

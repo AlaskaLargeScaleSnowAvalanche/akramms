@@ -1,4 +1,4 @@
-from dggs import avalanche,arcgis
+from dggs import avalanche
 import os
 
 thisdir = os.path.split(os.path.abspath(__file__))[0]
