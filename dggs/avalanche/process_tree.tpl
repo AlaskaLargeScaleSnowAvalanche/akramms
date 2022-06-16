@@ -53,15 +53,7 @@
 				<MapLvlProxy strName="L pixel" bVrbl="0">
 					<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 				</MapLvlProxy>
-				<MapLvlProxy strName="L fine long large" bVrbl="0">
-					<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
-				</MapLvlProxy>
-				<MapLvlProxy strName="L fine long medium" bVrbl="0">
-					<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
-				</MapLvlProxy>
-				<MapLvlProxy strName="L fine long small" bVrbl="0">
-					<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
-				</MapLvlProxy>
+{map_level_proxys}
 			</MapLvlProxies>
 			<MapLvlVrblValues></MapLvlVrblValues>
 		</MapLvlProxyCntnr>
@@ -416,7 +408,7 @@
 	<CustProcAlgrList></CustProcAlgrList>
 	<ExternalCustProcAlgrList></ExternalCustProcAlgrList>
 	<ProcessList>
-		<ProcBase Name="Process tree {return_period}y{_For}" bLoopChg="0" bExpand="1" bActive="1" bAutoName="0" bSubrtn="0">
+		<ProcBase Name="Process tree {return_period:d}y{_For}" bLoopChg="0" bExpand="1" bActive="1" bAutoName="0" bSubrtn="0">
 			<LcnsInfo sLcnsId="" sPwd=""></LcnsInfo>
 			<vrblValMaxCycle>
 				<DValue value="1." type="double"></DValue>
@@ -901,7 +893,7 @@
 						</Params>
 					</Domain>
 					<SubProc>
-						<ProcBase Name="steep at  L pixel: multi-resolution: {scale_parameter} [shape:0.6 compct.:1.0] creating 'L fine'" bLoopChg="0" bExpand="1" bActive="1" bAutoName="1" bSubrtn="0">
+						<ProcBase Name="steep at  L pixel: multi-resolution: {segmentation2_scale:d} [shape:0.6 compct.:1.0] creating 'L fine'" bLoopChg="0" bExpand="1" bActive="1" bAutoName="1" bSubrtn="0">
 							<LcnsInfo sLcnsId="" sPwd=""></LcnsInfo>
 							<vrblValMaxCycle>
 								<DValue value="1." type="double"></DValue>
@@ -975,7 +967,7 @@
 									<DValue type="vector" name="vThmLayers">
 									<Values></Values>
 									</DValue>
-									<DValue value="{scale_parameter}." type="double" name="vrblValScale"></DValue>
+									<DValue value="{segmentation2_scale:0.1f}" type="double" name="vrblValScale"></DValue>
 									<DValue value="0.59999999999999997779553950749686919153" type="double" name="vrblHCShape"></DValue>
 									<DValue value="1." type="double" name="vrblHCArea"></DValue>
 								</Params>
@@ -1418,10 +1410,7 @@
 						</Params>
 					</Domain>
 					<SubProc>
-{split_long_polygons_1large}
-{split_long_polygons_2medium}
-{split_long_polygons_3small}
-{split_long_polygons_3tiny}
+{split_long_polygonss}
 					</SubProc>
 				</ProcBase>
 				<ProcBase Name="export I frequent" bLoopChg="0" bExpand="1" bActive="1" bAutoName="0" bSubrtn="0">
@@ -1440,7 +1429,7 @@
 						</Params>
 					</Domain>
 					<SubProc>
-						<ProcBase Name="release with area m2 >= 500  and Mean Slope >= 28  and Mean DEM >= 600  at  L fine long small: export object shapes to variable" bLoopChg="0" bExpand="1" bActive="1" bAutoName="1" bSubrtn="0">
+						<ProcBase Name="release with area m2 >= 500  and Mean Slope >= 28  and Mean DEM >= 600  at  "{split_long_polygonss_output_layer}: export object shapes to variable" bLoopChg="0" bExpand="1" bActive="1" bAutoName="1" bSubrtn="0">
 							<LcnsInfo sLcnsId="" sPwd=""></LcnsInfo>
 							<vrblValMaxCycle>
 								<DValue value="1." type="double"></DValue>
@@ -1450,9 +1439,9 @@
 									<DValue value="2" type="int" name="eExportMode"></DValue>
 									<DValue value="ObjectShapes001" type="string" name="strExportItem"></DValue>
 									<DValue value="-1" type="procVarId" name="vrblExportItem"></DValue>
-									<DValue value="{scene_dir}\PRA_extreme\PRA_{return_period}y{_For}.xml" type="string" name="strExportPath"></DValue>
+									<DValue value="{scene_dir}\PRA_{return_period_category}\PRA_{return_period:d}y{_For}.xml" type="string" name="strExportPath"></DValue>
 									<DValue value="0" type="bool" name="bExportSeries"></DValue>
-									<DValue value="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?>&#xA;&lt;ExportInfo SingleFilePerWksp=&quot;0&quot; SingleFilePerItem=&quot;1&quot; ExportItem=&quot;ExportList&quot; ExportType=&quot;ExpList&quot; DriverID=&quot;ELS&quot; ExportPath=&quot;{scene_dir}\PRA_extreme\PRA_{return_period}y{_For}.xml&quot;>&lt;/ExportInfo>" type="string" name="strExportItemInfo"></DValue>
+									<DValue value="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?>&#xA;&lt;ExportInfo SingleFilePerWksp=&quot;0&quot; SingleFilePerItem=&quot;1&quot; ExportItem=&quot;ExportList&quot; ExportType=&quot;ExpList&quot; DriverID=&quot;ELS&quot; ExportPath=&quot;{scene_dir}\PRA_{return_period_category}\PRA_{return_period:d}y{_For}.xml&quot;>&lt;/ExportInfo>" type="string" name="strExportItemInfo"></DValue>
 									<DValue value="temporary" type="string" name="valExportTempLayer"></DValue>
 									<DValue type="vector" name="vColInfo">
 									<Values>
@@ -1520,7 +1509,7 @@
 							<Domain guid="CED621BD-F4D1-4ffa-A2F6-DB2BB1913E8C">
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
-									<MapLvlProxy strName="L fine long small" bVrbl="0">
+									<MapLvlProxy strName="{split_long_polygonss_output_layer}" bVrbl="0">
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1584,7 +1573,7 @@
 		</ProcBase>
 	</ProcessList>
 	<ExportedItems>
-		<item name="ExportList" type="ExpList" driver="ELS" ext="xml" path="{scene_dir}\PRA_extreme\PRA_{return_period}y{_For}.xml"></item>
+		<item name="ExportList" type="ExpList" driver="ELS" ext="xml" path="{scene_dir}\PRA_{return_period_category}\PRA_{return_period:d}y{_For}.xml"></item>
 	</ExportedItems>
 	<LcnsIds></LcnsIds>
 </eCog.Proc>

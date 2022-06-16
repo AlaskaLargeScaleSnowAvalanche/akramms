@@ -1,62 +1,95 @@
-import re
+import functools
 import os
 from dggs.avalanche import params
 
 
 thisdir = os.path.split(os.path.abspath(__file__))[0]
-ptdir = os.path.join(thisdir, 'process_trees')
 
-def list_all():
-    """Lists leafname of all process trees"""
-    for leaf in os.listdir(ptdir):
-        if leaf.endswith('.dcp'):
-            yield leaf
-
-
-
-import re
-
-rep = {"condition1": "", "condition2": "text"} # define desired replacements here
-
+@functools.lru_cache()
+load_tpl(tpl_file):
+    """Permanently loads a template from the source directory"""
+    with open(os.path.join(thisdir, tpl_file)) as fin:
+        return fin.read()
 # --------------------------------------------------------------------
-template_params = paramutil.parse([
-    ('name', None, 'str', True,
-        """Root name of scene; to use for filenames, plotting, etc"""),
-    ('scene_dir', None, 'path', True,
-        'Top-level directory of this scene / project'),
-    ('return_period', 'y', 'int', True,
-        "Period of expected avalanche return for this run"),
-    ('forest', None, 'bool', True,
-        "Is this segmentation with forests?"),
-])
+_val_scale = {
+    'large': 60,
+    'medium': 30,
+    'small': 20,
+    'tiny': 20,
+}
 
-def get(**kwargs):
+def _split_long_polygons(input_layer, step):
+    """A section to do one split-long-polygons step.
+    input_layer:
+        Name of the layer that came before this step.
+        Either 'L fine' (if this is the first step)
+        or 'L fine long {previous_step}'
+    step: 'large', 'medium', 'small' or 'tiny'
+        What KIND of step this is.
+    """
 
-    """Loads a .dcp file as a template; does some simple
-    search-and-replace to make it portable in the filesystem."""
+    tpl = load_tpl('split_long_polygons.tpl')
+    output_layer = f'L fine long {step}'
+    xml = tpl.format(
+        input_layer=input_layer,
+        output_layer=output_layer,
+        val_scale = _val_scale[step])
+    return output_layer, xml
 
-    template_args = {k:str(v) for k,v in paramutil.validate_args(kwargs, params=template_params).items()}
-    template_args['_For'] = '_For' if template_args['forest'] else '_NoFor'
-    template_args['LEFT_BRACKET'] = '{'
-    template_args['RIGHT_BRACKET'] = '}'
+# -----------------------------------------------------------------
+# How many split_long_polygons steps we run, depending on the return period
+_split_long_polygons_steps = {
+    10: ['tiny'],
+    30: ['small'],
+    100: ['medium', 'small'],
+    300: ['large', 'medium', 'small']
+}
 
-    template_args['scale_parameter'] = {10:25, 30:45, 100:60, 300:120}[return_period]
+def _split_long_polygonss(return_period):
+    """Creates XML for all the split_long_polygons needed for a step, depending on the return period.
+    return_period:
+        Years of risk of return (eg: 10-year avalanche, 100-year avalanche, etc)
+    """
+    sections = []
+    output_layer = 'L fine'    # output layer of PREVIOUS step
+    for step in _split_long_polygons_steps[return_period]:
+        output_layer,xml = _split_long_polygons(output_layer, step)
+        sections.append(xml)
 
+    return output_layer, ''.join(xml)
 
-    # Intepret certain patterns in the text as template args
-    return process_tree_tpl.format(**template_args)
+map_level_proxy_tpl = \
+"""<!-- BEGIN map_level_proxy_tpl step={step} -->
+\t\t\t\t<MapLvlProxy strName="L fine long {step}" bVrbl="0">
+\t\t\t\t\t<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
+\t\t\t\t</MapLvlProxy>
+<!-- END map_level_proxy_tpl step={step} -->
+"""
 
+def _map_level_proxys(return_period):
+    return ''.join(map_level_proxy_tpl.format(step=step)
+        for step in _split_long_polygons_steps[return_period])
+# -----------------------------------------------------------------
+# Scale parameter used in the "segmentation2" step
+# Keyed by return period
+_segmentation2_scale = {10:25, 30:45, 100:60, 300:120}
 
-
-
-
-    
-# 16 process trees total
-
-#grep 'ProcBase Name=.Process tree' *.dcp | less
-#...yields a repeat only on GHK_VS_10yNoFor.dcp
-
-
-
-# ============================================================================
-# Originally from file GHK_VS_300y_For.dcp
+def get(scene_dir, return_period, forest)
+    """
+    scene_dir:
+        Directory of the overall scene (NOT the eCog/ subdir)
+    return_period: [
+    """
+    tpl = load_tpl('process_tree.tpl')
+    slp_output_layer,slp = _split_long_polygons(return_period)    
+    return tpl.format(**{
+        'LEFT_BRACKET': '{', 'RIGHT_BRACKET': '}',
+        'scene_dir': scene_dir,
+        'map_level_proxys': _map_level_proxys(return_period),
+        'return_period': return_period,
+        'return_period_category': 'frequent' if return_period < 100 else 'extreme',
+        '_For': '_For' if forest else '_NoFor',
+        'segmentation2_scale': _segmentation2_scale[return_period],
+        'split_long_polygonss': slp,
+        'split_long_polygonss_output_layer': slp_output_layer,
+    })
