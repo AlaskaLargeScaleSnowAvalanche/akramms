@@ -107,15 +107,6 @@ def import_xml_str(scene_args, freq):
     }
     return import_xml_tpl.format(**args)
 # ---------------------------------------------------------------------------
-def return_period_category(return_period):
-    """Returns 'frequent' or 'extreme', depending on the return_period.
-    100y and up is considered 'extreme'.  """
-    if return_period < 100:
-        return 'frequent'
-    else:
-        return 'extreme'
-
-# ---------------------------------------------------------------------------
 def prepare_data_rule(scene_dir):
     """Runs the data_prep_PRA.py script on a scene"""
 
@@ -197,9 +188,18 @@ def prepare_data_rule(scene_dir):
                 args = {'scene_dir': scene_dir}
                 out.write(tpl.format(**args))
 
-        # Create PRA_frequent/ and PRA_extreme/ directories for process trees to write into
-        for subdir in ('PRA_frequent', 'PRA_extreme'):
-            os.makedirs(os.path.join(scene_dir, subdir), exist_ok=True)
+        # Generate the required process trees
+        for return_period in scene_args['return_periods']:
+
+            # They are sorted into two categories: _frequent and _extreme
+            return_period_category = 'frequent' if return_period < 100 else 'extreme'
+            odir = os.path.join(scene_dir, f'PRA_{return_period_category}')
+            os.makedirs(odir, exist_ok=True)
+
+            for forest in (False, True):
+                sforest = 'For' if forest else 'NoFor'
+                with open(os.path.join(odir, f'GHK_{return_period:d}y_{sforest}.dcp')) as out:
+                    out.write(process_tree.get(scene_dir, return_period, forest))
 
     return make.Rule(action, inputs, outputs)
 
