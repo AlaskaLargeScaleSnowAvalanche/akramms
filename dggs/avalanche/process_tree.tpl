@@ -48,22 +48,18 @@
 		<MapLvlProxyCntnr>
 			<MapLvlProxies>
 				<MapLvlProxy strName="L fine" bVrbl="0">
-					<Assignment MapLvl="1" MapName="main"></Assignment>
 					<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 				</MapLvlProxy>
 				<MapLvlProxy strName="L pixel" bVrbl="0">
 					<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 				</MapLvlProxy>
 				<MapLvlProxy strName="L fine long medium" bVrbl="0">
-					<Assignment MapLvl="3" MapName="main"></Assignment>
 					<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 				</MapLvlProxy>
 				<MapLvlProxy strName="L fine long small" bVrbl="0">
-					<Assignment MapLvl="4" MapName="main"></Assignment>
 					<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 				</MapLvlProxy>
 				<MapLvlProxy strName="L fine long large" bVrbl="0">
-					<Assignment MapLvl="2" MapName="main"></Assignment>
 					<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 				</MapLvlProxy>
 			</MapLvlProxies>
@@ -915,7 +911,6 @@
 									<DValue value="1" type="bool" name="bDoOverwrite"></DValue>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine" bVrbl="0">
-									<Assignment MapLvl="1" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1066,7 +1061,6 @@
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine" bVrbl="0">
-									<Assignment MapLvl="1" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1153,7 +1147,6 @@
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine" bVrbl="0">
-									<Assignment MapLvl="1" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1225,7 +1218,6 @@
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine" bVrbl="0">
-									<Assignment MapLvl="1" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1276,7 +1268,6 @@
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine" bVrbl="0">
-									<Assignment MapLvl="1" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1362,7 +1353,6 @@
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine" bVrbl="0">
-									<Assignment MapLvl="1" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
@@ -1531,7 +1521,6 @@
 								<Params>
 									<DValue type="lvlName" name="valMapLvl">
 									<MapLvlProxy strName="L fine long small" bVrbl="0">
-									<Assignment MapLvl="4" MapName="main"></Assignment>
 									<Scope GUID="00000000-0000-0000-0000-000000000000"></Scope>
 									</MapLvlProxy>
 									</DValue>
