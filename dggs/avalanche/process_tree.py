@@ -40,6 +40,9 @@ def get(**kwargs):
     template_args['LEFT_BRACKET'] = '{'
     template_args['RIGHT_BRACKET'] = '}'
 
+    template_args['scale_parameter'] = {10:25, 30:45, 100:60, 300:120}[return_period]
+
+
     # Intepret certain patterns in the text as template args
     return process_tree_tpl.format(**template_args)
 
