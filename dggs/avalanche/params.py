@@ -1,3 +1,5 @@
+import os
+import numpy as np
 from dggs.util import paramutil
 
 # List of all parameters involved in an overall run.
