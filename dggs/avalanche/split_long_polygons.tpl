@@ -164,6 +164,7 @@
 									<DValue value="1." type="double"></DValue>
 									</ProcVrblVal2>
 									</TermCondition>
+{tiny_term_condition}
 									</TermGroup>
 									</TermThrsh>
 									</DValue>

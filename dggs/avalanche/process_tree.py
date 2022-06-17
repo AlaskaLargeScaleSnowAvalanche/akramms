@@ -18,6 +18,24 @@ _val_scale = {
     'tiny': 20,
 }
 
+# Extra term in a conditional for the 'tiny' step.
+_tiny_term_condition = {
+    'large': '',
+    'medium': '',
+    'small': '',
+    'tiny': """\t\t\t\t\t\t\t\t\t<TermCondition eCmpr="5" eBaseUnit="0" eJoint="2">
+\t\t\t\t\t\t\t\t\t<ProcVrblVal1>
+\t\t\t\t\t\t\t\t\t<DValue type="propDscrId">
+\t\t\t\t\t\t\t\t\t<PropDscrId GUID="7F30AE70-0DDD-483c-A693-7698C3CB96FF" InstID="Existence of super objects long (1)"></PropDscrId>
+\t\t\t\t\t\t\t\t\t</DValue>
+\t\t\t\t\t\t\t\t\t</ProcVrblVal1>
+\t\t\t\t\t\t\t\t\t<ProcVrblVal2>
+\t\t\t\t\t\t\t\t\t<DValue value="1." type="double"></DValue>
+\t\t\t\t\t\t\t\t\t</ProcVrblVal2>
+\t\t\t\t\t\t\t\t\t</TermCondition>
+"""}
+
+
 def _split_long_polygons(input_layer, step):
     """A section to do one split-long-polygons step.
     input_layer:
@@ -33,7 +51,8 @@ def _split_long_polygons(input_layer, step):
     xml = tpl.format(
         input_layer=input_layer,
         output_layer=output_layer,
-        val_scale = _val_scale[step])
+        val_scale = _val_scale[step],
+        tiny_term_condition = _tiny_term_condition[step])
     return output_layer, xml
 
 # -----------------------------------------------------------------
