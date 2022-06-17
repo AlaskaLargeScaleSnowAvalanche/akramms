@@ -7,7 +7,8 @@ from uafgi import make
 from dggs.avalanche import process_tree,params
 
 
-
+thisdir = os.path.split(os.path.abspath(__file__))[0]
+akrammsdir = os.path.split(os.path.split(thisdir)[0])[0]
 
 # -----------------------------------------------------------------------
 # ---------------------------------------------------------------------------
@@ -162,8 +163,8 @@ def prepare_data_rule(scene_dir):
 
         # Obtain ArcGIS SpatialReference object (script needs as a script variable)
         script_args['outCoordSystem'] = arcgisutil.Lambda('arcpy', 'SpatialReference', scene_args['coordinate_system'])
-
-#        arcgisutil.run_script('data_prep_PRA.py', script_args, cwd=scene_dir, dry_run=False)
+        data_prep_PRA_py = os.path.join(akrammsdir, 'sh', 'arcgis', 'data_prep_PRA.py')
+        arcgisutil.run_script(data_prep_PRA_py, script_args, cwd=scene_dir, dry_run=False)
 
         # Clean up temporary files from ArcGIS step
         for dir in temporaries:
@@ -179,15 +180,6 @@ def prepare_data_rule(scene_dir):
             with open(os.path.join(ecog_dir, f'PRA_import_{freq}.xml'), 'w') as out:
                 out.write(import_xml_str(scene_args, freq))
 
-        # Add process trees to the eCog/ workspace
-        ptdir = os.path.join(ecog_dir, 'process_trees')
-        os.makedirs(ptdir, exist_ok=True)
-        for leaf in process_tree.list_all():
-            tpl = process_tree.load_tpl(leaf)
-            with open(os.path.join(ecog_dir, 'process_trees', leaf), 'w') as out:
-                args = {'scene_dir': scene_dir}
-                out.write(tpl.format(**args))
-
         # Generate the required process trees
         for return_period in scene_args['return_periods']:
 
@@ -198,7 +190,7 @@ def prepare_data_rule(scene_dir):
 
             for forest in (False, True):
                 sforest = 'For' if forest else 'NoFor'
-                with open(os.path.join(odir, f'GHK_{return_period:d}y_{sforest}.dcp')) as out:
+                with open(os.path.join(scene_dir, 'eCog', f'GHK_{return_period:d}y_{sforest}.dcp'), 'w') as out:
                     out.write(process_tree.get(scene_dir, return_period, forest))
 
     return make.Rule(action, inputs, outputs)

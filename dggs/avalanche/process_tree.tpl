@@ -1429,7 +1429,7 @@
 						</Params>
 					</Domain>
 					<SubProc>
-						<ProcBase Name="release with area m2 >= 500  and Mean Slope >= 28  and Mean DEM >= 600  at  "{split_long_polygonss_output_layer}: export object shapes to variable" bLoopChg="0" bExpand="1" bActive="1" bAutoName="1" bSubrtn="0">
+						<ProcBase Name="release with area m2 >= 500  and Mean Slope >= {min_mean_slope:d}  and Mean DEM >= 600  at  "{split_long_polygonss_output_layer}: export object shapes to variable" bLoopChg="0" bExpand="1" bActive="1" bAutoName="1" bSubrtn="0">
 							<LcnsInfo sLcnsId="" sPwd=""></LcnsInfo>
 							<vrblValMaxCycle>
 								<DValue value="1." type="double"></DValue>
@@ -1539,7 +1539,7 @@
 									</DValue>
 									</ProcVrblVal1>
 									<ProcVrblVal2>
-									<DValue value="28." type="double"></DValue>
+									<DValue value="{min_mean_slope:0.1f}" type="double"></DValue>
 									</ProcVrblVal2>
 									</TermCondition>
 									<TermCondition eCmpr="4" eBaseUnit="0" eJoint="2">

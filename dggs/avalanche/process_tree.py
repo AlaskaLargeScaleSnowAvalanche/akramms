@@ -6,7 +6,7 @@ from dggs.avalanche import params
 thisdir = os.path.split(os.path.abspath(__file__))[0]
 
 @functools.lru_cache()
-load_tpl(tpl_file):
+def load_tpl(tpl_file):
     """Permanently loads a template from the source directory"""
     with open(os.path.join(thisdir, tpl_file)) as fin:
         return fin.read()
@@ -56,7 +56,7 @@ def _split_long_polygonss(return_period):
         output_layer,xml = _split_long_polygons(output_layer, step)
         sections.append(xml)
 
-    return output_layer, ''.join(xml)
+    return output_layer, ''.join(sections)
 
 map_level_proxy_tpl = \
 """<!-- BEGIN map_level_proxy_tpl step={step} -->
@@ -73,15 +73,16 @@ def _map_level_proxys(return_period):
 # Scale parameter used in the "segmentation2" step
 # Keyed by return period
 _segmentation2_scale = {10:25, 30:45, 100:60, 300:120}
+_min_mean_slope = {10:30, 30:30, 100:28, 300:28}
 
-def get(scene_dir, return_period, forest)
+def get(scene_dir, return_period, forest):
     """
     scene_dir:
         Directory of the overall scene (NOT the eCog/ subdir)
     return_period: [
     """
     tpl = load_tpl('process_tree.tpl')
-    slp_output_layer,slp = _split_long_polygons(return_period)    
+    slp_output_layer,slp = _split_long_polygonss(return_period)
     return tpl.format(**{
         'LEFT_BRACKET': '{', 'RIGHT_BRACKET': '}',
         'scene_dir': scene_dir,
@@ -92,4 +93,5 @@ def get(scene_dir, return_period, forest)
         'segmentation2_scale': _segmentation2_scale[return_period],
         'split_long_polygonss': slp,
         'split_long_polygonss_output_layer': slp_output_layer,
+        'min_mean_slope': _min_mean_slope[return_period],
     })
