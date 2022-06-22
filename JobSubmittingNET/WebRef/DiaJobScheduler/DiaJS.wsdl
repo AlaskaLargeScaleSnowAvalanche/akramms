@@ -1,0 +1,941 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions name="DiaJS"
+ targetNamespace="http://localhost:80/DiaJS.wsdl"
+ xmlns:tns="http://localhost:80/DiaJS.wsdl"
+ xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"
+ xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/"
+ xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+ xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+ xmlns:js="http://tempuri.org/js.xsd"
+ xmlns:SOAP="http://schemas.xmlsoap.org/wsdl/soap/"
+ xmlns:MIME="http://schemas.xmlsoap.org/wsdl/mime/"
+ xmlns:DIME="http://schemas.xmlsoap.org/ws/2002/04/dime/wsdl/"
+ xmlns:WSDL="http://schemas.xmlsoap.org/wsdl/"
+ xmlns="http://schemas.xmlsoap.org/wsdl/">
+
+<types>
+
+ <schema targetNamespace="http://tempuri.org/js.xsd"
+  xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"
+  xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+  xmlns:js="http://tempuri.org/js.xsd"
+  xmlns="http://www.w3.org/2001/XMLSchema"
+  elementFormDefault="unqualified"
+  attributeFormDefault="unqualified">
+  <import namespace="http://schemas.xmlsoap.org/soap/encoding/"/>
+  <simpleType name="EEngineJobStatus">
+   <restriction base="xsd:string">
+    <enumeration value="EUndefined"/><!-- enum const = 0 -->
+    <enumeration value="ECreated"/><!-- enum const = 1 -->
+    <enumeration value="EWaiting"/><!-- enum const = 2 -->
+    <enumeration value="EWorking"/><!-- enum const = 3 -->
+    <enumeration value="EJobDone"/><!-- enum const = 4 -->
+    <enumeration value="EJobFailed"/><!-- enum const = 5 -->
+    <enumeration value="ETimeout"/><!-- enum const = 6 -->
+    <enumeration value="ECancelled"/><!-- enum const = 7 -->
+    <enumeration value="EKilled"/><!-- enum const = 8 -->
+    <enumeration value="EEdited"/><!-- enum const = 9 -->
+    <enumeration value="EAccepted"/><!-- enum const = 10 -->
+    <enumeration value="ERejected"/><!-- enum const = 11 -->
+    <enumeration value="EDeleted"/><!-- enum const = 12 -->
+    <enumeration value="ECrashed"/><!-- enum const = 13 -->
+    <enumeration value="EUnknown"/><!-- enum const = 14 -->
+    <enumeration value="EUnauthorized"/><!-- enum const = 15 -->
+    <enumeration value="EJobSkipped"/><!-- enum const = 16 -->
+    <enumeration value="EStarting"/><!-- enum const = 17 -->
+    <enumeration value="ELicensing"/><!-- enum const = 18 -->
+    <enumeration value="EEndOfEngineJobStatus"/><!-- enum const = 19 -->
+   </restriction>
+  </simpleType>
+  <simpleType name="EJobType">
+   <restriction base="xsd:string">
+    <enumeration value="ENone"/><!-- enum const = 0 -->
+    <enumeration value="EAnalyse"/><!-- enum const = 1 -->
+    <enumeration value="EStitch"/><!-- enum const = 2 -->
+    <enumeration value="EReport"/><!-- enum const = 3 -->
+    <enumeration value="ESort"/><!-- enum const = 4 -->
+    <enumeration value="ECustom"/><!-- enum const = 5 -->
+   </restriction>
+  </simpleType>
+  <simpleType name="EOrderType">
+   <restriction base="xsd:string">
+    <enumeration value="EParallel"/><!-- enum const = 0 -->
+    <enumeration value="ESerial"/><!-- enum const = 1 -->
+   </restriction>
+  </simpleType>
+  <complexType name="SString">
+   <sequence>
+     <element name="str" type="xsd:string" minOccurs="0" maxOccurs="1" nillable="true"/>
+   </sequence>
+  </complexType>
+  <complexType name="GeoInfo">
+   <sequence>
+     <element name="iSrc" type="xsd:int" minOccurs="1" maxOccurs="1" default="2"/>
+     <element name="dPxlRes" type="xsd:double" minOccurs="1" maxOccurs="1" default="-100000000000000010000000000000000.000000"/>
+     <element name="dXPos" type="xsd:double" minOccurs="1" maxOccurs="1" default="-100000000000000010000000000000000.000000"/>
+     <element name="dYPos" type="xsd:double" minOccurs="1" maxOccurs="1" default="-100000000000000010000000000000000.000000"/>
+     <element name="iSizeX" type="xsd:int" minOccurs="1" maxOccurs="1" default="-1"/>
+     <element name="iSizeY" type="xsd:int" minOccurs="1" maxOccurs="1" default="-1"/>
+     <element name="dSliceRes" type="xsd:double" minOccurs="1" maxOccurs="1" default="-100000000000000010000000000000000.000000"/>
+     <element name="dSlicePos" type="xsd:double" minOccurs="1" maxOccurs="1" default="-100000000000000010000000000000000.000000"/>
+     <element name="iSliceCount" type="xsd:int" minOccurs="1" maxOccurs="1" default="-1"/>
+     <element name="dFrameRes" type="xsd:double" minOccurs="1" maxOccurs="1" default="-100000000000000010000000000000000.000000"/>
+     <element name="dFramePos" type="xsd:double" minOccurs="1" maxOccurs="1" default="-100000000000000010000000000000000.000000"/>
+     <element name="iFrameCount" type="xsd:int" minOccurs="1" maxOccurs="1" default="-1"/>
+     <element name="strCSName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="iCSType" type="xsd:int" minOccurs="1" maxOccurs="1" default="1"/>
+     <element name="strPrjStr" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="iCSUnit" type="xsd:int" minOccurs="1" maxOccurs="1" default="0"/>
+   </sequence>
+  </complexType>
+  <complexType name="Layer">
+   <complexContent>
+    <extension base="js:GeoInfo">
+     <sequence>
+     <element name="strAlias" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strFilePath" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="iIndx" type="xsd:int" minOccurs="1" maxOccurs="1" default="0"/>
+     <element name="iNoDataType" type="xsd:int" minOccurs="1" maxOccurs="1" default="0"/>
+     <element name="dNoDataVal" type="xsd:double" minOccurs="1" maxOccurs="1" default="0.000000"/>
+     <element name="bFitted" type="xsd:boolean" minOccurs="1" maxOccurs="1" default="false"/>
+     </sequence>
+    </extension>
+   </complexContent>
+  </complexType>
+  <complexType name="ImgLayer">
+   <complexContent>
+    <extension base="js:Layer">
+     <sequence>
+     <element name="iDataType" type="xsd:int" minOccurs="1" maxOccurs="1" default="0"/>
+     <element name="dScanMagn" type="xsd:double" minOccurs="1" maxOccurs="1" default="0.000000"/>
+     <element name="strDrvrId" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="bPointCloud" type="xsd:boolean" minOccurs="1" maxOccurs="1" default="false"/>
+     </sequence>
+    </extension>
+   </complexContent>
+  </complexType>
+  <complexType name="AttrAlias">
+   <sequence>
+     <element name="column" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="alias" type="js:SString" minOccurs="1" maxOccurs="1"/>
+   </sequence>
+  </complexType>
+  <complexType name="ThmLayer">
+   <complexContent>
+    <extension base="js:Layer">
+     <sequence>
+     <element name="strAttrFilePath" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strIdColLabel" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strDrvrId" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strAttrDrvrId" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="iLineWidht" type="xsd:int" minOccurs="1" maxOccurs="1" default="0"/>
+     <element name="iPointSize" type="xsd:int" minOccurs="1" maxOccurs="1" default="0"/>
+     <element name="bDiagNghbEnbl" type="xsd:boolean" minOccurs="1" maxOccurs="1" default="false"/>
+     <element name="vAttrAliases" type="js:AttrAlias" minOccurs="0" maxOccurs="unbounded"/>
+     </sequence>
+    </extension>
+   </complexContent>
+  </complexType>
+  <complexType name="MetaData">
+   <sequence>
+     <element name="strName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strPath" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strDrvrId" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strCnvrt" type="js:SString" minOccurs="1" maxOccurs="1"/>
+   </sequence>
+  </complexType>
+  <complexType name="SingleScene">
+   <complexContent>
+    <extension base="js:GeoInfo">
+     <sequence>
+     <element name="strSceneName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="vImgLayers" type="js:ImgLayer" minOccurs="0" maxOccurs="unbounded"/>
+     <element name="vThmLayers" type="js:ThmLayer" minOccurs="0" maxOccurs="unbounded"/>
+     <element name="vMetadatas" type="js:MetaData" minOccurs="0" maxOccurs="unbounded"/>
+     </sequence>
+    </extension>
+   </complexContent>
+  </complexType>
+  <complexType name="Scene">
+   <complexContent>
+    <extension base="js:SingleScene">
+     <sequence>
+     <element name="vScenes" type="js:SingleScene" minOccurs="0" maxOccurs="unbounded"/>
+     <element name="iID" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="iVer" type="xsd:int" minOccurs="1" maxOccurs="1" default="0"/>
+     <element name="strName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strFilePath" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strSubWkspPath" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="dUnitPxlSize" type="xsd:double" minOccurs="1" maxOccurs="1" default="-1.000000"/>
+     <element name="bForceFit" type="xsd:boolean" minOccurs="1" maxOccurs="1" default="false"/>
+     <element name="iUnit" type="xsd:int" minOccurs="1" maxOccurs="1" default="5"/>
+     <element name="iCntrlTag" type="xsd:int" minOccurs="1" maxOccurs="1" default="0"/>
+     <element name="iScaleMode" type="xsd:int" minOccurs="1" maxOccurs="1" default="2"/>
+     </sequence>
+    </extension>
+   </complexContent>
+  </complexType>
+  <complexType name="ExportItem">
+   <sequence>
+     <element name="strName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strDriver" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strOptns" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strPath" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strSqlIns" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strSqlSel" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="iType" type="xsd:int" minOccurs="1" maxOccurs="1" default="0"/>
+   </sequence>
+  </complexType>
+  <complexType name="ExportSpec">
+   <sequence>
+     <element name="vExportItems" type="js:ExportItem" minOccurs="0" maxOccurs="unbounded"/>
+   </sequence>
+  </complexType>
+  <complexType name="JobBase">
+   <sequence>
+     <element name="strRuleSet" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strRuleSetPath" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strProcessName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strProcessArgs" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="iTimeout" type="xsd:int" minOccurs="1" maxOccurs="1" default="0"/>
+   </sequence>
+  </complexType>
+  <complexType name="Job">
+   <complexContent>
+    <extension base="js:JobBase">
+     <sequence>
+     <element name="eTask" type="js:EJobType" minOccurs="1" maxOccurs="1" default="EAnalyse"/>
+     <element name="mScene" type="js:Scene" minOccurs="1" maxOccurs="1"/>
+     <element name="mExportSpec" type="js:ExportSpec" minOccurs="1" maxOccurs="1"/>
+     <element name="mStitchInfo" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="mCredentials" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     </sequence>
+    </extension>
+   </complexContent>
+  </complexType>
+  <complexType name="JobList">
+   <complexContent>
+    <extension base="js:JobBase">
+     <sequence>
+     <element name="eOrderType" type="js:EOrderType" minOccurs="1" maxOccurs="1" default="EParallel"/>
+     <element name="vJobs" type="js:JobBase" minOccurs="0" maxOccurs="unbounded" nillable="true"/>
+     </sequence>
+    </extension>
+   </complexContent>
+  </complexType>
+  <complexType name="ConfigEntry">
+   <sequence>
+     <element name="sName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="sVersion" type="js:SString" minOccurs="1" maxOccurs="1"/>
+   </sequence>
+  </complexType>
+  <complexType name="JobConfig">
+   <sequence>
+     <element name="strConfig" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="vPlugins" type="js:ConfigEntry" minOccurs="0" maxOccurs="unbounded"/>
+     <element name="vRDIDrivers" type="js:ConfigEntry" minOccurs="0" maxOccurs="unbounded"/>
+     <element name="vLicenses" type="js:ConfigEntry" minOccurs="0" maxOccurs="unbounded"/>
+   </sequence>
+  </complexType>
+  <complexType name="UserJob">
+   <complexContent>
+    <extension base="js:JobList">
+     <sequence>
+     <element name="strWkspGUID" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strWkspName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strWkspPath" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strStoreName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strUserName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strRunName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strExportTmpl" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strRequestId" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="oCnfg" type="js:JobConfig" minOccurs="1" maxOccurs="1"/>
+     </sequence>
+    </extension>
+   </complexContent>
+  </complexType>
+  <complexType name="EngineJob">
+   <complexContent>
+    <extension base="js:Job">
+     <sequence>
+     <element name="strWkspGUID" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strWkspName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strWkspPath" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strUserName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strRunName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strExportTmpl" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="iUserJobID" type="xsd:int" minOccurs="1" maxOccurs="1"/>
+     <element name="oCnfg" type="js:JobConfig" minOccurs="1" maxOccurs="1"/>
+     </sequence>
+    </extension>
+   </complexContent>
+  </complexType>
+  <complexType name="StatusInfo">
+   <sequence>
+     <element name="iUserJobID" type="xsd:int" minOccurs="1" maxOccurs="1"/>
+     <element name="iSceneID" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="eStatus" type="js:EEngineJobStatus" minOccurs="1" maxOccurs="1"/>
+     <element name="eJobType" type="js:EJobType" minOccurs="1" maxOccurs="1"/>
+     <element name="timeStatus" type="xsd:long" minOccurs="1" maxOccurs="1"/>
+     <element name="timeSubmit" type="xsd:long" minOccurs="1" maxOccurs="1"/>
+     <element name="timeTake" type="xsd:long" minOccurs="1" maxOccurs="1"/>
+     <element name="timeStart" type="xsd:long" minOccurs="1" maxOccurs="1"/>
+     <element name="timeStop" type="xsd:long" minOccurs="1" maxOccurs="1"/>
+     <element name="strRemarks" type="js:SString" minOccurs="1" maxOccurs="1"/>
+   </sequence>
+  </complexType>
+  <complexType name="UserJobInfo">
+   <sequence>
+     <element name="iUserJobID" type="xsd:int" minOccurs="1" maxOccurs="1"/>
+     <element name="strWkspGUID" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strWkspName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strUserName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strRunName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+   </sequence>
+  </complexType>
+  <complexType name="EngineInfo">
+   <sequence>
+     <element name="strHostName" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="iPid" type="xsd:int" minOccurs="1" maxOccurs="1"/>
+     <element name="strBuildNo" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strRemarks" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strLogFile" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strCfgFile" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strREST-Url" type="js:SString" minOccurs="1" maxOccurs="1"/>
+   </sequence>
+  </complexType>
+  <complexType name="JobInfoHdr">
+   <sequence>
+     <element name="iJobNodeID" type="xsd:long" minOccurs="1" maxOccurs="1"/>
+     <element name="iUserJobID" type="xsd:int" minOccurs="1" maxOccurs="1"/>
+     <element name="strLicense" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strVldKey" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="strWkspGUID" type="js:SString" minOccurs="1" maxOccurs="1"/>
+     <element name="oCnfg" type="js:JobConfig" minOccurs="1" maxOccurs="1"/>
+   </sequence>
+  </complexType>
+  <!-- operation request element -->
+  <element name="GetApiVersion">
+   <complexType>
+    <sequence>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation response element -->
+  <element name="GetApiVersionResponse">
+   <complexType>
+    <sequence>
+     <element name="version" type="xsd:int" minOccurs="1" maxOccurs="1"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation request element -->
+  <element name="SubmitJob">
+   <complexType>
+    <sequence>
+     <element name="job" type="js:UserJob" minOccurs="0" maxOccurs="1" nillable="true"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation response element -->
+  <element name="SubmitJobResponse">
+   <complexType>
+    <sequence>
+     <element name="jobID" type="xsd:int" minOccurs="1" maxOccurs="1"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation request element -->
+  <element name="AppendJob">
+   <complexType>
+    <sequence>
+     <element name="job" type="js:UserJob" minOccurs="0" maxOccurs="1" nillable="true"/>
+     <element name="jobID" type="xsd:int" minOccurs="1" maxOccurs="1"/>
+     <element name="sceneID" type="xsd:string" minOccurs="0" maxOccurs="1" nillable="true"/>
+     <element name="parallel" type="xsd:boolean" minOccurs="1" maxOccurs="1" default="false"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation response element -->
+  <element name="empty">
+   <complexType>
+    <sequence>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation request element -->
+  <element name="RequestJobIDs">
+   <complexType>
+    <sequence>
+     <element name="wkspGUID" type="xsd:string" minOccurs="0" maxOccurs="1" nillable="true"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation response element -->
+  <element name="RequestJobIDsResponse">
+   <complexType>
+    <sequence>
+     <element name="ids" type="xsd:int" minOccurs="1" maxOccurs="unbounded"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation request element -->
+  <element name="RequestJobInfo">
+   <complexType>
+    <sequence>
+     <element name="wkspGUID" type="xsd:string" minOccurs="0" maxOccurs="1" nillable="true"/>
+     <element name="jobID" type="xsd:int" minOccurs="1" maxOccurs="1"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation response element -->
+  <element name="RequestJobInfoResponse">
+   <complexType>
+    <sequence>
+     <element name="infos" type="js:UserJobInfo" minOccurs="1" maxOccurs="unbounded"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation request element -->
+  <element name="RequestStatusInfo">
+   <complexType>
+    <sequence>
+     <element name="wkspGUID" type="xsd:string" minOccurs="0" maxOccurs="1" nillable="true"/>
+     <element name="jobID" type="xsd:int" minOccurs="1" maxOccurs="1"/>
+     <element name="since" type="xsd:long" minOccurs="1" maxOccurs="1"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation response element -->
+  <element name="RequestStatusInfoResponse">
+   <complexType>
+    <sequence>
+     <element name="infos" type="js:StatusInfo" minOccurs="1" maxOccurs="unbounded"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation request element -->
+  <element name="RequestStatusInfo2">
+   <complexType>
+    <sequence>
+     <element name="wkspGUID" type="xsd:string" minOccurs="0" maxOccurs="1" nillable="true"/>
+     <element name="jobID" type="xsd:int" minOccurs="1" maxOccurs="1"/>
+     <element name="since" type="xsd:long" minOccurs="1" maxOccurs="1"/>
+     <element name="maxInfos" type="xsd:int" minOccurs="1" maxOccurs="1"/>
+     <element name="active-only" type="xsd:boolean" minOccurs="1" maxOccurs="1"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation response element -->
+  <element name="RequestStatusInfo2Response">
+   <complexType>
+    <sequence>
+     <element name="infos" type="js:StatusInfo" minOccurs="1" maxOccurs="unbounded"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation request element -->
+  <element name="CancelJob">
+   <complexType>
+    <sequence>
+     <element name="wkspGUID" type="xsd:string" minOccurs="0" maxOccurs="1" nillable="true"/>
+     <element name="jobID" type="xsd:int" minOccurs="1" maxOccurs="1"/>
+     <element name="sceneIDs" type="js:SString" minOccurs="0" maxOccurs="unbounded"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation request element -->
+  <element name="DeleteJob">
+   <complexType>
+    <sequence>
+     <element name="wkspGUID" type="xsd:string" minOccurs="0" maxOccurs="1" nillable="true"/>
+     <element name="jobID" type="xsd:int" minOccurs="1" maxOccurs="1"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation response element -->
+  <element name="empty-2">
+   <complexType>
+    <sequence>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation request element -->
+  <element name="RequestJob">
+   <complexType>
+    <sequence>
+     <element name="engineID" type="xsd:string" minOccurs="0" maxOccurs="1" nillable="true"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation response element -->
+  <element name="RequestJobResponse">
+   <complexType>
+    <sequence>
+     <element name="job" type="js:EngineJob" minOccurs="1" maxOccurs="1"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation request element -->
+  <element name="RequestRESTURL">
+   <complexType>
+    <sequence>
+     <element name="sessionID" type="xsd:string" minOccurs="0" maxOccurs="1" nillable="true"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation response element -->
+  <element name="RequestRESTURLResponse">
+   <complexType>
+    <sequence>
+     <element name="restURL" type="js:SString" minOccurs="1" maxOccurs="1"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation request element -->
+  <element name="SubmitStatusInfo">
+   <complexType>
+    <sequence>
+     <element name="engineID" type="xsd:string" minOccurs="0" maxOccurs="1" nillable="true"/>
+     <element name="info" type="js:EngineInfo" minOccurs="0" maxOccurs="1" nillable="true"/>
+     <element name="status" type="js:EEngineJobStatus" minOccurs="1" maxOccurs="1"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation response element -->
+  <element name="SubmitStatusInfoResponse">
+   <complexType>
+    <sequence>
+     <element name="cancel" type="xsd:boolean" minOccurs="1" maxOccurs="1"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation request element -->
+  <element name="RequestJobHeader">
+   <complexType>
+    <sequence>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation response element -->
+  <element name="RequestJobHeaderResponse">
+   <complexType>
+    <sequence>
+     <element name="job" type="js:JobInfoHdr" minOccurs="1" maxOccurs="1"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation request element -->
+  <element name="RejectJob">
+   <complexType>
+    <sequence>
+     <element name="job" type="js:JobInfoHdr" minOccurs="0" maxOccurs="1" nillable="true"/>
+     <element name="status" type="js:EEngineJobStatus" minOccurs="1" maxOccurs="1"/>
+     <element name="error" type="xsd:string" minOccurs="0" maxOccurs="1" nillable="true"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation response element -->
+  <element name="empty-3">
+   <complexType>
+    <sequence>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation request element -->
+  <element name="RegisterEngineJob">
+   <complexType>
+    <sequence>
+     <element name="nodeID" type="xsd:long" minOccurs="1" maxOccurs="1"/>
+     <element name="info" type="js:EngineInfo" minOccurs="0" maxOccurs="1" nillable="true"/>
+     <element name="status" type="js:EEngineJobStatus" minOccurs="1" maxOccurs="1"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation response element -->
+  <element name="empty-4">
+   <complexType>
+    <sequence>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation request element -->
+  <element name="BackupDatabase">
+   <complexType>
+    <sequence>
+     <element name="filepath" type="xsd:string" minOccurs="0" maxOccurs="1" nillable="true"/>
+    </sequence>
+   </complexType>
+  </element>
+  <!-- operation response element -->
+  <element name="empty-5">
+   <complexType>
+    <sequence>
+    </sequence>
+   </complexType>
+  </element>
+ </schema>
+
+</types>
+
+<message name="GetApiVersionRequest">
+ <part name="parameters" element="js:GetApiVersion"/>
+</message>
+
+<message name="GetApiVersionResponse">
+ <part name="parameters" element="js:GetApiVersionResponse"/>
+</message>
+
+<message name="SubmitJobRequest">
+ <part name="parameters" element="js:SubmitJob"/>
+</message>
+
+<message name="SubmitJobResponse">
+ <part name="parameters" element="js:SubmitJobResponse"/>
+</message>
+
+<message name="AppendJob">
+ <part name="parameters" element="js:AppendJob"/>
+</message>
+
+<message name="empty">
+ <part name="parameters" element="js:empty"/>
+</message>
+
+<message name="RequestJobIDsRequest">
+ <part name="parameters" element="js:RequestJobIDs"/>
+</message>
+
+<message name="RequestJobIDsResponse">
+ <part name="parameters" element="js:RequestJobIDsResponse"/>
+</message>
+
+<message name="RequestJobInfoRequest">
+ <part name="parameters" element="js:RequestJobInfo"/>
+</message>
+
+<message name="RequestJobInfoResponse">
+ <part name="parameters" element="js:RequestJobInfoResponse"/>
+</message>
+
+<message name="RequestStatusInfoRequest">
+ <part name="parameters" element="js:RequestStatusInfo"/>
+</message>
+
+<message name="RequestStatusInfoResponse">
+ <part name="parameters" element="js:RequestStatusInfoResponse"/>
+</message>
+
+<message name="RequestStatusInfo2Request">
+ <part name="parameters" element="js:RequestStatusInfo2"/>
+</message>
+
+<message name="RequestStatusInfo2Response">
+ <part name="parameters" element="js:RequestStatusInfo2Response"/>
+</message>
+
+<message name="CancelJob">
+ <part name="parameters" element="js:CancelJob"/>
+</message>
+
+<message name="DeleteJob">
+ <part name="parameters" element="js:DeleteJob"/>
+</message>
+
+<message name="empty-2">
+ <part name="parameters" element="js:empty-2"/>
+</message>
+
+<message name="RequestJobRequest">
+ <part name="parameters" element="js:RequestJob"/>
+</message>
+
+<message name="RequestJobResponse">
+ <part name="parameters" element="js:RequestJobResponse"/>
+</message>
+
+<message name="RequestRESTURLRequest">
+ <part name="parameters" element="js:RequestRESTURL"/>
+</message>
+
+<message name="RequestRESTURLResponse">
+ <part name="parameters" element="js:RequestRESTURLResponse"/>
+</message>
+
+<message name="SubmitStatusInfoRequest">
+ <part name="parameters" element="js:SubmitStatusInfo"/>
+</message>
+
+<message name="SubmitStatusInfoResponse">
+ <part name="parameters" element="js:SubmitStatusInfoResponse"/>
+</message>
+
+<message name="RequestJobHeaderRequest">
+ <part name="parameters" element="js:RequestJobHeader"/>
+</message>
+
+<message name="RequestJobHeaderResponse">
+ <part name="parameters" element="js:RequestJobHeaderResponse"/>
+</message>
+
+<message name="RejectJob">
+ <part name="parameters" element="js:RejectJob"/>
+</message>
+
+<message name="empty-3">
+ <part name="parameters" element="js:empty-3"/>
+</message>
+
+<message name="RegisterEngineJob">
+ <part name="parameters" element="js:RegisterEngineJob"/>
+</message>
+
+<message name="empty-4">
+ <part name="parameters" element="js:empty-4"/>
+</message>
+
+<message name="BackupDatabase">
+ <part name="parameters" element="js:BackupDatabase"/>
+</message>
+
+<message name="empty-5">
+ <part name="parameters" element="js:empty-5"/>
+</message>
+
+<portType name="DiaJSPortType">
+ <operation name="GetApiVersion">
+  <documentation>Service definition of function js__GetApiVersion</documentation>
+  <input message="tns:GetApiVersionRequest"/>
+  <output message="tns:GetApiVersionResponse"/>
+ </operation>
+ <operation name="SubmitJob">
+  <documentation>Service definition of function js__SubmitJob</documentation>
+  <input message="tns:SubmitJobRequest"/>
+  <output message="tns:SubmitJobResponse"/>
+ </operation>
+ <operation name="AppendJob">
+  <documentation>Service definition of function js__AppendJob</documentation>
+  <input message="tns:AppendJob"/>
+  <output message="tns:empty"/>
+ </operation>
+ <operation name="RequestJobIDs">
+  <documentation>Service definition of function js__RequestJobIDs</documentation>
+  <input message="tns:RequestJobIDsRequest"/>
+  <output message="tns:RequestJobIDsResponse"/>
+ </operation>
+ <operation name="RequestJobInfo">
+  <documentation>Service definition of function js__RequestJobInfo</documentation>
+  <input message="tns:RequestJobInfoRequest"/>
+  <output message="tns:RequestJobInfoResponse"/>
+ </operation>
+ <operation name="RequestStatusInfo">
+  <documentation>Service definition of function js__RequestStatusInfo</documentation>
+  <input message="tns:RequestStatusInfoRequest"/>
+  <output message="tns:RequestStatusInfoResponse"/>
+ </operation>
+ <operation name="RequestStatusInfo2">
+  <documentation>Service definition of function js__RequestStatusInfo2</documentation>
+  <input message="tns:RequestStatusInfo2Request"/>
+  <output message="tns:RequestStatusInfo2Response"/>
+ </operation>
+ <operation name="CancelJob">
+  <documentation>Service definition of function js__CancelJob</documentation>
+  <input message="tns:CancelJob"/>
+ </operation>
+ <operation name="DeleteJob">
+  <documentation>Service definition of function js__DeleteJob</documentation>
+  <input message="tns:DeleteJob"/>
+  <output message="tns:empty-2"/>
+ </operation>
+ <operation name="RequestJob">
+  <documentation>Service definition of function js__RequestJob</documentation>
+  <input message="tns:RequestJobRequest"/>
+  <output message="tns:RequestJobResponse"/>
+ </operation>
+ <operation name="RequestRESTURL">
+  <documentation>Service definition of function js__RequestRESTURL</documentation>
+  <input message="tns:RequestRESTURLRequest"/>
+  <output message="tns:RequestRESTURLResponse"/>
+ </operation>
+ <operation name="SubmitStatusInfo">
+  <documentation>Service definition of function js__SubmitStatusInfo</documentation>
+  <input message="tns:SubmitStatusInfoRequest"/>
+  <output message="tns:SubmitStatusInfoResponse"/>
+ </operation>
+ <operation name="RequestJobHeader">
+  <documentation>Service definition of function js__RequestJobHeader</documentation>
+  <input message="tns:RequestJobHeaderRequest"/>
+  <output message="tns:RequestJobHeaderResponse"/>
+ </operation>
+ <operation name="RejectJob">
+  <documentation>Service definition of function js__RejectJob</documentation>
+  <input message="tns:RejectJob"/>
+  <output message="tns:empty-3"/>
+ </operation>
+ <operation name="RegisterEngineJob">
+  <documentation>Service definition of function js__RegisterEngineJob</documentation>
+  <input message="tns:RegisterEngineJob"/>
+  <output message="tns:empty-4"/>
+ </operation>
+ <operation name="BackupDatabase">
+  <documentation>Service definition of function js__BackupDatabase</documentation>
+  <input message="tns:BackupDatabase"/>
+  <output message="tns:empty-5"/>
+ </operation>
+</portType>
+
+<binding name="DiaJS" type="tns:DiaJSPortType">
+ <SOAP:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+ <operation name="GetApiVersion">
+  <SOAP:operation soapAction=""/>
+  <input>
+     <SOAP:body parts="parameters" use="literal"/>
+  </input>
+  <output>
+     <SOAP:body parts="parameters" use="literal"/>
+  </output>
+ </operation>
+ <operation name="SubmitJob">
+  <SOAP:operation soapAction=""/>
+  <input>
+     <SOAP:body parts="parameters" use="literal"/>
+  </input>
+  <output>
+     <SOAP:body parts="parameters" use="literal"/>
+  </output>
+ </operation>
+ <operation name="AppendJob">
+  <SOAP:operation soapAction=""/>
+  <input>
+     <SOAP:body parts="parameters" use="literal"/>
+  </input>
+  <output>
+     <SOAP:body parts="parameters" use="literal"/>
+  </output>
+ </operation>
+ <operation name="RequestJobIDs">
+  <SOAP:operation soapAction=""/>
+  <input>
+     <SOAP:body parts="parameters" use="literal"/>
+  </input>
+  <output>
+     <SOAP:body parts="parameters" use="literal"/>
+  </output>
+ </operation>
+ <operation name="RequestJobInfo">
+  <SOAP:operation soapAction=""/>
+  <input>
+     <SOAP:body parts="parameters" use="literal"/>
+  </input>
+  <output>
+     <SOAP:body parts="parameters" use="literal"/>
+  </output>
+ </operation>
+ <operation name="RequestStatusInfo">
+  <SOAP:operation soapAction=""/>
+  <input>
+     <SOAP:body parts="parameters" use="literal"/>
+  </input>
+  <output>
+     <SOAP:body parts="parameters" use="literal"/>
+  </output>
+ </operation>
+ <operation name="RequestStatusInfo2">
+  <SOAP:operation soapAction=""/>
+  <input>
+     <SOAP:body parts="parameters" use="literal"/>
+  </input>
+  <output>
+     <SOAP:body parts="parameters" use="literal"/>
+  </output>
+ </operation>
+ <operation name="CancelJob">
+  <SOAP:operation soapAction=""/>
+  <input>
+     <SOAP:body parts="parameters" use="literal"/>
+  </input>
+ </operation>
+ <operation name="DeleteJob">
+  <SOAP:operation soapAction=""/>
+  <input>
+     <SOAP:body parts="parameters" use="literal"/>
+  </input>
+  <output>
+     <SOAP:body parts="parameters" use="literal"/>
+  </output>
+ </operation>
+ <operation name="RequestJob">
+  <SOAP:operation soapAction=""/>
+  <input>
+     <SOAP:body parts="parameters" use="literal"/>
+  </input>
+  <output>
+     <SOAP:body parts="parameters" use="literal"/>
+  </output>
+ </operation>
+ <operation name="RequestRESTURL">
+  <SOAP:operation soapAction=""/>
+  <input>
+     <SOAP:body parts="parameters" use="literal"/>
+  </input>
+  <output>
+     <SOAP:body parts="parameters" use="literal"/>
+  </output>
+ </operation>
+ <operation name="SubmitStatusInfo">
+  <SOAP:operation soapAction=""/>
+  <input>
+     <SOAP:body parts="parameters" use="literal"/>
+  </input>
+  <output>
+     <SOAP:body parts="parameters" use="literal"/>
+  </output>
+ </operation>
+ <operation name="RequestJobHeader">
+  <SOAP:operation soapAction=""/>
+  <input>
+     <SOAP:body parts="parameters" use="literal"/>
+  </input>
+  <output>
+     <SOAP:body parts="parameters" use="literal"/>
+  </output>
+ </operation>
+ <operation name="RejectJob">
+  <SOAP:operation soapAction=""/>
+  <input>
+     <SOAP:body parts="parameters" use="literal"/>
+  </input>
+  <output>
+     <SOAP:body parts="parameters" use="literal"/>
+  </output>
+ </operation>
+ <operation name="RegisterEngineJob">
+  <SOAP:operation soapAction=""/>
+  <input>
+     <SOAP:body parts="parameters" use="literal"/>
+  </input>
+  <output>
+     <SOAP:body parts="parameters" use="literal"/>
+  </output>
+ </operation>
+ <operation name="BackupDatabase">
+  <SOAP:operation soapAction=""/>
+  <input>
+     <SOAP:body parts="parameters" use="literal"/>
+  </input>
+  <output>
+     <SOAP:body parts="parameters" use="literal"/>
+  </output>
+ </operation>
+</binding>
+
+<service name="DiaJS">
+ <documentation>gSOAP 2.7.9l generated service definition</documentation>
+ <port name="DiaJS" binding="tns:DiaJS">
+  <SOAP:address location="http://localhost:80"/>
+ </port>
+</service>
+
+</definitions>
