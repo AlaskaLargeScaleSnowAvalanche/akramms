@@ -29,7 +29,7 @@
     </FileUpgradeFlags>
     <UpgradeBackupLocation>
     </UpgradeBackupLocation>
-    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <OldToolsVersion>2.0</OldToolsVersion>
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
@@ -141,7 +141,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Web References\DiaJobScheduler\Reference.cs">
+    <Compile Include="WebRef\DiaJobScheduler\Reference.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
       <DependentUpon>Reference.map</DependentUpon>
@@ -156,7 +156,7 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
       <DependentUpon>Settings.settings</DependentUpon>
     </Compile>
-    <WebReferences Include="Web References\" />
+    <WebReferences Include="WebRef\" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
@@ -164,24 +164,27 @@
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
-    <None Include="Web References\DiaJobScheduler\DiaJS.wsdl" />
-    <None Include="Web References\DiaJobScheduler\EngineJob1.datasource">
+    <None Include="WebRef\DiaJobScheduler\DiaJS.wsdl" />
+    <None Include="WebRef\DiaJobScheduler\EngineJob1.datasource">
       <DependentUpon>Reference.map</DependentUpon>
     </None>
-    <None Include="Web References\DiaJobScheduler\JobInfoHdr1.datasource">
+    <None Include="WebRef\DiaJobScheduler\JobInfoHdr1.datasource">
       <DependentUpon>Reference.map</DependentUpon>
     </None>
-    <None Include="Web References\DiaJobScheduler\Reference.map">
+    <None Include="WebRef\DiaJobScheduler\Reference.map">
       <Generator>MSDiscoCodeGenerator</Generator>
       <LastGenOutput>Reference.cs</LastGenOutput>
     </None>
-    <None Include="Web References\DiaJobScheduler\SString1.datasource">
+    <None Include="WebRef\DiaJobScheduler\SString.datasource">
       <DependentUpon>Reference.map</DependentUpon>
     </None>
-    <None Include="Web References\DiaJobScheduler\StatusInfo1.datasource">
+    <None Include="WebRef\DiaJobScheduler\SString1.datasource">
       <DependentUpon>Reference.map</DependentUpon>
     </None>
-    <None Include="Web References\DiaJobScheduler\UserJobInfo1.datasource">
+    <None Include="WebRef\DiaJobScheduler\StatusInfo1.datasource">
+      <DependentUpon>Reference.map</DependentUpon>
+    </None>
+    <None Include="WebRef\DiaJobScheduler\UserJobInfo1.datasource">
       <DependentUpon>Reference.map</DependentUpon>
     </None>
   </ItemGroup>
@@ -205,7 +208,7 @@
   <ItemGroup>
     <WebReferenceUrl Include="C:\src\eCognition_Leo\SRC\DRPCom\soap\DiaJS.wsdl">
       <UrlBehavior>Dynamic</UrlBehavior>
-      <RelPath>Web References\DiaJobScheduler\</RelPath>
+      <RelPath>WebRef\DiaJobScheduler\</RelPath>
       <UpdateFromURL>C:\src\eCognition_Leo\SRC\DRPCom\soap\DiaJS.wsdl</UpdateFromURL>
       <ServiceLocationURL>
       </ServiceLocationURL>
