@@ -35,12 +35,13 @@ namespace JobSubmittingNET
 		//---------------------------------------------------------------
 		//	Sample data
 		//---------------------------------------------------------------
-        static string szRullsetPath = "..\\Data\\fastrule.dcp";		// ruleset
-        static string szLayer1ImgPath = "..\\Data\\cell1.tif";		// image 1
-        static string szLayer2ImgPath = "..\\Data\\cell2.tif";		// image 1
-		static string szExpItem1 = "..\\..\\..\\Data\\out.csv";				// output csv file
-		static string szExpItem2 = "..\\..\\..\\Data\\out1.dpr";
-        static string szExpItem3 = "..\\..\\..\\Data\\out2.dpr";		// image 1
+        static string DATA_HOME = "c:\\Users\\efischer\\git\\Data";
+        static string szRullsetPath = DATA_HOME+"\\fastrule.dcp";		// ruleset
+        static string szLayer1ImgPath = DATA_HOME+"\\cell1.tif";		// image 1
+        static string szLayer2ImgPath = DATA_HOME+"\\cell2.tif";		// image 1
+		static string szExpItem1 = "out.csv";				// output csv file
+		static string szExpItem2 = "out1.dpr";
+        static string szExpItem3 = "out2.dpr";		// image 1
 		static string szServer = "http://localhost:8186";					// server url
 		static string szGuid = "81B9641D-6671-4979-9224-F1E4AC4AD553";	// job guid
 
@@ -74,6 +75,7 @@ namespace JobSubmittingNET
 			//---------------------------------------------------------------
 			//	load ruleset
 			//---------------------------------------------------------------
+Console.WriteLine("AA1");
 			try 
 			{
 				// Create an instance of StreamReader to read from a file.
@@ -94,6 +96,7 @@ namespace JobSubmittingNET
 			//---------------------------------------------------------------
 			UserJob rootjob = new UserJob();
 
+Console.WriteLine("AA2");
             rootjob.strWkspGUID = new SString();
             rootjob.strWkspName = new SString();
             rootjob.strUserName = new SString();
@@ -109,6 +112,7 @@ namespace JobSubmittingNET
 			//---------------------------------------------------------------
 			// add a scene to the job
 			//---------------------------------------------------------------
+Console.WriteLine("AA3");
 			{
 				Job job = CreateScene("test scene 1",2,1);
                 job.strProcessArgs = new SString();
@@ -161,6 +165,7 @@ namespace JobSubmittingNET
                 rootjob.vJobs[1] = job2;
 			}
 
+Console.WriteLine("AA4");
             rootjob.oCnfg = new JobConfig();
             rootjob.oCnfg.strConfig = new SString();
             rootjob.oCnfg.strConfig.str = "eCognitionEarthServer64.9.last";
