@@ -1,0 +1,7 @@
+AKRAMMS_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+GIT_DIR=$(dirname "$AKRAMMS_DIR")
+
+conda activate avalanche
+export PYTHONPATH="$PYTHONPATH:$GIT_DIR/uafgi:$GIT_DIR/akramms"
+export PATH="$PATH:$GIT_DIR/akramms/sh"
+
