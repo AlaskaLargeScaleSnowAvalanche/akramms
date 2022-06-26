@@ -1,0 +1,11 @@
+#!/user/bin/env python
+#
+
+import sys
+from dggs import avalanche
+
+"""Script used to prepare scene remotely on Windows host."""
+
+scene_dir = sys.argv[1]
+avalanche.prepare_data_rule(scene_dir)()
+
