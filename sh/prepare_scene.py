@@ -1,6 +1,3 @@
-#!/user/bin/env python
-#
-
 import sys
 from dggs import avalanche
 import os

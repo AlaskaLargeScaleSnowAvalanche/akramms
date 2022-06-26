@@ -161,6 +161,10 @@ def prepare_data_rule(scene_dir):
                 out.write(' '.join(str(x) for x in kernel[irow,:]))
                 out.write('\n')
 
+        # Assume local (Linux) and remote (Windows) filesystems are
+        # set up the same within the home directories.
+        remote_scene_dir = os.path.join('~', os.path.relpath(os.path.abspath(scene_dir), os.environ['HOME']))
+
         # Obtain ArcGIS SpatialReference object (script needs as a script variable)
         script_args['outCoordSystem'] = arcgisutil.Lambda('arcpy', 'SpatialReference', scene_args['coordinate_system'])
         data_prep_PRA_py = os.path.join(akrammsdir, 'sh', 'arcgis', 'data_prep_PRA.py')
