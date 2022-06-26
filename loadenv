@@ -5,3 +5,6 @@ conda activate avalanche
 export PYTHONPATH="$PYTHONPATH:$GIT_DIR/uafgi:$GIT_DIR/akramms"
 export PATH="$PATH:$GIT_DIR/akramms/sh"
 
+git config --global user.name "$USER"
+git config --global user.email "$EMAIL"
+
