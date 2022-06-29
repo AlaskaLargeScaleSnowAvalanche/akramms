@@ -2,7 +2,6 @@ import functools
 import os
 from dggs.avalanche import params
 
-
 thisdir = os.path.split(os.path.abspath(__file__))[0]
 
 @functools.lru_cache()
@@ -94,6 +93,10 @@ def _map_level_proxys(return_period):
 _segmentation2_scale = {10:25, 30:45, 100:60, 300:120}
 _min_mean_slope = {10:30, 30:30, 100:28, 300:28}
 
+return_periods = sorted(list(_min_mean_slope.keys()))    # [10,30,100,300]
+def return_period_category(return_period):
+    return 'frequent' if return_period < 100 else 'extreme'
+
 def get(scene_dir, return_period, forest):
     """
     scene_dir:
@@ -107,7 +110,7 @@ def get(scene_dir, return_period, forest):
         'scene_dir': scene_dir,
         'map_level_proxys': _map_level_proxys(return_period),
         'return_period': return_period,
-        'return_period_category': 'frequent' if return_period < 100 else 'extreme',
+        'return_period_category': return_period_category(return_period),
         '_For': '_For' if forest else '_NoFor',
         'segmentation2_scale': _segmentation2_scale[return_period],
         'split_long_polygonss': slp,

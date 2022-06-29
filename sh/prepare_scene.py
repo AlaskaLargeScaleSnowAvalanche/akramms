@@ -8,5 +8,6 @@ import os
 relative_scene_dir = sys.argv[1]
 scene_dir = os.path.join(os.environ['HOME'], relative_scene_dir)
 
-avalanche.prepare_data_rule(scene_dir)()
+avalanche.prepare_data(scene_dir)
+
 
