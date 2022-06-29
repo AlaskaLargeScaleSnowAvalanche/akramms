@@ -1,3 +1,4 @@
+from dggs.util import harnutil
 import collections
 import pathlib
 import textwrap
@@ -22,12 +23,22 @@ class Type:
     def read_nc(self, ncv):
         return ncv.value
 
+# Things one can use in a path; eg: '{ROOT}/...'
+_path_vars = {
+    'HARNESS': harnutil.HARNESS
+}
+
 class PathType(Type):
     def __init__(self):
         super().__init__(str)
 
     def validate(self, val):
-        return os.path.abspath(val)
+#        return os.path.abspath(val.format(**_path_vars))
+        ret = os.path.join('{HARNESS}', os.path.replath(os.path.abspath(val), HARNESS))
+        if os.name == 'nt':
+            ret = ret.replace(os.path.pathsep, '/')
+        print('{} => {}'.format(val, ret))
+        return ret
 
 class InputFileType(Type):
     def __init__(self):
@@ -37,7 +48,15 @@ class InputFileType(Type):
         val = os.path.abspath(val)
         if not os.path.exists(val):
             raise FileNotFoundError(val)
-        return val
+
+        ret = os.path.join('{HARNESS}', os.path.relpath(val, harnutil.HARNESS))
+        if os.name == 'nt':
+            ret = ret.replace(os.path.pathsep, '/')
+        print('{} => {}'.format(val, ret))
+        return ret
+
+    def read_nc(self, ncv):
+        return ncv.value.format(**_path_vars)
 
 class ListType:
     def validate(self, val):
