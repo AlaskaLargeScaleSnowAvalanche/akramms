@@ -10,12 +10,18 @@
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
 
+# Add akramms to PYTHONPATH, and import utilities therein
+import sys,os
+sys.path.append(os.path.abspath(os.path.join(os.path.abspath(__file__), '..', '..', '..')))
+import dggs.util.arcgisutil
+
+
 import os, sys
 import arcpy
 from arcpy import env
 from arcpy.sa import *
 import multiprocessing
-from functools import partial
+import functools
 import tempfile
 import math
 import shutil
@@ -142,6 +148,7 @@ def findDomain(workspace, fileShp, fileDEM, fileFlowdir, buffdis, name):
         print("Cellsize = " + cellsize)
 
         # Create a tmp directory for domain workspaces
+        # TODO: Might need more unique names; maybe use ioutil.TmpDir
         workspace_tmp_domain = os.path.join(workspace, "temp_domain")
         if not os.path.exists(workspace_tmp_domain):
             os.makedirs(workspace_tmp_domain)
@@ -154,7 +161,7 @@ def findDomain(workspace, fileShp, fileDEM, fileFlowdir, buffdis, name):
 
         # This line creates a "pointer" to the real function but its a nifty way for declaring parameters.
         # Note the layer objects are passing their full path as layer objects cannot be pickled
-        func = partial(calcDomain, workspace_tmp_domain, fileDEM, fileFlowdir, buffdis, cellsize)
+        func = functools.partial(calcDomain, workspace_tmp_domain, fileDEM, fileFlowdir, buffdis, cellsize)
 
         # declare number of cores to use, use 2 less than the max
         # cpuNum = int(math.ceil(multiprocessing.cpu_count() / 2))
@@ -162,6 +169,7 @@ def findDomain(workspace, fileShp, fileDEM, fileFlowdir, buffdis, name):
         # cpuNum = 40
         print("Number of cores = " + str(cpuNum))
 
+        # TODO: Avoid job handling at this level.
         # Create the pool object
         pool = multiprocessing.Pool(processes=cpuNum)
 
@@ -200,8 +208,8 @@ def findDomain(workspace, fileShp, fileDEM, fileFlowdir, buffdis, name):
 #        sr = arcpy.SpatialReference(21781)
 #        sr = arcpy.SpatialReference(2056)
         desc = arcpy.Describe(fileShp)
-        print("Spatial reference name: {0}".format(desc.spatialReference.name))
-        print("Spatial reference factoryCode: {0}".format(desc.spatialReference.factoryCode))
+        print("Spatial reference name: {}".format(desc.spatialReference.name))
+        print("Spatial reference factoryCode: {}".format(desc.spatialReference.factoryCode))
         sr = arcpy.SpatialReference(desc.spatialReference.factoryCode)
 
         # This line creates a "pointer" to the real function but its a nifty way for declaring parameters.
@@ -265,62 +273,69 @@ def findDomain(workspace, fileShp, fileDEM, fileFlowdir, buffdis, name):
         arcpy.AddError(str(e))
 
 
-if __name__ == '__main__':
-    # Import current script
-    import domain_finder_multicore_all10_multi
+def main():
+    dggs.util.arcgisutil.get_script_vars(locals(), (
+        ('scene_dir', 'GetParameterAsText'),
+        ('fileDEM', 'GetParameterAsText'),
+    ))
+
     startTime = datetime.datetime.now()
+    try:
 
-    # Set domain finder input variables
-    basename = r"D:\LSHIM\TerrainClass2020\TestSites\Davos\RAMMS_sim\RELEASE\PRAsteph_5m_10"
-    fileDEM = r"D:\LSHIM\TerrainClass2020\TestSites\Davos\DTM_5m_Davos.tif"
-    workspace = r"D:\LSHIM\TerrainClass2020\TestSites\Davos\RAMMS_sim\DOMAIN_Test_AS"
+        # Set domain finder input variables
+        baseleaf = 'PRAsteph_5m_10'
+        basename = os.path.join(scene_dir, baseleaf)
+        workspace = os.path.join(scene_dir, 'RAMMS_sim', 'DOMAIN_AS')
 
 
-    # Create FlowDirection raster
-    arcpy.AddMessage("Creating FlowDirection raster...")
-    if arcpy.Exists(workspace):
-        shutil.rmtree(workspace)
-    arcpy.CreateFolder_management(os.path.dirname(workspace),os.path.basename(workspace))
-    fileFlowdirSink = os.path.join(workspace, "flowdirSink.tif")
-    outFlowdirSink = FlowDirection(fileDEM)
-    outFlowdirSink.save(fileFlowdirSink)
-    # Fill sinks in DEM
-    fileSink = os.path.join(workspace, "sink.tif")
-    outSink = Sink(outFlowdirSink)
-    outSink.save(fileSink)
-    fileFill = os.path.join(workspace, "fill.tif")
-    outFill = Fill(fileDEM)
-    outFill.save(fileFill)
-    fileFlowdirFill = os.path.join(workspace, "flowdirFill.tif")
-    outFlowdirFill = FlowDirection(fileFill)
-    outFlowdirFill.save(fileFlowdirFill)
-    fileFlowdir = os.path.join(workspace, "flowdir.tif")
-    outFlowdir = Con(IsNull(fileSink), fileFlowdirFill)
-    outFlowdir.save(fileFlowdir)
+        # Create FlowDirection raster
+        arcpy.AddMessage("Creating FlowDirection raster...")
+        if arcpy.Exists(workspace):
+            shutil.rmtree(workspace)
+        arcpy.CreateFolder_management(*os.path.split(workspace))
+        fileFlowdirSink = os.path.join(workspace, "flowdirSink.tif")
+        outFlowdirSink = FlowDirection(fileDEM)
+        outFlowdirSink.save(fileFlowdirSink)
 
-    # Delete temp files
-    #arcpy.Delete_management(fileFlowdirSink)
-    #arcpy.Delete_management(fileSink)
-    #arcpy.Delete_management(fileFill)
-    #arcpy.Delete_management(fileFlowdirFill)
+        # Fill sinks in DEM
+        fileSink = os.path.join(workspace, "sink.tif")
+        outSink = Sink(outFlowdirSink)
+        outSink.save(fileSink)
+        fileFill = os.path.join(workspace, "fill.tif")
+        outFill = Fill(fileDEM)
+        outFill.save(fileFill)
+        fileFlowdirFill = os.path.join(workspace, "flowdirFill.tif")
+        outFlowdirFill = FlowDirection(fileFill)
+        outFlowdirFill.save(fileFlowdirFill)
+        fileFlowdir = os.path.join(workspace, "flowdir.tif")
+        outFlowdir = Con(IsNull(fileSink), fileFlowdirFill)
+        outFlowdir.save(fileFlowdir)
 
-    # Calculate domains for scenarios in collection
-    collection = [ ['M', '800'], ['S', '400'], ['T', '200']] #['L', '1250'], ['M', '800'],
-    for x in collection:
-        fileShp = basename + x[0] + '_rel.shp'
-        buffdis = x[1]
-        name = os.path.basename(basename) + x[0]
+        # Delete temp files
+        #arcpy.Delete_management(fileFlowdirSink)
+        #arcpy.Delete_management(fileSink)
+        #arcpy.Delete_management(fileFill)
+        #arcpy.Delete_management(fileFlowdirFill)
 
-        if arcpy.Exists(fileShp):
-            arcpy.AddMessage("Calling multiprocessing code...")
-            domain_finder_multicore_all10_multi.findDomain(workspace, fileShp, fileDEM, fileFlowdir, buffdis, name)
-        else:
-            print("Shapefile " + fileShp + " does not exist!")
+        # Calculate domains for scenarios in collection
+        for sizeLetter,buffdis in [ ('M', '800'), ('S', '400'), ('T', '200')]:
+            fileShp = f'{basename}{sizeLetter}_rel.shp'
+            name = f'{baseleaf}{sizeLetter}'
 
-    # Cleanup temp files
-    # arcpy.Delete_management(fileFlowdir)
-    arcpy.AddMessage("Done!")
+            if arcpy.Exists(fileShp):
+                arcpy.AddMessage("Calling multiprocessing code...")
+                findDomain(workspace, fileShp, fileDEM, fileFlowdir, buffdis, name)
+            else:
+                raise FileNotFoundError(fileShp)
 
-    stopTime = datetime.datetime.now()
-    diff = stopTime - startTime
-    print("It took: {0} days, {1} hours, {2} minutes, {3} seconds".format(diff.days, diff.seconds//3600, (diff.seconds//60)%60, diff.seconds%60))
+    finally:
+        # Cleanup temp files
+        # arcpy.Delete_management(fileFlowdir)
+        arcpy.AddMessage("Done!")
+
+        stopTime = datetime.datetime.now()
+        diff = stopTime - startTime
+        print("It took: {0} days, {1} hours, {2} minutes, {3} seconds".format(diff.days, diff.seconds//3600, (diff.seconds//60)%60, diff.seconds%60))
+
+
+main()
