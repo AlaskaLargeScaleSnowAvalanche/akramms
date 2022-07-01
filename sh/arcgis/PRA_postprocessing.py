@@ -2,6 +2,10 @@
 # Created on: October 17th, 2019
 # Yves Buehler, Andreas Stoffel, SLF Davos
 # ---------------------------------------------------------------------------
+# Add akramms to PYTHONPATH, and import utilities therein
+import sys,os
+sys.path.append(os.path.abspath(os.path.join(os.path.abspath(__file__), '..', '..', '..')))
+import dggs.util.arcgisutil
 
 # Import system modules
 import sys, string, os
@@ -22,15 +26,20 @@ env.overwriteOutput = True
 
 #Script varibles...
 
-workspace =          arcpy.GetParameterAsText(0) + "\\"
-site =               arcpy.GetParameterAsText(1)
-inShp =              arcpy.GetParameterAsText(2)
-HS_flatfield =       arcpy.GetParameterAsText(3)
-ref_elevation =      arcpy.GetParameterAsText(4)
-gradient_snowdepth = arcpy.GetParameterAsText(5)
-wind_load =          arcpy.GetParameterAsText(6)
-return_period =      arcpy.GetParameterAsText(7)
-Naming =             arcpy.GetParameterAsText(8)
+dggs.util.arcgisutil.get_script_vars(globals(), (
+    ('workspace', 'GetParameterAsText'),
+    ('site' 'GetParameterAsText'),
+    ('inShp', 'GetParameterAsText'),
+    ('HS_flatfield', 'GetParameterAsText'),
+    ('ref_elevation', 'GetParameterAsText'),
+    ('gradient_snowdepth', 'GetParameterAsText'),
+    ('wind_load', 'GetParameterAsText'),
+    ('return_period', 'GetParameterAsText'),
+    ('Naming', 'GetParameterAsText'),
+))
+
+#workspace += '\\'
+
 
 arcpy.AddMessage("workspace = " + workspace)
 arcpy.AddMessage("input Shapefile = " + inShp)
@@ -43,7 +52,7 @@ import csv
 row1 = ["Site", "Shapefile with delineated PRA", "DHS3_flatfield [m]", "elevation of DHS3_flatfield [m.a.s.l.]", "snow depth increase with elevation [m/100m]", "snow drift [m]", "return period [years]", "Naming (For/NoFor)"]
 row2 = [site, inShp, HS_flatfield, ref_elevation, gradient_snowdepth, wind_load, return_period, Naming]
 array = [row1,row2]
-Name_csv_file = workspace + site
+Name_csv_file = os.path.join(workspace, site)
 with open("%s_input_parameters.csv" % Name_csv_file,"w") as f:
     writer = csv.writer(f,delimiter=";")
     writer.writerows(array)
@@ -92,7 +101,7 @@ arcpy.CalculateField_management(inShp, "d0_" + str(return_period), expression3, 
 
 # calculate volume (Vol_returnperiod)
 expression3 =  "(!area_m2!/math.cos(!Mean_slope!*(3.14159/180))*!d0_" + str(return_period) + "!)"
-arcpy.CalculateField_management(inShp, "VOL_" + str(return_period), expression3, "PYTHON", "")
+arcpy.CalculateField_management(inShp, f"VOL_{return_period}", expression3, "PYTHON", "")
 
 #-------------------------------------------------------------------------------
 # categorize avalanches based on release volume
@@ -109,22 +118,22 @@ field_map = arcpy.FieldMappings()
 field_map.addTable(inShp)
 
 # execute categorization
-category_tiny = site + Naming + '_' + res + 'm_' + return_period +'T_rel.shp'
+category_tiny = f'{site}{Naming}_{res}m_{return_period}T_rel.shp'
 arcpy.FeatureClassToFeatureClass_conversion(inShp, workspace, category_tiny, '"VOL_%s" < 5000' % (return_period), field_map, '#')
 
-category_small = site + Naming + '_' + res + 'm_' + return_period +'S_rel.shp'
+category_small = f'{site}{Naming}_{res}m_{return_period}S_rel.shp'
 arcpy.FeatureClassToFeatureClass_conversion(inShp, workspace, category_small, '"VOL_%s" >= 5000 AND "VOL_%s" < 25000' % (return_period, return_period), field_map, '#')
 
-category_medium = site + Naming + '_' + res + 'm_' + return_period +'M_rel.shp'
+category_medium = f'{site}{Naming}_{res}m_{return_period}M_rel.shp'
 arcpy.FeatureClassToFeatureClass_conversion(inShp, workspace, category_medium, '"VOL_%s" >= 25000 AND "VOL_%s" < 60000' % (return_period, return_period), field_map, '#')
 
-category_large = site + Naming + '_' + res + 'm_' + return_period +'L_rel.shp'
+category_large = f'{site}{Naming}_{res}m_{return_period}L_rel.shp'
 arcpy.FeatureClassToFeatureClass_conversion(inShp, workspace, category_large, '"VOL_%s" >= 60000' % (return_period), field_map, '#')
 
 # delete empty shapefiles
 category_list = [category_tiny, category_small, category_medium, category_large]
 for file in category_list:
-     file_path = workspace + file
+     file_path = os.path.join(workspace, file)
      if arcpy.management.GetCount(file_path)[0] == "0":
         arcpy.Delete_management(file_path)
 
