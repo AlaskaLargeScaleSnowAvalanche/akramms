@@ -103,7 +103,12 @@ arcpy.CalculateField_management(inShp, "d0_" + str(return_period), expression3, 
 expression3 =  "(!area_m2!/math.cos(!Mean_slope!*(3.14159/180))*!d0_" + str(return_period) + "!)"
 arcpy.CalculateField_management(inShp, f"VOL_{return_period}", expression3, "PYTHON", "")
 
+# Rick's raster file d0*, apply correction in Schweitz to get d0.  Probably also need to geometrically correct for slope angle.
+# Need to compute mean d0 from each polygon, then do the slope angle correction.  Also have a factor wind-blown snow, discuss whether to include.
+# Or just take value of d0 at center of release polygon.  Ricks' grid is very large.
+
 #-------------------------------------------------------------------------------
+# Same for Alaska and Schweitz
 # categorize avalanches based on release volume
 
 # get resolution

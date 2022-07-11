@@ -3,8 +3,12 @@ import os,pathlib,shutil
 import netCDF4
 import numpy as np
 from dggs.util import paramutil,harnutil,arcgisutil
-from uafgi import make
+from uafgi.util import make
 from dggs.avalanche import process_tree,params
+
+# TODO: Tar up
+# tar cvfz scene3.tar.gz $(find scene3 -name '*' -and -type f | grep -v eCog)
+
 
 
 # -----------------------------------------------------------------------
