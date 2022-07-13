@@ -27,7 +27,7 @@ ALL = paramutil.parse([
         """(pixels) TODO"""),
     ('rugged_upperlimit', '', 'float', True,
         """TODO"""),
-    ('coordinate_system', None, 'str', True,
+    ('coordinate_system_prj', None, 'str', True,
         """Coordinate system to use for intermediate and output files.
         Can be WKT string, EPS designator, etc.
         Eg: CH1903+_LV95 for Switzerland."""),
@@ -79,7 +79,7 @@ DEFAULTS = {
 
 #    coordinate_system='epsg:26908',
 #    coordinate_system=26908,
-    coordinate_system_prj='PROJCS["NAD_1983_UTM_Zone_8N",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["Degree",0.017453292519943295]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",-135],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],UNIT["Meter",1]]'
+    coordinate_system_prj='PROJCS["NAD_1983_UTM_Zone_8N",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["Degree",0.017453292519943295]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",-135],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],UNIT["Meter",1]]',
     return_periods=[10,30,100,300],
     stats_kernel=np.array([
         [0.625, 0.625, 0.625, 0.625, 0.625],
