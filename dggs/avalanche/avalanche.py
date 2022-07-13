@@ -163,8 +163,15 @@ def prepare_data(scene_dir):
             out.write(' '.join(str(x) for x in kernel[irow,:]))
             out.write('\n')
 
+    # Generate the coordinate_system file in ESRI .prj format
+    crs_prj = os.path.join(scene_dir, 'crs.prj')
+    with open(crs_prj, 'w') as out:
+        out.write(scene_args['coordinate_system_prj'])
+
     # Obtain ArcGIS SpatialReference object (script needs as a script variable)
-    script_args['outCoordSystem'] = arcgisutil.Lambda('arcpy', 'SpatialReference', scene_args['coordinate_system'])
+#    script_args['outCoordSystem'] = arcgisutil.Lambda('arcpy', 'SpatialReference', scene_args['coordinate_system'])
+    print('crs_prj = ',crs_prj)
+    script_args['outCoordSystem'] = crs_prj
     data_prep_PRA_py = os.path.join(harnutil.HARNESS, 'akramms', 'sh', 'arcgis', 'data_prep_PRA.py')
     arcgisutil.run_script(data_prep_PRA_py, script_args, cwd=scene_dir, dry_run=False)
 
@@ -220,6 +227,10 @@ def prepare_data_rule(hostname, scene_dir, HARNESS_REMOTE):
         remote_scene_host_dir = '{}:{}'.format(hostname, remote_scene_dir)
 
         # Copy scene.nc to remote host
+        cmd = ['ssh', hostname, 'mkdir', '-p', remote_scene_dir]
+        print(cmd)
+        subprocess.run(cmd, check=True)
+
         cmd = ['rsync', os.path.join(scene_dir, 'scene.nc'), remote_scene_host_dir+'/']
         print(cmd)
         subprocess.run(cmd, check=True)
@@ -230,6 +241,12 @@ def prepare_data_rule(hostname, scene_dir, HARNESS_REMOTE):
                 continue
             if param.name not in scene_args:
                 continue
+
+            cmd = ['ssh', hostname, 'mkdir', '-p',
+                harnutil.bash_name(harnutil.remote_name(os.path.split(scene_args[param.name])[0], HARNESS_REMOTE))]
+            print(cmd)
+            subprocess.run(cmd, check=True)
+
             cmd = ['rsync', scene_args[param.name],
                 '{}:{}'.format(hostname, harnutil.remote_name(scene_args[param.name], HARNESS_REMOTE, bash=True))]
             print(cmd)
