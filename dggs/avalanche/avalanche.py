@@ -171,7 +171,7 @@ def prepare_data(scene_dir):
     # Obtain ArcGIS SpatialReference object (script needs as a script variable)
 #    script_args['outCoordSystem'] = arcgisutil.Lambda('arcpy', 'SpatialReference', scene_args['coordinate_system'])
     print('crs_prj = ',crs_prj)
-    script_args['outCoordSystem'] = crs_prj
+    script_args['outCoordSystem'] = arcgisutil.Lambda('arcpy', 'SpatialReference', crs_prj)
     data_prep_PRA_py = os.path.join(harnutil.HARNESS, 'akramms', 'sh', 'arcgis', 'data_prep_PRA.py')
     arcgisutil.run_script(data_prep_PRA_py, script_args, cwd=scene_dir, dry_run=False)
 
