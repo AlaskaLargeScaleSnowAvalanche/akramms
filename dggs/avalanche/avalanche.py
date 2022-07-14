@@ -163,15 +163,20 @@ def prepare_data(scene_dir):
             out.write(' '.join(str(x) for x in kernel[irow,:]))
             out.write('\n')
 
-    # Generate the coordinate_system file in ESRI .prj format
-    crs_prj = os.path.join(scene_dir, 'crs.prj')
-    with open(crs_prj, 'w') as out:
-        out.write(scene_args['coordinate_system_prj'])
-
     # Obtain ArcGIS SpatialReference object (script needs as a script variable)
-#    script_args['outCoordSystem'] = arcgisutil.Lambda('arcpy', 'SpatialReference', scene_args['coordinate_system'])
-    print('crs_prj = ',crs_prj)
-    script_args['outCoordSystem'] = arcgisutil.Lambda('arcpy', 'SpatialReference', crs_prj)
+    if '[' in scene_args['coordinate_system']:    # It's a PRJ string
+        # Generate the coordinate_system file in ESRI .prj format
+        crs_prj = os.path.join(scene_dir, 'crs.prj')
+        with open(crs_prj, 'w') as out:
+            out.write(scene_args['coordinate_system_prj'])
+        print('crs_prj = ',crs_prj)
+
+        script_args['outCoordSystem'] = arcgisutil.Lambda('arcpy', 'SpatialReference', crs_prj)
+    else:
+        # It's an ESRI code
+        script_args['outCoordSystem'] = arcgisutil.Lambda('arcpy', 'SpatialReference', scene_args['coordinate_system'])
+
+    # Run the core script
     data_prep_PRA_py = os.path.join(harnutil.HARNESS, 'akramms', 'sh', 'arcgis', 'data_prep_PRA.py')
     arcgisutil.run_script(data_prep_PRA_py, script_args, cwd=scene_dir, dry_run=False)
 
