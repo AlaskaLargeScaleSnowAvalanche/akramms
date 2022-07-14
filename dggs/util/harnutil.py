@@ -22,7 +22,7 @@ def bash_name(wfname):
         wfname = '/{}{}'.format(wfname[0], wfname[2:])
     return wfname
 
-def remote_name(fname, REMOTE_HARNESS, bash=False):
+def remote_windows_name(fname, REMOTE_HARNESS, bash=False):
     """Assumes remote Windows host
     bash:
         Convert to bash-style pathname?"""
@@ -32,4 +32,11 @@ def remote_name(fname, REMOTE_HARNESS, bash=False):
         ret = bash_name(ret)
     print('remote_name: {} -> {}'.format(fname, ret))
     return ret
+
+
+def remote_linux_name(fname):
+    """Assumes same home directory structure on remote Linux host"""
+    ret = os.path.join('~', os.path.relpath(fname, os.path.environ['HOME']))
+
+
 

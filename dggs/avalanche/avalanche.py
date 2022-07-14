@@ -228,7 +228,7 @@ def prepare_data_rule(hostname, scene_dir, HARNESS_REMOTE):
     outputs = _prepare_data_outputs(scene_dir, scene_args)
 
     def action(tdir):
-        remote_scene_dir = harnutil.remote_name(scene_dir, HARNESS_REMOTE, bash=True)
+        remote_scene_dir = harnutil.remote_windows_name(scene_dir, HARNESS_REMOTE, bash=True)
         remote_scene_host_dir = '{}:{}'.format(hostname, remote_scene_dir)
 
         # Copy scene.nc to remote host
@@ -248,12 +248,12 @@ def prepare_data_rule(hostname, scene_dir, HARNESS_REMOTE):
                 continue
 
             cmd = ['ssh', hostname, 'mkdir', '-p',
-                harnutil.bash_name(harnutil.remote_name(os.path.split(scene_args[param.name])[0], HARNESS_REMOTE))]
+                harnutil.bash_name(harnutil.remote_windows_name(os.path.split(scene_args[param.name])[0], HARNESS_REMOTE))]
             print(cmd)
             subprocess.run(cmd, check=True)
 
             cmd = ['rsync', scene_args[param.name],
-                '{}:{}'.format(hostname, harnutil.remote_name(scene_args[param.name], HARNESS_REMOTE, bash=True))]
+                '{}:{}'.format(hostname, harnutil.remote_windows_name(scene_args[param.name], HARNESS_REMOTE, bash=True))]
             print(cmd)
             subprocess.run(cmd, check=True)
 
