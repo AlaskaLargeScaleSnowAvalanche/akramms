@@ -5,7 +5,7 @@ import os
 
 scene_dir = dggs.data.join('prj', 'juneau1')
 
-remote_scene_dir = harnutil.remote_name(scene_dir, HARNESS_REMOTE, bash=True)
+remote_scene_dir = harnutil.remote_linux_name(scene_dir)
 
 files = ['PRA_extreme', 'PRA_frequent', 'scene.cdl', 'scene.nc']
 cmd = ['rsync', 'antevorta', '-avz', #'--from0',
