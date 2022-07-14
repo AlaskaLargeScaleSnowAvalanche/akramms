@@ -168,7 +168,7 @@ def prepare_data(scene_dir):
         # Generate the coordinate_system file in ESRI .prj format
         crs_prj = os.path.join(scene_dir, 'crs.prj')
         with open(crs_prj, 'w') as out:
-            out.write(scene_args['coordinate_system_prj'])
+            out.write(scene_args['coordinate_system'])
         print('crs_prj = ',crs_prj)
 
         script_args['outCoordSystem'] = arcgisutil.Lambda('arcpy', 'SpatialReference', crs_prj)
