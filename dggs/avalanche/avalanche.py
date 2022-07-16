@@ -90,13 +90,13 @@ import_xml_tpl = """<?xml version="1.0" encoding="UTF-8"?>
 				<TagString>{froot}_Slope.tif</TagString>
 			</ImageLayer>
 			<ImageLayer channel="1" alias="PRA_raw" driver="GDAL">
-				<TagString>{froot}__PRA_raw_{freq}_Forest.tif</TagString>
+				<TagString>{froot}__PRA_raw_{freq}{_Forest}.tif</TagString>
 			</ImageLayer>
 		</SceneDefinition>
 	</ImportDefinition>
 </ImportDefinitions>
 """
-def import_xml_str(scene_args, freq):
+def import_xml_str(scene_args, freq, forest):
     """Generates text for the ...import....xml file
     freq: 'frequent' | 'extreme'
     """
@@ -106,6 +106,7 @@ def import_xml_str(scene_args, freq):
         'froot': '/mnt/eCog/{}'.format(scene_args['name']),    # Runs on mounted drive inside Docker container
         'scene_name': scene_args['name'],
         'freq': freq,
+        '_Forest' : '_Forest' if forest else '_NoForest',
         'layer': '{layer}',    # Leave this for eCognition
     }
     return import_xml_tpl.format(**args)
@@ -191,8 +192,10 @@ def prepare_data(scene_dir):
 
     # Write import...xml files 
     for freq in ('frequent', 'extreme'):
-        with open(os.path.join(ecog_dir, f'PRA_import_{freq}.xml'), 'w') as out:
-            out.write(import_xml_str(scene_args, freq))
+        for forest in ((True,False) if scene_args['forest'] else (False,)):
+            _Forest = '_Forest' if forest else '_NoForest'
+            with open(os.path.join(ecog_dir, f'PRA_import_{freq}{_Forest}.xml'), 'w') as out:
+                out.write(import_xml_str(scene_args, freq, forest))
 
     # Generate the required process trees
     for return_period in scene_args['return_periods']:
@@ -345,7 +348,7 @@ def run_ecog_rule(scene_dir, return_period, forest):
         # ----------
 
         # Import Connect to images in <scene_dir>/eCog
-        cmd += ['image-dir=/mnt/eCog', f'import-connector=PRA_import_{rpcat}', f'import-connector-file=/mnt/eCog/PRA_import_{rpcat}.xml']
+        cmd += ['image-dir=/mnt/eCog', f'import-connector=PRA_import_{rpcat}', f'import-connector-file=/mnt/eCog/PRA_import_{rpcat}{_For}est.xml']
 
         # Add the appropriate ruleset
         cmd += [f'ruleset=/mnt/eCog/GHK_{return_period:d}y{_For}.dcp']

@@ -37,6 +37,4 @@ def remote_windows_name(fname, REMOTE_HARNESS, bash=False):
 def remote_linux_name(fname):
     """Assumes same home directory structure on remote Linux host"""
     ret = os.path.join('~', os.path.relpath(fname, os.environ['HOME']))
-
-
-
+    return ret
