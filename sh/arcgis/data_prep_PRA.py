@@ -108,7 +108,7 @@ row1 = ["Name", "inDEM", "inForest", "resamp_cellsize [m]", "inPerimeter", "Slop
 row2 = [Name, inDEM, inForest, resampCellSize, inPerimeter, Slope_lowerlimit_frequent, Slope_lowerlimit_extreme, Slope_upperlimit, Curv_upperlimit, Rugged_neighborhood, Rugged_upperlimit, outCoordSystem.name, Weightingkernel]
 array = [row1,row2]
 Name_csv_file = os.path.join(Workspace, Name)
-with open("%s_DataPrep_InputParameters.csv" % Name_csv_file,"w") as f:s
+with open("%s_DataPrep_InputParameters.csv" % Name_csv_file,"w") as f:
     writer = csv.writer(f,delimiter=";")
     writer.writerows(array)
     f.close()
