@@ -97,10 +97,11 @@ return_periods = sorted(list(_min_mean_slope.keys()))    # [10,30,100,300]
 def return_period_category(return_period):
     return 'frequent' if return_period < 100 else 'extreme'
 
-def get(scene_dir, return_period, forest):
+def get(scene_args, scene_dir, return_period, forest):
     """
     scene_dir:
         Directory of the overall scene (NOT the eCog/ subdir)
+        NOTE: This is mounted path from WITHIN the Docker container.
     return_period: [
     """
     tpl = load_tpl('process_tree.tpl')
@@ -116,4 +117,5 @@ def get(scene_dir, return_period, forest):
         'split_long_polygonss': slp,
         'split_long_polygonss_output_layer': slp_output_layer,
         'min_mean_slope': _min_mean_slope[return_period],
+        'min_pra_elevation': str(scene_args['min_pra_elevation']),
     })

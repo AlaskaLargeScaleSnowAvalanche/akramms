@@ -33,6 +33,8 @@ ALL = paramutil.parse([
         Eg: CH1903+_LV95 for Switzerland."""),
     ('return_periods', 'y', 'list', True,
         """List of return periods (years) to compute avalanche risk for"""),
+    ('min_pra_elevation', 'm', 'float', True,
+        """Minimum elevation of potential release areas (PRAs) to export from eCognition."""),
     ('stats_kernel', None, 'array', True,
         """2D kernel used for statistics on DEM in ArcGIS data prep"""),
     ])
@@ -53,6 +55,7 @@ DEFAULTS = {
     rugged_upperlimit=3.5,
     coordinate_system='CH1903+_LV95',
     return_periods=[10,30,100,300],
+    min_pra_elevation=600.,
     stats_kernel=np.array([
         [0.625, 0.625, 0.625, 0.625, 0.625],
         [0.625, 1.5, 1.5, 1.5, 0.625],
@@ -82,6 +85,7 @@ DEFAULTS = {
     # EPSG 3338
     coordinate_system='PROJCS["NAD83 / Alaska Albers",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["Degree",0.017453292519943295]],PROJECTION["Albers"],PARAMETER["standard_parallel_1",55],PARAMETER["standard_parallel_2",65],PARAMETER["latitude_of_origin",50],PARAMETER["central_meridian",-154],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["Meter",1]]',
     return_periods=[10,30,100,300],
+    min_pra_elevation=0.,
     stats_kernel=np.array([
         [0.625, 0.625, 0.625, 0.625, 0.625],
         [0.625, 1.5, 1.5, 1.5, 0.625],

@@ -211,7 +211,7 @@ def prepare_data(scene_dir):
                 f'GHK_{return_period:d}y{_For}.dcp')
             with open(ofname, 'w') as out:
                 # scene_dir=/mnt because this runs in a docker container
-                out.write(process_tree.get('/mnt', return_period, forest))
+                out.write(process_tree.get(scene_args, '/mnt', return_period, forest))
 #                out.write(process_tree.get(scene_dir, return_period, forest))
 
 # ---------------------------------------------------------------------------
@@ -334,6 +334,9 @@ def run_ecog_rule(scene_dir, return_period, forest):
 #                outputs.append(os.path.join(scene_dir, f'PRA_{rpcat}', f'PRA_{rp}y{_For}{ext}'))
 
     def action(tdir):
+        import os
+        import pyproj
+
         # Base Docke rcommand
         cmd = ['docker', 'run', '--rm', '--network', 'host']
 
@@ -345,6 +348,13 @@ def run_ecog_rule(scene_dir, return_period, forest):
 
         # Mount paths inside eCognition container
         cmd += ['-v', f'{scene_dir}:/mnt']
+
+        # Write files to that mount with the currect user and group ID
+        # https://stackoverflow.com/questions/20894086/in-docker-writing-file-to-mounted-file-system-as-non-root
+        # NOTE: To affect umask, the Docker container will have to be adjusted.
+        # https://widerin.net/blog/change-umask-in-docker-containers/
+        cmd += ['-u', '{}:{}'.format(os.getuid(), os.getgid())]
+
 
         # Docker container and command to run
         cmd += ['ecognition/linux_cle:10.2.0', './DIACmdEngine']
@@ -359,6 +369,9 @@ def run_ecog_rule(scene_dir, return_period, forest):
         cmd += [f'ruleset=/mnt/eCog/GHK_{return_period:d}y{_For}.dcp']
 
         # Place for output
+        # eCognition writes out files with problems in the projection.
+        # In a later rule we will copy them out of the eCog/ directory and
+        # fix that.  The polygon files are small...
         odir = os.path.join(scene_dir, f'PRA_{rpcat}')
         os.makedirs(odir, exist_ok=True)
         cmd += [f'--output-dir=/mnt/PRA_{rpcat}']
@@ -367,7 +380,22 @@ def run_ecog_rule(scene_dir, return_period, forest):
         # unfortunately not much.
         cmd += [f'--log-file=/mnt/eCog/GHK_{return_period:d}y{_For}.log']
 
+        # Run eCognition!
         print(' '.join(cmd))
         subprocess.run(cmd, check=True)
+
+        # ---------------------------------------
+        # eCognition writes out shapefiles with wrong projection.  Fix that
+        # by overwriting with the right projection
+
+        # Read correct projection and convert to WKT format (if it is not already)
+        wkt = pyproj.CRS(scene_args['coordinate_system']).to_wkt()
+
+        # Replace original projection from eCognition with that WKT string
+        prjs = [out for out in outputs if out.endswith('.prj')]
+        for prj in prjs:
+            os.rename(prj, f'{prj}.orig')
+            with open(prj, 'w') as out:
+                out.write(wkt)
 
     return make.Rule(action, inputs, outputs)
