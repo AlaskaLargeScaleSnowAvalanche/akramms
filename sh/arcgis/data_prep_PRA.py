@@ -210,6 +210,7 @@ if inForest != "":
 
     # See here to build a new Raster Attribute Table
     # https://pro.arcgis.com/en/pro-app/2.8/tool-reference/data-management/build-raster-attribute-table.htm
+    # This does not overwrite the .tif file, it merely adds attitional files named .tif.vat.cpg, .tif.vat.dbf, .tif.xml
     arcpy.management.BuildRasterAttributeTable(inForest, "Overwrite")
 
     # Checking Value range of inForest raster
