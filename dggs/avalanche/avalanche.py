@@ -231,6 +231,7 @@ def prepare_data_rule(hostname, scene_dir, HARNESS_REMOTE):
     outputs = _prepare_data_outputs(scene_dir, scene_args)
 
     def action(tdir):
+#      if False:
         remote_scene_dir = harnutil.remote_windows_name(scene_dir, HARNESS_REMOTE, bash=True)
         remote_scene_host_dir = '{}:{}'.format(hostname, remote_scene_dir)
 
@@ -265,9 +266,10 @@ def prepare_data_rule(hostname, scene_dir, HARNESS_REMOTE):
         print(cmd)
         subprocess.run(cmd, check=True)
 
+#      if True:
         # TODO: Copy outputs back to local host
         cmd = ['rsync', '-avz', remote_scene_host_dir+'/', scene_dir]
-        print(cmd)
+        print(' '.join(cmd))
         subprocess.run(cmd, check=True)
 
 
@@ -334,6 +336,9 @@ def run_ecog_rule(scene_dir, return_period, forest):
     def action(tdir):
         # Base Docke rcommand
         cmd = ['docker', 'run', '--rm', '--network', 'host']
+
+        # Tell eCognition to make more output.
+        cmd += ['-e', 'ECOG_CONFIG_logging=trace level=Detailed']
 
         # eCognition licensing
         cmd += ['-e', 'LM_LICENSE_FILE=27000@10.10.129.211']
