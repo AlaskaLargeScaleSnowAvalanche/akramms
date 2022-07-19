@@ -107,8 +107,8 @@ import csv
 row1 = ["Name", "inDEM", "inForest", "resamp_cellsize [m]", "inPerimeter", "Slope_lowerlimit_frequent [degree]", "Slope_lowerlimit_extreme [degree]", "Slope_upperlimit [degree]", "Curv_plan_upperlimit [rad/100m]", "Rugged_neighborhood [pixel]", "Rugged_upperlimit [ ]", "outCoordSystem", "Weithingkernel"]
 row2 = [Name, inDEM, inForest, resampCellSize, inPerimeter, Slope_lowerlimit_frequent, Slope_lowerlimit_extreme, Slope_upperlimit, Curv_upperlimit, Rugged_neighborhood, Rugged_upperlimit, outCoordSystem.name, Weightingkernel]
 array = [row1,row2]
-Name_csv_file = Workspace + Name
-with open("%s_DataPrep_InputParameters.csv" % Name_csv_file,"w") as f:
+Name_csv_file = os.path.join(Workspace, Name)
+with open("%s_DataPrep_InputParameters.csv" % Name_csv_file,"w") as f:s
     writer = csv.writer(f,delimiter=";")
     writer.writerows(array)
     f.close()
@@ -208,6 +208,10 @@ if inForest != "":
         arcpy.AddError("InputError:Forest and DEM do not intersect")
         exit()
 
+    # See here to build a new Raster Attribute Table
+    # https://pro.arcgis.com/en/pro-app/2.8/tool-reference/data-management/build-raster-attribute-table.htm
+    arcpy.management.BuildRasterAttributeTable(inForest, "Overwrite")
+
     # Checking Value range of inForest raster
     unique_value_count = int(arcpy.GetRasterProperties_management(inForest, "UNIQUEVALUECOUNT").getOutput(0))
     min_value = int(arcpy.GetRasterProperties_management(inForest, "MINIMUM").getOutput(0))
@@ -222,6 +226,8 @@ if inForest != "":
         arcpy.Resample_management(inForest, Forest, resampCellSize, 'BILINEAR')
     else:
         arcpy.Copy_management(inForest, Forest)
+    arcpy.Copy_management(inForest, Forest)
+
 
 # Create Slope
 arcpy.AddMessage("creating Slope...")
