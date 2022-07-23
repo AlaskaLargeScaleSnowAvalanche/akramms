@@ -13,7 +13,9 @@ ALL = paramutil.parse([
         """Name of forest cover file to use (GeoTIFF)"""),
     ('clip', None, 'input_file', False,
         """Clip domain to this region (Shapefile)"""),
-    ('resample_cell_size', 'm', 'int', True,
+
+    # Parameters for preprocessing and eCognition
+    ('resolution', 'm', 'int', True,
         """Resample DEM and forest files to this resolution for computation"""),
     ('slope_lowerlimit_frequent', 'angular_degree', 'float', True,
         """Slope angle, frequent scenario"""),
@@ -37,6 +39,17 @@ ALL = paramutil.parse([
         """Minimum elevation of potential release areas (PRAs) to export from eCognition."""),
     ('stats_kernel', None, 'array', True,
         """2D kernel used for statistics on DEM in ArcGIS data prep"""),
+
+    # Parameters for PRA postprocessing (after eCognition)
+#    ('hs_flatfield', 'm', 'float', True,
+#        """TODO DHS3 flatfield"""),
+    ('reference_elevation', 'm', 'float', True,
+        """TODO???"""),
+    ('gradient_snowdepth', '.01', float, True,
+        """Snow depth increase with elevation [m/100m]"""),
+    ('wind_load', 'm', float, True,
+        """Snow drift"""),
+
     ])
 
 # Not included in main parameters because it doesn't affect the value
@@ -46,7 +59,7 @@ SCENE_DIR = paramutil.Param('scene_dir', None, 'path', False,
 
 DEFAULTS = {
     'schweitz': dict(
-    resample_cell_size=5,
+    resolution=5,
     slope_lowerlimit_frequent=30,
     slope_lowerlimit_extreme=28,
     slope_upperlimit=55,
@@ -64,7 +77,7 @@ DEFAULTS = {
         [0.625, 0.625, 0.625, 0.625, 0.625]])),
 
     'alaska': dict(
-    resample_cell_size=5,
+    resolution=5,
     slope_lowerlimit_frequent=30,
     slope_lowerlimit_extreme=28,
     slope_upperlimit=55,

@@ -68,46 +68,18 @@ class WrfLookup:
         with netCDF4.Dataset(data_fname) as nc:
             # Masked array
             masked_data = nc.variables[vname][:,:]    # sx3(j=south_north,i=west_east)
-        #print('filled ',masked_data.mask[0,0], masked_data.data[0,0])
-        #import copy
-        #data2 = copy.copy(masked_data.data)
-        #data2[data2<0] = 0.
-        #print('sum is ',np.sum(data2))
-        self.data,converged = gridfill.fill(masked_data, 1, 0, .001, itermax=10000)
-        #print('filled ',self.data[0,0])
-        #print('converged ',converged)
-
-        #print(type(self.data), self.data.shape)
-        #print(np.sum(self.data))
-        #print(type(self.data), self.data[0,0])
-        #print(np.sum(self.data < 0))
+        self.data,converged = gridfill.fill(masked_data, 1, 0, .1)#, itermax=10000)
 
         # Write a GeoTIFF file of our results
-        if False:
-            (rows, cols) = self.data.shape
-            gdalDriver = gdal.GetDriverByName('GTiff')
-            outRaster = gdalDriver.Create('x.tif', cols, rows, 1, gdal.GDT_Float32,
-              ['COMPRESS=DEFLATE'])
-            try:
-                outRaster.SetGeoTransform(self.geo_info.geotransform)
-                outRaster.SetProjection(self.geo_info.wkt)
-                outBand = outRaster.GetRasterBand(1)
-                outBand.SetNoDataValue(np.nan)
-                outBand.WriteArray(self.data)
-            finally:
-                outRaster = None
+        wrfutil.write_geotiff(self.geo_info, self.data, 'x.tif')
 
-
-    def centroid_value(self, poly):
+    def value_at_centroid(self, poly):
         centroid = poly.centroid    # In scene coordinates
         x_scene, y_scene = (centroid.x, centroid.y)
         x_wrf,y_wrf = self.scene2wrf.transform(x_scene, y_scene)    # --> WRF coordinates
         ir,jr = self.geo_info.to_ij(x_wrf, y_wrf)    # --> (j,i) index into data
         i = round(ir)
         j = round(jr)
-#        print(f'({x_scene}, {y_scene}) -> ({x_wrf}, {y_wrf}) -> ({i}, {j})')
-#        x2,y2 = self.geo_info.to_xy(i,j)
-#        print(f'   -> ({x2},{y2})')
         return self.data[j,i]
 
     def to_ij(self, poly):
@@ -117,33 +89,111 @@ class WrfLookup:
         i,j = self.geo_info.to_ij(x_wrf, y_wrf)    # --> (j,i) index into data
         return (round(i), round(j))
 
-def pra_post(scene_dir):
+# ---------------------------------------------------------------------------------
+_post_cat_bounds = (0.,5000.,25000.,60000.,1e10)    # Dummy value at end
+def _pra_post_iter0(scene_args):
+    for return_period in scene_args['return_periods']:
+        for For in ('For', 'NoFor'):
+            yield (return_period, For)
+
+def _pra_post_iter1():
+    return iter(('tiny', 'small', 'medium', 'large'))
+
+
+
+def pra_post_rule(scene_dir, sx3_file, geo_file):
+    """
+    scene_dir:
+        Uses params: name ("site"), resample_cell_size ("res")
+
+    return_period:
+        Return period we are calculating for.
+        Must be included in scene_args['return_periods']
+    forest: bool  (formerly "Naming")
+        Whether we are doing with / without forest
+    sx3_file:
+        Name of WRF file containing the sx3 snow depth variable
+    geo_file:
+        Name of WRF file containing eometry information for sx3_file
+    """
+
     scene_args = params.load(scene_dir)
 
-    # Create lookup for snow depth in WRF output file
-    scene_wkt = scene_args['coordinate_system']
-    data_fname = os.path.join(dggs.data.HARNESS, 'data', 'lader', 'sx3', 'gfdl_sx3_1986.nc')
-    vname = 'sx3'
-    geo_fname = os.path.join(dggs.data.HARNESS, 'data', 'lader', 'sx3', 'geo_southeast.nc')
+    # Main input and output files: THESE MUST BE FIRST
+    inputs = list()
+    outputs = list()
+    resolution = scene_args['resolution']
+    name = scene_args['name']
+    for return_period,For in _post_cat_iter0(scene_args):
+        inputs.append(os.path.join(
+            scene_dir,
+            f'PRA_{process_tree.return_period_category(rp)}',
+            f'PRA_{return_period}y_{For}.shp'))
 
-    print(geo_fname)
-    print(data_fname)
-    snow_lookup = WrfLookup(scene_wkt, data_fname, vname, geo_fname)
+        for catname in _pra_post_iter1():
+            cat_letter = catname[0].upper()
+            outputs.append(os.path.join(scene_dir,
+                f'{name}_{For}_{resolution}m_{return_period}{cat_letter}_rel.shp'))
+
+    # Add one-off input files
+    inputs += [os.path.join(scene_dir, 'scene.nc'), pra_input, sx3_file, geo_file]
+
+    def action(tdir):
+
+        # Create lookup for snow depth in WRF output file
+        snow_lookup = WrfLookup(scene_args['coordinate_system'], sx3_file, 'sx3', geo_file)
+
+        degree = np.pi / 180.
+        name = scene_args['name']
+        resolution = scene_args['resolution']
+
+        # Use same loop as when constructing inputs / outputs
+        inputsi = iter(inputs)
+        outputsi = iter(outputs)
+        for return_period,For in _post_cat_iter0(scene_args):
+            input = next(inputsi)
+
+            # Load the polygons
+            df = shputil.read_df(pra_info, shape='pra').df
+            df['sx3'] = df['pra'].map(snow_lookup.value_at_centroid)    # Raw snow depth
+
+            # --- Elevation correction
+            snowdepth_correction = (df['Mean_DEM'] - scene_args['reference_elevation']) *.01 * scene_args['gradient_snowdepth']
+            sx3_corrected = (df['sx3'] + snowdepth_correction)
+            # TODO: Why are we multiplying by cos(28) = .883?
+            df['d0star'] = sx3_corrected * np.cos(28. * degree)
+
+            # --- Slope angle correction (slopecorr)
+            df['slopecorr'] =  0.291 / np.sin(df['Mean_slope']*degree) \
+                             - 0.202 * np.cos(df['Mean_slope']*degree)
+
+            # Wind load interpolation between 100 (0) and 200 (full wind load) elevation
+            # Change max wind load dependent on scenario!!
+            df['Wind'] = np.clip((df['Mean_DEM'] - 1000.) * .0001, 0., 0.1)
+
+            # Calculate final d0 (d0_{return_period})
+            d0_vname = f'd0_{return_period}'
+            df[d0_vname] = ((df['d0star'] + df['Wind']) * df['slopecorr'])
+
+            # Calculate volume (VOL_returnperiod)
+            VOL_vname = f'VOL_{return_period}'
+            # df[VOL_vname] = df['area_m2'] / np.cos(df['Mean_slope']*degree) * df[d0_vname]
+            df[VOL_vname] = (df['area_m2'] * df[d0_vname]) / np.cos(df['Mean_slope']*degree)
 
 
-    # Load the polygons
-    ifname = os.path.join(scene_dir, 'PRA_frequent', 'PRA_30y_For.shp')
-    df = shputil.read_df(ifname, shape='pra').df
-    df['area2'] = df['pra'].map(lambda pra: pra.area)
-    df['loc'] = df['pra'].map(lambda pra: (round(pra.centroid.x), round(pra.centroid.y)))
-    df['sx3'] = df['pra'].map(snow_lookup.centroid_value)
-    df['ij'] = df['pra'].map(snow_lookup.to_ij)
+            for catname in _pra_post_iter1():
+                output = next(outputsi)
 
-    dfx = df[['fid','area_m2','area2','loc', 'ij', 'sx3']] 
-#    print(dfx[dfx.sx3 < 0])
-    print(dfx)
-#    print(dfx.iloc[0])
+                for catname,low,high in zip(catnames, _post_cat_bounds[:-1], _post_cat_bounds[1:]):
+                    df_cat = df[df['area_m2'].between(low, high, inclusive='both')]
+                    cat_output = os.path.join(scene_dir, f'{name}_{For}_{resolution}m_{return_period}{cat_letter}_rel.shp')
+#                    shputil.write_df(df_cat, cat_output)
 
+                    print('------ writing ')
+                    print(df.columns)
+                    print([(c,c.dtype) for c in df.columns])
+                
+    return action
 
 def main():
 #    with netCDF4.Dataset('x.nc', 'a') as nc:
@@ -156,6 +206,13 @@ def main():
 
 
     scene_dir = os.path.join(dggs.data.HARNESS, 'prj', 'juneau1')
-    pra_post(scene_dir)
+    sx3_file = '/Users/eafischer2/av/data/lader/sx3/geo_southeast.nc'
+    geo_file = '/Users/eafischer2/av/data/lader/sx3/gfdl_sx3_1986.nc'
+    pra_post_rule(scene_dir, sx3_file, geo_file)(None)
 
 main()
+
+
+
+        # data_fname = os.path.join(dggs.data.HARNESS, 'data', 'lader', 'sx3', 'gfdl_sx3_1986.nc')
+        # geo_fname = os.path.join(dggs.data.HARNESS, 'data', 'lader', 'sx3', 'geo_southeast.nc')

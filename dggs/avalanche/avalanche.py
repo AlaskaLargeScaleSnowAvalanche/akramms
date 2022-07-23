@@ -138,7 +138,7 @@ def prepare_data(scene_dir):
     script_args = {'Workspace': scene_dir}
     for script_arg, scene_arg in [
         ('inDEM', 'dem'),
-        ('resampCellSize', 'resample_cell_size'),
+        ('resampCellSize', 'resolution'),
         ('Slope_lowerlimit_frequent', 'slope_lowerlimit_frequent'),
         ('Slope_lowerlimit_extreme', 'slope_lowerlimit_extreme'),
         ('Slope_upperlimit', 'slope_upperlimit'),
