@@ -45,10 +45,20 @@ ALL = paramutil.parse([
 #        """TODO DHS3 flatfield"""),
     ('reference_elevation', 'm', 'float', True,
         """TODO???"""),
-    ('gradient_snowdepth', '.01', float, True,
+    ('gradient_snowdepth', '.01', 'float', True,
         """Snow depth increase with elevation [m/100m]"""),
-    ('wind_load', 'm', float, True,
-        """Snow drift"""),
+# TODO: The formula looks like it has two params, not one.  I'm confused.
+#    ('wind_load', 'm', 'float', True,
+#        """Snow drift"""),
+    ('snowdepth_type', None, 'str', True,
+        """Type of snowdepth file: 'wrf' or 'original'"""),
+    ('snowdepth_geo', None, 'input_file', False,
+        """Name of Snowdepth geometry file (if snowdepth_type=='wrf')"""),
+    # TODO: Will we need more than one???
+    ('snowdepth_file', None, 'input_file', True,
+        """Name of file containing snow depth information"""),
+
+
 
     ])
 
@@ -74,7 +84,9 @@ DEFAULTS = {
         [0.625, 1.5, 1.5, 1.5, 0.625],
         [0.625, 1.5, 3, 1.5, 0.625],
         [0.625, 1.5, 1.5, 1.5, 0.625],
-        [0.625, 0.625, 0.625, 0.625, 0.625]])),
+        [0.625, 0.625, 0.625, 0.625, 0.625]]),
+    snowdepth_type='original',
+    ),
 
     'alaska': dict(
     resolution=5,
@@ -98,14 +110,21 @@ DEFAULTS = {
     # EPSG 3338
     coordinate_system='PROJCS["NAD83 / Alaska Albers",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["Degree",0.017453292519943295]],PROJECTION["Albers"],PARAMETER["standard_parallel_1",55],PARAMETER["standard_parallel_2",65],PARAMETER["latitude_of_origin",50],PARAMETER["central_meridian",-154],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["Meter",1]]',
     return_periods=[10,30,100,300],
-    min_pra_elevation=0.,
+    min_pra_elevation=0.,        # Or maybe 150m (as per Gabe) 2022-07-19: Yves, I think we imposed a lower limit of 150 m to remove unrealistic PRA mapping in warm/wet maritime areas.
     stats_kernel=np.array([
         [0.625, 0.625, 0.625, 0.625, 0.625],
         [0.625, 1.5, 1.5, 1.5, 0.625],
         [0.625, 1.5, 3, 1.5, 0.625],
         [0.625, 1.5, 1.5, 1.5, 0.625],
-        [0.625, 0.625, 0.625, 0.625, 0.625]])),
-}
+        [0.625, 0.625, 0.625, 0.625, 0.625]]),
+
+    snowdepth_type='wrf',
+
+    # These are WILD GUESSES
+    reference_elevation=100.,
+    gradient_snowdepth=0.1,    # [m/100m]
+
+)}
 
 def load(scene_dir):
     """Reads the scene """

@@ -1,6 +1,6 @@
 import scipy.spatial
 from osgeo import gdal
-from dggs.avalanche import params
+from dggs.avalanche import params,process_tree
 from uafgi.util import shputil,gdalutil,wrfutil
 import os,sys
 import subprocess
@@ -12,8 +12,7 @@ import numpy as np
 import gridfill
 
 
-
-
+# From the gridfill docs...
 #def gridfill.fill(grids, xdim, ydim, eps, relax=.6, itermax=100, initzonal=False,
 #         cyclic=False, verbose=False):
 #    """
@@ -101,7 +100,7 @@ def _pra_post_iter1():
 
 
 
-def pra_post_rule(scene_dir, sx3_file, geo_file):
+def pra_post_rule(scene_dir, require_all=True):
     """
     scene_dir:
         Uses params: name ("site"), resample_cell_size ("res")
@@ -124,10 +123,11 @@ def pra_post_rule(scene_dir, sx3_file, geo_file):
     outputs = list()
     resolution = scene_args['resolution']
     name = scene_args['name']
-    for return_period,For in _post_cat_iter0(scene_args):
+    for return_period,For in _pra_post_iter0(scene_args):
+
         inputs.append(os.path.join(
             scene_dir,
-            f'PRA_{process_tree.return_period_category(rp)}',
+            f'PRA_{process_tree.return_period_category(return_period)}',
             f'PRA_{return_period}y_{For}.shp'))
 
         for catname in _pra_post_iter1():
@@ -136,12 +136,13 @@ def pra_post_rule(scene_dir, sx3_file, geo_file):
                 f'{name}_{For}_{resolution}m_{return_period}{cat_letter}_rel.shp'))
 
     # Add one-off input files
-    inputs += [os.path.join(scene_dir, 'scene.nc'), pra_input, sx3_file, geo_file]
+    inputs += [os.path.join(scene_dir, 'scene.nc'), scene_args['snowdepth_file'], scene_args['snowdepth_geo']]
 
     def action(tdir):
 
         # Create lookup for snow depth in WRF output file
-        snow_lookup = WrfLookup(scene_args['coordinate_system'], sx3_file, 'sx3', geo_file)
+        snow_lookup = WrfLookup(scene_args['coordinate_system'], scene_args['snowdepth_file'], 'sx3', scene_args['snowdepth_geo'])
+        snow_info = snow_lookup.geo_info
 
         degree = np.pi / 180.
         name = scene_args['name']
@@ -150,11 +151,20 @@ def pra_post_rule(scene_dir, sx3_file, geo_file):
         # Use same loop as when constructing inputs / outputs
         inputsi = iter(inputs)
         outputsi = iter(outputs)
-        for return_period,For in _post_cat_iter0(scene_args):
+        for return_period,For in _pra_post_iter0(scene_args):
             input = next(inputsi)
 
+            # Skip files that don't exist (for testing)
+            if (not require_all) and (not os.path.exists(input)):
+                for catname in _pra_post_iter1():
+                    next(outputsi)
+                continue
+
+
             # Load the polygons
-            df = shputil.read_df(pra_info, shape='pra').df
+            print('======== Reading {}'.format(input))
+            df = shputil.read_df(input, shape='pra')
+            print('Read columns ', df.columns)
             df['sx3'] = df['pra'].map(snow_lookup.value_at_centroid)    # Raw snow depth
 
             # --- Elevation correction
@@ -164,8 +174,8 @@ def pra_post_rule(scene_dir, sx3_file, geo_file):
             df['d0star'] = sx3_corrected * np.cos(28. * degree)
 
             # --- Slope angle correction (slopecorr)
-            df['slopecorr'] =  0.291 / np.sin(df['Mean_slope']*degree) \
-                             - 0.202 * np.cos(df['Mean_slope']*degree)
+            df['slopecorr'] =  0.291 / np.sin(df['Mean_Slope']*degree) \
+                             - 0.202 * np.cos(df['Mean_Slope']*degree)
 
             # Wind load interpolation between 100 (0) and 200 (full wind load) elevation
             # Change max wind load dependent on scenario!!
@@ -177,42 +187,16 @@ def pra_post_rule(scene_dir, sx3_file, geo_file):
 
             # Calculate volume (VOL_returnperiod)
             VOL_vname = f'VOL_{return_period}'
-            # df[VOL_vname] = df['area_m2'] / np.cos(df['Mean_slope']*degree) * df[d0_vname]
-            df[VOL_vname] = (df['area_m2'] * df[d0_vname]) / np.cos(df['Mean_slope']*degree)
+            # df[VOL_vname] = df['area_m2'] / np.cos(df['Mean_Slope']*degree) * df[d0_vname]
+            df[VOL_vname] = (df['area_m2'] * df[d0_vname]) / np.cos(df['Mean_Slope']*degree)
 
-
-            for catname in _pra_post_iter1():
+            # Split into segments and save
+            for catname,low,high in zip(_pra_post_iter1(), _post_cat_bounds[:-1], _post_cat_bounds[1:]):
+                print('Category: {}, [{}, {})'.format(catname, low, high))
                 output = next(outputsi)
 
-                for catname,low,high in zip(catnames, _post_cat_bounds[:-1], _post_cat_bounds[1:]):
-                    df_cat = df[df['area_m2'].between(low, high, inclusive='both')]
-                    cat_output = os.path.join(scene_dir, f'{name}_{For}_{resolution}m_{return_period}{cat_letter}_rel.shp')
-#                    shputil.write_df(df_cat, cat_output)
+                df_cat = df[df['area_m2'].between(low, high, inclusive='both')]
 
-                    print('------ writing ')
-                    print(df.columns)
-                    print([(c,c.dtype) for c in df.columns])
+                shputil.write_df(df_cat, 'pra', 'Polygon', output, wkt=scene_args['coordinate_system'])
                 
     return action
-
-def main():
-#    with netCDF4.Dataset('x.nc', 'a') as nc:
-#        sx3 = nc.variables['sx3'][:]
-#        for i in range(sx3.shape[0]):
-#            sx3[i,:] = i
-#        for j in range(sx3.shape[1]):
-#            sx3[:,j] += j
-#        nc.variables['sx3'][:] = sx3
-
-
-    scene_dir = os.path.join(dggs.data.HARNESS, 'prj', 'juneau1')
-    sx3_file = '/Users/eafischer2/av/data/lader/sx3/geo_southeast.nc'
-    geo_file = '/Users/eafischer2/av/data/lader/sx3/gfdl_sx3_1986.nc'
-    pra_post_rule(scene_dir, sx3_file, geo_file)(None)
-
-main()
-
-
-
-        # data_fname = os.path.join(dggs.data.HARNESS, 'data', 'lader', 'sx3', 'gfdl_sx3_1986.nc')
-        # geo_fname = os.path.join(dggs.data.HARNESS, 'data', 'lader', 'sx3', 'geo_southeast.nc')
