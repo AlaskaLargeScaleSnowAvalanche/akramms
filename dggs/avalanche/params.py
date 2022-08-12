@@ -43,6 +43,7 @@ ALL = paramutil.parse([
     # Parameters for PRA postprocessing (after eCognition)
 #    ('hs_flatfield', 'm', 'float', True,
 #        """TODO DHS3 flatfield"""),
+##### reference_elevation and gradient_snowdepth not needed for Alaska....
     ('reference_elevation', 'm', 'float', True,
         """TODO???"""),
     ('gradient_snowdepth', '.01', 'float', True,

@@ -69,8 +69,8 @@ class WrfLookup:
             masked_data = nc.variables[vname][:,:]    # sx3(j=south_north,i=west_east)
         self.data,converged = gridfill.fill(masked_data, 1, 0, .1)#, itermax=10000)
 
-        # Write a GeoTIFF file of our results
-        wrfutil.write_geotiff(self.geo_info, self.data, 'x.tif')
+#        # Write a GeoTIFF file of our results
+#        wrfutil.write_geotiff(self.geo_info, self.data, 'x.tif')
 
     def value_at_centroid(self, poly):
         centroid = poly.centroid    # In scene coordinates
@@ -164,21 +164,35 @@ def pra_post_rule(scene_dir, require_all=True):
             # Load the polygons
             print('======== Reading {}'.format(input))
             df = shputil.read_df(input, shape='pra')
-            print('Read columns ', df.columns)
+            df = df.rename(columns={'fid': 'Id'})    # RAMMS etc. want it named "Id"
             df['sx3'] = df['pra'].map(snow_lookup.value_at_centroid)    # Raw snow depth
 
             # --- Elevation correction
             snowdepth_correction = (df['Mean_DEM'] - scene_args['reference_elevation']) *.01 * scene_args['gradient_snowdepth']
             sx3_corrected = (df['sx3'] + snowdepth_correction)
             # TODO: Why are we multiplying by cos(28) = .883?
-            df['d0star'] = sx3_corrected * np.cos(28. * degree)
+
+            # Very old rule developed 30-40 years ago: the steeper the
+            # slope, the less snow that can accumulate.  Very
+            # traditional from SLF.  DO NOT use for Alaska.
+
+            # (BUT... the steeper a release point is, the less snow it
+            # has, MIGHT be useful for Alaska.  TODO: Discuss with
+            # Gabe).  If snow is very moist...???
+            if False:
+                df['d0star'] = sx3_corrected * np.cos(28. * degree)
+            else:
+                df['d0star'] = sx3_corrected
 
             # --- Slope angle correction (slopecorr)
+            # TODO: Discuss with Gabe.  Do we want to apply slope angle correction?
+            # If yes, we can make it much simpler than what we have here.
             df['slopecorr'] =  0.291 / np.sin(df['Mean_Slope']*degree) \
                              - 0.202 * np.cos(df['Mean_Slope']*degree)
 
             # Wind load interpolation between 100 (0) and 200 (full wind load) elevation
             # Change max wind load dependent on scenario!!
+            # TODO: Discuss with Gabe, how we do the wind load.
             df['Wind'] = np.clip((df['Mean_DEM'] - 1000.) * .0001, 0., 0.1)
 
             # Calculate final d0 (d0_{return_period})
@@ -195,7 +209,7 @@ def pra_post_rule(scene_dir, require_all=True):
                 print('Category: {}, [{}, {})'.format(catname, low, high))
                 output = next(outputsi)
 
-                df_cat = df[df['area_m2'].between(low, high, inclusive='both')]
+                df_cat = df[df['area_m2'].between(low, high, inclusive='both')]  SHOULD be inclusive='left'
 
                 shputil.write_df(df_cat, 'pra', 'Polygon', output, wkt=scene_args['coordinate_system'])
                 
