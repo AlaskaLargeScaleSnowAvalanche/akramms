@@ -1,3 +1,4 @@
+import collections,itertools,sys
 from uafgi.util import gdalutil,shapelyutil,shputil
 import numpy as np
 
@@ -79,6 +80,131 @@ def neighbor_array(raster, nodata):
 
     return neighbors.astype('i')
 
+class ECGNodeInfo(collections.namedtuple('ECGNode', ['ji', 'forward', 'edge', 'eqclass', 'neighbors'])):
+    pass
+
+class ECGraph:
+    """Graph of Equivalence Classes.
+    Graph has out-degree of 1."""
+    def __init__(self, neighbors):
+        """Begin by creating an equivalence class for every gridcell.
+
+        neighbors: int[ji, 9]
+            Index of neighbors of each gridcell
+            neighbors[ji,0] < 0:
+                gridcell ji doesn't exist
+            neighbors[ji,k] < 0:
+                gridcell ji doesn't have a kth neighbor
+        """
+
+        # Reshape neigbhors to 2D
+        neighbors = neighbors.reshape((np.prod(neighbors.shape[:-1]), neighbors.shape[-1]))
+
+        # Original number of nodes in graph
+        self.nnode0 = neighbors.shape[0]
+
+        unused = (neighbors[:,0] == -1)
+        print('Found {} unused cells'.format(np.sum(unused)))
+
+        # forwards[i] is the currently-valid equivalence class
+        # that node i has been merged into.
+        self.forward = np.arange(self.nnode0)
+        self.forward[unused] = -1
+
+        # eqclass[i] is the gridcells currently in equivalence class i
+        # It is initialized to one gridcell per class
+        self.eqclass = [None if unused[ji] else set((ji,)) for ji in range(self.nnode0)]
+
+        # Neighbor nodes as sets
+        # INVARIANT: This is disjoint from eqclass
+        self.neighbors = [None if unused[ji] else
+            set(x for x in neighbors[ji,1:] if x >= 0)
+            for ji in range(self.nnode0)]
+
+        # Determine whether it's an edge
+        self.edge = (neighbors[:,-1] < 0)
+
+
+    def all_neighbors(self,i):
+        """Returns neighbors of node i, including i itself, as a list."""
+        return list(itertools.chain((i,), self.neighbors[i]))
+
+    def info(self,i):
+        """Useful for debuggin"""
+        return ECGNodeInfo(i, self.forward[i], self.edge[i], self.eqclass[i], self.neighbors[i])
+
+    def merge(self, i, j):
+        """Merges eqclass i into j
+        i:
+            Index of source equivalence class
+        j:
+            Index of desitnation equivalence class.
+        """
+        # Update nodes in this equivalence class
+        self.eqclass[j].update(self.eqclass[i])
+        self.edge[j] = self.edge[j] or self.edge[i]
+
+        # Merge neighbors
+        # Maintain invariant, disjoint from eqclass
+        self.neighbors[j].update(self.neighbors[i])
+        self.neighbors[j].difference_update(self.eqclass[j])
+
+
+        # Update forwards to j
+        for k in self.eqclass[i]:
+            self.forward[k] = j
+
+        # Decommission i
+        self.eqclass[i] = None
+        self.neighbors[i] = None
+
+def fill_sinks(ecg, dem, max_sink_size=10):
+    """Merges equivalence classes with no outlets
+    ecg:
+        ECGraqph
+    dem:
+        Original digital elevation model
+        (WILL BE MODIFIED)
+    max_sink_size:
+        Don't merge sinks larger than this.
+    """
+    dem = dem.reshape(-1)
+    nnode = dem.shape[0]
+    for ix in range(nnode):
+        # Only look at primary node for each EQ class
+        if ecg.forward[ix] != ix:
+            continue
+
+        # Progressively merge with neighbors
+        while True:
+            # Edge nodes don't get merged, the edge is "by definition" an outflow.
+            if ecg.edge[ix]:
+                break
+
+            # Find lowest neighbor
+            ngh = list(ecg.neighbors[ix])
+            min_ix = ngh[np.argmin(dem[ngh])]
+
+            # This EQ class is not a sink because it has an outflow to a neighbor
+            #print(ix, dem[ix], ngh, dem[ngh])
+            if dem[ix] > dem[min_ix]:
+                break
+
+            # This EQ class IS a sink: merge with lowest neighbor
+            print('Merging {} -> {}'.format(min_ix, ix))
+            print(dem[min_ix], ecg.info(min_ix))
+            print(dem[ix], ecg.info(ix))
+            ecg.merge(min_ix, ix)   # Merge min_ix into ix
+            # Set elevation for the EQ class accordingly
+            dem[ix] = dem[min_ix]
+
+            if len(ecg.eqclass[ix]) > max_sink_size:
+                break
+
+
+def filled_grid(
+
+# --------------------------------------------------------------
 def dem_example():
     # Small example
     nj=9
@@ -99,7 +225,7 @@ def dem_example():
 
     # Make an internally drained basin
     # (to be corrected for later)
-    # dem[4:6,4:6] = 6.
+    dem[4:6,4:6] = 6.
 
     return dem,-5
 
