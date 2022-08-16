@@ -1,5 +1,5 @@
 import collections,itertools,sys
-from uafgi.util import gdalutil,shapelyutil,shputil
+from uafgi.util import gdalutil,shapelyutil,shputil,gisutil
 import numpy as np
 
 
@@ -86,6 +86,12 @@ class ECGNodeInfo(collections.namedtuple('ECGNode', ['ji', 'forward', 'edge', 'e
 class ECGraph:
     """Graph of Equivalence Classes.
     Graph has out-degree of 1."""
+#    def __init__(self, forward, eqclass, neighbors, edge):
+#        self.forward = forward
+#        self.eqclass = eqclass
+#        self.neighbors = neighbors
+#        self.edge = edge
+
     def __init__(self, neighbors):
         """Begin by creating an equivalence class for every gridcell.
 
@@ -124,6 +130,8 @@ class ECGraph:
         # Determine whether it's an edge
         self.edge = (neighbors[:,-1] < 0)
 
+    def __len__(self):
+        return len(self.forward)
 
     def all_neighbors(self,i):
         """Returns neighbors of node i, including i itself, as a list."""
@@ -182,7 +190,7 @@ def fill_sinks(ecg, dem, max_sink_size=10):
                 break
 
             # Find lowest neighbor
-            ngh = list(ecg.neighbors[ix])
+            ngh = ecg.forward[list(ecg.neighbors[ix])]    # Could be dups
             min_ix = ngh[np.argmin(dem[ngh])]
 
             # This EQ class is not a sink because it has an outflow to a neighbor
@@ -192,8 +200,8 @@ def fill_sinks(ecg, dem, max_sink_size=10):
 
             # This EQ class IS a sink: merge with lowest neighbor
             print('Merging {} -> {}'.format(min_ix, ix))
-            print(dem[min_ix], ecg.info(min_ix))
-            print(dem[ix], ecg.info(ix))
+            #print(dem[min_ix], ecg.info(min_ix))
+            #print(dem[ix], ecg.info(ix))
             ecg.merge(min_ix, ix)   # Merge min_ix into ix
             # Set elevation for the EQ class accordingly
             dem[ix] = dem[min_ix]
@@ -201,8 +209,58 @@ def fill_sinks(ecg, dem, max_sink_size=10):
             if len(ecg.eqclass[ix]) > max_sink_size:
                 break
 
+    # Look up all forwards (and remove neighbors pointing to now-defunct EC's)
+    for ix in range(nnode):
+        if ecg.neighbors[ix] is not None:
+            ecg.neighbors[ix] = set(ecg.forward[list(ecg.neighbors[ix])])
 
-def filled_grid(
+
+def set_lowest_neighbor(ecg, dem):
+    """Starting with a graph of ALL neighbors, removes those that are
+    not the steepest."""
+
+    dem = dem.reshape(-1)
+    for ix in range(len(ecg)):
+        if ecg.neighbors[ix] is not None:
+            ngh = list(ecg.neighbors[ix])
+            elev = dem[ngh]
+            min = np.min(elev)
+            #min_ix = ngh[np.argmin(dem[ngh])]
+            ecg.neighbors[ix] = set(itertools.compress(ngh, elev == min))
+        
+# Remove extra neighbors...
+
+def fill_region(ecg, cells0):
+    """Finds the set of nodes reachable from cells0.
+    ecg:
+        The graph, with nodes ALREADY consolidated.
+    cells0:
+        Gridcells in the UNCONSOLIDATED graph to start with.
+        (Any collection type OK)
+    """
+
+    # Get set of starting nodes in consolidated graph
+    seen = set(ecg.forward[list(cells0)])
+
+    # Fill until we reach a sink
+    while True:
+        nghs = [ecg.neighbors[ix] for ix in seen]
+        print('seen: ', sorted(list(seen)))
+        #print('nghhs ',list(zip(seen,nghs)))
+        #print('******* ',ecg.info(45))
+        neighbors = set().union(*nghs)
+        new_neighbors = neighbors.difference(seen)
+        #print(neighbors)
+        #print(new_neighbors)
+        if len(new_neighbors) == 0:
+            break
+        seen.update(new_neighbors)
+
+    # Convert from EQ classes back to node indices
+    print('seen: {}'.format(sorted(list(seen))))
+    cells1 = np.array(sorted(list(set().union(*[ecg.eqclass[ix] for ix in seen]))))
+    return cells1
+
 
 # --------------------------------------------------------------
 def dem_example():
@@ -227,12 +285,62 @@ def dem_example():
     # (to be corrected for later)
     dem[4:6,4:6] = 6.
 
-    return dem,-5
+    grid_info = gisutil.RasterInfo('', ni, nj, [0.0, 2.0, 0.0, 0.0, 0.0, 2.0])
+
+    return dem,-5,grid_info
 
 def main():
 
-    dem,nodata = dem_example()
-    ngh = neighbor_array()
+    # Compute filled-out set of points
+    #importlib.reload(domain)
+    dem,nodata0,grid_info=domain.dem_example()
+    nj,ni = dem.shape
+
+    neighbors = domain.neighbor_array(dem,nodata0)
+    ecg = domain.ECGraph(neighbors)
+    domain.fill_sinks(ecg, dem)
+    domain.set_lowest_neighbor(ecg,dem)
+    cells0 = {78,68,29}
+    cells1 = domain.fill_region(ecg, cells0)
+
+    ivals = np.tile(np.arange(0,ni),(nj,1)).reshape(-1)
+    jvals = np.tile(np.arange(0,nj).reshape(-1,1), (1,ni)).reshape(-1)
+    ii = ivals[cells1]
+    jj = jvals[cells1]
+
+    xx,yy = grid_info.to_xy(ii,jj)
+    print(yy)
+    print(xx)
+
+
+
+    import MinimumBoundingBox
+    mp = shapely.geometry.MultiPoint(list(zip(xx,yy)))
+    chull = mp.convex_hull
+    chull_list = list(zip(*chull.exterior.coords.xy))
+    mbb = MinimumBoundingBox.MinimumBoundingBox(chull_list[:-1])
+
+    margin = 2
+    center = np.array(list(mbb.rectangle_center))
+    j0 = np.array(list(mbb.unit_vector))
+    jj0 = j0 * (margin + .5*mbb.length_parallel)
+    j1 = np.array([j0[1],-j0[0]])
+    jj1 = j1 * (margin + .5*mbb.length_orthogonal)
+    mbb_points = [center+jj0+jj1, center+jj0-jj1,  center-jj0+jj1, center-jj0-jj1]
+    mbb_rectangle = shapely.geometry.MultiPoint(list(mbb_points)).convex_hull
+
+    #mbb_rectangle=shapely.geometry.MultiPoint(list(mbb.corner_points)).convex_hull
+    mbb
+
+
+
+    # mbb_rectangle is our domain!!!
+    plt.plot(*mbb_rectangle.exterior.xy)
+    plt.plot(*chull.exterior.xy)
+    plt.plot(xx,yy,marker='.', linewidth=0)
+    mbb_points = list(np.array(xy) for xy in zip(*mbb_rectangle.exterior.xy))
+    print(mbb_points)
+
 
 
 # =====================================================
