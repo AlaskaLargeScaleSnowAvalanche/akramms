@@ -103,6 +103,7 @@ class ECGraph:
                 gridcell ji doesn't have a kth neighbor
         """
 
+        print('BB1')
         # Reshape neigbhors to 2D
         neighbors = neighbors.reshape((np.prod(neighbors.shape[:-1]), neighbors.shape[-1]))
 
@@ -117,18 +118,22 @@ class ECGraph:
         self.forward = np.arange(self.nnode0)
         self.forward[unused] = -1
 
+        print('BB2')
         # eqclass[i] is the gridcells currently in equivalence class i
         # It is initialized to one gridcell per class
         self.eqclass = [None if unused[ji] else set((ji,)) for ji in range(self.nnode0)]
 
+        print('BB3')
         # Neighbor nodes as sets
         # INVARIANT: This is disjoint from eqclass
         self.neighbors = [None if unused[ji] else
             set(x for x in neighbors[ji,1:] if x >= 0)
             for ji in range(self.nnode0)]
 
+        print('BB4')
         # Determine whether it's an edge
         self.edge = (neighbors[:,-1] < 0)
+        print('BB5')
 
     def __len__(self):
         return len(self.forward)
@@ -287,7 +292,7 @@ def dem_example():
 
     grid_info = gisutil.RasterInfo('', ni, nj, [0.0, 2.0, 0.0, 0.0, 0.0, 2.0])
 
-    return dem,-5,grid_info
+    return grid_info,dem,-5
 
 def main():
 
