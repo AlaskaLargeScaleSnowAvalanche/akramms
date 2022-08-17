@@ -6,6 +6,109 @@
 
 typedef int ix_t;
 
+
+/** Stores vector<vector<TypeT>> in an efficient manner */
+template<TypeT>
+class PackedVectors {
+    std::vector<TypeT> data;    // All the vector<TypeT> concatenated together
+    std::vector<int> starts{0};    // Index of start of ith vector
+
+public:
+    // Reading
+    size_t size() { return starts.size()-1; }
+
+    std::vector<TypeT>::iterator begin(int ix) const
+        { return data.begin() + (size_t)starts[(size_t)ix]; }
+
+    std::vector<TypeT>::iterator end(int ix) const
+        { return begin(ix+1); }
+
+    size_t size(int ix) { return end(ix) - start(ix); }
+
+    // Writing
+
+    auto push_back(TypeT const &val) { return data.push_back(val); }
+
+    /** Finish the current vector, so we can go on to the next one. */
+    void finish_vector()
+    {
+        starts.push_back((int)data.size());
+    };
+
+};
+
+
+class PackedEQClasses {
+public:
+    std::vector<ix_t> forwards;    // Cell this has been merged into
+
+    // Index to determine the eqclass set for ix
+    // if ix in exceptions:
+    //     eqclass = {x for x in eqclass[exceptions[ix]]}
+    // else:
+    //     eqclass = {ix}
+    // This will only have entries for a few merged EQ Classes
+//    std::set<ix_t, int> exceptions;
+
+    // Original gridcells in each eq class node.
+    // If the eqclass[i] is empty, then it is implicitly equal to {i}
+//    PackedVectors<ix_t> exceptions;
+
+    std::unordered_set<ix_t, std::vector<int>> exceptions;
+
+    // Stand-in for single-element eqclasses
+    std::vector<ix_t> _single{0};
+
+    /** Fetches the elements of the ith equivalence class */
+    std::array<std::vector<ix_t>::iterator, 2> members(int eqi)
+    {
+        auto ii(exceptions.find(eqi));
+        if (ii != exceptions.end()) {
+            // This EQClass is stored explicitly, return it.
+            return {ii->second.begin(), ii->second.end()};
+        } else {
+            // This EQClass is not explicitly represented, just equal to self
+            _single[0] = eqi;
+            return {_single.begin(), _single.end()};
+        }
+    }
+
+    /** Determines which eqclass the ith gridcell is a part of */
+    int parent(int gci) { return forwards[gci]; }
+};
+
+
+#if 0
+class D1Graph {
+public:
+    std::vector<ix_t> forwards;    // Cell this has been merged into
+
+    // Index of the minimum neighbor(s) for each node.
+    PackedSets<ix_t> neighbors;    // Neighbors with the lowest value (maybe >1)
+  
+    // Original gridcells in each eq class node.
+    // If the eqclass[i] is empty, then it is implicitly equal to {i}
+    PackedVectors<ix_t> eqclass;
+};
+
+
+
+class D1Graph {
+public:
+    std::vector<ix_t> forwards;    // Cell this has been merged into
+
+    // Index of the minimum neighbor(s) for each node.
+    PackedSets<ix_t> neighbors;    // Neighbors with the lowest value (maybe >1)
+  
+    // Original gridcells in each eq class node.
+    // If the eqclass[i] is empty, then it is implicitly equal to {i}
+    PackedVectors<ix_t> eqclass;
+};
+#endif
+
+
+
+
 class D8Node {
 public:
     std::unorderd_set<ix_t> eqclass;    // All gridcells at same elevation as this one (including self)
@@ -216,7 +319,8 @@ public:
         }
     }
 
-    /** Returns: vector<int>
+    /** Retains just the single neighbor with lowest elevation.
+    Returns: vector<int>
         ret[i] =
             If gridcell i is unused: -1
             If gridcell i has been merged into equiv class j != i: -1
@@ -224,8 +328,37 @@ public:
                  Index of lowest neighbor of eq class i
                  (including i as a neighbor)
     */
-    std::vector<int> to_single_neighbors()
+    std::vector<int> lowest_neighbors()
     {
+        std::vector<int> ret;
+        ret.reserve(size());
+
+        for (int ix=0; ix<(int)size(); ++ix) {
+            if (dem[ix] == nodata) || (forwards[ix] != ix) {
+                ret.push_back(-1);
+            } else {
+                auto &ngh(neighbors(ix));
+                ix_t min_ix = *std::min_element(ngh.begin(), ngh.end(),
+                    [](int const ix0, int const ix1) { return dem[ix0] < dem[ix1] });
+                ret.push_back(min_ix);
+            }
+        }
+        return ret;
+    }
+
+    EQClasses to_eqclasses()
+    {
+        EQClasses eqc;
+
+        eqc.forwards = forwards;
+
+        // Compress format of merged nodes
+        for (auto ii(nodes.begin()); ii != nodes.end(); ++ii) {
+            auto ix(ii->first);
+            auto &node(ii->second);
+        }
+
+        return eqc;
     }
 
 };

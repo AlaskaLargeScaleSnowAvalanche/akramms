@@ -298,7 +298,7 @@ def main():
 
     # Compute filled-out set of points
     #importlib.reload(domain)
-    dem,nodata0,grid_info=domain.dem_example()
+    grid_info,dem,nodata0=domain.dem_example()
     nj,ni = dem.shape
 
     neighbors = domain.neighbor_array(dem,nodata0)
