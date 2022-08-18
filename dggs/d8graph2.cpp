@@ -84,9 +84,10 @@ public:
     }
 
     /** SPECIAL CASE: Determines the lowest-number index in an eq class
+    (Assumes members are always sorted)
     ix:
         An active eq class index (use parent() if needed).*/
-    ix_t member0(ix_t ix) const
+    ix_t min_member(ix_t ix) const
     {
         auto ii(eqclasses.find(ix));
         if (ii != eqclasses.end()) {
@@ -354,10 +355,19 @@ public:
     }
 
 
-    /** Construct the degree-1 neighbor relationship */
-    std::vector<ix_t> to_neighbors1()
+    /** Construct the degree-1 neighbor relationship.  Represented as
+    a 1D array by gridcell.  Gridcells in each EQ class are arranged
+    in a linear fashion, so all of them are traversed in any graph
+    search.
+    neighbors1:  [nj*ni]
+        Base of 1D array of gridcell neighbors.
+        (Potentially this is a Numpy array.)
+    */
+    void to_neighbors1(double *neighbors1)
     {
-        std::vector<ix_t> neighbor1(size(), -1);    // Degree-1 graph
+        // Initialize all to -1
+        for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i)
+            neighbors1[ix_i] = -1;
 
         // ix_i is the index of the "current" eq class
         for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i) {
@@ -369,12 +379,20 @@ public:
                 ix_t ix_j = *std::min_element(ngh_bounds[0], ngh_bounds[1],
                     [](int const ix0, int const ix1) { return dem[ix0] < dem[ix1] });
 
+                // If the lowest neighboring eq class is ourself, then
+                // we are a sink.  Record no outbound neighbor.
+                if (ix_i == ix_j) {
+                    neighbors1[ix_i] = -1;
+                    continue;
+                }
+
+
                 // Now create graph link: ix_i -> ix_j
                 // if ix_i is a compound eq class, link from the LARGEST gridcell in it
                 // if ix_j is a compound eq class, link to the SMALLEST gridcell in it
                 auto members_i_bounds(members(ix_i));
-                ix_t max_member_i = *(members_bounds[1]-1);
-                ix_t min_member_j = min_member(ix_j);
+                ix_t max_member_i = *(members_bounds[1]-1);   // Largest in i
+                ix_t min_member_j = min_member(ix_j);         // Smallest in j
                 neighbors1[max_member_i] = min_member_j;
 
                 // Create links *within* eq class i, from the min to
@@ -387,7 +405,6 @@ public:
             }
         }
         return neighbors1;
-
 
     }
 
