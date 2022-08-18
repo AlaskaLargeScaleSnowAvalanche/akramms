@@ -83,6 +83,19 @@ public:
         }
     }
 
+    /** SPECIAL CASE: Determines the lowest-number index in an eq class
+    ix:
+        An active eq class index (use parent() if needed).*/
+    ix_t member0(ix_t ix) const
+    {
+        auto ii(eqclasses.find(ix));
+        if (ii != eqclasses.end()) {
+            return ii->second[0];
+        } else {
+            return ix;
+        }
+    }
+
     /** Determines which eqclass the ith gridcell is a part of */
     ix_t parent(ix_t gci) const
     {
@@ -90,6 +103,7 @@ public:
         if (ii != forwards.end()) return *ii;
         return gci;
     }
+
 
     /** Merge eq class i into j
     i:
@@ -99,7 +113,7 @@ public:
     Returns:
         Sorted vector of members of newly merged j
     */
-    std::vector<int> &merge(int j, int i)
+    std::vector<ix_t> &merge(int j, int i)
     {
         // Access contents of the destination eq class,
         // converting to explicit form if needed.
@@ -117,7 +131,7 @@ public:
         std::vector<ix_t> eqcnew;
         std::set_union(
             eqcj.begin(), eqcj.end(), eqci_bounds[0], eqci_bounds[1],
-            std::inserter(ewcnew, eqcnew.begin()));
+            std::inserter(eqcnew, eqcnew.begin()));
         eqcj = std::move(eqcnew);
 
         // Delete eqclass i and forward to j
@@ -140,7 +154,8 @@ class D8Graph {
 
     // Maintain a DEM (imported from Python), giving us our neighbors
     double *dem;
-    int nj, ni;
+    int const nj;
+    int const ni;
     double nodata;             // dem==nodata ==> unused gridcell
     // Tells whether an EQ class is on the edge of the grid or adjacent to an unused cell
     std::vector<bool> edge;
@@ -152,6 +167,7 @@ class D8Graph {
     // ---------------------------------------------------------
 
     // Increments to get to neighbors
+    // These need to be in sorted order...
     static const std::vector<std::array<int,2>> dneigh {
         {-1,-1}, {-1,0}, {-1,1},
         {0, -1},       , {0, 1},
@@ -237,13 +253,22 @@ public:
         }
     }
 
-    void &merge(int j, int i)
+    /** Returns merged {eqclass vector, neighbor vector} */
+    std::array<std::vector<ix_t>*, 2> &merge(int j, int i)
     {
+        // -------- Merge equivalence classes
+        auto &eqclassj(eqclasses.merge(j,i));
+
+        // -------- Merge neighbors
         // Access contents of the destination neighbors,
         // converting to explicit form if needed.
         auto nghj_it(neighborss.find(j));
         if (nghj_it == neighborss.end()) {
-            nghj_it = neighborss.insert(nghj_it, std::vector<ix_t>{i});
+            // Initialize with explicit list of neighbors
+            auto neighs_bounds(neighbors(i));
+            nghj_it = neighborss.insert(
+                nghj_it,
+                std::vector<ix_t>(neighs_bounds[0], neighs_bounds[1]));
         }
         std::vector<ix_t> &nghj(nghj_it->second);
 
@@ -251,47 +276,122 @@ public:
         // care whether it's in implicit or explicit form.
         auto nghi_bounds(members(i));
 
-        // Merge eq class i into eq class j
+        // Copy neighbors of i into neighbors of j
         std::vector<ix_t> nghnew;
         std::set_union(
             nghj.begin(), nghj.end(), nghi_bounds[0], nghi_bounds[1],
-            std::inserter(ewcnew, nghnew.begin()));
-        nghj = std::move(nghnew);
+            std::inserter(nghnew, nghnew.begin()));
+        //std::sort(nghnew.begin(), nghnew.end());    // not needed
+
+        // ------ Maintain invariant: eqclass and neighbors are disjoint!
+        auto eqc_bounds(eqclasses.members(j));
+        std::vector<ix_t> nghnew2;
+        std::set_difference(
+            nghnew.begin(), nghnew.end(),    // Copy these
+            eqc_bounds[0], eqc_bounds[1],    // As long as they are not in here
+            std::insert(nghnew2, nghnew2.begin()));
+        nghj = std::move(nghnew2);
+
+
+        // ----------- Maintain edge designation
+        edge[j] |= edge[i];
+
+        return {&eqclassj, nghj};
+    }
 
 
 
+    /**
+    max_sink_size:
+        Don't merge sinks larger than this.
+    */
+    void fill_sinks(size_t max_sink_size)
+    {
 
+        for (int ix=0; ix<(int)size(); ++ix) {
+            // Only look at primary node for each EQ class
+            if (eqclasses.parent(ix) != ix) continue;
 
+            // Progressively merge with neighbors
+            for (;;) {
 
+                // Edge nodes don't get merged, the unused gridcell
+                // nextdoor is by definition a place we can flow to from this
+                // gridcell.
+                if (edge[ix]) break;
 
-        eqclasses.merge(j, i);
+                // Find index of the neighbor with the lowest elevation in the dem
+                auto ngh_bounds(neighbors(ix));
+                ix_t min_ix = *std::min_element(ngh_bounds[0], ngh_bounds[1],
+                    [](int const ix0, int const ix1) { return dem[ix0] < dem[ix1] });
 
-        // Merge neighbors i into neighbors j
-        std::vector<ix_t> eqcnew;
-        std::set_union(
-            eqcj.begin(), eqcj.end(), eqci_bounds[0], eqci_bounds[1],
-            std::inserter(ewcnew, eqcnew.begin()));
-        eqcj = std::move(eqcnew);
+                // This Equiv class is not a sink because it has an outflow to a neighbor
+                if (dem[ix] > dem[min_ix]) break;
 
+                // This EQ class IS a sink: merge with lowest neighbor
+                printf("Merging %d -> %d\n", min_ix, ix);
+                // Merge min_ix into ix, return neighbors of merged ix
+                auto &merged(merge(ix, min_ix));
+                auto &merged_eqclass(*merged[0]);    // Unpack results
+                //auto &merged_neighbors(*merged[1]);
 
-        nodej.neighbors.insert(nodei.neighbors.begin(), nodei.neighbors.end());
+                // Set elevation for the EQ class accordingly
+                dem[ix] = dem[min_ix];
 
-        // Maintain invariant: eqclass and neighbors are disjoint!
-        for (auto jj=nodej.neighbors.begin(); jj != nodej.neighbors.end(); ) {
-            // https://stackoverflow.com/questions/2874441/deleting-elements-from-stdset-while-iterating
-            if (nodej.eqclass.find(*jj) != nodej.eqclass.end()) {
-                nodej.neighbors.erase(jj++);    // post-increment to avoid invalidating iterator
-            } else {
-                ++jj;
+                // Stop if we've gotten too large
+                if (merged_eqclass.size() > max_sink_size) break;
             }
         }
 
-        // Maintain edge designation
-        edge[j] |= edge[i];
+        // Look up all forwards on explicit eq classes
+        // (and remove neighbors pointing to now-defunct EC's)
+        for (auto ii(neighborss.begin()); ii != neighborss.end(); ++ii) {
+            std::vector<ix_t> &neighbors(ii->second);
+            for (auto jj(neighbors.begin()); jj < neighbors.end(); ++jj) {
+                *jj = eqclasses.parent(*jj);
+            }
+        }
+    }
+
+
+    /** Construct the degree-1 neighbor relationship */
+    std::vector<ix_t> to_neighbors1()
+    {
+        std::vector<ix_t> neighbor1(size(), -1);    // Degree-1 graph
+
+        // ix_i is the index of the "current" eq class
+        for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i) {
+            // Only consider lead gridcells of equivalence classes
+            if ((dem[ix_i] != nodata) && (parent(ix_i) == ix_i)) {
+
+                // ix_j is index of lowest neighboring eq class
+                auto ngh_bounds(neighbors(ix_i));
+                ix_t ix_j = *std::min_element(ngh_bounds[0], ngh_bounds[1],
+                    [](int const ix0, int const ix1) { return dem[ix0] < dem[ix1] });
+
+                // Now create graph link: ix_i -> ix_j
+                // if ix_i is a compound eq class, link from the LARGEST gridcell in it
+                // if ix_j is a compound eq class, link to the SMALLEST gridcell in it
+                auto members_i_bounds(members(ix_i));
+                ix_t max_member_i = *(members_bounds[1]-1);
+                ix_t min_member_j = min_member(ix_j);
+                neighbors1[max_member_i] = min_member_j;
+
+                // Create links *within* eq class i, from the min to
+                // the max gridcell.  Any flow into eq class i will
+                // enter at the min gridcell, then traverse all
+                // portions of the eq class.
+                for (auto ii(members_bounds[0])+1; ii<members_bounds[1]; ++ii)
+                    neighbors1[*(ii-1)] = *ii;
+                
+            }
+        }
+        return neighbors1;
+
 
     }
 
-};
+
 
 
 
