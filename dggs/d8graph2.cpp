@@ -6,6 +6,303 @@
 
 typedef int ix_t;
 
+/** A memory-efficient version of map<KeyT,ValT> in two vectors. */
+template<class KeyT, class ValT>
+struct PackedMap {
+    std::vector<KeyT> keys;    // TODO: Use Numpy array here, because this is used to/from Python
+    std::vector<ValT> values;
+};
+
+/** A memory-efficient version of map<KeyT, vector<ValT>> in three vectors */
+template<class KeyT, class ValT, IndexT>
+struct PackedMapVectors {
+    std::vector<KeyT> keys;
+    std::vector<IndexT> starts {0};    // Index into values; keys.size+1
+    std::vector<ValT> values;
+
+};
+
+// ==================================================================================
+class EQClasses {
+    // Cell this has been merged into (if it's been merged)
+    std::unordered_map<ix_t, ix_t> forwards;
+
+    // EQClass with >1 element
+    // Inner vector is SORTED
+    std::unordered_map<ix_t, std::vector<ix_t>> eqclasses;
+
+    // Stand-in for single-element eqclasses
+    std::vector<ix_t> _single_ret{0};
+
+public:
+
+    EQClasses() {}    // Start off with everything in its own class
+
+    void set_forwards(PackedMap<ix_t, ix_t> const &_forwards)
+    {
+        // Initialize forwards
+        for (size_t k=0; k<_forwards.keys.size(); ++k) {
+            forwards[_forwards.keys[k]] = _values[k];
+        }
+    }
+
+    void set_eqclasses(PackedMapVectors<ix_t, int, int> const &_eqclasses)
+    {
+        // Initialize eqclasses
+        for (size_t k=0; k<_eqclasses.keys.size(); ++k) {
+            size_t begin_ix = _eqclasses.starts[k];
+            size_t end_ix = _eqclasses.starts[k+1];
+            std::vector<int> eqc;
+            for (size_t ix=begin_ix; ix<end_ix; ++ix)
+                eqc.push_back(_eqclasses.values[ix]);
+            eqclasses.insert(std::make_pair(_eqclasses.keys[k], std::move(eqc)));
+        }
+    }
+
+    /** Initialized stored EQClasses from Python */
+    EQClasses(
+        PackedMap<ix_t, ix_t> const &_forwards,
+        PackedMapVectors<ix_t, int, int> const &_eqclasses)
+    {
+        set_forwards(_forwards);
+        set_eqclasses(_eqclasses);
+    }
+
+
+    /** Fetches the elements of the ith equivalence class */
+    std::array<std::vector<ix_t>::iterator, 2> members(int eqi) const
+    {
+        auto ii(eqclasses.find(eqi));
+        if (ii != eqclasses.end()) {
+            // This EQClass is stored explicitly, return it.
+            return {ii->second.begin(), ii->second.end()};
+        } else {
+            // This EQClass is not explicitly represented, just equal to self
+            _single_ret[0] = eqi;
+            return {_single_ret.begin(), _single_ret.end()};
+        }
+    }
+
+    /** Determines which eqclass the ith gridcell is a part of */
+    ix_t parent(ix_t gci) const
+    {
+        auto ii(forwards.find(gci));
+        if (ii != forwards.end()) return *ii;
+        return gci;
+    }
+
+    /** Merge eq class i into j
+    i:
+        Index of source equivalence class
+    j:
+        Index of destination equivalence class
+    Returns:
+        Sorted vector of members of newly merged j
+    */
+    std::vector<int> &merge(int j, int i)
+    {
+        // Access contents of the destination eq class,
+        // converting to explicit form if needed.
+        auto eqcj_it(eqclasses.find(j));
+        if (eqcj_it == eqclasses.end()) {
+            eqcj_it = eqclasses.insert(eqcj_it, std::vector<ix_t>{i});
+        }
+        std::vector<ix_t> &eqcj(eqcj_it->second);
+
+        // Access contents of the source eq class.  We don't know or
+        // care whether it's in implicit or explicit form.
+        auto eqci_bounds(members(i));
+
+        // Merge eq class i into eq class j
+        std::vector<ix_t> eqcnew;
+        std::set_union(
+            eqcj.begin(), eqcj.end(), eqci_bounds[0], eqci_bounds[1],
+            std::inserter(ewcnew, eqcnew.begin()));
+        eqcj = std::move(eqcnew);
+
+        // Delete eqclass i and forward to j
+        eqclasses.erase(i);
+        forwards[i] = j;
+
+        // Return the new Equiv Class j
+        return eqcj;
+    }
+
+};
+
+// ----------------------------------------------------------
+
+/** A graph with implicit 8-way neighbors based on DEM and used /
+unused gridcells */
+class D8Graph {
+    // Maintain nodes of our graph as equivalence classes
+    EQClasses eqclasses;
+
+    // Maintain a DEM (imported from Python), giving us our neighbors
+    double *dem;
+    int nj, ni;
+    double nodata;             // dem==nodata ==> unused gridcell
+    // Tells whether an EQ class is on the edge of the grid or adjacent to an unused cell
+    std::vector<bool> edge;
+
+    // Explicit neighbors for merged EQ classes
+    std::unordered_map<ix_t, std::vector<ix_t>> neighborss;
+    // Buffer used to return neighbors
+    std::vector<int> _neighbors_ret;
+    // ---------------------------------------------------------
+
+    // Increments to get to neighbors
+    static const std::vector<std::array<int,2>> dneigh {
+        {-1,-1}, {-1,0}, {-1,1},
+        {0, -1},       , {0, 1},
+        {1,-1},  {1,0},  {1,1}};
+
+    /** Determines whether a gridcell is an edge cell, i.e. borders on
+    an unused cell or grid edge.  This function is called a the
+    beginning to build a lookup table, which is then modified as eq
+    classes are merged. */
+    bool is_edge(int j0, int i0)
+    {
+        // Look at neighboring nodes in 2D space
+        for (auto &dn : dneigh) {
+            // It's an edge if at edge of domain
+            int const j1 = j0 + dn[0];
+            int const i1 = i0 + dn[1];
+            if ((j1<0) || (j1>=nj) || (i1<0) || (i1>ni)) return true;
+
+            // It's an edge if neighbor is unused
+            int const ji1 = j1*ni + i1;
+            if (dem[ji1] == nodata) return true;
+        }
+        return false;
+    }
+
+public:
+    D8Graph(double *_dem, int _nj, int _ni, double _nodata)
+        : dem(_dem), nj(_nj), ni(_ni), nodata(_nodata)
+    {
+
+        // Initialize edge indicator
+        edge.reserve(nji);
+        for (int j=0; i<nj; ++j) {
+        for (int i=0; i<ni; ++i) {
+            edge.push_back(is_edge(j,i));
+        }}
+
+        // Reserve output vector for sharing neighbors
+        _neighbors_ret.reserve(32);
+    }
+
+    size_t size() { return nj*ni; }
+
+    std::array<std::vector<ix_t>::iterator, 2> const &neighbors(int ji0)
+    {
+        // Follow forwards
+        ji0 = eqclasses.parent(ji0);
+
+        // Is this EQ class a result of a merger?
+        _neighbors_ret.clear();
+        auto ii(neighborss.find(ji0));
+        if (ii != neighborss.end())
+            // -------------------------------------------
+            // This node has been merged, its neighbors are stored explicitly
+            std::vector<ix_t> &neighs(ii->second);
+            return {neighs.begin(), neigs.end()}
+        }
+
+        // -------------------------------------------
+        // This node has not been merged; identify its neighbors
+        // based on the 2D raster
+        int const j0 = ji0 / ni;
+        int const i0 = ji0 % ni;    // Probably compiles down to divmod
+
+        // Look at neighboring nodes in 2D space
+        for (auto &dn : dneigh) {
+
+            // Avoid outrunning our domain
+            int const j1 = j0 + dn[0];
+            int const i1 = i0 + dn[1];
+            if ((j1<0) || (j1>=nj) || (i1<0) || (i1>ni)) contine;
+
+            // Avoid "neighbor" gridcells that are unused
+            int const ji1 = j1*ni + i1;
+            if (dem[ji1] == nodata) continue;
+
+            // Follow forwrding for neighbors that have been merged
+            ji1 = eqclasses.parent[ji1];
+
+            // Add to our list of output
+            _neighbors_ret.push_back(ji1);
+            return {_neighbors_ret.begin(), _neighbors_ret.end()};
+        }
+    }
+
+    void &merge(int j, int i)
+    {
+        // Access contents of the destination neighbors,
+        // converting to explicit form if needed.
+        auto nghj_it(neighborss.find(j));
+        if (nghj_it == neighborss.end()) {
+            nghj_it = neighborss.insert(nghj_it, std::vector<ix_t>{i});
+        }
+        std::vector<ix_t> &nghj(nghj_it->second);
+
+        // Access contents of the source eq class.  We don't know or
+        // care whether it's in implicit or explicit form.
+        auto nghi_bounds(members(i));
+
+        // Merge eq class i into eq class j
+        std::vector<ix_t> nghnew;
+        std::set_union(
+            nghj.begin(), nghj.end(), nghi_bounds[0], nghi_bounds[1],
+            std::inserter(ewcnew, nghnew.begin()));
+        nghj = std::move(nghnew);
+
+
+
+
+
+
+
+        eqclasses.merge(j, i);
+
+        // Merge neighbors i into neighbors j
+        std::vector<ix_t> eqcnew;
+        std::set_union(
+            eqcj.begin(), eqcj.end(), eqci_bounds[0], eqci_bounds[1],
+            std::inserter(ewcnew, eqcnew.begin()));
+        eqcj = std::move(eqcnew);
+
+
+        nodej.neighbors.insert(nodei.neighbors.begin(), nodei.neighbors.end());
+
+        // Maintain invariant: eqclass and neighbors are disjoint!
+        for (auto jj=nodej.neighbors.begin(); jj != nodej.neighbors.end(); ) {
+            // https://stackoverflow.com/questions/2874441/deleting-elements-from-stdset-while-iterating
+            if (nodej.eqclass.find(*jj) != nodej.eqclass.end()) {
+                nodej.neighbors.erase(jj++);    // post-increment to avoid invalidating iterator
+            } else {
+                ++jj;
+            }
+        }
+
+        // Maintain edge designation
+        edge[j] |= edge[i];
+
+    }
+
+};
+
+
+
+
+
+
+
+
+
+
+
 
 /** Stores vector<vector<TypeT>> in an efficient manner */
 template<TypeT>
@@ -38,73 +335,7 @@ public:
 };
 
 
-class PackedEQClasses {
-public:
-    std::vector<ix_t> forwards;    // Cell this has been merged into
 
-    // Index to determine the eqclass set for ix
-    // if ix in exceptions:
-    //     eqclass = {x for x in eqclass[exceptions[ix]]}
-    // else:
-    //     eqclass = {ix}
-    // This will only have entries for a few merged EQ Classes
-//    std::set<ix_t, int> exceptions;
-
-    // Original gridcells in each eq class node.
-    // If the eqclass[i] is empty, then it is implicitly equal to {i}
-//    PackedVectors<ix_t> exceptions;
-
-    std::unordered_set<ix_t, std::vector<int>> exceptions;
-
-    // Stand-in for single-element eqclasses
-    std::vector<ix_t> _single{0};
-
-    /** Fetches the elements of the ith equivalence class */
-    std::array<std::vector<ix_t>::iterator, 2> members(int eqi)
-    {
-        auto ii(exceptions.find(eqi));
-        if (ii != exceptions.end()) {
-            // This EQClass is stored explicitly, return it.
-            return {ii->second.begin(), ii->second.end()};
-        } else {
-            // This EQClass is not explicitly represented, just equal to self
-            _single[0] = eqi;
-            return {_single.begin(), _single.end()};
-        }
-    }
-
-    /** Determines which eqclass the ith gridcell is a part of */
-    int parent(int gci) { return forwards[gci]; }
-};
-
-
-#if 0
-class D1Graph {
-public:
-    std::vector<ix_t> forwards;    // Cell this has been merged into
-
-    // Index of the minimum neighbor(s) for each node.
-    PackedSets<ix_t> neighbors;    // Neighbors with the lowest value (maybe >1)
-  
-    // Original gridcells in each eq class node.
-    // If the eqclass[i] is empty, then it is implicitly equal to {i}
-    PackedVectors<ix_t> eqclass;
-};
-
-
-
-class D1Graph {
-public:
-    std::vector<ix_t> forwards;    // Cell this has been merged into
-
-    // Index of the minimum neighbor(s) for each node.
-    PackedSets<ix_t> neighbors;    // Neighbors with the lowest value (maybe >1)
-  
-    // Original gridcells in each eq class node.
-    // If the eqclass[i] is empty, then it is implicitly equal to {i}
-    PackedVectors<ix_t> eqclass;
-};
-#endif
 
 
 
@@ -126,7 +357,7 @@ public:
     double *dem;      // double[nji=nj*ni]
     int nj, ni;
     double nodata;             // dem==nodata ==> unused gridcell
-    std::vector<ix_t> forwards;    // Cell this has been merged into
+    std::unordered_map<ix_t, ix_t> forwards;    // Cell this has been merged into
     std::vector<bool> edge;
 
     // ------- For EQ classes that are combined gridcells
