@@ -393,32 +393,37 @@ static PyObject* d8graph_d8graph(PyObject *module, PyObject *args, PyObject *kwa
 
 
 // ============================================================
+// ============================================================
 // Random other Python C Extension Stuff
 static PyMethodDef D8graphMethods[] = {
-    {"d8graph",
-        (PyCFunction)d8graph_d8graph,
+    {"neighbor_graph",
+        (PyCFunction)d8graph_neighbor_graph,
         METH_VARARGS | METH_KEYWORDS, d8graph_d8graph_docstring},
-
-    {"solar_noon",
-        (PyCFunction)d8graph_solar_noon,
-        METH_VARARGS | METH_KEYWORDS, d8graph_solar_noon_docstring},
 
     // Sentinel
     {NULL, NULL, 0, NULL}
 };
 
+
 /* This initiates the module using the above definitions. */
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
-    .m_name = "dggs.d8graph",    // Name of module
-    .m_doc = "dggs.d8graph C Extnesion Module",    // Per-module docstring
-    .m_size = -1,  /* size of per-interpreter state of the module,
+    "dggs._d8graph",    // Name of module
+    module_docstring,    // Per-module docstring
+    -1,  /* size of per-interpreter state of the module,
                  or -1 if the module keeps state in global variables. */
+    D8GraphMethods,    // Functions
+    NULL,
+    NULL,
+    NULL,
+    NULL
 };
 
+extern "C"
 PyMODINIT_FUNC PyInit_d8graph(void)
 {
     import_array();    // Needed for Numpy
 
     return PyModule_Create(&moduledef);
 }
+

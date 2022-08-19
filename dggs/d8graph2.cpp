@@ -409,131 +409,302 @@ public:
     }
 };
 
+/** Does a breadth-first-search of the neighbor1 graph starting from
+some gridcells.
+
+start_begin, start_end:
+    begin and end iterators for starting gridcell indices
+*/
+std::unordered_set<ix_t> flood_fill(
+    ix_t const *neighbor1,
+    // int nj, int ni,     // Not needed, except for bounds checking on neighbor1 lookup
+    ix_t const *start_begin, ix_t const *start_end)
+{
+    // State of breadth-first-search
+    std::unordered_set<ix_t> seen;
+    std::vector<ix_t> cur(start_begin, start_end);
+    std::vector<ix_t> neighbors;   // can have duplicates
+    for (;;) {
+        // Determine neighbor values of each current node
+        // Add to our vector of neighbors if we haven't seen it yet.
+        // Also add to our seen set (most efficient this way)
+        for (ix_t ix : cur) {
+            ix_t ngh = neighbor1[ix];
+            if (ngh < 0) continue;    // No neighbor for this node
+
+            auto ii(seen.find(ngh));
+            if (ii == seen.end()) {
+                neighbors.push_back(ngh);
+                seen.insert(ngh):
+            }
+        }
+
+        // Exit condition: no more neighbors!
+        if (neighbors.size() == 0) break;
+
+        // neighbors becomes cur
+        // O(1) time see: https://www.geeksforgeeks.org/difference-between-stdswap-and-stdvectorswap/
+        std::swap(cur, neighbors);
+        neighbors.clear();
+    }
+
+    return seen;
+}
+
+
+
 // =========================================================================
-// Python Interface Stuff
+// Functions in the Python interface
 
-typedef struct {
-    PyObject_HEAD
-    std::unique_ptr<D8GraphObject> cobj;
-} D8GraphObject;
+static char const *d8graph_neighbor_graph_docstring = 
+R"Produces the single-neighbor graph from a DEM; a degree-1 graph
+providing the D8 routing from each gridcell to the next; with the
+following caveats:
 
+  1. Interior sinks are filled by combining cells into *equivalence classes*.
 
-static void
-D8Graph_dealloc(D8GraphObject *self)
+  2. The graph routes into the lowest numbered cell in each
+     equivalence class, and out the highest number, while going
+     through all intervening members.  This ensures that flow entering
+     the equivalence class will reach all members.  (Corner case: this
+     will not necessarily be true if the flow begans in the middle of
+     an equivalence class).
+
+  3. The out-degree of the graph can be at most 1.  If two neighboring
+     cells are equally low, then one is chosen.
+
+  4. 
+
+dem: np.array(nj, ni, dtype='d')
+    The input digital elevation model
+nodata: float
+    dem takes this value for unused cells (eg ocean)
+max_sink_size: int
+    Maximum number of cells to join together in equivalence classes
+
+Returns: neighbor1=np.array(nj, ni, dtype=np.int32)
+    Representation of the degree-1 graph
+    neighbor1[j,i] = 1D index of the downstream node.
+       ...or -1 if cell (j,i) is unused, or there is no downstream node.
+";
+static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObject *kwargs)
 {
-    self->cobj.reset();    // Delete allocated C++ object
-    Py_TYPE(self)->tp_free((PyObject *) self);
-}
+    // Input arrays
+    PyArrayObject *dem;
+    double nodata;
+    int max_sink_size = 10;
 
-static int
-D8Graph_init(D8GraphObject *self, PyObject *args, PyObject *kwds)
-{
+    // Parse args and kwargs
+    static char *kwlist[] = {
+        "dem", "nodata",         // *args,
+        "max_sink_size",    // **kwargs
+        NULL};
+    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!d|i",
+        kwlist,
+        &PyArray_Type, &dem, &nodata,
+        &max_sink_size
+        )) return NULL;
 
-
-
-
-    static char *kwlist[] = {"first", "last", "number", NULL};
-    PyObject *first = NULL, *last = NULL, *tmp;
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OOi", kwlist,
-                                     &first, &last,
-                                     &self->number))
-        return -1;
-
-    if (first) {
-        tmp = self->first;
-        Py_INCREF(first);
-        self->first = first;
-        Py_XDECREF(tmp);
-    }
-    if (last) {
-        tmp = self->last;
-        Py_INCREF(last);
-        self->last = last;
-        Py_XDECREF(tmp);
-    }
-    return 0;
-
-
-
-    // Properly construct the C++ object(s) in the D8GraphObject struct
-    // (which was allocated by Python without proper construction)
-    // Use placement new here...
-    new(self->cobj) std::unique_ptr<D8GraphObject>(
-        new D8GraphObject(...));
-
-
-}
-
-static PyMemberDef D8Graph_members[] = {
-    {"first", T_OBJECT_EX, offsetof(D8GraphObject, first), 0,
-     "first name"},
-    {"last", T_OBJECT_EX, offsetof(D8GraphObject, last), 0,
-     "last name"},
-    {"number", T_INT, offsetof(D8GraphObject, number), 0,
-     "d8graph number"},
-    {NULL}  /* Sentinel */
-};
-
-static PyObject *
-D8Graph_name(D8GraphObject *self, PyObject *Py_UNUSED(ignored))
-{
-    if (self->first == NULL) {
-        PyErr_SetString(PyExc_AttributeError, "first");
+    // -----------------------------------------
+    // Typecheck
+    // Check storage
+    if (!PyArray_ISCARRAY_RO(dem)) {
+        PyErr_SetString(PyExc_TypeError, "Input dem must be C-style, contiguous array.");
         return NULL;
     }
-    if (self->last == NULL) {
-        PyErr_SetString(PyExc_AttributeError, "last");
+
+    // Check type
+    if (PyArray_DESCR(dem)->type_num != NPY_DOUBLE) {
+        PyErr_SetString(PyExc_TypeError, "Input dem must have type double");
         return NULL;
     }
-    return PyUnicode_FromFormat("%S %S", self->first, self->last);
+
+    // Check rank
+    if (PyArray_NDIM(dem) != 2) {
+        PyErr_SetString(PyExc_TypeError, "Input dem must have rank 2");
+        return NULL;
+    }
+
+    // -----------------------------------------
+    // Create output array (uninitialized)
+    PyArrayObject *neighbor1 = (PyArrayObject *)PyArray_NewLikeArray(
+        dem, NPY_ANYORDER, NULL, 0);
+
+    PyArrayObject *neighbor1 = (PyArrayObject*) PyArray_NewFromDescr(
+        &PyArray_Type, 
+        PyArray_DescrFromType(NPY_INT),             // dtype='i'
+        2,                                          // rank 2
+        PyArray_DIMS(dem), PyArray_STRIDES(dem),    // Same shape as DEM
+        NULL,        // Allocate new memory
+        // PyArray_FLAGS(dem), ...
+        NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED, NULL);
+
+    // ========================================================
+    // Do the computation
+
+    D8Graph d8g((double *)PyArray_GETPTR2(dem,0,0), PyArray_DIM(dem,0), PyArray_DIM(dem,1), nodata);
+
+    printf("Filling sinks...\n");
+    d8g.fill_sinks(max_sink_size);
+
+    printf("Converting to neighbors1 format\n");
+    d8g.to_neighbors1(PyArray_GETPTR(neighbors1,0,0));
+
+    // ========================================================
+    return neighbor1;
+}
+// ----------------------------------------------------------------------------------------
+static bool ff_check_input(PyArrayObject *arr, char const *name)
+{
+    char msg[256];
+
+    // Check storage
+    if (!PyArray_ISCARRAY_RO(dem)) {
+        snprintf(msg, 256, "Parameter %s must be C-style, contiguous array.", name);
+        PyErr_SetString(PyExc_TypeError, msg);
+        return false;
+    }
+
+    // Check type
+    if (PyArray_DESCR(dem)->type_num != NPY_INT) {
+        snprintf(msg, 256, "Parameter %s must have dtype int.", name);
+        PyErr_SetString(PyExc_TypeError, msg);
+        return false;
+    }
+
+    // Check rank
+    if (PyArray_NDIM(dem) != 1) {
+        snprintf(msg, 256, "Parameter %s must have rank 1", name);
+        PyErr_SetString(PyExc_TypeError, msg);
+        return false;
+    }
+    return true;
+}
+// ----------------------------------------------------------------------------------------
+static char const *d8graph_flood_fill_docstring =
+R"(Given indices of starting nodes, "rolls a marble downhill."  Returns
+j (N-S) and i (E-W) gridcell coordinates of all nodes touched.
+
+neighbor1: np.array(nj, ni, dtype=np.int32)
+    Representation of the degree-1 graph
+    neighbor1[j,i] = 1D index of the downstream node.
+       ...or -1 if cell (j,i) is unused, or there is no downstream node.
+
+start: np.array(m, dtype='i')
+    1D index of starting gridcells (eg burned from a PRA polygon)
+    (for m starting nodes)
+
+Returns: (jj, ii)
+    jj: np.array(n, dtype='i')
+        2D N-S index of nodes reached
+    ii: np.array(n, dtype='i')
+        2D E-W index of nodes reached
+)";
+
+static PyObject* d8graph_flood_fill(PyObject *module, PyObject *args, PyObject *kwargs)
+{
+    // ======================== Parse Python Input
+    // Input arrays
+    PyArrayObject *neighbor1;
+    PyArrayObject *start;
+
+    // Parse args and kwargs
+    static char *kwlist[] = {
+        "neighbor1", "start",         // *args,
+        NULL};
+    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!",
+        kwlist,
+        &PyArray_Type, &neighbor1,
+        &PyArray_Type, &start,
+        &max_sink_size
+        )) return NULL;
+
+    // ----------- Typecheck input arrays
+    if (!ff_check_input(neighbor1, "neighbor1") return NULL;
+    if (!ff_check_input(start, "start") return NULL;
+
+    // ============================ Run the Core Computation
+    // Run the flood fill algorithm, result in a set of 1D indices
+    std::unordered_set<ix_t> seen(
+        flood_fill(
+            (ix_t *)PyArray_GETPTR2(neighbor1,0,0),
+            // PyArray_DIM(neighbor1,0), PyArray_DIM(neighbor1,1),    // Not needed
+            (ix_t *)PyArray_GETPTR1(start, 0),
+            (ix_t *)PyArray_GETPTR1(start, PyArray_DIM(start,0))));
+
+    // ============================= Construct Python Output
+    // Allocate output arrays
+    static npy_intp out_dims[] = {seen.size()};
+    static npy_intp out_strides[] = {sizeof(int)};
+
+    // Allocate jj and ii output arrays
+    std::array<PyArrayObject *, 2> jjii;
+    for (int k=0; k<2; ++k) {
+        jjii[k] = (PyArrayObject*) PyArray_NewFromDescr(&PyArray_Type, 
+            PyArray_DescrFromType(NPY_INT),             // dtype='i'
+            1,                                          // rank 1
+            out_dims, out_strides,
+            NULL,        // Allocate new memory
+            // PyArray_FLAGS(dem), ...
+            NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED, NULL);
+    }
+
+
+    // Convert the set of 1D indices to (j,i) index pairs
+    // int const nj = PyArray_DIM(neighbor1,0);
+    int const ni = PyArray_DIM(neighbor1,1);
+
+    for (ix_t ix : seen) {
+        int const j = ix / ni;
+        int const i = ix % ni;    // Probably compiles down to divmod
+
+        jjii[0].push_back(j);
+        jjii[1].push_back(i);
+    }
+
+
+    // Return a tuple of the output arrays we created.
+    // https://stackoverflow.com/questions/3498210/returning-a-tuple-of-multipe-objects-in-python-c-api
+    PyObject *ret = PyTuple_Pack(2, jj, ii);
+    return ret;
+
 }
 
-static PyMethodDef D8Graph_methods[] = {
-    {"name", (PyCFunction) D8Graph_name, METH_NOARGS,
-     "Return the name, combining the first and last name"
-    },
-    {NULL}  /* Sentinel */
+// ============================================================
+// Random other Python C Extension Stuff
+static PyMethodDef D8graphMethods[] = {
+    {"neighbor_graph",
+        (PyCFunction)d8graph_neighbor_graph,
+        METH_VARARGS | METH_KEYWORDS, d8graph_neighbor_graph_docstring},
+
+    {"flood_fill",
+        (PyCFunction)d8graph_flood_fill,
+        METH_VARARGS | METH_KEYWORDS, d8graph_flood_fill_docstring},
+
+    // Sentinel
+    {NULL, NULL, 0, NULL}
 };
 
-static PyTypeObject D8GraphType = {
-    PyVarObject_HEAD_INIT(NULL, 0)
-    .tp_name = "dggs.d8graph.D8Graph",
-    .tp_doc = PyDoc_STR("D8Graph objects"),
-    .tp_basicsize = sizeof(D8GraphObject),
-    .tp_itemsize = 0,
-    .tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,    // BASETYPE=available for subclassing
-    .tp_new = D8Graph_new,
-    .tp_init = (initproc) D8Graph_init,
-    .tp_dealloc = (destructor) D8Graph_dealloc,
-    .tp_members = D8Graph_members,
-    .tp_methods = D8Graph_methods,
-};
 
-static PyModuleDef d8graph_module = {
+/* This initiates the module using the above definitions. */
+static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
-    .m_name = "dggs.d8graph",
-    .m_doc = "Example module that creates an extension type.",
-    .m_size = -1,
+    "dggs._d8graph",    // Name of module
+    module_docstring,    // Per-module docstring
+    -1,  /* size of per-interpreter state of the module,
+                 or -1 if the module keeps state in global variables. */
+    D8GraphMethods,    // Functions
+    NULL,
+    NULL,
+    NULL,
+    NULL
 };
 
-PyMODINIT_FUNC
-PyInit_d8graph(void)
+extern "C"
+PyMODINIT_FUNC PyInit_d8graph(void)
 {
-    PyObject *m;
-    if (PyType_Ready(&D8GraphType) < 0)
-        return NULL;
+    import_array();    // Needed for Numpy
 
-    m = PyModule_Create(&d8graph_module);
-    if (m == NULL)
-        return NULL;
-
-    Py_INCREF(&D8GraphType);
-    if (PyModule_AddObject(m, "D8Graph", (PyObject *) &D8GraphType) < 0) {
-        Py_DECREF(&D8GraphType);
-        Py_DECREF(m);
-        return NULL;
-    }
-
-    return m;
+    return PyModule_Create(&moduledef);
 }
+
