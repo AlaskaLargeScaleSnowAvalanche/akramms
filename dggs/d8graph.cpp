@@ -689,7 +689,7 @@ static PyMethodDef D8graphMethods[] = {
 /* This initiates the module using the above definitions. */
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
-    "dggs._d8graph",    // Name of module
+    "dggs.d8graph",    // Name of module
     module_docstring,    // Per-module docstring
     -1,  /* size of per-interpreter state of the module,
                  or -1 if the module keeps state in global variables. */
