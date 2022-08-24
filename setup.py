@@ -26,8 +26,11 @@ import numpy
 
 from distutils.core import setup, Extension
 
-d8graph_mod = Extension('d8graph', sources=['dggs/d8graph.cpp'],
-    include_dirs=[numpy.get_include()])
+d8graph_mod = Extension('d8graph',
+    sources=['dggs/d8graph.cpp'],
+    include_dirs=[numpy.get_include()],
+    extra_compile_args=['-std=c++17']
+)
 
 setup(name = 'akramms',
         description='Alaska Large Scale Avalanche Simulations',

@@ -1,8 +1,18 @@
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include <numpy/arrayobject.h>
 //#include "structmember.h"    // Map C struct members to Python attributes
 #include <numeric>    // iota
 // https://docs.python.org/3.9/extending/newtypes_tutorial.html
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+#include <array>
+
+static char module_docstring[] = 
+"D8Graph 1.0.0 extension module computes graphs and flow paths in digital elevation models.";
+
 
 typedef int ix_t;
 
@@ -14,10 +24,10 @@ struct PackedMap {
 };
 
 /** A memory-efficient version of map<KeyT, vector<ValT>> in three vectors */
-template<class KeyT, class ValT, IndexT>
+template<class KeyT, class ValT, class IndexT>
 struct PackedMapVectors {
     std::vector<KeyT> keys;
-    std::vector<IndexT> starts {0};    // Index into values; keys.size+1
+    std::vector<IndexT> starts = {0};    // Index into values; keys.size+1
     std::vector<ValT> values;
 
 };
@@ -42,7 +52,7 @@ public:
     {
         // Initialize forwards
         for (size_t k=0; k<_forwards.keys.size(); ++k) {
-            forwards[_forwards.keys[k]] = _values[k];
+            forwards[_forwards.keys[k]] = _forwards.values[k];
         }
     }
 
@@ -70,7 +80,7 @@ public:
 
 
     /** Fetches the elements of the ith equivalence class */
-    std::array<std::vector<ix_t>::iterator, 2> members(int eqi) const
+    std::array<std::vector<ix_t>::iterator, 2> members(int eqi)
     {
         auto ii(eqclasses.find(eqi));
         if (ii != eqclasses.end()) {
@@ -101,7 +111,7 @@ public:
     ix_t parent(ix_t gci) const
     {
         auto ii(forwards.find(gci));
-        if (ii != forwards.end()) return *ii;
+        if (ii != forwards.end()) return ii->second;
         return gci;
     }
 
@@ -114,15 +124,15 @@ public:
     Returns:
         Sorted vector of members of newly merged j
     */
-    std::vector<ix_t> &merge(int j, int i)
+    std::vector<ix_t> *merge(int j, int i)
     {
         // Access contents of the destination eq class,
         // converting to explicit form if needed.
         auto eqcj_it(eqclasses.find(j));
         if (eqcj_it == eqclasses.end()) {
-            eqcj_it = eqclasses.insert(eqcj_it, std::vector<ix_t>{i});
+            eqcj_it = eqclasses.insert(eqcj_it, std::make_pair(j, std::vector<ix_t>{i}));
         }
-        std::vector<ix_t> &eqcj(eqcj_it->second);
+        std::vector<ix_t> *eqcj(&eqcj_it->second);
 
         // Access contents of the source eq class.  We don't know or
         // care whether it's in implicit or explicit form.
@@ -131,9 +141,9 @@ public:
         // Merge eq class i into eq class j
         std::vector<ix_t> eqcnew;
         std::set_union(
-            eqcj.begin(), eqcj.end(), eqci_bounds[0], eqci_bounds[1],
+            eqcj->begin(), eqcj->end(), eqci_bounds[0], eqci_bounds[1],
             std::inserter(eqcnew, eqcnew.begin()));
-        eqcj = std::move(eqcnew);
+        *eqcj = std::move(eqcnew);
 
         // Delete eqclass i and forward to j
         eqclasses.erase(i);
@@ -169,10 +179,7 @@ class D8Graph {
 
     // Increments to get to neighbors
     // These need to be in sorted order...
-    static const std::vector<std::array<int,2>> dneigh {
-        {-1,-1}, {-1,0}, {-1,1},
-        {0, -1},       , {0, 1},
-        {1,-1},  {1,0},  {1,1}};
+    static const std::vector<std::array<int,2>> dneigh;
 
     /** Determines whether a gridcell is an edge cell, i.e. borders on
     an unused cell or grid edge.  This function is called a the
@@ -200,8 +207,8 @@ public:
     {
 
         // Initialize edge indicator
-        edge.reserve(nji);
-        for (int j=0; i<nj; ++j) {
+        edge.reserve(nj*ni);
+        for (int j=0; j<nj; ++j) {
         for (int i=0; i<ni; ++i) {
             edge.push_back(is_edge(j,i));
         }}
@@ -220,11 +227,10 @@ public:
         // Is this EQ class a result of a merger?
         _neighbors_ret.clear();
         auto ii(neighborss.find(ji0));
-        if (ii != neighborss.end())
+        if (ii != neighborss.end()) {
             // -------------------------------------------
             // This node has been merged, its neighbors are stored explicitly
-            std::vector<ix_t> &neighs(ii->second);
-            return {neighs.begin(), neigs.end()}
+            return {ii->second.begin(), ii->second.end()};
         }
 
         // -------------------------------------------
@@ -239,26 +245,28 @@ public:
             // Avoid outrunning our domain
             int const j1 = j0 + dn[0];
             int const i1 = i0 + dn[1];
-            if ((j1<0) || (j1>=nj) || (i1<0) || (i1>ni)) contine;
+            if ((j1<0) || (j1>=nj) || (i1<0) || (i1>ni)) continue;
 
             // Avoid "neighbor" gridcells that are unused
-            int const ji1 = j1*ni + i1;
+            int ji1 = j1*ni + i1;
             if (dem[ji1] == nodata) continue;
 
             // Follow forwrding for neighbors that have been merged
-            ji1 = eqclasses.parent[ji1];
+            ji1 = eqclasses.parent(ji1);
 
             // Add to our list of output
             _neighbors_ret.push_back(ji1);
-            return {_neighbors_ret.begin(), _neighbors_ret.end()};
         }
+
+        // Return the list of neighbors found
+        return {_neighbors_ret.begin(), _neighbors_ret.end()};
     }
 
     /** Returns merged {eqclass vector, neighbor vector} */
-    std::array<std::vector<ix_t>*, 2> &merge(int j, int i)
+    std::array<std::vector<ix_t> *, 2> const &merge(int j, int i)
     {
         // -------- Merge equivalence classes
-        auto &eqclassj(eqclasses.merge(j,i));
+        std::vector<ix_t> *eqclassj(eqclasses.merge(j,i));
 
         // -------- Merge neighbors
         // Access contents of the destination neighbors,
@@ -269,18 +277,18 @@ public:
             auto neighs_bounds(neighbors(i));
             nghj_it = neighborss.insert(
                 nghj_it,
-                std::vector<ix_t>(neighs_bounds[0], neighs_bounds[1]));
+                std::make_pair(j, std::vector<ix_t>(neighs_bounds[0], neighs_bounds[1])));
         }
-        std::vector<ix_t> &nghj(nghj_it->second);
+        std::vector<ix_t> *nghj(&nghj_it->second);
 
         // Access contents of the source eq class.  We don't know or
         // care whether it's in implicit or explicit form.
-        auto nghi_bounds(members(i));
+        auto nghi_bounds(eqclasses.members(i));
 
         // Copy neighbors of i into neighbors of j
         std::vector<ix_t> nghnew;
         std::set_union(
-            nghj.begin(), nghj.end(), nghi_bounds[0], nghi_bounds[1],
+            nghj->begin(), nghj->end(), nghi_bounds[0], nghi_bounds[1],
             std::inserter(nghnew, nghnew.begin()));
         //std::sort(nghnew.begin(), nghnew.end());    // not needed
 
@@ -290,14 +298,14 @@ public:
         std::set_difference(
             nghnew.begin(), nghnew.end(),    // Copy these
             eqc_bounds[0], eqc_bounds[1],    // As long as they are not in here
-            std::insert(nghnew2, nghnew2.begin()));
-        nghj = std::move(nghnew2);
+            std::inserter(nghnew2, nghnew2.begin()));
+        *nghj = std::move(nghnew2);
 
 
         // ----------- Maintain edge designation
-        edge[j] |= edge[i];
+        edge[j] = edge[j] || edge[i];
 
-        return {&eqclassj, nghj};
+        return {eqclassj, nghj};
     }
 
 
@@ -324,7 +332,7 @@ public:
                 // Find index of the neighbor with the lowest elevation in the dem
                 auto ngh_bounds(neighbors(ix));
                 ix_t min_ix = *std::min_element(ngh_bounds[0], ngh_bounds[1],
-                    [](int const ix0, int const ix1) { return dem[ix0] < dem[ix1] });
+                    [this](int const ix0, int const ix1) { return dem[ix0] < dem[ix1]; });
 
                 // This Equiv class is not a sink because it has an outflow to a neighbor
                 if (dem[ix] > dem[min_ix]) break;
@@ -372,12 +380,12 @@ public:
         // ix_i is the index of the "current" eq class
         for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i) {
             // Only consider lead gridcells of equivalence classes
-            if ((dem[ix_i] != nodata) && (parent(ix_i) == ix_i)) {
+            if ((dem[ix_i] != nodata) && (eqclasses.parent(ix_i) == ix_i)) {
 
                 // ix_j is index of lowest neighboring eq class
                 auto ngh_bounds(neighbors(ix_i));
                 ix_t ix_j = *std::min_element(ngh_bounds[0], ngh_bounds[1],
-                    [](int const ix0, int const ix1) { return dem[ix0] < dem[ix1] });
+                    [this](int const ix0, int const ix1) { return dem[ix0] < dem[ix1]; });
 
                 // If the lowest neighboring eq class is ourself, then
                 // we are a sink.  Record no outbound neighbor.
@@ -390,34 +398,39 @@ public:
                 // Now create graph link: ix_i -> ix_j
                 // if ix_i is a compound eq class, link from the LARGEST gridcell in it
                 // if ix_j is a compound eq class, link to the SMALLEST gridcell in it
-                auto members_i_bounds(members(ix_i));
+                auto members_bounds(eqclasses.members(ix_i));
                 ix_t max_member_i = *(members_bounds[1]-1);   // Largest in i
-                ix_t min_member_j = min_member(ix_j);         // Smallest in j
+                ix_t min_member_j = eqclasses.min_member(ix_j);         // Smallest in j
                 neighbors1[max_member_i] = min_member_j;
 
                 // Create links *within* eq class i, from the min to
                 // the max gridcell.  Any flow into eq class i will
                 // enter at the min gridcell, then traverse all
                 // portions of the eq class.
-                for (auto ii(members_bounds[0])+1; ii<members_bounds[1]; ++ii)
+                for (auto ii(members_bounds[0]+1); ii<members_bounds[1]; ++ii)
                     neighbors1[*(ii-1)] = *ii;
                 
             }
         }
-        return neighbors1;
-
     }
 };
 
-/** Does a breadth-first-search of the neighbor1 graph starting from
+const std::vector<std::array<int,2>> D8Graph::dneigh = {
+    {-1,-1}, {-1,0}, {-1,1},
+    {0, -1},         {0, 1},
+    {1,-1},  {1,0},  {1,1}};
+
+// ====================================================================
+
+/** Does a breadth-first-search of the neighbors1 graph starting from
 some gridcells.
 
 start_begin, start_end:
     begin and end iterators for starting gridcell indices
 */
 std::unordered_set<ix_t> flood_fill(
-    ix_t const *neighbor1,
-    // int nj, int ni,     // Not needed, except for bounds checking on neighbor1 lookup
+    ix_t const *neighbors1,
+    // int nj, int ni,     // Not needed, except for bounds checking on neighbors1 lookup
     ix_t const *start_begin, ix_t const *start_end)
 {
     // State of breadth-first-search
@@ -429,13 +442,13 @@ std::unordered_set<ix_t> flood_fill(
         // Add to our vector of neighbors if we haven't seen it yet.
         // Also add to our seen set (most efficient this way)
         for (ix_t ix : cur) {
-            ix_t ngh = neighbor1[ix];
+            ix_t ngh = neighbors1[ix];
             if (ngh < 0) continue;    // No neighbor for this node
 
             auto ii(seen.find(ngh));
             if (ii == seen.end()) {
                 neighbors.push_back(ngh);
-                seen.insert(ngh):
+                seen.insert(ngh);
             }
         }
 
@@ -457,7 +470,7 @@ std::unordered_set<ix_t> flood_fill(
 // Functions in the Python interface
 
 static char const *d8graph_neighbor_graph_docstring = 
-R"Produces the single-neighbor graph from a DEM; a degree-1 graph
+R"XXX(Produces the single-neighbor graph from a DEM; a degree-1 graph
 providing the D8 routing from each gridcell to the next; with the
 following caveats:
 
@@ -482,11 +495,11 @@ nodata: float
 max_sink_size: int
     Maximum number of cells to join together in equivalence classes
 
-Returns: neighbor1=np.array(nj, ni, dtype=np.int32)
+Returns: neighbors1=np.array(nj, ni, dtype=np.int32)
     Representation of the degree-1 graph
-    neighbor1[j,i] = 1D index of the downstream node.
+    neighbors1[j,i] = 1D index of the downstream node.
        ...or -1 if cell (j,i) is unused, or there is no downstream node.
-";
+)XXX";
 static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObject *kwargs)
 {
     // Input arrays
@@ -495,12 +508,12 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
     int max_sink_size = 10;
 
     // Parse args and kwargs
-    static char *kwlist[] = {
+    static char const *kwlist[] = {
         "dem", "nodata",         // *args,
         "max_sink_size",    // **kwargs
         NULL};
     if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!d|i",
-        kwlist,
+        (char **)kwlist,
         &PyArray_Type, &dem, &nodata,
         &max_sink_size
         )) return NULL;
@@ -527,10 +540,7 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
 
     // -----------------------------------------
     // Create output array (uninitialized)
-    PyArrayObject *neighbor1 = (PyArrayObject *)PyArray_NewLikeArray(
-        dem, NPY_ANYORDER, NULL, 0);
-
-    PyArrayObject *neighbor1 = (PyArrayObject*) PyArray_NewFromDescr(
+    PyArrayObject *neighbors1 = (PyArrayObject*) PyArray_NewFromDescr(
         &PyArray_Type, 
         PyArray_DescrFromType(NPY_INT),             // dtype='i'
         2,                                          // rank 2
@@ -548,13 +558,13 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
     d8g.fill_sinks(max_sink_size);
 
     printf("Converting to neighbors1 format\n");
-    d8g.to_neighbors1(PyArray_GETPTR(neighbors1,0,0));
+    d8g.to_neighbors1((double *)PyArray_GETPTR2(neighbors1,0,0));
 
     // ========================================================
-    return neighbor1;
+    return (PyObject *)neighbors1;
 }
 // ----------------------------------------------------------------------------------------
-static bool ff_check_input(PyArrayObject *arr, char const *name)
+static bool ff_check_input(PyArrayObject *dem, char const *name)
 {
     char msg[256];
 
@@ -585,9 +595,9 @@ static char const *d8graph_flood_fill_docstring =
 R"(Given indices of starting nodes, "rolls a marble downhill."  Returns
 j (N-S) and i (E-W) gridcell coordinates of all nodes touched.
 
-neighbor1: np.array(nj, ni, dtype=np.int32)
+neighbors1: np.array(nj, ni, dtype=np.int32)
     Representation of the degree-1 graph
-    neighbor1[j,i] = 1D index of the downstream node.
+    neighbors1[j,i] = 1D index of the downstream node.
        ...or -1 if cell (j,i) is unused, or there is no downstream node.
 
 start: np.array(m, dtype='i')
@@ -605,37 +615,38 @@ static PyObject* d8graph_flood_fill(PyObject *module, PyObject *args, PyObject *
 {
     // ======================== Parse Python Input
     // Input arrays
-    PyArrayObject *neighbor1;
+    PyArrayObject *neighbors1;
     PyArrayObject *start;
+    int max_sink_size;
 
     // Parse args and kwargs
-    static char *kwlist[] = {
-        "neighbor1", "start",         // *args,
+    static char const *kwlist[] = {
+        "neighbors1", "start",         // *args,
         NULL};
     if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!",
-        kwlist,
-        &PyArray_Type, &neighbor1,
+        (char **)kwlist,
+        &PyArray_Type, &neighbors1,
         &PyArray_Type, &start,
         &max_sink_size
         )) return NULL;
 
     // ----------- Typecheck input arrays
-    if (!ff_check_input(neighbor1, "neighbor1") return NULL;
-    if (!ff_check_input(start, "start") return NULL;
+    if (!ff_check_input(neighbors1, "neighbors1")) return NULL;
+    if (!ff_check_input(start, "start")) return NULL;
 
     // ============================ Run the Core Computation
     // Run the flood fill algorithm, result in a set of 1D indices
     std::unordered_set<ix_t> seen(
         flood_fill(
-            (ix_t *)PyArray_GETPTR2(neighbor1,0,0),
-            // PyArray_DIM(neighbor1,0), PyArray_DIM(neighbor1,1),    // Not needed
+            (ix_t *)PyArray_GETPTR2(neighbors1,0,0),
+            // PyArray_DIM(neighbors1,0), PyArray_DIM(neighbors1,1),    // Not needed
             (ix_t *)PyArray_GETPTR1(start, 0),
             (ix_t *)PyArray_GETPTR1(start, PyArray_DIM(start,0))));
 
     // ============================= Construct Python Output
     // Allocate output arrays
-    static npy_intp out_dims[] = {seen.size()};
-    static npy_intp out_strides[] = {sizeof(int)};
+    npy_intp out_dims[] = {(npy_intp) seen.size()};
+    npy_intp out_strides[] = {(npy_intp) sizeof(int)};
 
     // Allocate jj and ii output arrays
     std::array<PyArrayObject *, 2> jjii;
@@ -651,28 +662,28 @@ static PyObject* d8graph_flood_fill(PyObject *module, PyObject *args, PyObject *
 
 
     // Convert the set of 1D indices to (j,i) index pairs
-    // int const nj = PyArray_DIM(neighbor1,0);
-    int const ni = PyArray_DIM(neighbor1,1);
+    // int const nj = PyArray_DIM(neighbors1,0);
+    int const ni = PyArray_DIM(neighbors1,1);
 
     for (ix_t ix : seen) {
         int const j = ix / ni;
         int const i = ix % ni;    // Probably compiles down to divmod
 
-        jjii[0].push_back(j);
-        jjii[1].push_back(i);
+        *(npy_intp *)PyArray_GETPTR1(jjii[0], ix) = j;
+        *(npy_intp *)PyArray_GETPTR1(jjii[1], ix) = i;
     }
 
 
     // Return a tuple of the output arrays we created.
     // https://stackoverflow.com/questions/3498210/returning-a-tuple-of-multipe-objects-in-python-c-api
-    PyObject *ret = PyTuple_Pack(2, jj, ii);
+    PyObject *ret = PyTuple_Pack(2, jjii[0], jjii[1]);
     return ret;
 
 }
 
 // ============================================================
 // Random other Python C Extension Stuff
-static PyMethodDef D8graphMethods[] = {
+static PyMethodDef D8GraphMethods[] = {
     {"neighbor_graph",
         (PyCFunction)d8graph_neighbor_graph,
         METH_VARARGS | METH_KEYWORDS, d8graph_neighbor_graph_docstring},
@@ -700,7 +711,6 @@ static struct PyModuleDef moduledef = {
     NULL
 };
 
-extern "C"
 PyMODINIT_FUNC PyInit_d8graph(void)
 {
     import_array();    // Needed for Numpy
