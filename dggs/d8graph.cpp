@@ -9,6 +9,14 @@
 #include <unordered_set>
 #include <vector>
 #include <array>
+#include <iostream>
+
+// https://stackoverflow.com/questions/77005/how-to-automatically-generate-a-stacktrace-when-my-program-crashes
+#include <cstdio>
+#include <execinfo.h>
+#include <csignal>
+#include <cstdlib>
+//#include <cunistd>
 
 static char module_docstring[] = 
 "D8Graph 1.0.0 extension module computes graphs and flow paths in digital elevation models.";
@@ -210,7 +218,9 @@ public:
         edge.reserve(nj*ni);
         for (int j=0; j<nj; ++j) {
         for (int i=0; i<ni; ++i) {
-            edge.push_back(is_edge(j,i));
+            bool const ie = is_edge(j,i);
+            edge.push_back(ie);
+//            printf("is_edge[%d, %d] = %d\n", j, i, (int)ie);
         }}
 
         // Reserve output vector for sharing neighbors
@@ -219,7 +229,7 @@ public:
 
     size_t size() { return nj*ni; }
 
-    std::array<std::vector<ix_t>::iterator, 2> const &neighbors(int ji0)
+    std::array<std::vector<ix_t>::iterator, 2> const neighbors(int ji0)
     {
         // Follow forwards
         ji0 = eqclasses.parent(ji0);
@@ -339,18 +349,24 @@ public:
 
                 // This EQ class IS a sink: merge with lowest neighbor
                 printf("Merging %d -> %d\n", min_ix, ix);
+
                 // Merge min_ix into ix, return neighbors of merged ix
                 auto &merged(merge(ix, min_ix));
+printf("BB1\n");
                 auto &merged_eqclass(*merged[0]);    // Unpack results
+printf("BB2\n");
                 //auto &merged_neighbors(*merged[1]);
 
                 // Set elevation for the EQ class accordingly
                 dem[ix] = dem[min_ix];
+printf("BB3\n");
 
                 // Stop if we've gotten too large
                 if (merged_eqclass.size() > max_sink_size) break;
+printf("BB4\n");
             }
         }
+printf("CC1\n");
 
         // Look up all forwards on explicit eq classes
         // (and remove neighbors pointing to now-defunct EC's)
@@ -711,8 +727,26 @@ static struct PyModuleDef moduledef = {
     NULL
 };
 
+extern "C" void handler(int sig) {
+  void *array[10];
+  size_t size;
+
+  // get void*'s for all entries on the stack
+  size = backtrace(array, 10);
+
+  // print out all the frames to stderr
+  fprintf(stderr, "Error: signal %d:\n", sig);
+  backtrace_symbols_fd(array, size, STDERR_FILENO);
+  exit(1);
+}
+
+
 PyMODINIT_FUNC PyInit_d8graph(void)
 {
+    // TODO: Disable this in production so it doesn't interfere with
+    // Python interpreter in general.
+    signal(SIGSEGV, handler);   // install our handler
+
     import_array();    // Needed for Numpy
 
     return PyModule_Create(&moduledef);
