@@ -505,7 +505,6 @@ printf("CC1 %ld %ld\n", size(), sizeof(npy_int));
                 ix_t min_member_j = eqclasses.min_member(ix_j);         // Smallest in j
                 neighbors1[max_member_i] = min_member_j;
 
-#if 0
                 // Create links *within* eq class i, from the min to
                 // the max gridcell.  Any flow into eq class i will
                 // enter at the min gridcell, then traverse all
@@ -513,7 +512,6 @@ printf("CC1 %ld %ld\n", size(), sizeof(npy_int));
                 for (auto ii(members_bounds[0]+1); ii<members_bounds[1]; ++ii) {
                     neighbors1[*(ii-1)] = *ii;
                 }
-#endif
                 
             }
         }
