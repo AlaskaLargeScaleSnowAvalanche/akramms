@@ -159,6 +159,22 @@ public:
         }
     }
 
+    /** Fetches the elements of the ith equivalence class */
+    size_t size(int eqi)
+    {
+        auto ii(eqclasses.find(eqi));
+        if (ii != eqclasses.end()) {
+            // This EQClass is stored explicitly, return it.
+            return ii->second.size();
+        } else {
+            // This EQClass is not explicitly represented, just equal to self
+            return 1;
+        }
+    }
+
+
+
+
     /** SPECIAL CASE: Determines the lowest-number index in an eq class
     (Assumes members are always sorted)
     ix:
@@ -290,7 +306,7 @@ public:
 
 private:
     /** Obtain list of neighbors based on raster. */
-    std::vector<ix_t> &d8_neighbors_list(int ji0, std::vector<ix_t> ngh)
+    std::vector<ix_t> &d8_neighbors_list(int ji0, std::vector<ix_t> &ngh)
     {
         ngh.clear();
 
@@ -327,15 +343,16 @@ private:
 
 public:
     /**
-    explicit:
-        If set, then convert to explicit format if not already.
+    expl:
+        If set, then convert to expl format if not already.
     */
-    std::vector<ix_t> &neighbors(int ji0, explicit=false)
+    std::vector<ix_t> &neighbors(int ji0, bool expl=false)
     {
         // Are neighbors represented explicitly?
+        // If so, just lookup and return that list.
         auto ii(neighborss.find(ji0));
         if (ii != neighborss.end()) {
-            return ii.second;
+            return ii->second;
         }
 
         // Neighbor is not represented explicitly.
@@ -351,7 +368,7 @@ public:
         d8_neighbors_list(ji0, ngh);
 
         // We're done if we don't need to store it for later use.
-        if (!explicit) return ret;
+        if (!expl) return ngh;
 
         // We DO need to store the explicit representation.
         ii = neighborss.insert(std::make_pair(ji0, std::move(ngh))).first;
@@ -359,10 +376,10 @@ public:
     }
 
     /** Merge neighbor lists in prep for an eqclass merger of j <- i */
-    void merge_neighbor_lists(ix_t j, ix_t i)
+    std::vector<ix_t> &merge_neighbor_lists(ix_t j, ix_t i)
     {
         // Original neighbor lists
-        std::vector<ix_t> &nghj(neighbors(j), explicit=true);
+        std::vector<ix_t> &nghj(neighbors(j, true));
         std::vector<ix_t> &nghi(neighbors(i));
 
 printf("********* Merging %d -> %d\n", i, j);
@@ -392,7 +409,7 @@ printf("joined neighbors %d: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_
 
         // ============== Replace i->j in neighbor lists of neighbors
         for (ix_t k : nghj) {
-            std::vector<ix_t> &nghk(neighbors(k, true);
+            std::vector<ix_t> &nghk(neighbors(k, true));
             for (auto kk(nghk.begin()); kk != nghk.end(); ++kk) {
                 if (*kk == i) *kk = j;
             }
@@ -407,13 +424,14 @@ auto &xnghj(neighbors(j));
 printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end(); ++ii) printf(" %d", *ii); printf("\n");
 }
 
+        return nghj;
     }
 
 
 
 
     /** Returns merged {eqclass vector, neighbor vector} */
-    std::array<std::vector<ix_t> &, 2> const merge(int j, int i)
+    std::array<std::vector<ix_t> *, 2> const merge(int j, int i)
     {
         // ----------- Merge neighbor lists
         std::vector<ix_t> &nghj(merge_neighbor_lists(j, i));
@@ -424,9 +442,8 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
 
         // ----------- Merge underlying EQClasses
         std::vector<ix_t> &eqclassj(eqclasses.merge_eq(j,i));
-        return {eqclassj, nghj};
+        return {&eqclassj, &nghj};
     }
-
 
 
     /**
@@ -449,9 +466,22 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
                 if (edge[ix]) break;
 
                 // Find index of the neighbor with the lowest elevation in the dem
+                // (that is small enough to merge)
+                ix_t min_ix = -1;
+                double min_elev = 1.e20;
                 auto &ngh(neighbors(ix));
-                ix_t const min_ix = *std::min_element(ngh.begin(), ngh.end(),
-                    [this](int const ix0, int const ix1) { return dem[ix0] < dem[ix1]; });
+                for (auto kk(ngh.begin()); ; ++kk) {
+                    if (kk == ngh.end()) break;
+                    if (eqclasses.size(ix) + eqclasses.size(*kk) > max_sink_size) continue;
+                    if (dem[*kk] < min_elev) {
+                        min_ix = *kk;
+                        min_elev = dem[min_ix];
+                    }
+                }
+                if (min_ix == -1) break;    // No merge candidates with small number of cells
+
+                //ix_t const min_ix = *std::min_element(ngh.begin(), ngh.end(),
+                //    [this](int const ix0, int const ix1) { return dem[ix0] < dem[ix1]; });
 
                 // This Equiv class is not a sink because it has an outflow to a neighbor
                 if (dem[ix] > dem[min_ix]) break;
@@ -461,7 +491,7 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
 
                 // Merge min_ix into ix, return neighbors of merged ix
 //                std::array<std::vector<ix_t> *, 2> const merged(merge(sorted_ix[0], sorted_ix[1]));    // Merge into lower index always
-                std::array<std::vector<ix_t> *, 2> const merged(merge(ix, min_ix));    // Merge into lower index always
+                std::array<std::vector<ix_t> *, 2> const merged(merge(ix, min_ix));    // Merge into lower-elevation     index always
                 auto &merged_eqclass(*merged[0]);    // Unpack results
                 //auto &merged_neighbors(*merged[1]);
 
@@ -486,14 +516,23 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
         }
 #endif
 
-for (auto ii(neighborss.begin()); ii != neighborss.end(); ++ii) {
-    std::vector<ix_t> &neighbors(ii->second);
-    printf("Neighbors of %d: ", ii->first);
+
+// ---------------------- Debugging
+{
+std::vector<ix_t> keys;
+for (auto kv: neighborss) keys.push_back(kv.first);
+std::sort(keys.begin(), keys.end());
+
+for (auto key : keys) {
+    std::vector<ix_t> &neighbors(neighborss[key]);
+    printf("Neighbors of %d: ", key);
     print_range(std::cout, neighbors.begin(), neighbors.end());
     printf("\n");
 }
 
 printf("Filled DEM:\n"); print_raster(std::cout, dem, nj, ni);
+}
+// ----------------------
 
     }
 
