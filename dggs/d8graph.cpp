@@ -285,78 +285,79 @@ public:
 //            printf("is_edge[%d, %d] = %d\n", j, i, (int)ie);
         }}
 
-        // Reserve output vector for sharing neighbors
-        for (size_t i=0; i<_neighbors_rets.size(); ++i)
-            _neighbors_rets[i].reserve(32);
     }
 
     size_t size() { return nj*ni; }
 
-    std::array<std::vector<ix_t>::iterator, 2> const neighbors(int ji0)
+    std::vector<ix_t> &neighbors(int ji0)
     {
+        // Prepare output buffer
+        reti = 1 - reti;    // swap double buffer
+        auto &ret(_neighbors_rets[reti]);
+        ret.clear();
+
         // Follow forwards
         ji0 = eqclasses.parent(ji0);
 
         // Is this EQ class a result of a merger?
         auto ii(neighborss.find(ji0));
         if (ii != neighborss.end()) {
+            ret = std::vector<ix_t>(ii->second.begin(), ii->second.end());
+        } else {
+            ret.reserve(8);
+
             // -------------------------------------------
-            // This node has been merged, its neighbors are stored explicitly
-            return {ii->second.begin(), ii->second.end()};
+            // This node has not been merged; identify its neighbors
+            // based on the 2D raster
+            int const j0 = ji0 / ni;
+            int const i0 = ji0 % ni;    // Probably compiles down to divmod
+
+            // Look at neighboring nodes in 2D space
+            for (auto &dn : dneigh) {
+
+                // Avoid outrunning our domain
+                int const j1 = j0 + dn[0];
+                int const i1 = i0 + dn[1];
+                if ((j1<0) || (j1>=nj) || (i1<0) || (i1>=ni)) continue;
+
+                // Avoid "neighbor" gridcells that are unused
+                int ji1 = j1*ni + i1;
+                if (dem[ji1] == nodata) continue;
+
+                // Follow forwrding for neighbors that have been merged
+                // NOTE: This could result in non-unique neighbor lists being returned!
+                ji1 = eqclasses.parent(ji1);
+
+                // Add to our list of output
+                ret.push_back(ji1);
+            }
         }
 
-        // Prepare buffer for output
-        reti = 1 - reti;    // swap double buffer
-        auto &ret(_neighbors_rets[reti]);
-        ret.clear();
-        // -------------------------------------------
-        // This node has not been merged; identify its neighbors
-        // based on the 2D raster
-        int const j0 = ji0 / ni;
-        int const i0 = ji0 % ni;    // Probably compiles down to divmod
-
-        // Look at neighboring nodes in 2D space
-        for (auto &dn : dneigh) {
-
-            // Avoid outrunning our domain
-            int const j1 = j0 + dn[0];
-            int const i1 = i0 + dn[1];
-            if ((j1<0) || (j1>=nj) || (i1<0) || (i1>=ni)) continue;
-
-            // Avoid "neighbor" gridcells that are unused
-            int ji1 = j1*ni + i1;
-            if (dem[ji1] == nodata) continue;
-
-            // Follow forwrding for neighbors that have been merged
-            ji1 = eqclasses.parent(ji1);
-
-            // Add to our list of output
-            ret.push_back(ji1);
-        }
-
-        // Return the list of neighbors found
-        return {ret.begin(), ret.end()};
+        // Uniq-ify and return
+        std::sort(ret.begin(), ret.end());
+        ret.erase(std::unique(ret.begin(), ret.end()), ret.end());
+        return ret;
     }
 
     /** Returns merged {eqclass vector, neighbor vector} */
     std::array<std::vector<ix_t> *, 2> const merge(int j, int i)
     {
+        // Get unique list of neighbors!
+        std::vector<ix_t> &nghj(neighbors(j));
+        std::vector<ix_t> &nghi(neighbors(i));
+
 printf("********* Merging %d -> %d\n", i, j);
 {
-auto xnghj(neighbors(j));
-printf(" pre neighbors[%d]: ", j); for (auto ii(xnghj[0]); ii != xnghj[1]; ++ii) printf(" %d", *ii); printf("\n");
-auto xnghi(neighbors(i));
-printf(" pre neighbors[%d]: ", i); for (auto ii(xnghi[0]); ii != xnghi[1]; ++ii) printf(" %d", *ii); printf("\n");
+printf(" pre neighbors[%d]: ", j); for (auto ii(nghj.begin()); ii != nghj.end(); ++ii) printf(" %d", *ii); printf("\n");
+printf(" pre neighbors[%d]: ", i); for (auto ii(nghi.begin()); ii != nghi.end(); ++ii) printf(" %d", *ii); printf("\n");
 }
 
         // ------------------- Merge neighbors of i and j
         std::vector<ix_t> ngh_joined;
-        auto nghj_bounds(neighbors(j));    // This works because of double buffering
-        auto nghi_bounds(neighbors(i));
-        std::set_union(nghj_bounds[0], nghj_bounds[1], nghi_bounds[0], nghi_bounds[1],
+        std::set_union(nghj.begin(), nghj.end(), nghi.begin(), nghi.end(),
             std::inserter(ngh_joined, ngh_joined.begin()));
 
-printf("joined neighbors: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_joined.end(); ++ii) printf(" %d", *ii); printf("\n");
+printf("joined neighbors %d: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_joined.end(); ++ii) printf(" %d", *ii); printf("\n");
 
         // --------------- Filter out i and j
         std::vector<ix_t> ngh_filtered;
@@ -365,46 +366,7 @@ printf("joined neighbors: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_joi
         }
 
         // -------------- Store as new neighbors for j
-        neighborss[j] = std::move(ngh_filtered);
-#if 0
-        auto nghj_it(neighborss.find(j));
-        if (nghj_it == neighborss.end()) {
-            neighborss.insert(ngh_it, std::make_pair(j, std::move(ngh_filtered)));
-        } else {
-            
-        }
-
-
-
-        // -------- Merge equivalence classes
-        std::vector<ix_t> *eqclassj(eqclasses.merge(j,i));
-
-        // -------- Merge neighbors
-        // Access contents of the destination neighbors,
-        // converting to explicit form if needed.
-        auto nghj_it(neighborss.find(j));
-        if (nghj_it == neighborss.end()) {
-            // Initialize with explicit list of neighbors
-            auto neighs_bounds(neighbors(i));
-            nghj_it = neighborss.insert(
-                nghj_it,
-                std::make_pair(j, std::vector<ix_t>(neighs_bounds[0], neighs_bounds[1])));
-        }
-        std::vector<ix_t> *nghj(&nghj_it->second);
-
-
-
-        // ------ Maintain invariant: eqclass and neighbors are disjoint!
-        auto eqc_bounds(eqclasses.members(j));
-printf("eqclass[%d].members:", j); for (auto ii(eqc_bounds[0]); ii != eqc_bounds[1]; ++ii) printf(" %d", *ii); printf("\n");
-        std::vector<ix_t> nghnew2;
-        std::set_difference(
-            nghnew.begin(), nghnew.end(),    // Copy these
-            eqc_bounds[0], eqc_bounds[1],    // As long as they are not in here
-            std::inserter(nghnew2, nghnew2.begin()));
-        *nghj = std::move(nghnew2);
-#endif
-
+        auto nghj_it(neighborss.insert(std::make_pair(j, std::move(ngh_filtered))).first);
 
         // ----------- Maintain edge designation
         edge[j] = edge[j] || edge[i];
@@ -413,11 +375,12 @@ printf("eqclass[%d].members:", j); for (auto ii(eqc_bounds[0]); ii != eqc_bounds
         neighborss.erase(i);
 
 {
-auto xnghj(neighbors(j));
-printf("post neighbors[%d]: ", j); for (auto ii(xnghj[0]); ii != xnghj[1]; ++ii) printf(" %d", *ii); printf("\n");
+auto &xnghj(neighbors(j));
+printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end(); ++ii) printf(" %d", *ii); printf("\n");
 }
-
-        return {eqclassj, nghj};
+        // Merge underlying EQClasses
+        std::vector<ix_t> *eqclassj(eqclasses.merge(j,i));
+        return {eqclassj, &nghj_it->second};
     }
 
 
@@ -442,11 +405,8 @@ printf("post neighbors[%d]: ", j); for (auto ii(xnghj[0]); ii != xnghj[1]; ++ii)
                 if (edge[ix]) break;
 
                 // Find index of the neighbor with the lowest elevation in the dem
-                auto ngh_bounds(neighbors(ix));
-/*for (auto ii(ngh_bounds[0]); ii != ngh_bounds[1]; ++ii) {
-    printf("Neighbor %d: %d\n", ix, *ii);
-}*/
-                ix_t const min_ix = *std::min_element(ngh_bounds[0], ngh_bounds[1],
+                auto &ngh(neighbors(ix));
+                ix_t const min_ix = *std::min_element(ngh.begin(), ngh.end(),
                     [this](int const ix0, int const ix1) { return dem[ix0] < dem[ix1]; });
 
                 // This Equiv class is not a sink because it has an outflow to a neighbor
@@ -469,6 +429,7 @@ printf("post neighbors[%d]: ", j); for (auto ii(xnghj[0]); ii != xnghj[1]; ++ii)
             }
         }
 
+#if 0
         // Look up all forwards on explicit eq classes
         // (and remove neighbors pointing to now-defunct EC's)
         for (auto ii(neighborss.begin()); ii != neighborss.end(); ++ii) {
@@ -476,7 +437,10 @@ printf("post neighbors[%d]: ", j); for (auto ii(xnghj[0]); ii != xnghj[1]; ++ii)
             for (auto jj(neighbors.begin()); jj < neighbors.end(); ++jj) {
                 *jj = eqclasses.parent(*jj);
             }
+            std::sort(neighbors.begin(), neighbors.end());
+            neighbors.erase(std::unique(neighbors.begin(), neighbors.end()), neighbors.end());
         }
+#endif
 
 for (auto ii(neighborss.begin()); ii != neighborss.end(); ++ii) {
     std::vector<ix_t> &neighbors(ii->second);
@@ -484,7 +448,6 @@ for (auto ii(neighborss.begin()); ii != neighborss.end(); ++ii) {
     print_range(std::cout, neighbors.begin(), neighbors.end());
     printf("\n");
 }
-
 
 printf("Filled DEM:\n"); print_raster(std::cout, dem, nj, ni);
 
@@ -513,10 +476,9 @@ printf("CC1 %ld %ld\n", size(), sizeof(npy_int));
             if ((dem[ix_i] != nodata) && (eqclasses.parent(ix_i) == ix_i)) {
 
                 // ix_j is index of lowest neighboring eq class
-                auto ngh_bounds(neighbors(ix_i));
-if (ix_i == 33) std::cout << (char const *)"Neighbors 33: " << ngh_bounds << std::endl;
+                auto &ngh(neighbors(ix_i));
 
-                ix_t ix_j = *std::min_element(ngh_bounds[0], ngh_bounds[1],
+                ix_t ix_j = *std::min_element(ngh.begin(), ngh.end(),
                     [this](int const ix0, int const ix1) { return dem[ix0] < dem[ix1]; });
 
 #if 0           // NOT POSSIBLE: Because neihbors and eq class are disjoint!!!!
@@ -543,6 +505,7 @@ if (ix_i == 33) std::cout << (char const *)"Neighbors 33: " << ngh_bounds << std
                 ix_t min_member_j = eqclasses.min_member(ix_j);         // Smallest in j
                 neighbors1[max_member_i] = min_member_j;
 
+#if 0
                 // Create links *within* eq class i, from the min to
                 // the max gridcell.  Any flow into eq class i will
                 // enter at the min gridcell, then traverse all
@@ -550,6 +513,7 @@ if (ix_i == 33) std::cout << (char const *)"Neighbors 33: " << ngh_bounds << std
                 for (auto ii(members_bounds[0]+1); ii<members_bounds[1]; ++ii) {
                     neighbors1[*(ii-1)] = *ii;
                 }
+#endif
                 
             }
         }
