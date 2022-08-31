@@ -1,3 +1,7 @@
+demo_d8graph:
+	python setup.py build
+	python demo_d8graph.py 
+
 
 # This assumes you have done `rclone config` and created a setup
 # called "alaska."  It doesn't matter which Google Account you use.

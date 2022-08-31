@@ -190,7 +190,7 @@ public:
     Returns:
         Sorted vector of members of newly merged j
     */
-    std::vector<ix_t> *merge(int j, int i)
+    std::vector<ix_t> &merge_eq(int j, int i)
     {
         // Access contents of the destination eq class,
         // converting to explicit form if needed.
@@ -199,8 +199,8 @@ public:
             printf("Creating new eqclass for %d\n", j);
             eqcj_it = eqclasses.insert(eqcj_it, std::make_pair(j, std::vector<ix_t>{j}));
         }
-        std::vector<ix_t> *eqcj(&eqcj_it->second);
-std::cout << "Dst EQClass " << j << ": "; print_range(std::cout, eqcj->begin(), eqcj->end()); std::cout << std::endl;
+        std::vector<ix_t> &eqcj(eqcj_it->second);
+std::cout << "Dst EQClass " << j << ": "; print_range(std::cout, eqcj.begin(), eqcj.end()); std::cout << std::endl;
 
         // Access contents of the source eq class.  We don't know or
         // care whether it's in implicit or explicit form.
@@ -210,9 +210,9 @@ std::cout << "Src EQClass " << i << ": "; print_range(std::cout, eqci_bounds[0],
         // Merge eq class i into eq class j
         std::vector<ix_t> eqcnew;
         std::set_union(
-            eqcj->begin(), eqcj->end(), eqci_bounds[0], eqci_bounds[1],
+            eqcj.begin(), eqcj.end(), eqci_bounds[0], eqci_bounds[1],
             std::inserter(eqcnew, eqcnew.begin()));
-        *eqcj = std::move(eqcnew);
+        eqcj = std::move(eqcnew);
 
         // Delete eqclass i and forward to j
         eqclasses.erase(i);
@@ -225,7 +225,6 @@ std::cout << "Src EQClass " << i << ": "; print_range(std::cout, eqci_bounds[0],
 };
 
 // ----------------------------------------------------------
-
 /** A graph with implicit 8-way neighbors based on DEM and used /
 unused gridcells */
 class D8Graph {
@@ -289,61 +288,81 @@ public:
 
     size_t size() { return nj*ni; }
 
-    std::vector<ix_t> &neighbors(int ji0)
+private:
+    /** Obtain list of neighbors based on raster. */
+    std::vector<ix_t> &d8_neighbors_list(int ji0, std::vector<ix_t> ngh)
     {
-        // Prepare output buffer
-        reti = 1 - reti;    // swap double buffer
-        auto &ret(_neighbors_rets[reti]);
-        ret.clear();
+        ngh.clear();
 
-        // Follow forwards
-        ji0 = eqclasses.parent(ji0);
+        // Identify neighbors based on the 2D raster.
+        int const j0 = ji0 / ni;
+        int const i0 = ji0 % ni;    // Probably compiles down to divmod
 
-        // Is this EQ class a result of a merger?
-        auto ii(neighborss.find(ji0));
-        if (ii != neighborss.end()) {
-            ret = std::vector<ix_t>(ii->second.begin(), ii->second.end());
-        } else {
-            ret.reserve(8);
+        // Look at neighboring nodes in 2D space
+        for (auto &dn : dneigh) {
 
-            // -------------------------------------------
-            // This node has not been merged; identify its neighbors
-            // based on the 2D raster
-            int const j0 = ji0 / ni;
-            int const i0 = ji0 % ni;    // Probably compiles down to divmod
+            // Avoid outrunning our domain
+            int const j1 = j0 + dn[0];
+            int const i1 = i0 + dn[1];
+            if ((j1<0) || (j1>=nj) || (i1<0) || (i1>=ni)) continue;
 
-            // Look at neighboring nodes in 2D space
-            for (auto &dn : dneigh) {
+            // Avoid "neighbor" gridcells that are unused
+            int ji1 = j1*ni + i1;
+            if (dem[ji1] == nodata) continue;
 
-                // Avoid outrunning our domain
-                int const j1 = j0 + dn[0];
-                int const i1 = i0 + dn[1];
-                if ((j1<0) || (j1>=nj) || (i1<0) || (i1>=ni)) continue;
+            // Follow forwrding for neighbors that have been merged
+            // NOTE: This could result in non-unique neighbor lists being returned!
+            ji1 = eqclasses.parent(ji1);
 
-                // Avoid "neighbor" gridcells that are unused
-                int ji1 = j1*ni + i1;
-                if (dem[ji1] == nodata) continue;
-
-                // Follow forwrding for neighbors that have been merged
-                // NOTE: This could result in non-unique neighbor lists being returned!
-                ji1 = eqclasses.parent(ji1);
-
-                // Add to our list of output
-                ret.push_back(ji1);
-            }
+            // Add to our list of output
+            ngh.push_back(ji1);
         }
 
         // Uniq-ify and return
-        std::sort(ret.begin(), ret.end());
-        ret.erase(std::unique(ret.begin(), ret.end()), ret.end());
-        return ret;
+        std::sort(ngh.begin(), ngh.end());
+        ngh.erase(std::unique(ngh.begin(), ngh.end()), ngh.end());
+
+        return ngh;
     }
 
-    /** Returns merged {eqclass vector, neighbor vector} */
-    std::array<std::vector<ix_t> *, 2> const merge(int j, int i)
+public:
+    /**
+    explicit:
+        If set, then convert to explicit format if not already.
+    */
+    std::vector<ix_t> &neighbors(int ji0, explicit=false)
     {
-        // Get unique list of neighbors!
-        std::vector<ix_t> &nghj(neighbors(j));
+        // Are neighbors represented explicitly?
+        auto ii(neighborss.find(ji0));
+        if (ii != neighborss.end()) {
+            return ii.second;
+        }
+
+        // Neighbor is not represented explicitly.
+        // Construct the neighbor list.
+
+        // Prepare output buffer
+        reti = 1 - reti;    // swap double buffer
+        auto &ngh(_neighbors_rets[reti]);
+        ngh.clear();
+        ngh.reserve(8);
+
+        // Obtain explicit list of neighbors
+        d8_neighbors_list(ji0, ngh);
+
+        // We're done if we don't need to store it for later use.
+        if (!explicit) return ret;
+
+        // We DO need to store the explicit representation.
+        ii = neighborss.insert(std::make_pair(ji0, std::move(ngh))).first;
+        return ii->second;
+    }
+
+    /** Merge neighbor lists in prep for an eqclass merger of j <- i */
+    void merge_neighbor_lists(ix_t j, ix_t i)
+    {
+        // Original neighbor lists
+        std::vector<ix_t> &nghj(neighbors(j), explicit=true);
         std::vector<ix_t> &nghi(neighbors(i));
 
 printf("********* Merging %d -> %d\n", i, j);
@@ -352,7 +371,7 @@ printf(" pre neighbors[%d]: ", j); for (auto ii(nghj.begin()); ii != nghj.end();
 printf(" pre neighbors[%d]: ", i); for (auto ii(nghi.begin()); ii != nghi.end(); ++ii) printf(" %d", *ii); printf("\n");
 }
 
-        // ------------------- Merge neighbors of i and j
+        // ------------------- Merge the lists
         std::vector<ix_t> ngh_joined;
         std::set_union(nghj.begin(), nghj.end(), nghi.begin(), nghi.end(),
             std::inserter(ngh_joined, ngh_joined.begin()));
@@ -365,22 +384,47 @@ printf("joined neighbors %d: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_
             if ((*ii != i) && (*ii != j)) ngh_filtered.push_back(*ii);
         }
 
-        // -------------- Store as new neighbors for j
-        auto nghj_it(neighborss.insert(std::make_pair(j, std::move(ngh_filtered))).first);
-
-        // ----------- Maintain edge designation
-        edge[j] = edge[j] || edge[i];
+        // Store back merged / filtered list
+        nghj = std::move(ngh_filtered);
 
         // Delete neighbors list for i
         neighborss.erase(i);
+
+        // ============== Replace i->j in neighbor lists of neighbors
+        for (ix_t k : nghj) {
+            std::vector<ix_t> &nghk(neighbors(k, true);
+            for (auto kk(nghk.begin()); kk != nghk.end(); ++kk) {
+                if (*kk == i) *kk = j;
+            }
+
+            // Uniquify
+            std::sort(nghk.begin(), nghk.end());
+            nghk.erase(std::unique(nghk.begin(), nghk.end()), nghk.end());
+        }
 
 {
 auto &xnghj(neighbors(j));
 printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end(); ++ii) printf(" %d", *ii); printf("\n");
 }
-        // Merge underlying EQClasses
-        std::vector<ix_t> *eqclassj(eqclasses.merge(j,i));
-        return {eqclassj, &nghj_it->second};
+
+    }
+
+
+
+
+    /** Returns merged {eqclass vector, neighbor vector} */
+    std::array<std::vector<ix_t> &, 2> const merge(int j, int i)
+    {
+        // ----------- Merge neighbor lists
+        std::vector<ix_t> &nghj(merge_neighbor_lists(j, i));
+
+        // ----------- Maintain edge designation
+        edge[j] = edge[j] || edge[i];
+
+
+        // ----------- Merge underlying EQClasses
+        std::vector<ix_t> &eqclassj(eqclasses.merge_eq(j,i));
+        return {eqclassj, nghj};
     }
 
 
