@@ -243,7 +243,8 @@ class D8Graph {
     // Explicit neighbors for merged EQ classes
     std::unordered_map<ix_t, std::vector<ix_t>> neighborss;
     // Buffer used to return neighbors
-    std::vector<int> _neighbors_ret;
+    std::array<std::vector<int>, 2> _neighbors_rets;
+    int reti = 0;    // Double buffering
     // ---------------------------------------------------------
 
     // Increments to get to neighbors
@@ -285,7 +286,8 @@ public:
         }}
 
         // Reserve output vector for sharing neighbors
-        _neighbors_ret.reserve(32);
+        for (size_t i=0; i<_neighbors_rets.size(); ++i)
+            _neighbors_rets[i].reserve(32);
     }
 
     size_t size() { return nj*ni; }
@@ -296,7 +298,6 @@ public:
         ji0 = eqclasses.parent(ji0);
 
         // Is this EQ class a result of a merger?
-        _neighbors_ret.clear();
         auto ii(neighborss.find(ji0));
         if (ii != neighborss.end()) {
             // -------------------------------------------
@@ -304,6 +305,10 @@ public:
             return {ii->second.begin(), ii->second.end()};
         }
 
+        // Prepare buffer for output
+        reti = 1 - reti;    // swap double buffer
+        auto &ret(_neighbors_rets[reti]);
+        ret.clear();
         // -------------------------------------------
         // This node has not been merged; identify its neighbors
         // based on the 2D raster
@@ -326,11 +331,11 @@ public:
             ji1 = eqclasses.parent(ji1);
 
             // Add to our list of output
-            _neighbors_ret.push_back(ji1);
+            ret.push_back(ji1);
         }
 
         // Return the list of neighbors found
-        return {_neighbors_ret.begin(), _neighbors_ret.end()};
+        return {ret.begin(), ret.end()};
     }
 
     /** Returns merged {eqclass vector, neighbor vector} */
@@ -343,26 +348,31 @@ printf(" pre neighbors[%d]: ", j); for (auto ii(xnghj[0]); ii != xnghj[1]; ++ii)
 auto xnghi(neighbors(i));
 printf(" pre neighbors[%d]: ", i); for (auto ii(xnghi[0]); ii != xnghi[1]; ++ii) printf(" %d", *ii); printf("\n");
 }
+
         // ------------------- Merge neighbors of i and j
-        std::vector<ix_t> nghnew;
-        auto nghj_bounds(neighbors(j));
+        std::vector<ix_t> ngh_joined;
+        auto nghj_bounds(neighbors(j));    // This works because of double buffering
         auto nghi_bounds(neighbors(i));
-#if 1
-        std::merge(nghj_bounds[0], nghj_bounds[1], nghi_bounds[0], nghi_bounds[1],
-            std::inserter(nghnew, nghnew.begin()));
+        std::set_union(nghj_bounds[0], nghj_bounds[1], nghi_bounds[0], nghi_bounds[1],
+            std::inserter(ngh_joined, ngh_joined.begin()));
 
-{
-printf("post-a neighbors[%d]: ", j); for (auto ii(nghnew.begin()); ii != nghnew.end(); ++ii) printf(" %d", *ii); printf("\n");
-}
+printf("joined neighbors: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_joined.end(); ++ii) printf(" %d", *ii); printf("\n");
 
-#else
-        std::set_union(
-            nghj->begin(), nghj->end(), nghi_bounds[0], nghi_bounds[1],
-            std::inserter(nghnew, nghnew.begin()));
-        //std::sort(nghnew.begin(), nghnew.end());    // not needed
-#endif
+        // --------------- Filter out i and j
+        std::vector<ix_t> ngh_filtered;
+        for (auto ii(ngh_joined.begin()); ii != ngh_joined.end(); ++ii) {
+            if ((*ii != i) && (*ii != j)) ngh_filtered.push_back(*ii);
+        }
 
-
+        // -------------- Store as new neighbors for j
+        neighborss[j] = std::move(ngh_filtered);
+#if 0
+        auto nghj_it(neighborss.find(j));
+        if (nghj_it == neighborss.end()) {
+            neighborss.insert(ngh_it, std::make_pair(j, std::move(ngh_filtered)));
+        } else {
+            
+        }
 
 
 
@@ -393,12 +403,13 @@ printf("eqclass[%d].members:", j); for (auto ii(eqc_bounds[0]); ii != eqc_bounds
             eqc_bounds[0], eqc_bounds[1],    // As long as they are not in here
             std::inserter(nghnew2, nghnew2.begin()));
         *nghj = std::move(nghnew2);
+#endif
 
 
         // ----------- Maintain edge designation
         edge[j] = edge[j] || edge[i];
 
-        // Delete eqclass i
+        // Delete neighbors list for i
         neighborss.erase(i);
 
 {
