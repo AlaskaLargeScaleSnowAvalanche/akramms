@@ -343,6 +343,27 @@ printf(" pre neighbors[%d]: ", j); for (auto ii(xnghj[0]); ii != xnghj[1]; ++ii)
 auto xnghi(neighbors(i));
 printf(" pre neighbors[%d]: ", i); for (auto ii(xnghi[0]); ii != xnghi[1]; ++ii) printf(" %d", *ii); printf("\n");
 }
+        // ------------------- Merge neighbors of i and j
+        std::vector<ix_t> nghnew;
+        auto nghj_bounds(neighbors(j));
+        auto nghi_bounds(neighbors(i));
+#if 1
+        std::merge(nghj_bounds[0], nghj_bounds[1], nghi_bounds[0], nghi_bounds[1],
+            std::inserter(nghnew, nghnew.begin()));
+
+{
+printf("post-a neighbors[%d]: ", j); for (auto ii(nghnew.begin()); ii != nghnew.end(); ++ii) printf(" %d", *ii); printf("\n");
+}
+
+#else
+        std::set_union(
+            nghj->begin(), nghj->end(), nghi_bounds[0], nghi_bounds[1],
+            std::inserter(nghnew, nghnew.begin()));
+        //std::sort(nghnew.begin(), nghnew.end());    // not needed
+#endif
+
+
+
 
 
         // -------- Merge equivalence classes
@@ -361,23 +382,6 @@ printf(" pre neighbors[%d]: ", i); for (auto ii(xnghi[0]); ii != xnghi[1]; ++ii)
         }
         std::vector<ix_t> *nghj(&nghj_it->second);
 
-        // Copy neighbors of i into neighbors of j
-        std::vector<ix_t> nghnew;
-        auto nghi_bounds(neighbors(i));
-#if 1
-        std::merge(nghj->begin(), nghj->end(), nghi_bounds[0], nghi_bounds[1],
-            std::inserter(nghnew, nghnew.begin()));
-
-{
-printf("post-a neighbors[%d]: ", j); for (auto ii(nghnew.begin()); ii != nghnew.end(); ++ii) printf(" %d", *ii); printf("\n");
-}
-
-#else
-        std::set_union(
-            nghj->begin(), nghj->end(), nghi_bounds[0], nghi_bounds[1],
-            std::inserter(nghnew, nghnew.begin()));
-        //std::sort(nghnew.begin(), nghnew.end());    // not needed
-#endif
 
 
         // ------ Maintain invariant: eqclass and neighbors are disjoint!
