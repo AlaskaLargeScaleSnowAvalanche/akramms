@@ -23,4 +23,6 @@ pra_ras = gdalutil.rasterize_polygons(pra_ds, grid_info)
 
 print(dem)
 
-d8graph.neighbor_graph(dem, dem_nodata, 2)
+neighbors1 = d8graph.neighbor_graph(dem, dem_nodata, 2)
+print(neighbors1)
+

@@ -10,6 +10,8 @@
 #include <vector>
 #include <array>
 #include <iostream>
+#include <iomanip>
+#include <iterator>
 
 // https://stackoverflow.com/questions/77005/how-to-automatically-generate-a-stacktrace-when-my-program-crashes
 #include <cstdio>
@@ -39,6 +41,62 @@ struct PackedMapVectors {
     std::vector<ValT> values;
 
 };
+
+
+// ==================================================================================
+template<class IterT>
+std::ostream& operator << (std::ostream& out, std::array<IterT,2> const &bounds)
+{
+    std::copy(bounds[0], bounds[1],
+      std::ostream_iterator<typename std::iterator_traits<IterT>::value_type>(std::cout, " "));
+    return out;
+}
+
+template<class IterT>
+std::ostream& print_range(std::ostream& out, IterT const &begin, IterT const &end)
+{
+    std::copy(begin, end,
+      std::ostream_iterator<typename std::iterator_traits<IterT>::value_type>(std::cout, " "));
+    return out;
+}
+
+
+template<class TypeT>
+std::ostream& print_raster(std::ostream& out, std::vector<TypeT> const &arr, int const nj, int const ni)
+{
+//    std::cout << std::setw(9);
+    std::cout << std::showpos;
+    for (int j=0; j<nj; ++j) {
+//        for (int i=0; i<ni; ++i) {
+            
+        std::copy(arr.begin()+j*ni, arr.begin()+(j+1)*ni,
+            std::ostream_iterator<TypeT>(std::cout, " "));
+        std::cout << std::endl;
+    }
+    return out;
+}
+
+template<class TypeT>
+std::ostream& print_raster(std::ostream& out, TypeT const *arr, int const nj, int const ni)
+{
+    for (int j=0; j<nj; ++j) {
+        for (int i=0; i<ni; ++i) {
+            std::cout << std::setw(6) << *(arr + j*ni + i);
+        }
+        std::cout << std::endl;
+//        std::copy(arr+j*ni, arr+(j+1)*ni,
+//            std::ostream_iterator<TypeT>(std::cout, " "));
+//        std::cout << std::endl;
+    }
+    return out;
+}
+
+template<class TypeT>
+std::array<TypeT, 2> sorted(TypeT a, TypeT b)
+{
+    if (a < b) return {a,b};
+    return {b,a};
+}
 
 // ==================================================================================
 class EQClasses {
@@ -138,14 +196,17 @@ public:
         // converting to explicit form if needed.
         auto eqcj_it(eqclasses.find(j));
         if (eqcj_it == eqclasses.end()) {
-            eqcj_it = eqclasses.insert(eqcj_it, std::make_pair(j, std::vector<ix_t>{i}));
+            printf("Creating new eqclass for %d\n", j);
+            eqcj_it = eqclasses.insert(eqcj_it, std::make_pair(j, std::vector<ix_t>{j}));
         }
         std::vector<ix_t> *eqcj(&eqcj_it->second);
+std::cout << "Dst EQClass " << j << ": "; print_range(std::cout, eqcj->begin(), eqcj->end()); std::cout << std::endl;
 
         // Access contents of the source eq class.  We don't know or
         // care whether it's in implicit or explicit form.
         auto eqci_bounds(members(i));
 
+std::cout << "Src EQClass " << i << ": "; print_range(std::cout, eqci_bounds[0], eqci_bounds[1]); std::cout << std::endl;
         // Merge eq class i into eq class j
         std::vector<ix_t> eqcnew;
         std::set_union(
@@ -255,7 +316,7 @@ public:
             // Avoid outrunning our domain
             int const j1 = j0 + dn[0];
             int const i1 = i0 + dn[1];
-            if ((j1<0) || (j1>=nj) || (i1<0) || (i1>ni)) continue;
+            if ((j1<0) || (j1>=nj) || (i1<0) || (i1>=ni)) continue;
 
             // Avoid "neighbor" gridcells that are unused
             int ji1 = j1*ni + i1;
@@ -273,8 +334,17 @@ public:
     }
 
     /** Returns merged {eqclass vector, neighbor vector} */
-    std::array<std::vector<ix_t> *, 2> const &merge(int j, int i)
+    std::array<std::vector<ix_t> *, 2> const merge(int j, int i)
     {
+printf("********* Merging %d -> %d\n", i, j);
+{
+auto xnghj(neighbors(j));
+printf(" pre neighbors[%d]: ", j); for (auto ii(xnghj[0]); ii != xnghj[1]; ++ii) printf(" %d", *ii); printf("\n");
+auto xnghi(neighbors(i));
+printf(" pre neighbors[%d]: ", i); for (auto ii(xnghi[0]); ii != xnghi[1]; ++ii) printf(" %d", *ii); printf("\n");
+}
+
+
         // -------- Merge equivalence classes
         std::vector<ix_t> *eqclassj(eqclasses.merge(j,i));
 
@@ -291,19 +361,28 @@ public:
         }
         std::vector<ix_t> *nghj(&nghj_it->second);
 
-        // Access contents of the source eq class.  We don't know or
-        // care whether it's in implicit or explicit form.
-        auto nghi_bounds(eqclasses.members(i));
-
         // Copy neighbors of i into neighbors of j
         std::vector<ix_t> nghnew;
+        auto nghi_bounds(neighbors(i));
+#if 1
+        std::merge(nghj->begin(), nghj->end(), nghi_bounds[0], nghi_bounds[1],
+            std::inserter(nghnew, nghnew.begin()));
+
+{
+printf("post-a neighbors[%d]: ", j); for (auto ii(nghnew.begin()); ii != nghnew.end(); ++ii) printf(" %d", *ii); printf("\n");
+}
+
+#else
         std::set_union(
             nghj->begin(), nghj->end(), nghi_bounds[0], nghi_bounds[1],
             std::inserter(nghnew, nghnew.begin()));
         //std::sort(nghnew.begin(), nghnew.end());    // not needed
+#endif
+
 
         // ------ Maintain invariant: eqclass and neighbors are disjoint!
         auto eqc_bounds(eqclasses.members(j));
+printf("eqclass[%d].members:", j); for (auto ii(eqc_bounds[0]); ii != eqc_bounds[1]; ++ii) printf(" %d", *ii); printf("\n");
         std::vector<ix_t> nghnew2;
         std::set_difference(
             nghnew.begin(), nghnew.end(),    // Copy these
@@ -314,6 +393,14 @@ public:
 
         // ----------- Maintain edge designation
         edge[j] = edge[j] || edge[i];
+
+        // Delete eqclass i
+        neighborss.erase(i);
+
+{
+auto xnghj(neighbors(j));
+printf("post neighbors[%d]: ", j); for (auto ii(xnghj[0]); ii != xnghj[1]; ++ii) printf(" %d", *ii); printf("\n");
+}
 
         return {eqclassj, nghj};
     }
@@ -341,32 +428,31 @@ public:
 
                 // Find index of the neighbor with the lowest elevation in the dem
                 auto ngh_bounds(neighbors(ix));
-                ix_t min_ix = *std::min_element(ngh_bounds[0], ngh_bounds[1],
+/*for (auto ii(ngh_bounds[0]); ii != ngh_bounds[1]; ++ii) {
+    printf("Neighbor %d: %d\n", ix, *ii);
+}*/
+                ix_t const min_ix = *std::min_element(ngh_bounds[0], ngh_bounds[1],
                     [this](int const ix0, int const ix1) { return dem[ix0] < dem[ix1]; });
 
                 // This Equiv class is not a sink because it has an outflow to a neighbor
                 if (dem[ix] > dem[min_ix]) break;
 
                 // This EQ class IS a sink: merge with lowest neighbor
-                printf("Merging %d -> %d\n", min_ix, ix);
+                std::array<ix_t, 2> sorted_ix(sorted(ix, min_ix));
 
                 // Merge min_ix into ix, return neighbors of merged ix
-                auto &merged(merge(ix, min_ix));
-printf("BB1\n");
+//                std::array<std::vector<ix_t> *, 2> const merged(merge(sorted_ix[0], sorted_ix[1]));    // Merge into lower index always
+                std::array<std::vector<ix_t> *, 2> const merged(merge(ix, min_ix));    // Merge into lower index always
                 auto &merged_eqclass(*merged[0]);    // Unpack results
-printf("BB2\n");
                 //auto &merged_neighbors(*merged[1]);
 
                 // Set elevation for the EQ class accordingly
                 dem[ix] = dem[min_ix];
-printf("BB3\n");
 
                 // Stop if we've gotten too large
                 if (merged_eqclass.size() > max_sink_size) break;
-printf("BB4\n");
             }
         }
-printf("CC1\n");
 
         // Look up all forwards on explicit eq classes
         // (and remove neighbors pointing to now-defunct EC's)
@@ -376,6 +462,17 @@ printf("CC1\n");
                 *jj = eqclasses.parent(*jj);
             }
         }
+
+for (auto ii(neighborss.begin()); ii != neighborss.end(); ++ii) {
+    std::vector<ix_t> &neighbors(ii->second);
+    printf("Neighbors of %d: ", ii->first);
+    print_range(std::cout, neighbors.begin(), neighbors.end());
+    printf("\n");
+}
+
+
+printf("Filled DEM:\n"); print_raster(std::cout, dem, nj, ni);
+
     }
 
 
@@ -387,11 +484,13 @@ printf("CC1\n");
         Base of 1D array of gridcell neighbors.
         (Potentially this is a Numpy array.)
     */
-    void to_neighbors1(double *neighbors1)
+    void to_neighbors1(npy_int *neighbors1)
     {
+printf("CC1 %ld %ld\n", size(), sizeof(npy_int));
         // Initialize all to -1
-        for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i)
-            neighbors1[ix_i] = -1;
+        for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i) {
+            neighbors1[ix_i] = -2;
+        }
 
         // ix_i is the index of the "current" eq class
         for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i) {
@@ -400,16 +499,26 @@ printf("CC1\n");
 
                 // ix_j is index of lowest neighboring eq class
                 auto ngh_bounds(neighbors(ix_i));
+if (ix_i == 33) std::cout << (char const *)"Neighbors 33: " << ngh_bounds << std::endl;
+
                 ix_t ix_j = *std::min_element(ngh_bounds[0], ngh_bounds[1],
                     [this](int const ix0, int const ix1) { return dem[ix0] < dem[ix1]; });
 
+#if 0           // NOT POSSIBLE: Because neihbors and eq class are disjoint!!!!
                 // If the lowest neighboring eq class is ourself, then
                 // we are a sink.  Record no outbound neighbor.
                 if (ix_i == ix_j) {
                     neighbors1[ix_i] = -1;
                     continue;
                 }
-
+#else
+                // If the lowest neighboring eq class is higher than us, then we are a sink.
+                // Record no outbound neighbor.  AVOID CYCLES IN THE GRAPH!
+                if (dem[ix_j] > dem[ix_i]) {
+                    neighbors1[ix_i] = -1;
+                    continue;
+                }
+#endif
 
                 // Now create graph link: ix_i -> ix_j
                 // if ix_i is a compound eq class, link from the LARGEST gridcell in it
@@ -423,11 +532,14 @@ printf("CC1\n");
                 // the max gridcell.  Any flow into eq class i will
                 // enter at the min gridcell, then traverse all
                 // portions of the eq class.
-                for (auto ii(members_bounds[0]+1); ii<members_bounds[1]; ++ii)
+                for (auto ii(members_bounds[0]+1); ii<members_bounds[1]; ++ii) {
                     neighbors1[*(ii-1)] = *ii;
+                }
                 
             }
         }
+printf("CC3\n");
+
     }
 };
 
@@ -556,11 +668,13 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
 
     // -----------------------------------------
     // Create output array (uninitialized)
+    auto const ni = PyArray_DIM(dem,1);
+    npy_intp const strides[] = {(npy_intp)(sizeof(int) * ni), (npy_intp)sizeof(int)};
     PyArrayObject *neighbors1 = (PyArrayObject*) PyArray_NewFromDescr(
         &PyArray_Type, 
-        PyArray_DescrFromType(NPY_INT),             // dtype='i'
+        PyArray_DescrFromType(NPY_INT32),             // dtype='i'
         2,                                          // rank 2
-        PyArray_DIMS(dem), PyArray_STRIDES(dem),    // Same shape as DEM
+        PyArray_DIMS(dem), strides,    // Same shape as DEM
         NULL,        // Allocate new memory
         // PyArray_FLAGS(dem), ...
         NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED, NULL);
@@ -574,8 +688,11 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
     d8g.fill_sinks(max_sink_size);
 
     printf("Converting to neighbors1 format\n");
-    d8g.to_neighbors1((double *)PyArray_GETPTR2(neighbors1,0,0));
 
+    printf("neighbors1 dims: %ld %ld\n", PyArray_DIM(neighbors1,0), PyArray_DIM(neighbors1,1));
+    d8g.to_neighbors1((npy_int *)PyArray_GETPTR2(neighbors1,0,0));
+
+printf("DD1\n");
     // ========================================================
     return (PyObject *)neighbors1;
 }
@@ -592,7 +709,7 @@ static bool ff_check_input(PyArrayObject *dem, char const *name)
     }
 
     // Check type
-    if (PyArray_DESCR(dem)->type_num != NPY_INT) {
+    if (PyArray_DESCR(dem)->type_num != NPY_INT32) {
         snprintf(msg, 256, "Parameter %s must have dtype int.", name);
         PyErr_SetString(PyExc_TypeError, msg);
         return false;
@@ -668,7 +785,7 @@ static PyObject* d8graph_flood_fill(PyObject *module, PyObject *args, PyObject *
     std::array<PyArrayObject *, 2> jjii;
     for (int k=0; k<2; ++k) {
         jjii[k] = (PyArrayObject*) PyArray_NewFromDescr(&PyArray_Type, 
-            PyArray_DescrFromType(NPY_INT),             // dtype='i'
+            PyArray_DescrFromType(NPY_INT32),             // dtype='i'
             1,                                          // rank 1
             out_dims, out_strides,
             NULL,        // Allocate new memory
@@ -685,8 +802,8 @@ static PyObject* d8graph_flood_fill(PyObject *module, PyObject *args, PyObject *
         int const j = ix / ni;
         int const i = ix % ni;    // Probably compiles down to divmod
 
-        *(npy_intp *)PyArray_GETPTR1(jjii[0], ix) = j;
-        *(npy_intp *)PyArray_GETPTR1(jjii[1], ix) = i;
+        *(npy_int *)PyArray_GETPTR1(jjii[0], ix) = j;
+        *(npy_int *)PyArray_GETPTR1(jjii[1], ix) = i;
     }
 
 
