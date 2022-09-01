@@ -1,5 +1,6 @@
-#include <cmath>
-#include <vector>
+#include <dggs/mbr.hpp>
+
+namespace dggs {
 
 /** Find the smallest bounding rectangle for a set of points.
 Returns a set of points representing the corners of the bounding box.
@@ -7,9 +8,11 @@ Returns a set of points representing the corners of the bounding box.
 chull: [(x,y), ...]
     Points of the Convex Hull
     (or [(y,x), ...], doesn't matter)
+    NOTE: This array is TEMPORARILY modified
 Returns: [(x,y), ...]
     The four corners of the minimum area rectangle */
-std::vector<std::array<double,2>> mbr_chull(std::vector<std::array<double,2>> &chull)
+std::vector<std::array<double,2>> mbr_chull(
+    std::vector<std::array<double,2>> &chull)
 {
     double const pi_by_2 = M_PI / 2.;
 
@@ -32,9 +35,9 @@ std::vector<std::array<double,2>> mbr_chull(std::vector<std::array<double,2>> &c
     for (int i=0; i<chull.size()-1; ++i) {
         std::array<double,2> const &p0(chull[i]);
         std::array<double,2> const &p1(chull[i+1]);
-
+        std::array<double,2> const edge {p1[0]-p0[0], p1[1]-p0[1]};
         // Calculate the edge angle
-        double angle = atan2(p1, p0);
+        double angle = std::atan2(edge[1], edge[0]);
         
         // angles = np.abs(np.mod(angles, pi_by_2))
         angle = fmod(angle + pi_by_2, pi_by_2);  // https://github.com/brian-team/brian2/issues/286
@@ -46,27 +49,27 @@ std::vector<std::array<double,2>> mbr_chull(std::vector<std::array<double,2>> &c
         // find rotation matrix
         // (Use of cos(x-p/2) instad of -sin(x) is intentional)
         std::array<std::array<double,2>,2> const R {
-            {cos(angle), cos(angle-py_by_2)},    // cos, -sin
-            {cos(angle + pi_by_2), cos(angle)}};    // sin, cos
+            std::array<double,2>{cos(angle), cos(angle - pi_by_2)},    // cos, -sin
+            std::array<double,2>{cos(angle + pi_by_2), cos(angle)}};    // sin, cos
 
         // Rotate the chull
         // rot_points = np.dot(rotations, chull.T)
         xrot.clear();
         yrot.clear();
-        for (int j=0; i<chull.size()-1; ++j) {
-            std::array<double,2> const &p(chull[i]);
+        for (int j=0; j<chull.size()-1; ++j) {
+            std::array<double,2> const &p(chull[j]);
             // Compute matrix product R * point
             xrot.push_back(R[0][0]*p[0] + R[0][1]*p[1]);
             yrot.push_back(R[1][0]*p[0] + R[1][1]*p[1]);
         }
 
         // Bounding points of this box in rotated space
-        auto const mmx(std::minmax(xrot.begin(), xrot.end()));
-        double const min_x = mmx.first;
-        double const max_x = mmx.second;
-        auto const mmy(std::minmax(yrot.begin(), yrot.end()));
-        double const min_y = mmy.first;
-        double const max_y = mmy.second;
+        auto const mmx(std::minmax_element(xrot.begin(), xrot.end()));
+        double const min_x = *mmx.first;
+        double const max_x = *mmx.second;
+        auto const mmy(std::minmax_element(yrot.begin(), yrot.end()));
+        double const min_y = *mmy.first;
+        double const max_y = *mmy.second;
 
         // Area of this box
         double const area = (max_x - min_x) * (max_y - min_y);
@@ -74,7 +77,9 @@ std::vector<std::array<double,2>> mbr_chull(std::vector<std::array<double,2>> &c
         // Update max
         if (area < best_area) {
             best_R = R;
-            best_mmxy = {min_x, max_x, min_y, max_y};
+printf("Found smaller MBR (area=%f): %f, %f, %f, %f\n", area, min_x, max_x, min_y, max_y);
+            best_mmxy = std::array{min_x, max_x, min_y, max_y};
+            best_area = area;
         }
     }
 
@@ -108,7 +113,7 @@ std::vector<std::array<double,2>> mbr_chull(std::vector<std::array<double,2>> &c
     return rval;
 }
 
-
+}    // namespace dggs
 
 #if 0
 // Original Python code from:

@@ -7,6 +7,7 @@ from uafgi.util import shputil,shapelyutil,gdalutil
 import sys
 import os
 import MinimumBoundingBox
+import shapely
 
 pras_file = '/Users/eafischer2/av/prj/juneau1/juneau1_For_5m_30L_rel.shp'
 dem_file = '/Users/eafischer2/av/data/wolken/BaseData_AKAlbers/Juneau_IFSAR_DTM_AKAlbers_EPSG_3338.tif'
@@ -94,13 +95,14 @@ print(pra_ras)
 print('Seed Points: ', len(start_ixs), start_ixs)
 
 print('================ Filled Points')
-jjarr, iiarr = d8graph.flood_fill(neighbors1, start_ixs)
-print(f'Found {len(jjarr)} points')
-print(jjarr)
-print(iiarr)
+mbr = d8graph.find_domain(neighbors1, start_ixs, grid_info.geotransform)
+print('Domain is ', mbr)
 
-print('=============== Filled Raster')
-filled_ras = np.zeros(pra_ras.shape, dtype='i')
-filled_ras[jjarr,iiarr] = 1
-print(filled_ras)
+poly = shapely.geometry.Polygon(mbr)
+print('Area is ', poly.area)
+
+#print('=============== Filled Raster')
+#filled_ras = np.zeros(pra_ras.shape, dtype='i')
+#filled_ras[jjarr,iiarr] = 1
+#print(filled_ras)
 

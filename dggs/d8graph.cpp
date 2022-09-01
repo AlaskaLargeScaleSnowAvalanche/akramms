@@ -20,7 +20,10 @@
 #include <csignal>
 #include <cstdlib>
 //#include <cunistd>
-#include "chull.hpp"
+#include <dggs/chull.hpp>
+#include <dggs/mbr.hpp>
+
+using namespace dggs;
 
 static char module_docstring[] = 
 "D8Graph 1.0.0 extension module computes graphs and flow paths in digital elevation models.";
@@ -553,7 +556,7 @@ some gridcells.
 start_begin, start_end:
     begin and end iterators for starting gridcell indices
 */
-std::unordered_set<ix_t> flood_fill(
+std::unordered_set<ix_t> find_domain(
     ix_t const *neighbors1,
     // int nj, int ni,     // Not needed, except for bounds checking on neighbors1 lookup
     ix_t const *start_begin, ix_t const *start_end)
@@ -591,6 +594,7 @@ std::unordered_set<ix_t> flood_fill(
 
 
 
+// =========================================================================
 // =========================================================================
 // Functions in the Python interface
 
@@ -699,7 +703,7 @@ printf("DD1\n");
     return (PyObject *)neighbors1;
 }
 // ----------------------------------------------------------------------------------------
-static bool ff_check_input(PyArrayObject *dem, char const *name, int rank)
+static bool ff_check_input_int(PyArrayObject *dem, char const *name, int rank)
 {
     char msg[256];
 
@@ -725,8 +729,34 @@ static bool ff_check_input(PyArrayObject *dem, char const *name, int rank)
     }
     return true;
 }
+static bool ff_check_input_double(PyArrayObject *dem, char const *name, int rank)
+{
+    char msg[256];
+
+    // Check storage
+    if (!PyArray_ISCARRAY_RO(dem)) {
+        snprintf(msg, 256, "Parameter %s must be C-style, contiguous array.", name);
+        PyErr_SetString(PyExc_TypeError, msg);
+        return false;
+    }
+
+    // Check type
+    if (PyArray_DESCR(dem)->type_num != NPY_DOUBLE) {
+        snprintf(msg, 256, "Parameter %s must have dtype double.", name);
+        PyErr_SetString(PyExc_TypeError, msg);
+        return false;
+    }
+
+    // Check rank
+    if (PyArray_NDIM(dem) != rank) {
+        snprintf(msg, 256, "Parameter %s must have rank %d", name, rank);
+        PyErr_SetString(PyExc_TypeError, msg);
+        return false;
+    }
+    return true;
+}
 // ----------------------------------------------------------------------------------------
-static char const *d8graph_flood_fill_docstring =
+static char const *d8graph_find_domain_docstring =
 R"(Given indices of starting nodes, "rolls a marble downhill."  Returns
 j (N-S) and i (E-W) gridcell coordinates of all nodes touched.
 
@@ -746,81 +776,135 @@ Returns: (jj, ii)
         2D E-W index of nodes reached
 )";
 
-static PyObject* d8graph_flood_fill(PyObject *module, PyObject *args, PyObject *kwargs)
+static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject *kwargs)
 {
     // ======================== Parse Python Input
     // Input arrays
     PyArrayObject *neighbors1;
     PyArrayObject *start;
-    int max_sink_size;
+    PyArrayObject *geotransform;
 
     // Parse args and kwargs
     static char const *kwlist[] = {
-        "neighbors1", "start",         // *args,
+        "neighbors1", "start", "geotransform",         // *args,
         NULL};
-    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!",
+    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!O!",
         (char **)kwlist,
         &PyArray_Type, &neighbors1,
         &PyArray_Type, &start,
-        &max_sink_size
+        &PyArray_Type, &geotransform
         )) return NULL;
 
     // ----------- Typecheck input arrays
-    if (!ff_check_input(neighbors1, "neighbors1", 2)) return NULL;
-    if (!ff_check_input(start, "start", 1)) return NULL;
+    if (!ff_check_input_int(neighbors1, "neighbors1", 2)) return NULL;
+    if (!ff_check_input_int(start, "start", 1)) return NULL;
+    if (!ff_check_input_double(geotransform, "geotransform", 1)) return NULL;
+
+    // int const nj = PyArray_DIM(neighbors1,0);
+    int const ni = PyArray_DIM(neighbors1,1);
 
     // ============================ Run the Core Computation
     // Run the flood fill algorithm, result in a set of 1D indices
     std::unordered_set<ix_t> seen(
-        flood_fill(
+        find_domain(
             (ix_t *)PyArray_GETPTR2(neighbors1,0,0),
             // PyArray_DIM(neighbors1,0), PyArray_DIM(neighbors1,1),    // Not needed
             (ix_t *)PyArray_GETPTR1(start, 0),
             (ix_t *)PyArray_GETPTR1(start, PyArray_DIM(start,0))));
 
-    // ============================= Construct Python Output
-    // Allocate output arrays
-    npy_intp out_dims[] = {(npy_intp) seen.size()};
-    npy_intp out_strides[] = {(npy_intp) sizeof(int)};
+    // ================ Return raw results of the flood fill
+    if (false) {
+        // ============================= Construct Python Output
+        // Allocate output arrays
+        npy_intp out_dims[] = {(npy_intp) seen.size()};
+        npy_intp out_strides[] = {(npy_intp) sizeof(int)};
 
-    // Allocate jj and ii output arrays
-    std::array<PyArrayObject *, 2> jjii;
-    for (int k=0; k<2; ++k) {
-        jjii[k] = (PyArrayObject*) PyArray_NewFromDescr(&PyArray_Type, 
-            PyArray_DescrFromType(NPY_INT32),             // dtype='i'
-            1,                                          // rank 1
-            out_dims, out_strides,
-            NULL,        // Allocate new memory
-            // PyArray_FLAGS(dem), ...
-            NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED, NULL);
+        // Allocate jj and ii output arrays
+        std::array<PyArrayObject *, 2> jjii;
+        for (int k=0; k<2; ++k) {
+            jjii[k] = (PyArrayObject*) PyArray_NewFromDescr(&PyArray_Type, 
+                PyArray_DescrFromType(NPY_INT32),             // dtype='i'
+                1,                                          // rank 1
+                out_dims, out_strides,
+                NULL,        // Allocate new memory
+                // PyArray_FLAGS(dem), ...
+                NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED, NULL);
+        }
+
+
+        // Convert the set of 1D indices to (j,i) index pairs
+
+        // Iterate in order
+        std::vector<ix_t> seen_vec(seen.begin(), seen.end());
+        std::sort(seen_vec.begin(), seen_vec.end());
+        for (size_t k=0; k<seen_vec.size(); ++k) {
+            ix_t const ji = seen_vec[k];
+            int const j = ji / ni;
+            int const i = ji % ni;    // Probably compiles down to divmod
+            // printf("seen %d,%d: %d\n", j, i, ji);
+
+            *(npy_int *)PyArray_GETPTR1(jjii[0], k) = j;
+            *(npy_int *)PyArray_GETPTR1(jjii[1], k) = i;
+        }
+
+
+        // Return a tuple of the output arrays we created.
+        // https://stackoverflow.com/questions/3498210/returning-a-tuple-of-multipe-objects-in-python-c-api
+        PyObject *ret = PyTuple_Pack(2, jjii[0], jjii[1]);
+        fflush(stdout);
+        fflush(stderr);
+        return ret;
     }
 
+    // ========================= Compute Convex Hull
+    // Compute convex hull in integer coordinate space
+    // (because we can, and we avoid computational geometry
+    // problems that stem from floating point)
+    std::vector<std::array<int,2>> ij_points;
+    ij_points.reserve(seen.size());
+    for (auto ii(seen.begin()); ii != seen.end(); ++ii) {
 
-    // Convert the set of 1D indices to (j,i) index pairs
-    // int const nj = PyArray_DIM(neighbors1,0);
-    int const ni = PyArray_DIM(neighbors1,1);
+        // Convert 1D index to 2D index
+        ix_t const ji = *ii;
+        ix_t const j = ji / ni;
+        ix_t const i = ji % ni;    // Probably compiles down to divmod
 
-    // Iterate in order
-    std::vector<ix_t> seen_vec(seen.begin(), seen.end());
-    std::sort(seen_vec.begin(), seen_vec.end());
-    for (size_t k=0; k<seen_vec.size(); ++k) {
-        ix_t const ji = seen_vec[k];
-        int const j = ji / ni;
-        int const i = ji % ni;    // Probably compiles down to divmod
-        // printf("seen %d,%d: %d\n", j, i, ji);
+        // Add it in (notice we are standardizing on i-j coordinate order here on out)
+        ij_points.push_back(std::array{i,j});
+    }
+    std::vector<std::array<int,2>> chull_ij(dggs::convex_hull(ij_points));
+    ij_points.clear();    // Free memory
 
-        *(npy_int *)PyArray_GETPTR1(jjii[0], k) = j;
-        *(npy_int *)PyArray_GETPTR1(jjii[1], k) = i;
+    // Convert convex hull to geographic coordinates by applying the geotransform
+    // https://gdal.org/tutorials/geotransforms_tut.html
+    std::vector<std::array<double,2>> chull_xy;
+    chull_xy.reserve(chull_ij.size());
+    double const *gt = (double *)PyArray_GETPTR1(geotransform, 0);
+    for (auto &ij : chull_ij) {
+        ix_t const i = ij[0];
+        ix_t const j = ij[1];
+        double const x = gt[0] + i*gt[1] + j*gt[2];
+        double const y = gt[3] + i*gt[4] + j*gt[5];
+        chull_xy.push_back(std::array{x,y});
     }
 
+    // Compute minimum bounding rectangle (MBR) on the convex hull
+    std::vector<std::array<double,2>> mbr(dggs::mbr_chull(chull_xy));
 
-    // Return a tuple of the output arrays we created.
-    // https://stackoverflow.com/questions/3498210/returning-a-tuple-of-multipe-objects-in-python-c-api
-    PyObject *ret = PyTuple_Pack(2, jjii[0], jjii[1]);
+    // ========================= Convert MBR to Python list of tuples
+    // (input format for shapely)
+    PyObject *mbr_list = PyList_New(mbr.size());
+    if (!mbr_list) return NULL;
+
+    for (size_t i=0; i<mbr.size(); ++i) {
+        auto const &xy = mbr[i];
+        PyObject *tup = Py_BuildValue("dd", xy[0], xy[1]);
+        if (!tup) return NULL;
+        PyList_SetItem(mbr_list, i, tup);
+    }
     fflush(stdout);
     fflush(stderr);
-    return ret;
-
+    return mbr_list;
 }
 
 // ============================================================
@@ -830,9 +914,9 @@ static PyMethodDef D8GraphMethods[] = {
         (PyCFunction)d8graph_neighbor_graph,
         METH_VARARGS | METH_KEYWORDS, d8graph_neighbor_graph_docstring},
 
-    {"flood_fill",
-        (PyCFunction)d8graph_flood_fill,
-        METH_VARARGS | METH_KEYWORDS, d8graph_flood_fill_docstring},
+    {"find_domain",
+        (PyCFunction)d8graph_find_domain,
+        METH_VARARGS | METH_KEYWORDS, d8graph_find_domain_docstring},
 
     // Sentinel
     {NULL, NULL, 0, NULL}

@@ -62,10 +62,12 @@ struct compare_vs {
 
     inline bool operator()(Point<T> const &p1, Point<T> const &p2)
     {
-       // Find orientation
-       Orientation o = orientation(p0, p1, p2);
-       if (o == Orientation::COLLINEAR) return dist_sq(p0, p2) >= dist_sq(p0, p1);
-       return (o == Orientation::COUNTERCLOCKWISE);
+        bool ret;
+        // Find orientation
+        Orientation o = orientation(p0, p1, p2);
+        if (o == Orientation::COLLINEAR) ret = dist_sq(p0, p2) >= dist_sq(p0, p1);
+        ret = (o == Orientation::COUNTERCLOCKWISE);
+        return ret;
     }
 };
 }    // namespace dggs::chull
@@ -132,7 +134,7 @@ std::vector<std::array<T,2>> convex_hull(
     stack.push_back(points[2]);
   
     // Process remaining n-3 points
-    for (int i = 3; i < m; i++) {
+    for (int i = 3; i < points.size(); i++) {
         // Keep removing top while the angle formed by
         // points next-to-top, top, and points[i] makes
         // a non-left turn
