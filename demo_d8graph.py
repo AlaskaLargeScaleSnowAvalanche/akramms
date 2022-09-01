@@ -7,7 +7,7 @@ from uafgi.util import shputil,shapelyutil,gdalutil
 pras_file = '/Users/eafischer2/av/prj/juneau1/juneau1_For_5m_30L_rel.shp'
 dem_file = '/Users/eafischer2/av/data/wolken/BaseData_AKAlbers/Juneau_IFSAR_DTM_AKAlbers_EPSG_3338.tif'
 
-if False:
+if True:
     # Read DEM
     grid_info,dem,dem_nodata = gdalutil.read_raster(dem_file)
 
