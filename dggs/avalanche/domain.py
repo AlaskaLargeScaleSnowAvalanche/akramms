@@ -292,7 +292,7 @@ def dem_example():
 
     grid_info = gisutil.RasterInfo('', ni, nj, [0.0, 2.0, 0.0, 0.0, 0.0, 2.0])
 
-    return grid_info,dem,-5
+    return grid_info,dem.astype(np.single),-5
 
 def main():
 

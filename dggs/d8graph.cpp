@@ -23,7 +23,7 @@
 static char module_docstring[] = 
 "D8Graph 1.0.0 extension module computes graphs and flow paths in digital elevation models.";
 
-
+typedef float dem_t;    // The Digital Elevation Model is single prceision
 typedef int ix_t;
 
 /** A memory-efficient version of map<KeyT,ValT> in two vectors. */
@@ -248,7 +248,7 @@ class D8Graph {
     EQClasses eqclasses;
 
     // Maintain a DEM (imported from Python), giving us our neighbors
-    double *dem;
+    dem_t *dem;
     int const nj;
     int const ni;
     double nodata;             // dem==nodata ==> unused gridcell
@@ -287,9 +287,10 @@ class D8Graph {
     }
 
 public:
-    D8Graph(double *_dem, int _nj, int _ni, double _nodata)
+    D8Graph(dem_t *_dem, int _nj, int _ni, double _nodata)
         : dem(_dem), nj(_nj), ni(_ni), nodata(_nodata)
     {
+//printf("AA1 %f %f %f %f\n", dem[0], dem[1], dem[2], dem[3]);
 
         // Initialize edge indicator
         edge.reserve(nj*ni);
@@ -359,7 +360,7 @@ public:
         // Construct the neighbor list.
 
         // Prepare output buffer
-        reti = 1 - reti;    // swap double buffer
+        reti = 1 - reti;    // swap dem_t buffer
         auto &ngh(_neighbors_rets[reti]);
         ngh.clear();
         ngh.reserve(8);
@@ -447,7 +448,7 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
 
 
     /**
-    max_sink_size:
+    max_sink_size: (DEPRECATED; IGNORED)
         Don't merge sinks larger than this.
     */
     void fill_sinks(size_t max_sink_size)
@@ -468,11 +469,13 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
                 // Find index of the neighbor with the lowest elevation in the dem
                 // (that is small enough to merge)
                 ix_t min_ix = -1;
-                double min_elev = 1.e20;
+                dem_t min_elev = 1.e20;
                 auto &ngh(neighbors(ix));
                 for (auto kk(ngh.begin()); ; ++kk) {
                     if (kk == ngh.end()) break;
+#if 0     // max_sink_size is too buggy
                     if (eqclasses.size(ix) + eqclasses.size(*kk) > max_sink_size) continue;
+#endif
                     if (dem[*kk] < min_elev) {
                         min_ix = *kk;
                         min_elev = dem[min_ix];
@@ -498,8 +501,11 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
                 // Set elevation for the EQ class accordingly
                 dem[ix] = dem[min_ix];
 
+#if 0     // max_sink_size is too buggy
                 // Stop if we've gotten too large
                 if (merged_eqclass.size() > max_sink_size) break;
+#endif
+
             }
         }
 
@@ -572,9 +578,9 @@ printf("CC1 %ld %ld\n", size(), sizeof(npy_int));
                     continue;
                 }
 #else
-                // If the lowest neighboring eq class is higher than us, then we are a sink.
+                // If the lowest neighboring eq class is no lower than us, then we are a sink.
                 // Record no outbound neighbor.  AVOID CYCLES IN THE GRAPH!
-                if (dem[ix_j] > dem[ix_i]) {
+                if (dem[ix_j] >= dem[ix_i]) {
                     neighbors1[ix_i] = -1;
                     continue;
                 }
@@ -678,10 +684,11 @@ following caveats:
 
 dem: np.array(nj, ni, dtype='d')
     The input digital elevation model
-nodata: float
+nodata: double
     dem takes this value for unused cells (eg ocean)
-max_sink_size: int
+max_sink_size: int DEFAULT 0
     Maximum number of cells to join together in equivalence classes
+    (Currently deprecated: 0=don't fill sinks, >0=do fill sinks)
 
 Returns: neighbors1=np.array(nj, ni, dtype=np.int32)
     Representation of the degree-1 graph
@@ -693,7 +700,7 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
     // Input arrays
     PyArrayObject *dem;
     double nodata;
-    int max_sink_size = 10;
+    int max_sink_size = 0;
 
     // Parse args and kwargs
     static char const *kwlist[] = {
@@ -715,8 +722,8 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
     }
 
     // Check type
-    if (PyArray_DESCR(dem)->type_num != NPY_DOUBLE) {
-        PyErr_SetString(PyExc_TypeError, "Input dem must have type double");
+    if (PyArray_DESCR(dem)->type_num != NPY_FLOAT) {
+        PyErr_SetString(PyExc_TypeError, "Input dem must have type float (single precision)");
         return NULL;
     }
 
@@ -742,10 +749,11 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
     // ========================================================
     // Do the computation
 
-    D8Graph d8g((double *)PyArray_GETPTR2(dem,0,0), PyArray_DIM(dem,0), PyArray_DIM(dem,1), nodata);
+    D8Graph d8g((dem_t *)PyArray_GETPTR2(dem,0,0), PyArray_DIM(dem,0), PyArray_DIM(dem,1), nodata);
+printf("AA2\n");
 
     printf("Filling sinks...\n");
-    d8g.fill_sinks(max_sink_size);
+    if (max_sink_size > 0) d8g.fill_sinks(max_sink_size);
 
     printf("Converting to neighbors1 format\n");
 
@@ -757,7 +765,7 @@ printf("DD1\n");
     return (PyObject *)neighbors1;
 }
 // ----------------------------------------------------------------------------------------
-static bool ff_check_input(PyArrayObject *dem, char const *name)
+static bool ff_check_input(PyArrayObject *dem, char const *name, int rank)
 {
     char msg[256];
 
@@ -776,8 +784,8 @@ static bool ff_check_input(PyArrayObject *dem, char const *name)
     }
 
     // Check rank
-    if (PyArray_NDIM(dem) != 1) {
-        snprintf(msg, 256, "Parameter %s must have rank 1", name);
+    if (PyArray_NDIM(dem) != rank) {
+        snprintf(msg, 256, "Parameter %s must have rank %d", name, rank);
         PyErr_SetString(PyExc_TypeError, msg);
         return false;
     }
@@ -824,8 +832,8 @@ static PyObject* d8graph_flood_fill(PyObject *module, PyObject *args, PyObject *
         )) return NULL;
 
     // ----------- Typecheck input arrays
-    if (!ff_check_input(neighbors1, "neighbors1")) return NULL;
-    if (!ff_check_input(start, "start")) return NULL;
+    if (!ff_check_input(neighbors1, "neighbors1", 2)) return NULL;
+    if (!ff_check_input(start, "start", 1)) return NULL;
 
     // ============================ Run the Core Computation
     // Run the flood fill algorithm, result in a set of 1D indices
@@ -858,12 +866,17 @@ static PyObject* d8graph_flood_fill(PyObject *module, PyObject *args, PyObject *
     // int const nj = PyArray_DIM(neighbors1,0);
     int const ni = PyArray_DIM(neighbors1,1);
 
-    for (ix_t ix : seen) {
-        int const j = ix / ni;
-        int const i = ix % ni;    // Probably compiles down to divmod
+    // Iterate in order
+    std::vector<ix_t> seen_vec(seen.begin(), seen.end());
+    std::sort(seen_vec.begin(), seen_vec.end());
+    for (size_t k=0; k<seen_vec.size(); ++k) {
+        ix_t const ji = seen_vec[k];
+        int const j = ji / ni;
+        int const i = ji % ni;    // Probably compiles down to divmod
+        // printf("seen %d,%d: %d\n", j, i, ji);
 
-        *(npy_int *)PyArray_GETPTR1(jjii[0], ix) = j;
-        *(npy_int *)PyArray_GETPTR1(jjii[1], ix) = i;
+        *(npy_int *)PyArray_GETPTR1(jjii[0], k) = j;
+        *(npy_int *)PyArray_GETPTR1(jjii[1], k) = i;
     }
 
 
