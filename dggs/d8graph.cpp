@@ -212,17 +212,17 @@ public:
         // converting to explicit form if needed.
         auto eqcj_it(eqclasses.find(j));
         if (eqcj_it == eqclasses.end()) {
-            printf("Creating new eqclass for %d\n", j);
+//            printf("Creating new eqclass for %d\n", j);
             eqcj_it = eqclasses.insert(eqcj_it, std::make_pair(j, std::vector<ix_t>{j}));
         }
         std::vector<ix_t> &eqcj(eqcj_it->second);
-std::cout << "Dst EQClass " << j << ": "; print_range(std::cout, eqcj.begin(), eqcj.end()); std::cout << std::endl;
+//std::cout << "Dst EQClass " << j << ": "; print_range(std::cout, eqcj.begin(), eqcj.end()); std::cout << std::endl;
 
         // Access contents of the source eq class.  We don't know or
         // care whether it's in implicit or explicit form.
         auto eqci_bounds(members(i));
 
-std::cout << "Src EQClass " << i << ": "; print_range(std::cout, eqci_bounds[0], eqci_bounds[1]); std::cout << std::endl;
+//std::cout << "Src EQClass " << i << ": "; print_range(std::cout, eqci_bounds[0], eqci_bounds[1]); std::cout << std::endl;
         // Merge eq class i into eq class j
         std::vector<ix_t> eqcnew;
         std::set_union(
@@ -377,14 +377,14 @@ public:
     }
 
     /** Merge neighbor lists in prep for an eqclass merger of j <- i */
-    std::vector<ix_t> &merge_neighbor_lists(ix_t j, ix_t i)
+    std::vector<ix_t> &merge_neighbor_lists(ix_t j, ix_t i, bool debug=false)
     {
         // Original neighbor lists
         std::vector<ix_t> &nghj(neighbors(j, true));
         std::vector<ix_t> &nghi(neighbors(i));
 
-printf("********* Merging %d -> %d\n", i, j);
-{
+if (debug) printf("********* Merging %d (%f) <- %d (%f)\n", j, dem[j], i, dem[i]);
+if (false) {
 printf(" pre neighbors[%d]: ", j); for (auto ii(nghj.begin()); ii != nghj.end(); ++ii) printf(" %d", *ii); printf("\n");
 printf(" pre neighbors[%d]: ", i); for (auto ii(nghi.begin()); ii != nghi.end(); ++ii) printf(" %d", *ii); printf("\n");
 }
@@ -394,7 +394,9 @@ printf(" pre neighbors[%d]: ", i); for (auto ii(nghi.begin()); ii != nghi.end();
         std::set_union(nghj.begin(), nghj.end(), nghi.begin(), nghi.end(),
             std::inserter(ngh_joined, ngh_joined.begin()));
 
+if (false) {
 printf("joined neighbors %d: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_joined.end(); ++ii) printf(" %d", *ii); printf("\n");
+}
 
         // --------------- Filter out i and j
         std::vector<ix_t> ngh_filtered;
@@ -420,7 +422,7 @@ printf("joined neighbors %d: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_
             nghk.erase(std::unique(nghk.begin(), nghk.end()), nghk.end());
         }
 
-{
+if (false) {
 auto &xnghj(neighbors(j));
 printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end(); ++ii) printf(" %d", *ii); printf("\n");
 }
@@ -432,10 +434,10 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
 
 
     /** Returns merged {eqclass vector, neighbor vector} */
-    std::array<std::vector<ix_t> *, 2> const merge(int j, int i)
+    std::array<std::vector<ix_t> *, 2> const merge(int j, int i, bool debug=false)
     {
         // ----------- Merge neighbor lists
-        std::vector<ix_t> &nghj(merge_neighbor_lists(j, i));
+        std::vector<ix_t> &nghj(merge_neighbor_lists(j, i, debug));
 
         // ----------- Maintain edge designation
         edge[j] = edge[j] || edge[i];
@@ -454,6 +456,7 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
     void fill_sinks(size_t max_sink_size)
     {
 
+        int merge_count = 0;
         for (int ix=0; ix<(int)size(); ++ix) {
             // Only look at primary node for each EQ class
             if (eqclasses.parent(ix) != ix) continue;
@@ -494,11 +497,13 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
 
                 // Merge min_ix into ix, return neighbors of merged ix
 //                std::array<std::vector<ix_t> *, 2> const merged(merge(sorted_ix[0], sorted_ix[1]));    // Merge into lower index always
-                std::array<std::vector<ix_t> *, 2> const merged(merge(ix, min_ix));    // Merge into lower-elevation     index always
+
+                std::array<std::vector<ix_t> *, 2> const merged(merge(ix, min_ix, merge_count%1000 == 0));    // Merge into lower-elevation     index always
+                ++merge_count;
                 auto &merged_eqclass(*merged[0]);    // Unpack results
                 //auto &merged_neighbors(*merged[1]);
 
-                // Set elevation for the EQ class accordingly
+                // Set elevation for the EQ class to the (higher) elevation of the neighbor
                 dem[ix] = dem[min_ix];
 
 #if 0     // max_sink_size is too buggy
@@ -524,7 +529,7 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
 
 
 // ---------------------- Debugging
-{
+if (false) {
 std::vector<ix_t> keys;
 for (auto kv: neighborss) keys.push_back(kv.first);
 std::sort(keys.begin(), keys.end());
@@ -762,6 +767,8 @@ printf("AA2\n");
 
 printf("DD1\n");
     // ========================================================
+    fflush(stdout);
+    fflush(stderr);
     return (PyObject *)neighbors1;
 }
 // ----------------------------------------------------------------------------------------
@@ -883,6 +890,8 @@ static PyObject* d8graph_flood_fill(PyObject *module, PyObject *args, PyObject *
     // Return a tuple of the output arrays we created.
     // https://stackoverflow.com/questions/3498210/returning-a-tuple-of-multipe-objects-in-python-c-api
     PyObject *ret = PyTuple_Pack(2, jjii[0], jjii[1]);
+    fflush(stdout);
+    fflush(stderr);
     return ret;
 
 }

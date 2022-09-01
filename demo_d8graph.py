@@ -2,6 +2,7 @@ import numpy as np
 import d8graph
 from dggs.avalanche import domain
 from uafgi.util import shputil,shapelyutil,gdalutil
+import sys
 
 
 pras_file = '/Users/eafischer2/av/prj/juneau1/juneau1_For_5m_30L_rel.shp'
@@ -10,8 +11,19 @@ dem_file = '/Users/eafischer2/av/data/wolken/BaseData_AKAlbers/Juneau_IFSAR_DTM_
 if True:
     # Read DEM
     grid_info,dem,dem_nodata = gdalutil.read_raster(dem_file)
+    dem1d = dem.reshape(-1)
 
-    print('xxxxxxxxx ',dem.dtype)
+    print('nodata = ',dem_nodata)
+    print('Total gridcells = ', dem.shape[0] * dem.shape[1])
+    print('# nodata = ', np.sum(dem == dem_nodata))
+    print('# zero = ', np.sum(dem == 0))
+
+    ixs = (22270038,)
+    for ix in ixs:
+        print(f'dem[{ix}] = {dem1d[ix]}')
+    
+
+    dem[dem == 0] = dem_nodata    # Bank out zero-elevation squares (sea level)
 
     # Read (one) polygon
     pras_df = shputil.read_df(pras_file)
@@ -21,6 +33,7 @@ if True:
     #print('*** ',pra)
     pra_ds = shapelyutil.to_datasource(pra)
     pra_ras = gdalutil.rasterize_polygons(pra_ds, grid_info)
+
 else:
     grid_info,dem,dem_nodata = domain.dem_example()
 
@@ -47,10 +60,11 @@ print('========== Seed Raster')
 # Start off with a rasterized polygon of the PRA
 start_ixs = np.where(pra_ras.reshape(-1))[0].astype('i')
 print(pra_ras)
-print('Seed Points: ', start_ixs)
+print('Seed Points: ', len(start_ixs), start_ixs)
 
 print('================ Filled Points')
 jjarr, iiarr = d8graph.flood_fill(neighbors1, start_ixs)
+print(f'Found {len(jjarr)} points')
 print(jjarr)
 print(iiarr)
 
