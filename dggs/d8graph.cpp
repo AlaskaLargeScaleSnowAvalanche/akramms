@@ -20,6 +20,7 @@
 #include <csignal>
 #include <cstdlib>
 //#include <cunistd>
+#include "chull.hpp"
 
 static char module_docstring[] = 
 "D8Graph 1.0.0 extension module computes graphs and flow paths in digital elevation models.";

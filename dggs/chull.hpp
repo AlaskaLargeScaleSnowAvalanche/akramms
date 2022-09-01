@@ -1,6 +1,10 @@
 // A C++ program to find convex hull of a set of points. Refer
-// https://www.geeksforgeeks.org/orientation-3-ordered-points/
-// for explanation of orientation()
+// https://www.geeksforgeeks.org/convex-hull-set-2-graham-scan/
+// This uses the Graham Scan Algorithm
+
+// More on Graham Scan
+// https://leetcode.com/problems/erect-the-fence/discuss/103307/c-graham-scanmonotone-chain-dealing-with-collinear-cases
+
 #include <iostream>
 #include <vector>
 #include <array>
@@ -8,14 +12,19 @@
 #include <cstdio>
 #include <algorithm>
 
+namespace dggs {
 
-typedef std::array<double,2> Point;    // y,x
-int const Y=0;
-int const X=1;
+namespace chull {
+
+template <class T>
+using Point = std::array<T,2>;    // y,x
+static int const Y=0;
+static int const X=1;
 
 // A utility function to return square of distance
 // between p1 and p2
-inline double dist_sq(Point const &p1, Point const &p2)
+template <class T>
+inline T dist_sq(Point<T> const &p1, Point<T> const &p2)
 {
     return (p1[Y] - p2[Y])*(p1[Y] - p2[Y]) +
         (p1[X] - p2[X])*(p1[X] - p2[X]);
@@ -23,16 +32,18 @@ inline double dist_sq(Point const &p1, Point const &p2)
      
 
 enum Orientation {COLLINEAR, CLOCKWISE, COUNTERCLOCKWISE};
+enum IndexOrder {XY, YX};
 
 // To find orientation of ordered triplet (p, q, r).
 // The function returns following values
 // 0 --> p, q and r are collinear
 // 1 --> Clockwise
 // 2 --> Counterclockwise
-inline Orientation orientation(Point const &p, Point const &q, Point const &r)
+template <class T>
+inline Orientation orientation(Point<T> const &p, Point<T> const &q, Point<T> const &r)
 {
-    double val = (q[X] - p[X]) * (r[Y] - q[Y]) -
-              (q[Y] - p[Y]) * (r[X] - q[X]);
+    double val = (q[Y] - p[Y]) * (r[X] - q[X]) -
+              (q[X] - p[X]) * (r[Y] - q[Y]);
  
     if (val == 0.0) return Orientation::COLLINEAR;    // TODO: Use epsilon for comparison with 0?
     return (val > 0.0)? Orientation::CLOCKWISE : Orientation::COUNTERCLOCKWISE;
@@ -41,14 +52,15 @@ inline Orientation orientation(Point const &p, Point const &q, Point const &r)
 
 // A function used by library function qsort() to sort an array of
 // points with respect to the first point
+template <class T>
 struct compare_vs {
     // A global point needed for  sorting points with reference
     // to  the first point Used in compare function of qsort()
-    Point const &p0;
+    Point<T> const &p0;
 
-    compare_vs(Point const &_p0) : p0(_p0) {}
+    compare_vs(Point<T> const &_p0) : p0(_p0) {}
 
-    inline bool operator()(Point const &p1, Point const &p2)
+    inline bool operator()(Point<T> const &p1, Point<T> const &p2)
     {
        // Find orientation
        Orientation o = orientation(p0, p1, p2);
@@ -56,17 +68,32 @@ struct compare_vs {
        return (o == Orientation::COUNTERCLOCKWISE);
     }
 };
+}    // namespace dggs::chull
 
+/** Returns convex hull of a set of n points.
 
-/** Prints convex hull of a set of n points.
-points:
+points: [(y,x), ...]
     NOTE: points array is modified
+order: Orientation::COUNTERCLOCKWISE (DEFAULT)
+    Order of output points: clockwise or counter-clockwise
+    NOTE: This will be the order if points are in default (y,x) coordinates.
+          If points are (x,y) then this will be the REVERSE of the order.
+Returns: [(y,x), ...]
+    Points of the convex hull polygon, in clockwise / counter-clockwise order.
+    Not unique as to where the cycle of points is "split" into a linear array.
+    The first point is NOT repeated at the end.
 */
-std::vector<Point> convex_hull(std::vector<Point> &points)
+template <class T>
+std::vector<std::array<T,2>> convex_hull(
+    std::vector<std::array<T,2>> &points,
+    chull::IndexOrder iorder = chull::IndexOrder::XY,
+    chull::Orientation orient = chull::Orientation::COUNTERCLOCKWISE)
 {
+    using namespace chull;
+
     // Place the bottom-most point at first position
     std::swap(points[0], *std::min_element(points.begin(), points.end()));
-    Point &p0(points[Y]);    // Alias for bottom-most point
+    Point<T> &p0(points[Y]);    // Alias for bottom-most point
 
     // Sort n-1 points with respect to the first point.
     // A point p1 comes before p2 in sorted output if p2
@@ -95,11 +122,11 @@ std::vector<Point> convex_hull(std::vector<Point> &points)
   
     // If modified array of points has fewer than 3 points,
     // convex hull is not possible
-    if (m < 3) return std::vector<Point>{};
+    if (m < 3) return std::vector<Point<T>>{};
   
     // Create an empty std::stack and push first three points
     // to it.
-    std::vector<Point> stack;
+    std::vector<Point<T>> stack;
     stack.push_back(points[0]);
     stack.push_back(points[1]);
     stack.push_back(points[2]);
@@ -117,18 +144,10 @@ std::vector<Point> convex_hull(std::vector<Point> &points)
     }
   
     // Now std::stack has the output points
-    std::reverse(stack.begin(), stack.end());
+    if ((orient == Orientation::CLOCKWISE) != (iorder == chull::IndexOrder::XY)) {
+        std::reverse(stack.begin(), stack.end());
+    }
     return stack;
 }
-         
-// Driver program to test above functions
-int main()
-{
-    std::vector<Point> points {{0, 3}, {1, 1}, {2, 2}, {4, 4},
-                      {0, 0}, {1, 2}, {3, 1}, {3, 3}};
-    std::vector<Point> chull(convex_hull(points));
+}    // namespace dggs
 
-    printf("Convex Hull (y,x):");
-    for (Point &p : chull) printf(" (%f, %f)", p[0], p[1]);
-    printf("\n");
-}
