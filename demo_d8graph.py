@@ -1,4 +1,4 @@
-import bz2
+import gzip
 import pickle
 import numpy as np
 import d8graph
@@ -6,10 +6,26 @@ from dggs.avalanche import domain
 from uafgi.util import shputil,shapelyutil,gdalutil
 import sys
 import os
+import MinimumBoundingBox
 
 pras_file = '/Users/eafischer2/av/prj/juneau1/juneau1_For_5m_30L_rel.shp'
 dem_file = '/Users/eafischer2/av/data/wolken/BaseData_AKAlbers/Juneau_IFSAR_DTM_AKAlbers_EPSG_3338.tif'
-neighbors1_pik = 'neighbors1.pik.bz2'
+neighbors1_pik = 'neighbors1.pik.gz'
+
+
+def domain_rectangle(xx, yy):
+    """Computes the domain rectangle enclosing a bunch of points.
+    xx, yy: np.array
+        Points to enclose (projected x/y space)
+    margin:
+        Margin around rectangle to enlarge
+    """
+    mp = shapely.geometry.MultiPoint(list(zip(xx,yy)))
+    chull = mp.convex_hull
+    chull_list = list(zip(*chull.exterior.coords.xy))
+    mbb = MinimumBoundingBox.MinimumBoundingBox(chull_list[:-1])
+
+
 
 if True:
     # Read DEM
@@ -56,15 +72,17 @@ print(dem)
 
 print('========== Running C++')
 if os.path.exists(neighbors1_pik):
-    with bz2.BZ2File(neighbors1_pik, 'rb') as fin:
+    with gzip.open(neighbors1_pik, 'rb') as fin:
         dem = pickle.load(fin)    # Sinks are filled
         neighbors1 = pickle.load(fin)
 else:
     neighbors1 = d8graph.neighbor_graph(dem, dem_nodata, 1)
-    with bz2.BZ2File(neighbors1_pik, 'wb') as out:
+    with gzip.open(neighbors1_pik, 'wb') as out:
         pickle.dump(dem, out)
         pickle.dump(neighbors1, out)
 
+print('============= DEM')
+print(dem)
 
 print('========== Neighbors1')
 print(neighbors1)

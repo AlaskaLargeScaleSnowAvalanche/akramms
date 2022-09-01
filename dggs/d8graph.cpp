@@ -88,10 +88,12 @@ class EQClasses {
     // Cell this has been merged into (if it's been merged)
     std::unordered_map<ix_t, ix_t> forwards;
 
+public:
     // EQClass with >1 element
     // Inner vector is SORTED
     std::unordered_map<ix_t, std::set<ix_t>> eqclasses;
 
+private:
     // Stand-in for single-element eqclasses
     std::set<ix_t> _single_ret{0};
 
@@ -432,11 +434,15 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
                 // This EQ class IS a sink: merge with lowest neighbor
                 std::array<ix_t, 2> sorted_ix(sorted(ix, min_ix));
 
+
                 // Set elevation for the EQ class to the (higher) elevation of the neighbor
-                // dem[ix] = dem[min_ix];
+#if 1
+                dem[ix] = dem[min_ix];
+#else            // This is too slow!
                 for (ix_t ix2 : eqclasses.members(ix)) {    // ngh == neighbors(ix)
                     dem[ix2] = dem[min_ix];
                 }
+#endif
 
                 // Merge min_ix into ix, return neighbors of merged ix
 //                std::array<std::set<ix_t> *, 2> const merged(merge(sorted_ix[0], sorted_ix[1]));    // Merge into lower index always
@@ -454,37 +460,12 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
             }
         }
 
-#if 0
-        // Look up all forwards on explicit eq classes
-        // (and remove neighbors pointing to now-defunct EC's)
-        for (auto ii(neighborss.begin()); ii != neighborss.end(); ++ii) {
-            std::set<ix_t> &neighbors(ii->second);
-            for (auto jj(neighbors.begin()); jj < neighbors.end(); ++jj) {
-                *jj = eqclasses.parent(*jj);
-            }
-            std::sort(neighbors.begin(), neighbors.end());
-            neighbors.erase(std::unique(neighbors.begin(), neighbors.end()), neighbors.end());
+        // Set DEM level for all cells in each eqclass
+        for (auto eqii(eqclasses.eqclasses.begin()); eqii != eqclasses.eqclasses.end(); ++eqii) {
+            dem_t const elev = dem[eqii->first];
+            std::set<ix_t> &members(eqii->second);
+            for (auto ix2 : members) dem[ix2] = elev;
         }
-#endif
-
-
-// ---------------------- Debugging
-if (false) {
-std::vector<ix_t> keys;
-for (auto kv: neighborss) keys.push_back(kv.first);
-std::sort(keys.begin(), keys.end());
-
-for (auto key : keys) {
-    std::set<ix_t> &neighbors(neighborss[key]);
-    printf("Neighbors of %d: ", key);
-    print_range(std::cout, neighbors.begin(), neighbors.end());
-    printf("\n");
-}
-
-printf("Filled DEM:\n"); print_raster(std::cout, dem, nj, ni);
-}
-// ----------------------
-
     }
 
 
