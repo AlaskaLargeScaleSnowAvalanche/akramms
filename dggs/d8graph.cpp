@@ -26,22 +26,6 @@ static char module_docstring[] =
 typedef float dem_t;    // The Digital Elevation Model is single prceision
 typedef int ix_t;
 
-/** A memory-efficient version of map<KeyT,ValT> in two vectors. */
-template<class KeyT, class ValT>
-struct PackedMap {
-    std::vector<KeyT> keys;    // TODO: Use Numpy array here, because this is used to/from Python
-    std::vector<ValT> values;
-};
-
-/** A memory-efficient version of map<KeyT, vector<ValT>> in three vectors */
-template<class KeyT, class ValT, class IndexT>
-struct PackedMapVectors {
-    std::vector<KeyT> keys;
-    std::vector<IndexT> starts = {0};    // Index into values; keys.size+1
-    std::vector<ValT> values;
-
-};
-
 
 // ==================================================================================
 template<class IterT>
@@ -105,57 +89,27 @@ class EQClasses {
 
     // EQClass with >1 element
     // Inner vector is SORTED
-    std::unordered_map<ix_t, std::vector<ix_t>> eqclasses;
+    std::unordered_map<ix_t, std::set<ix_t>> eqclasses;
 
     // Stand-in for single-element eqclasses
-    std::vector<ix_t> _single_ret{0};
+    std::set<ix_t> _single_ret{0};
 
 public:
 
     EQClasses() {}    // Start off with everything in its own class
 
-    void set_forwards(PackedMap<ix_t, ix_t> const &_forwards)
-    {
-        // Initialize forwards
-        for (size_t k=0; k<_forwards.keys.size(); ++k) {
-            forwards[_forwards.keys[k]] = _forwards.values[k];
-        }
-    }
-
-    void set_eqclasses(PackedMapVectors<ix_t, int, int> const &_eqclasses)
-    {
-        // Initialize eqclasses
-        for (size_t k=0; k<_eqclasses.keys.size(); ++k) {
-            size_t begin_ix = _eqclasses.starts[k];
-            size_t end_ix = _eqclasses.starts[k+1];
-            std::vector<int> eqc;
-            for (size_t ix=begin_ix; ix<end_ix; ++ix)
-                eqc.push_back(_eqclasses.values[ix]);
-            eqclasses.insert(std::make_pair(_eqclasses.keys[k], std::move(eqc)));
-        }
-    }
-
-    /** Initialized stored EQClasses from Python */
-    EQClasses(
-        PackedMap<ix_t, ix_t> const &_forwards,
-        PackedMapVectors<ix_t, int, int> const &_eqclasses)
-    {
-        set_forwards(_forwards);
-        set_eqclasses(_eqclasses);
-    }
-
-
     /** Fetches the elements of the ith equivalence class */
-    std::array<std::vector<ix_t>::iterator, 2> members(int eqi)
+    std::set<ix_t> &members(int eqi)
     {
         auto ii(eqclasses.find(eqi));
         if (ii != eqclasses.end()) {
             // This EQClass is stored explicitly, return it.
-            return {ii->second.begin(), ii->second.end()};
+            return ii->second;
         } else {
             // This EQClass is not explicitly represented, just equal to self
-            _single_ret[0] = eqi;
-            return {_single_ret.begin(), _single_ret.end()};
+            _single_ret.clear();
+            _single_ret.insert(eqi);
+            return _single_ret;
         }
     }
 
@@ -183,7 +137,7 @@ public:
     {
         auto ii(eqclasses.find(ix));
         if (ii != eqclasses.end()) {
-            return ii->second[0];
+            return *(ii->second.begin());
         } else {
             return ix;
         }
@@ -206,29 +160,25 @@ public:
     Returns:
         Sorted vector of members of newly merged j
     */
-    std::vector<ix_t> &merge_eq(int j, int i)
+    std::set<ix_t> &merge_eq(int j, int i)
     {
         // Access contents of the destination eq class,
         // converting to explicit form if needed.
         auto eqcj_it(eqclasses.find(j));
         if (eqcj_it == eqclasses.end()) {
 //            printf("Creating new eqclass for %d\n", j);
-            eqcj_it = eqclasses.insert(eqcj_it, std::make_pair(j, std::vector<ix_t>{j}));
+            eqcj_it = eqclasses.insert(eqcj_it, std::make_pair(j, std::set<ix_t>{j}));
         }
-        std::vector<ix_t> &eqcj(eqcj_it->second);
+        std::set<ix_t> &eqcj(eqcj_it->second);
 //std::cout << "Dst EQClass " << j << ": "; print_range(std::cout, eqcj.begin(), eqcj.end()); std::cout << std::endl;
 
         // Access contents of the source eq class.  We don't know or
         // care whether it's in implicit or explicit form.
-        auto eqci_bounds(members(i));
+        auto &eqci(members(i));
 
 //std::cout << "Src EQClass " << i << ": "; print_range(std::cout, eqci_bounds[0], eqci_bounds[1]); std::cout << std::endl;
         // Merge eq class i into eq class j
-        std::vector<ix_t> eqcnew;
-        std::set_union(
-            eqcj.begin(), eqcj.end(), eqci_bounds[0], eqci_bounds[1],
-            std::inserter(eqcnew, eqcnew.begin()));
-        eqcj = std::move(eqcnew);
+        for (ix_t ix : eqci) eqcj.insert(ix);
 
         // Delete eqclass i and forward to j
         eqclasses.erase(i);
@@ -256,9 +206,9 @@ class D8Graph {
     std::vector<bool> edge;
 
     // Explicit neighbors for merged EQ classes
-    std::unordered_map<ix_t, std::vector<ix_t>> neighborss;
+    std::unordered_map<ix_t, std::set<ix_t>> neighborss;
     // Buffer used to return neighbors
-    std::array<std::vector<int>, 2> _neighbors_rets;
+    std::array<std::set<ix_t>, 2> _neighbors_rets;
     int reti = 0;    // Double buffering
     // ---------------------------------------------------------
 
@@ -307,9 +257,10 @@ public:
 
 private:
     /** Obtain list of neighbors based on raster. */
-    std::vector<ix_t> &d8_neighbors_list(int ji0, std::vector<ix_t> &ngh)
+    std::set<ix_t> &d8_neighbors_list(int ji0, std::set<ix_t> &ngh)
     {
         ngh.clear();
+        ngh.reserve(8);
 
         // Identify neighbors based on the 2D raster.
         int const j0 = ji0 / ni;
@@ -332,12 +283,8 @@ private:
             ji1 = eqclasses.parent(ji1);
 
             // Add to our list of output
-            ngh.push_back(ji1);
+            ngh.insert(ji1);
         }
-
-        // Uniq-ify and return
-        std::sort(ngh.begin(), ngh.end());
-        ngh.erase(std::unique(ngh.begin(), ngh.end()), ngh.end());
 
         return ngh;
     }
@@ -347,7 +294,7 @@ public:
     expl:
         If set, then convert to expl format if not already.
     */
-    std::vector<ix_t> &neighbors(int ji0, bool expl=false)
+    std::set<ix_t> &neighbors(int ji0, bool expl=false)
     {
         // Are neighbors represented explicitly?
         // If so, just lookup and return that list.
@@ -361,9 +308,7 @@ public:
 
         // Prepare output buffer
         reti = 1 - reti;    // swap dem_t buffer
-        auto &ngh(_neighbors_rets[reti]);
-        ngh.clear();
-        ngh.reserve(8);
+        std::set<ix_t> &ngh(_neighbors_rets[reti]);
 
         // Obtain explicit list of neighbors
         d8_neighbors_list(ji0, ngh);
@@ -377,11 +322,11 @@ public:
     }
 
     /** Merge neighbor lists in prep for an eqclass merger of j <- i */
-    std::vector<ix_t> &merge_neighbor_lists(ix_t j, ix_t i, bool debug=false)
+    std::set<ix_t> &merge_neighbor_lists(ix_t j, ix_t i, bool debug=false)
     {
         // Original neighbor lists
-        std::vector<ix_t> &nghj(neighbors(j, true));
-        std::vector<ix_t> &nghi(neighbors(i));
+        std::set<ix_t> &nghj(neighbors(j, true));
+        std::set<ix_t> &nghi(neighbors(i));
 
 if (debug) printf("********* Merging %d (%f) <- %d (%f)\n", j, dem[j], i, dem[i]);
 if (false) {
@@ -390,36 +335,27 @@ printf(" pre neighbors[%d]: ", i); for (auto ii(nghi.begin()); ii != nghi.end();
 }
 
         // ------------------- Merge the lists
-        std::vector<ix_t> ngh_joined;
-        std::set_union(nghj.begin(), nghj.end(), nghi.begin(), nghi.end(),
-            std::inserter(ngh_joined, ngh_joined.begin()));
+        for (ix_t ix : nghi) nghj.insert(ix);
 
 if (false) {
 printf("joined neighbors %d: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_joined.end(); ++ii) printf(" %d", *ii); printf("\n");
 }
 
         // --------------- Filter out i and j
-        std::vector<ix_t> ngh_filtered;
-        for (auto ii(ngh_joined.begin()); ii != ngh_joined.end(); ++ii) {
-            if ((*ii != i) && (*ii != j)) ngh_filtered.push_back(*ii);
-        }
-
-        // Store back merged / filtered list
-        nghj = std::move(ngh_filtered);
+        nghj.erase(i);
+        nghj.erase(j);
 
         // Delete neighbors list for i
         neighborss.erase(i);
 
         // ============== Replace i->j in neighbor lists of neighbors
         for (ix_t k : nghj) {
-            std::vector<ix_t> &nghk(neighbors(k, true));
-            for (auto kk(nghk.begin()); kk != nghk.end(); ++kk) {
-                if (*kk == i) *kk = j;
+            std::set<ix_t> &nghk(neighbors(k, true));
+            auto findi(nghk.find(i));
+            if (findi != nghk.end()) {
+                nghk.erase(i);
+                nghk.insert(j);
             }
-
-            // Uniquify
-            std::sort(nghk.begin(), nghk.end());
-            nghk.erase(std::unique(nghk.begin(), nghk.end()), nghk.end());
         }
 
 if (false) {
@@ -434,17 +370,17 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
 
 
     /** Returns merged {eqclass vector, neighbor vector} */
-    std::array<std::vector<ix_t> *, 2> const merge(int j, int i, bool debug=false)
+    std::array<std::set<ix_t> *, 2> const merge(int j, int i, bool debug=false)
     {
         // ----------- Merge neighbor lists
-        std::vector<ix_t> &nghj(merge_neighbor_lists(j, i, debug));
+        std::set<ix_t> &nghj(merge_neighbor_lists(j, i, debug));
 
         // ----------- Maintain edge designation
         edge[j] = edge[j] || edge[i];
 
 
         // ----------- Merge underlying EQClasses
-        std::vector<ix_t> &eqclassj(eqclasses.merge_eq(j,i));
+        std::set<ix_t> &eqclassj(eqclasses.merge_eq(j,i));
         return {&eqclassj, &nghj};
     }
 
@@ -496,9 +432,9 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
                 std::array<ix_t, 2> sorted_ix(sorted(ix, min_ix));
 
                 // Merge min_ix into ix, return neighbors of merged ix
-//                std::array<std::vector<ix_t> *, 2> const merged(merge(sorted_ix[0], sorted_ix[1]));    // Merge into lower index always
+//                std::array<std::set<ix_t> *, 2> const merged(merge(sorted_ix[0], sorted_ix[1]));    // Merge into lower index always
 
-                std::array<std::vector<ix_t> *, 2> const merged(merge(ix, min_ix, merge_count%1000 == 0));    // Merge into lower-elevation     index always
+                std::array<std::set<ix_t> *, 2> const merged(merge(ix, min_ix, merge_count%1000 == 0));    // Merge into lower-elevation     index always
                 ++merge_count;
                 auto &merged_eqclass(*merged[0]);    // Unpack results
                 //auto &merged_neighbors(*merged[1]);
@@ -518,7 +454,7 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
         // Look up all forwards on explicit eq classes
         // (and remove neighbors pointing to now-defunct EC's)
         for (auto ii(neighborss.begin()); ii != neighborss.end(); ++ii) {
-            std::vector<ix_t> &neighbors(ii->second);
+            std::set<ix_t> &neighbors(ii->second);
             for (auto jj(neighbors.begin()); jj < neighbors.end(); ++jj) {
                 *jj = eqclasses.parent(*jj);
             }
@@ -535,7 +471,7 @@ for (auto kv: neighborss) keys.push_back(kv.first);
 std::sort(keys.begin(), keys.end());
 
 for (auto key : keys) {
-    std::vector<ix_t> &neighbors(neighborss[key]);
+    std::set<ix_t> &neighbors(neighborss[key]);
     printf("Neighbors of %d: ", key);
     print_range(std::cout, neighbors.begin(), neighbors.end());
     printf("\n");
