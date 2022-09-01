@@ -1,12 +1,15 @@
+import bz2
+import pickle
 import numpy as np
 import d8graph
 from dggs.avalanche import domain
 from uafgi.util import shputil,shapelyutil,gdalutil
 import sys
-
+import os
 
 pras_file = '/Users/eafischer2/av/prj/juneau1/juneau1_For_5m_30L_rel.shp'
 dem_file = '/Users/eafischer2/av/data/wolken/BaseData_AKAlbers/Juneau_IFSAR_DTM_AKAlbers_EPSG_3338.tif'
+neighbors1_pik = 'neighbors1.pik.bz2'
 
 if True:
     # Read DEM
@@ -18,12 +21,13 @@ if True:
     print('# nodata = ', np.sum(dem == dem_nodata))
     print('# zero = ', np.sum(dem == 0))
 
-    ixs = (22270038,)
-    for ix in ixs:
-        print(f'dem[{ix}] = {dem1d[ix]}')
+
+#    ixs = (22270038,)
+#    for ix in ixs:
+#        print(f'dem[{ix}] = {dem1d[ix]}')
     
 
-    dem[dem == 0] = dem_nodata    # Bank out zero-elevation squares (sea level)
+    dem[dem == 0] = dem_nodata    # Blank out zero-elevation squares (sea level)
 
     # Read (one) polygon
     pras_df = shputil.read_df(pras_file)
@@ -51,7 +55,16 @@ print('============= DEM')
 print(dem)
 
 print('========== Running C++')
-neighbors1 = d8graph.neighbor_graph(dem, dem_nodata, 1)
+if os.path.exists(neighbors1_pik):
+    with bz2.BZ2File(neighbors1_pik, 'rb') as fin:
+        dem = pickle.load(fin)    # Sinks are filled
+        neighbors1 = pickle.load(fin)
+else:
+    neighbors1 = d8graph.neighbor_graph(dem, dem_nodata, 1)
+    with bz2.BZ2File(neighbors1_pik, 'wb') as out:
+        pickle.dump(dem, out)
+        pickle.dump(neighbors1, out)
+
 
 print('========== Neighbors1')
 print(neighbors1)

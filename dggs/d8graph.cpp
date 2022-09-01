@@ -6,6 +6,7 @@
 #include <numeric>    // iota
 // https://docs.python.org/3.9/extending/newtypes_tutorial.html
 #include <unordered_map>
+#include <set>
 #include <unordered_set>
 #include <vector>
 #include <array>
@@ -260,7 +261,7 @@ private:
     std::set<ix_t> &d8_neighbors_list(int ji0, std::set<ix_t> &ngh)
     {
         ngh.clear();
-        ngh.reserve(8);
+        //ngh.reserve(8);
 
         // Identify neighbors based on the 2D raster.
         int const j0 = ji0 / ni;
@@ -337,9 +338,9 @@ printf(" pre neighbors[%d]: ", i); for (auto ii(nghi.begin()); ii != nghi.end();
         // ------------------- Merge the lists
         for (ix_t ix : nghi) nghj.insert(ix);
 
-if (false) {
+#if 0
 printf("joined neighbors %d: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_joined.end(); ++ii) printf(" %d", *ii); printf("\n");
-}
+#endif
 
         // --------------- Filter out i and j
         nghj.erase(i);
@@ -431,6 +432,12 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
                 // This EQ class IS a sink: merge with lowest neighbor
                 std::array<ix_t, 2> sorted_ix(sorted(ix, min_ix));
 
+                // Set elevation for the EQ class to the (higher) elevation of the neighbor
+                // dem[ix] = dem[min_ix];
+                for (ix_t ix2 : eqclasses.members(ix)) {    // ngh == neighbors(ix)
+                    dem[ix2] = dem[min_ix];
+                }
+
                 // Merge min_ix into ix, return neighbors of merged ix
 //                std::array<std::set<ix_t> *, 2> const merged(merge(sorted_ix[0], sorted_ix[1]));    // Merge into lower index always
 
@@ -438,9 +445,6 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
                 ++merge_count;
                 auto &merged_eqclass(*merged[0]);    // Unpack results
                 //auto &merged_neighbors(*merged[1]);
-
-                // Set elevation for the EQ class to the (higher) elevation of the neighbor
-                dem[ix] = dem[min_ix];
 
 #if 0     // max_sink_size is too buggy
                 // Stop if we've gotten too large
@@ -530,8 +534,8 @@ printf("CC1 %ld %ld\n", size(), sizeof(npy_int));
                 // Now create graph link: ix_i -> ix_j
                 // if ix_i is a compound eq class, link from the LARGEST gridcell in it
                 // if ix_j is a compound eq class, link to the SMALLEST gridcell in it
-                auto members_bounds(eqclasses.members(ix_i));
-                ix_t max_member_i = *(members_bounds[1]-1);   // Largest in i
+                auto &members_i(eqclasses.members(ix_i));
+                ix_t max_member_i = *members_i.rbegin();   // Largest in i
                 ix_t min_member_j = eqclasses.min_member(ix_j);         // Smallest in j
                 neighbors1[max_member_i] = min_member_j;
 
@@ -539,8 +543,12 @@ printf("CC1 %ld %ld\n", size(), sizeof(npy_int));
                 // the max gridcell.  Any flow into eq class i will
                 // enter at the min gridcell, then traverse all
                 // portions of the eq class.
-                for (auto ii(members_bounds[0]+1); ii<members_bounds[1]; ++ii) {
-                    neighbors1[*(ii-1)] = *ii;
+                auto ii0(members_i.begin());
+                auto ii1(ii0);   ++ii1;
+                while (ii1 != members_i.end()) {
+                    neighbors1[*ii0] = *ii1;
+                    ii0 = ii1;
+                    ++ii1;
                 }
                 
             }
@@ -623,8 +631,9 @@ following caveats:
 
   4. 
 
-dem: np.array(nj, ni, dtype='d')
+dem: np.array(nj, ni, dtype=np.single)  INOUT
     The input digital elevation model
+    Elevations get changed here if fill-sinks is turned on (max_sink_size > 0)
 nodata: double
     dem takes this value for unused cells (eg ocean)
 max_sink_size: int DEFAULT 0
