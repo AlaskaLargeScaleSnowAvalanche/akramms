@@ -783,16 +783,19 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     PyArrayObject *neighbors1;
     PyArrayObject *start;
     PyArrayObject *geotransform;
+    double margin;
 
     // Parse args and kwargs
     static char const *kwlist[] = {
         "neighbors1", "start", "geotransform",         // *args,
+        "margin",        // **kwargs
         NULL};
-    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!O!",
+    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!O!|d",
         (char **)kwlist,
         &PyArray_Type, &neighbors1,
         &PyArray_Type, &start,
-        &PyArray_Type, &geotransform
+        &PyArray_Type, &geotransform,
+        &margin
         )) return NULL;
 
     // ----------- Typecheck input arrays
@@ -889,7 +892,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     }
 
     // Compute minimum bounding rectangle (MBR) on the convex hull
-    std::vector<std::array<double,2>> mbr(dggs::mbr_chull(chull_xy));
+    std::vector<std::array<double,2>> mbr(dggs::mbr_chull(chull_xy, margin));
 
     // ========================= Convert MBR to Python list of tuples
     // (input format for shapely)

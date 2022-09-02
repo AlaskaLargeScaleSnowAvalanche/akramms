@@ -95,7 +95,7 @@ print(pra_ras)
 print('Seed Points: ', len(start_ixs), start_ixs)
 
 print('================ Filled Points')
-mbr = d8graph.find_domain(neighbors1, start_ixs, grid_info.geotransform)
+mbr = d8graph.find_domain(neighbors1, start_ixs, grid_info.geotransform, margin=0)
 print('Domain is ', mbr)
 
 poly = shapely.geometry.Polygon(mbr)

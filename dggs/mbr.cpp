@@ -12,7 +12,8 @@ chull: [(x,y), ...]
 Returns: [(x,y), ...]
     The four corners of the minimum area rectangle */
 std::vector<std::array<double,2>> mbr_chull(
-    std::vector<std::array<double,2>> &chull)
+    std::vector<std::array<double,2>> &chull,
+    double margin)
 {
     double const pi_by_2 = M_PI / 2.;
 
@@ -85,10 +86,10 @@ printf("Found smaller MBR (area=%f): %f, %f, %f, %f\n", area, min_x, max_x, min_
 
     // Construct the best box in original (unrotated) space
     // best_mmxy = [min_x, max_x, min_y, max_y]
-    double const x1 = best_mmxy[1];
-    double const x2 = best_mmxy[0];
-    double const y1 = best_mmxy[3];
-    double const y2 = best_mmxy[2];
+    double const x1 = best_mmxy[1] + margin;
+    double const x2 = best_mmxy[0] - margin;
+    double const y1 = best_mmxy[3] + margin;
+    double const y2 = best_mmxy[2] - margin;
 
     std::vector<std::array<double,2>> rval;
     rval.push_back({

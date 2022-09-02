@@ -145,7 +145,7 @@ std::vector<std::array<T,2>> convex_hull(
         stack.push_back(points[i]);
     }
   
-    // Now std::stack has the output points
+    // Now stack has the output points
     if ((orient == Orientation::CLOCKWISE) != (iorder == chull::IndexOrder::XY)) {
         std::reverse(stack.begin(), stack.end());
     }
