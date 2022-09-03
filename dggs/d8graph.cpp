@@ -756,6 +756,20 @@ static bool ff_check_input_double(PyArrayObject *dem, char const *name, int rank
     return true;
 }
 // ----------------------------------------------------------------------------------------
+static PyObject *polygon_to_python(std::vector<std::array<double,2>> const &mbr)
+{
+    PyObject *mbr_list = PyList_New(mbr.size());
+    if (!mbr_list) return NULL;
+
+    for (size_t i=0; i<mbr.size(); ++i) {
+        auto const &xy = mbr[i];
+        PyObject *tup = Py_BuildValue("dd", xy[0], xy[1]);
+        if (!tup) return NULL;
+        PyList_SetItem(mbr_list, i, tup);
+    }
+    return mbr_list;
+}
+// ----------------------------------------------------------------------------------------
 static char const *d8graph_find_domain_docstring =
 R"(Given indices of starting nodes, "rolls a marble downhill."  Returns
 j (N-S) and i (E-W) gridcell coordinates of all nodes touched.
@@ -898,18 +912,8 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
 
     // ========================= Convert MBR to Python list of tuples
     // (input format for shapely)
-    PyObject *mbr_list = PyList_New(mbr.size());
-    if (!mbr_list) return NULL;
-
-    for (size_t i=0; i<mbr.size(); ++i) {
-        auto const &xy = mbr[i];
-        PyObject *tup = Py_BuildValue("dd", xy[0], xy[1]);
-        if (!tup) return NULL;
-        PyList_SetItem(mbr_list, i, tup);
-    }
-    fflush(stdout);
-    fflush(stderr);
-    return mbr_list;
+//    return polygon_to_python(mbr);
+    return polygon_to_python(chull_xy);
 }
 
 // ============================================================
