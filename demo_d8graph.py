@@ -14,22 +14,8 @@ dem_file = '/Users/eafischer2/av/data/wolken/BaseData_AKAlbers/Juneau_IFSAR_DTM_
 neighbors1_pik = 'neighbors1.pik.gz'
 
 
-def domain_rectangle(xx, yy):
-    """Computes the domain rectangle enclosing a bunch of points.
-    xx, yy: np.array
-        Points to enclose (projected x/y space)
-    margin:
-        Margin around rectangle to enlarge
-    """
-    mp = shapely.geometry.MultiPoint(list(zip(xx,yy)))
-    chull = mp.convex_hull
-    chull_list = list(zip(*chull.exterior.coords.xy))
-    mbb = MinimumBoundingBox.MinimumBoundingBox(chull_list[:-1])
-
-
-
 if True:
-    # Read DEM
+    # Real Problem: read DEM
     grid_info,dem,dem_nodata = gdalutil.read_raster(dem_file)
     dem1d = dem.reshape(-1)
 
@@ -56,17 +42,13 @@ if True:
     pra_ras = gdalutil.rasterize_polygons(pra_ds, grid_info)
 
 else:
+    # Small toy problem
     grid_info,dem,dem_nodata = domain.dem_example()
 
     pra_ras = np.zeros((grid_info.ny,grid_info.nx), dtype='b')
     pra_ras[7,8] = 1
     pra_ras[6,8] = 1
     pra_ras[2,9] = 1
-
-
-
-
-    pra_ras1d = pra_ras.reshape(-1)
 
 print('============= DEM')
 print(dem)

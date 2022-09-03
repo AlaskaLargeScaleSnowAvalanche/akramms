@@ -1,7 +1,7 @@
 import scipy.spatial
 from osgeo import gdal
 from dggs.avalanche import params,process_tree
-from uafgi.util import shputil,gdalutil,wrfutil
+from uafgi.util import shputil,gdalutil,wrfutil,make
 import os,sys
 import subprocess
 import json
@@ -213,4 +213,5 @@ def pra_post_rule(scene_dir, require_all=True):
 
                 shputil.write_df(df_cat, 'pra', 'Polygon', output, wkt=scene_args['coordinate_system'])
                 
-    return action
+    return make.Rule(action, inputs, outputs)
+

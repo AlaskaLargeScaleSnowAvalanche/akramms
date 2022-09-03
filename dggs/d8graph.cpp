@@ -815,6 +815,8 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
             (ix_t *)PyArray_GETPTR1(start, 0),
             (ix_t *)PyArray_GETPTR1(start, PyArray_DIM(start,0))));
 
+    printf("Flood Fill went from %ld -> %ld gridcells.\n", PyArray_DIM(start,0), seen.size());
+
     // ================ Return raw results of the flood fill
     if (false) {
         // ============================= Construct Python Output
