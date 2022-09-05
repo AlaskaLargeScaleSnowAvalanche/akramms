@@ -132,6 +132,7 @@ def dump_nc(ofname, args, params=None):
             #ncv = nc.createVariable(vname, 'i', [])
             param = params[vname]
             typ = TYPES[param.type]
+#            print('writing ',vname, val)
             ncv = typ.write_nc(nc, vname, val)
             if param.units is not None:
                 ncv.units = param.units
