@@ -58,36 +58,35 @@ def domain_rule(neighbor1_file, pra_file, domain_file, margin=0):
             neighbor1 = pickle.load(fin)
             # dem = pickle.load(fin)    # Not needed
 
-        for pra_file,domain_file in zip(pra_files, domain_files):
-            # Read the PRAs
-            pras_df = shputil.read_df(pra_file)
-            if 'fid' in pras_df:
-                pras_df = pras_df.rename(columns={'fid': 'Id'})  # RAMMS etc. want it named "Id"
+        # Read the PRAs
+        pras_df = shputil.read_df(pra_file)
+        if 'fid' in pras_df:
+            pras_df = pras_df.rename(columns={'fid': 'Id'})  # RAMMS etc. want it named "Id"
 
-            # Find domains based on the PRAs
-            domains = list()
-            for _,row in pras_df.iterrows():
-                pra = row['shape']
+        # Find domains based on the PRAs
+        domains = list()
+        for _,row in pras_df.iterrows():
+            pra = row['shape']
 
-                # Burn the PRA polygon into a raster
-                pra_ds = shapelyutil.to_datasource(pra)
-                pra_ras = gdalutil.rasterize_polygons(pra_ds, grid_info)
-                pra_ds = None    # Free memory
+            # Burn the PRA polygon into a raster
+            pra_ds = shapelyutil.to_datasource(pra)
+            pra_ras = gdalutil.rasterize_polygons(pra_ds, grid_info)
+            pra_ds = None    # Free memory
 
-                # Convert to a list of initial gridcell IDs
-                pra_ras1d = pra_ras.reshape(-1)
-                start_cells = np.where(pra_ras1d)[0].astype('i')
+            # Convert to a list of initial gridcell IDs
+            pra_ras1d = pra_ras.reshape(-1)
+            start_cells = np.where(pra_ras1d)[0].astype('i')
 
-                # Find the domain based on the start cells
-                domain = shapely.geometry.Polygon(
-                    d8graph.find_domain(neighbor1, start_cells, grid_info.geotransform, margin=margin))
-                domains.append(domain)
+            # Find the domain based on the start cells
+            domain = shapely.geometry.Polygon(
+                d8graph.find_domain(neighbor1, start_cells, grid_info.geotransform, margin=margin))
+            domains.append(domain)
 
-            # All done... construct new dataframe
-            domains_df = pras_df[['Id']]
-            domains_df['shape'] = domains
+        # All done... construct new dataframe
+        domains_df = pras_df[['Id']]
+        domains_df['shape'] = domains
 
-            # Store it as a Shapefile
-            shputil.write_df(domains_df, 'shape', 'Polygon', domain_file, wkt=grid_info.wkt)
+        # Store it as a Shapefile
+        shputil.write_df(domains_df, 'shape', 'Polygon', domain_file, wkt=grid_info.wkt)
 
     return make.Rule(action, [neighbor1_file, pra_file], [domain_file])
