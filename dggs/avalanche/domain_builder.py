@@ -2,7 +2,6 @@ import gzip,pickle
 import numpy as np
 import shapely
 import d8graph
-from dggs.avalanche import domain
 from uafgi.util import shputil,shapelyutil,gdalutil,make
 
 # --------------------------------------------------------------------
