@@ -149,8 +149,8 @@ def prepare_data(scene_dir):
 
     # Optional arguments...
     for script_arg, scene_arg in [
-        ('inForest', 'forest'),
-        ('inPerimeter', 'clip')]:
+        ('inForest', 'forest_file'),
+        ('inPerimeter', 'clip_file')]:
         if scene_arg in scene_args:
             script_args[script_arg] = str(scene_args[scene_arg])
 
@@ -188,11 +188,11 @@ def prepare_data(scene_dir):
     # Copy DEM to eCog folder
     ecog_dir = os.path.join(scene_dir, 'eCog')
     os.makedirs(ecog_dir, exist_ok=True)
-    shutil.copy(scene_args['dem'], os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name'])))
+    shutil.copy(scene_args['dem_file'], os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name'])))
 
     # Write import...xml files 
     for freq in ('frequent', 'extreme'):
-        for forest in ((True,False) if scene_args['forest'] else (False,)):
+        for forest in ((True,False) if scene_args['forest_file'] else (False,)):
             _Forest = '_Forest' if forest else '_NoForest'
             with open(os.path.join(ecog_dir, f'PRA_import_{freq}{_Forest}.xml'), 'w') as out:
                 out.write(import_xml_str(scene_args, freq, forest))
