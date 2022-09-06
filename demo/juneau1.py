@@ -1,6 +1,6 @@
 from uafgi.util import make
 import dggs.data
-from dggs import avalanche
+from dggs.avalanche import avalanche, pra_post, domain_builder
 from dggs.util import paramutil,harnutil
 import os
 
@@ -14,7 +14,7 @@ def add_akramms_rules(makefile, scene_dir):
 
     # Get neighbor1 graph for DEM routing network
     neighbor1_file = makefile.add(
-        avalanche.neighbor1_rule(scene_args['dem_file'], fill_sinks=True)).outputs[0]
+        domain_builder.neighbor1_rule(scene_args['dem_file'], fill_sinks=True)).outputs[0]
 
     # Loop over combos
     for return_period in scene_args['return_periods']:
@@ -26,13 +26,13 @@ def add_akramms_rules(makefile, scene_dir):
             # Post-Process eCognition Output
             # [f'{name}_{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
             pra_files = makefile.add(
-                avalanche.pra_post_rule(scene_dir, return_period, forest, require_all=False)).outputs
+                pra_post.pra_post_rule(scene_dir, return_period, forest, require_all=False)).outputs
 
             # Domain finder for post-process output
             for pra_file in pra_files:
                 domain_file = '{}_domains.shp'.format(pra_file[:-4])
                 makefile.add(
-                    avalanche.domain_rule(neighbor1_file, pra_file, domain_file))
+                    domain_builder.domain_rule(neighbor1_file, pra_file, domain_file))
 
 def main():
 
