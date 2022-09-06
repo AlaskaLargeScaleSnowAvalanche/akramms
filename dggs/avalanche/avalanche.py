@@ -227,7 +227,8 @@ def prepare_data_rule(hostname, scene_dir, HARNESS_REMOTE):
 
     scene_args = params.load(scene_dir)
 
-    inputs = [os.path.join(scene_dir, 'scene.nc')]
+    # inputs = [os.path.join(scene_dir, 'scene.nc')]
+    inputs = []
     outputs = _prepare_data_outputs(scene_dir, scene_args)
 
     def action(tdir):

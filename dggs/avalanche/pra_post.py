@@ -132,7 +132,8 @@ def pra_post_rule(scene_dir, return_period, forest, require_all=True):
             f'{name}_{For}_{resolution}m_{return_period}{cat_letter}_rel.shp'))
 
     # Add one-off input files
-    inputs += [os.path.join(scene_dir, 'scene.nc'), scene_args['snowdepth_file'], scene_args['snowdepth_geo']]
+#    inputs += [os.path.join(scene_dir, 'scene.nc'), scene_args['snowdepth_file'], scene_args['snowdepth_geo']]
+    inputs += [scene_args['snowdepth_file'], scene_args['snowdepth_geo']]
 
     def action(tdir):
 
