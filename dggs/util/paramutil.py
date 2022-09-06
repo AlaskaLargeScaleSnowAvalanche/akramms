@@ -69,7 +69,8 @@ class ListType:
         return ncv
 
     def read_nc(self, ncv):
-        return list(ncv.value)
+        val = ncv.value
+        return list(val) if hasattr(val, '__iter__') else [val]
 
 class ArrayType:
     def validate(self, val):
