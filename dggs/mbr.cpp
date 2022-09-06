@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <dggs/mbr.hpp>
 
 namespace dggs {
@@ -65,6 +66,7 @@ std::vector<std::array<double,2>> mbr_chull(
         }
 
         // Bounding points of this box in rotated space
+        // Requires a newer C++...
         auto const mmx(std::minmax_element(xrot.begin(), xrot.end()));
         double const min_x = *mmx.first;
         double const max_x = *mmx.second;
