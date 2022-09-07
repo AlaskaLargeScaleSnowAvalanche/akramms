@@ -31,10 +31,9 @@ std::vector<std::array<double,2>> mbr_chull(
     // Iterate through each edge
     chull.push_back(chull[0]);    // Add sentinel
     double best_area = DBL_MAX;
-    int best_i = -1;
     std::array<std::array<double,2>,2> best_R;    // Best rotation matrix
     std::array<double,4> best_mmxy;    // best (min_x, max_x, min_y, max_y) in rotate space
-    for (int i=0; i<chull.size()-1; ++i) {
+    for (size_t i=0; i<chull.size()-1; ++i) {
         std::array<double,2> const &p0(chull[i]);
         std::array<double,2> const &p1(chull[i+1]);
         std::array<double,2> const edge {p1[0]-p0[0], p1[1]-p0[1]};
@@ -58,7 +57,7 @@ std::vector<std::array<double,2>> mbr_chull(
         // rot_points = np.dot(rotations, chull.T)
         xrot.clear();
         yrot.clear();
-        for (int j=0; j<chull.size()-1; ++j) {
+        for (size_t j=0; j<chull.size()-1; ++j) {
             std::array<double,2> const &p(chull[j]);
             // Compute matrix product R * point
             xrot.push_back(R[0][0]*p[0] + R[0][1]*p[1]);
@@ -80,7 +79,7 @@ std::vector<std::array<double,2>> mbr_chull(
         // Update max
         if (area < best_area) {
             best_R = R;
-printf("Found smaller MBR (area=%f): %f, %f, %f, %f\n", area, min_x, max_x, min_y, max_y);
+//printf("Found smaller MBR (area=%f): %f, %f, %f, %f\n", area, min_x, max_x, min_y, max_y);
             best_mmxy = std::array{min_x, max_x, min_y, max_y};
             best_area = area;
         }

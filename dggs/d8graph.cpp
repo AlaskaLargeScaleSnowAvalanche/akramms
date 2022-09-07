@@ -336,10 +336,10 @@ public:
         std::set<ix_t> &nghi(neighbors(i));
 
 if (debug) printf("********* Merging %d (%f) <- %d (%f)\n", j, dem[j], i, dem[i]);
-if (false) {
+#if 0
 printf(" pre neighbors[%d]: ", j); for (auto ii(nghj.begin()); ii != nghj.end(); ++ii) printf(" %d", *ii); printf("\n");
 printf(" pre neighbors[%d]: ", i); for (auto ii(nghi.begin()); ii != nghi.end(); ++ii) printf(" %d", *ii); printf("\n");
-}
+#endif
 
         // ------------------- Merge the lists
         for (ix_t ix : nghi) nghj.insert(ix);
@@ -365,10 +365,10 @@ printf("joined neighbors %d: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_
             }
         }
 
-if (false) {
+#if 0
 auto &xnghj(neighbors(j));
 printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end(); ++ii) printf(" %d", *ii); printf("\n");
-}
+#endif
 
         return nghj;
     }
@@ -435,10 +435,6 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
                 // This Equiv class is not a sink because it has an outflow to a neighbor
                 if (dem[ix] > dem[min_ix]) break;
 
-                // This EQ class IS a sink: merge with lowest neighbor
-                std::array<ix_t, 2> sorted_ix(sorted(ix, min_ix));
-
-
                 // Set elevation for the EQ class to the (higher) elevation of the neighbor
 #if 1
                 dem[ix] = dem[min_ix];
@@ -449,12 +445,8 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
 #endif
 
                 // Merge min_ix into ix, return neighbors of merged ix
-//                std::array<std::set<ix_t> *, 2> const merged(merge(sorted_ix[0], sorted_ix[1]));    // Merge into lower index always
-
-                std::array<std::set<ix_t> *, 2> const merged(merge(ix, min_ix, merge_count%1000 == 0));    // Merge into lower-elevation     index always
+                merge(ix, min_ix, merge_count%1000 == 0);    // Merge into lower-elevation     index always
                 ++merge_count;
-                auto &merged_eqclass(*merged[0]);    // Unpack results
-                //auto &merged_neighbors(*merged[1]);
 
 #if 0     // max_sink_size is too buggy
                 // Stop if we've gotten too large
@@ -798,19 +790,23 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     PyArrayObject *start;
     PyArrayObject *geotransform;
     double margin;
+    // https://stackoverflow.com/questions/9316179/what-is-the-correct-way-to-pass-a-boolean-to-a-python-c-extension
+    PyObject *py_debug;
 
     // Parse args and kwargs
     static char const *kwlist[] = {
         "neighbors1", "start", "geotransform",         // *args,
         "margin",        // **kwargs
         NULL};
-    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!O!|d",
+    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!O!|dO!",
         (char **)kwlist,
         &PyArray_Type, &neighbors1,
         &PyArray_Type, &start,
         &PyArray_Type, &geotransform,
-        &margin
+        &margin,
+        &PyBool_Type, &py_debug
         )) return NULL;
+    bool const  debug = PyObject_IsTrue(py_debug);
 
     // ----------- Typecheck input arrays
     if (!ff_check_input_int(neighbors1, "neighbors1", 2)) return NULL;
@@ -832,50 +828,33 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     printf("Flood Fill went from %ld -> %ld gridcells.\n", PyArray_DIM(start,0), seen.size());
 
     // ================ Return raw results of the flood fill
-    if (false) {
-        // ============================= Construct Python Output
-        // Allocate output arrays
-        npy_intp out_dims[] = {(npy_intp) seen.size()};
-        npy_intp out_strides[] = {(npy_intp) sizeof(int)};
 
-        // Allocate jj and ii output arrays
-        std::array<PyArrayObject *, 2> jjii;
-        for (int k=0; k<2; ++k) {
-            jjii[k] = (PyArrayObject*) PyArray_NewFromDescr(&PyArray_Type, 
-                PyArray_DescrFromType(NPY_INT32),             // dtype='i'
-                1,                                          // rank 1
-                out_dims, out_strides,
-                NULL,        // Allocate new memory
-                // PyArray_FLAGS(dem), ...
-                NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED, NULL);
-        }
-
-
-        // Convert the set of 1D indices to (j,i) index pairs
-
-        // Iterate in order
+    PyArrayObject *ret_seen = nullptr;
+    if (debug) {
+        // Sort result
         std::vector<ix_t> seen_vec(seen.begin(), seen.end());
         std::sort(seen_vec.begin(), seen_vec.end());
+
+        // ============================= Construct Python Output
+        // Allocate output array of seen indices
+        npy_intp out_dims[] = {(npy_intp) seen.size()};
+        npy_intp out_strides[] = {(npy_intp) sizeof(int)};
+        ret_seen = (PyArrayObject*) PyArray_NewFromDescr(&PyArray_Type, 
+            PyArray_DescrFromType(NPY_INT32),             // dtype='i'
+            1,                                          // rank 1
+            out_dims, out_strides,
+            NULL,        // Allocate new memory
+            // PyArray_FLAGS(dem), ...
+            NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED, NULL);
+
+        // Copy to ret_seen
         for (size_t k=0; k<seen_vec.size(); ++k) {
-            ix_t const ji = seen_vec[k];
-            int const j = ji / ni;
-            int const i = ji % ni;    // Probably compiles down to divmod
-            // printf("seen %d,%d: %d\n", j, i, ji);
-
-            *(npy_int *)PyArray_GETPTR1(jjii[0], k) = j;
-            *(npy_int *)PyArray_GETPTR1(jjii[1], k) = i;
+            *(npy_int *)PyArray_GETPTR1(ret_seen, k) = seen_vec[k];
         }
-
-
-        // Return a tuple of the output arrays we created.
-        // https://stackoverflow.com/questions/3498210/returning-a-tuple-of-multipe-objects-in-python-c-api
-        PyObject *ret = PyTuple_Pack(2, jjii[0], jjii[1]);
-        fflush(stdout);
-        fflush(stderr);
-        return ret;
+        // ========================================================
     }
 
-    // ========================= Compute Convex Hull
+    // Compute Convex Hull
     // Compute convex hull in integer coordinate space
     // (because we can, and we avoid computational geometry
     // problems that stem from floating point)
@@ -907,13 +886,22 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
         chull_xy.push_back(std::array{x,y});
     }
 
+    PyObject *ret_chull_xy = nullptr;
+    if (debug) ret_chull_xy = polygon_to_python(chull_xy);
+
     // Compute minimum bounding rectangle (MBR) on the convex hull
     std::vector<std::array<double,2>> mbr(dggs::mbr_chull(chull_xy, margin));
+    PyObject *ret_mbr = polygon_to_python(mbr);
 
-    // ========================= Convert MBR to Python list of tuples
-    // (input format for shapely)
-//    return polygon_to_python(mbr);
-    return polygon_to_python(chull_xy);
+
+    fflush(stdout);
+    fflush(stderr);
+    
+    if (debug) {
+        return PyTuple_Pack(3, ret_seen, ret_chull_xy, ret_mbr);
+    } else {
+        return ret_mbr;
+    }
 }
 
 // ============================================================

@@ -93,6 +93,9 @@ std::vector<std::array<T,2>> convex_hull(
 {
     using namespace chull;
 
+    // Check for degenerate case(s)
+    if (points.size() <= 3) return points;
+
     // Place the bottom-most point at first position
     std::swap(points[0], *std::min_element(points.begin(), points.end()));
     Point<T> &p0(points[Y]);    // Alias for bottom-most point
@@ -134,7 +137,7 @@ std::vector<std::array<T,2>> convex_hull(
     stack.push_back(points[2]);
   
     // Process remaining n-3 points
-    for (int i = 3; i < points.size(); i++) {
+    for (size_t i=3; i < points.size(); i++) {
         // Keep removing top while the angle formed by
         // points next-to-top, top, and points[i] makes
         // a non-left turn
