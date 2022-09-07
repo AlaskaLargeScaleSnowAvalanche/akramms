@@ -173,7 +173,7 @@ public:
         // converting to explicit form if needed.
         auto eqcj_it(eqclasses.find(j));
         if (eqcj_it == eqclasses.end()) {
-//            printf("Creating new eqclass for %d\n", j);
+//            PySys_WriteStdout("Creating new eqclass for %d\n", j);
             eqcj_it = eqclasses.insert(eqcj_it, std::make_pair(j, std::set<ix_t>{j}));
         }
         std::set<ix_t> &eqcj(eqcj_it->second);
@@ -247,7 +247,7 @@ public:
     D8Graph(dem_t *_dem, int _nj, int _ni, double _nodata)
         : dem(_dem), nj(_nj), ni(_ni), nodata(_nodata)
     {
-//printf("AA1 %f %f %f %f\n", dem[0], dem[1], dem[2], dem[3]);
+//PySys_WriteStdout("AA1 %f %f %f %f\n", dem[0], dem[1], dem[2], dem[3]);
 
         // Initialize edge indicator
         edge.reserve(nj*ni);
@@ -255,7 +255,7 @@ public:
         for (int i=0; i<ni; ++i) {
             bool const ie = is_edge(j,i);
             edge.push_back(ie);
-//            printf("is_edge[%d, %d] = %d\n", j, i, (int)ie);
+//            PySys_WriteStdout("is_edge[%d, %d] = %d\n", j, i, (int)ie);
         }}
 
     }
@@ -335,17 +335,17 @@ public:
         std::set<ix_t> &nghj(neighbors(j, true));
         std::set<ix_t> &nghi(neighbors(i));
 
-if (debug) printf("********* Merging %d (%f) <- %d (%f)\n", j, dem[j], i, dem[i]);
+if (debug) PySys_WriteStdout("********* Merging %d (%f) <- %d (%f)\n", j, dem[j], i, dem[i]);
 #if 0
-printf(" pre neighbors[%d]: ", j); for (auto ii(nghj.begin()); ii != nghj.end(); ++ii) printf(" %d", *ii); printf("\n");
-printf(" pre neighbors[%d]: ", i); for (auto ii(nghi.begin()); ii != nghi.end(); ++ii) printf(" %d", *ii); printf("\n");
+PySys_WriteStdout(" pre neighbors[%d]: ", j); for (auto ii(nghj.begin()); ii != nghj.end(); ++ii) PySys_WriteStdout(" %d", *ii); PySys_WriteStdout("\n");
+PySys_WriteStdout(" pre neighbors[%d]: ", i); for (auto ii(nghi.begin()); ii != nghi.end(); ++ii) PySys_WriteStdout(" %d", *ii); PySys_WriteStdout("\n");
 #endif
 
         // ------------------- Merge the lists
         for (ix_t ix : nghi) nghj.insert(ix);
 
 #if 0
-printf("joined neighbors %d: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_joined.end(); ++ii) printf(" %d", *ii); printf("\n");
+PySys_WriteStdout("joined neighbors %d: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_joined.end(); ++ii) PySys_WriteStdout(" %d", *ii); PySys_WriteStdout("\n");
 #endif
 
         // --------------- Filter out i and j
@@ -367,7 +367,7 @@ printf("joined neighbors %d: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_
 
 #if 0
 auto &xnghj(neighbors(j));
-printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end(); ++ii) printf(" %d", *ii); printf("\n");
+PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end(); ++ii) PySys_WriteStdout(" %d", *ii); PySys_WriteStdout("\n");
 #endif
 
         return nghj;
@@ -475,7 +475,6 @@ printf(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end
     */
     void to_neighbors1(npy_int *neighbors1)
     {
-printf("CC1 %ld %ld\n", size(), sizeof(npy_int));
         // Initialize all to -1
         for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i) {
             neighbors1[ix_i] = -2;
@@ -530,8 +529,6 @@ printf("CC1 %ld %ld\n", size(), sizeof(npy_int));
                 
             }
         }
-printf("CC3\n");
-
     }
 };
 
@@ -678,20 +675,16 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
     // Do the computation
 
     D8Graph d8g((dem_t *)PyArray_GETPTR2(dem,0,0), PyArray_DIM(dem,0), PyArray_DIM(dem,1), nodata);
-printf("AA2\n");
 
-    printf("Filling sinks...\n");
+    PySys_WriteStdout("Filling sinks...\n");
     if (max_sink_size > 0) d8g.fill_sinks(max_sink_size);
 
-    printf("Converting to neighbors1 format\n");
+    PySys_WriteStdout("Converting to neighbors1 format\n");
 
-    printf("neighbors1 dims: %ld %ld\n", PyArray_DIM(neighbors1,0), PyArray_DIM(neighbors1,1));
+    PySys_WriteStdout("neighbors1 dims: %ld %ld\n", PyArray_DIM(neighbors1,0), PyArray_DIM(neighbors1,1));
     d8g.to_neighbors1((npy_int *)PyArray_GETPTR2(neighbors1,0,0));
 
-printf("DD1\n");
     // ========================================================
-    fflush(stdout);
-    fflush(stderr);
     return (PyObject *)neighbors1;
 }
 // ----------------------------------------------------------------------------------------
@@ -789,24 +782,21 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     PyArrayObject *neighbors1;
     PyArrayObject *start;
     PyArrayObject *geotransform;
-    double margin;
-    // https://stackoverflow.com/questions/9316179/what-is-the-correct-way-to-pass-a-boolean-to-a-python-c-extension
-    PyObject *py_debug;
+    double margin = 0;
+    int debug = 0;    // bool
 
     // Parse args and kwargs
     static char const *kwlist[] = {
         "neighbors1", "start", "geotransform",         // *args,
-        "margin",        // **kwargs
+        "margin", "debug",        // **kwargs
         NULL};
-    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!O!|dO!",
+    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!O!|di",
         (char **)kwlist,
         &PyArray_Type, &neighbors1,
         &PyArray_Type, &start,
         &PyArray_Type, &geotransform,
-        &margin,
-        &PyBool_Type, &py_debug
+        &margin, &debug
         )) return NULL;
-    bool const  debug = PyObject_IsTrue(py_debug);
 
     // ----------- Typecheck input arrays
     if (!ff_check_input_int(neighbors1, "neighbors1", 2)) return NULL;
@@ -825,7 +815,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
             (ix_t *)PyArray_GETPTR1(start, 0),
             (ix_t *)PyArray_GETPTR1(start, PyArray_DIM(start,0))));
 
-    printf("Flood Fill went from %ld -> %ld gridcells.\n", PyArray_DIM(start,0), seen.size());
+    PySys_WriteStdout("Flood Fill went from %ld -> %ld gridcells.\n", PyArray_DIM(start,0), seen.size());
 
     // ================ Return raw results of the flood fill
 
@@ -890,13 +880,12 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     if (debug) ret_chull_xy = polygon_to_python(chull_xy);
 
     // Compute minimum bounding rectangle (MBR) on the convex hull
-    std::vector<std::array<double,2>> mbr(dggs::mbr_chull(chull_xy, margin));
-    PyObject *ret_mbr = polygon_to_python(mbr);
+    PyObject *ret_mbr = nullptr;
+    if (chull_xy.size() >= 3) {
+        std::vector<std::array<double,2>> mbr(dggs::mbr_chull(chull_xy, margin));
+        ret_mbr = polygon_to_python(mbr);
+    }
 
-
-    fflush(stdout);
-    fflush(stderr);
-    
     if (debug) {
         return PyTuple_Pack(3, ret_seen, ret_chull_xy, ret_mbr);
     } else {
@@ -942,7 +931,7 @@ extern "C" void handler(int sig) {
   size = backtrace(array, 10);
 
   // print out all the frames to stderr
-  fprintf(stderr, "Error: signal %d:\n", sig);
+  PySys_WriteStderr("Error: signal %d:\n", sig);
   backtrace_symbols_fd(array, size, STDERR_FILENO);
   exit(1);
 }

@@ -37,7 +37,6 @@ def neighbor1_rule(dem_file, fill_sinks=True):
             pickle.dump(dem, out)    # In case for later inspection
 
     return make.Rule(action, [dem_file], [neighbor1_file])
-
 # --------------------------------------------------------------------
 def domain_rule(neighbor1_file, pra_file, domain_file, margin=0):
     """Compute domains for each PRA.
@@ -60,8 +59,6 @@ def domain_rule(neighbor1_file, pra_file, domain_file, margin=0):
 
         # Read the PRAs
         pras_df = shputil.read_df(pra_file)
-        if 'fid' in pras_df:
-            pras_df = pras_df.rename(columns={'fid': 'Id'})  # RAMMS etc. want it named "Id"
 
         # Find domains based on the PRAs
         domains = list()
@@ -77,10 +74,20 @@ def domain_rule(neighbor1_file, pra_file, domain_file, margin=0):
             pra_ras1d = pra_ras.reshape(-1)
             start_cells = np.where(pra_ras1d)[0].astype('i')
 
-            # Find the domain based on the start cells
-            domain = shapely.geometry.Polygon(
-                d8graph.find_domain(neighbor1, start_cells, grid_info.geotransform, margin=margin))
-            domains.append(domain)
+            args = (neighbor1, start_cells, grid_info.geotransform)
+            mbr = d8graph.find_domain(*args, margin=margin)
+            if mbr is None:
+                # Store info on items that didn't work
+                ret = d8graph.find_domain(*args, margin=margin, debug=True)
+                Id = row['Id']
+                with open(f'degen_{Id}.pik', 'wb') as out:
+                    pickle.dump(Id, out)
+                    pickle.dump(ret, out)
+                domains.append(shapely.geometry.Polygon([]))
+            else:
+                # Find the domain based on the start cells
+                domain = shapely.geometry.Polygon(mbr)
+                domains.append(domain)
 
         # All done... construct new dataframe
         domains_df = pras_df[['Id']]
