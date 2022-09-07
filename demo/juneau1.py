@@ -30,9 +30,13 @@ def add_akramms_rules(makefile, scene_dir):
 
             # Domain finder for post-process output
             for pra_file in pra_files:
+                pra_burn_file = '{}_burn.pik.gz'.format(pra_file[:-4])
+                makefile.add(
+                    domain_builder.burn_pra_rule(neighbor1_file, pra_file, pra_burn_file))
+
                 domain_file = '{}_domains.shp'.format(pra_file[:-4])
                 makefile.add(
-                    domain_builder.domain_rule(neighbor1_file, pra_file, domain_file))
+                    domain_builder.domain_rule(neighbor1_file, pra_burn_file, domain_file))
 
 def main():
 
