@@ -744,7 +744,7 @@ static bool ff_check_input_double(PyArrayObject *dem, char const *name, int rank
 static PyObject *polygon_to_python(std::vector<std::array<double,2>> const &mbr)
 {
     PyObject *mbr_list = PyList_New(mbr.size());
-    if (!mbr_list) return NULL;
+    if (!mbr_list) return Py_BuildValue("");    // return None
 
     for (size_t i=0; i<mbr.size(); ++i) {
         auto const &xy = mbr[i];
