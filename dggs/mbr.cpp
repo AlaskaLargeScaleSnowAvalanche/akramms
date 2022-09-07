@@ -31,8 +31,8 @@ std::vector<std::array<double,2>> mbr_chull(
     // Iterate through each edge
     chull.push_back(chull[0]);    // Add sentinel
     double best_area = DBL_MAX;
-    std::array<std::array<double,2>,2> best_R;    // Best rotation matrix
-    std::array<double,4> best_mmxy;    // best (min_x, max_x, min_y, max_y) in rotate space
+    std::array<std::array<double,2>,2> best_R {};    // Best rotation matrix
+    std::array<double,4> best_mmxy{};    // best (min_x, max_x, min_y, max_y) in rotate space
     for (size_t i=0; i<chull.size()-1; ++i) {
         std::array<double,2> const &p0(chull[i]);
         std::array<double,2> const &p1(chull[i+1]);
@@ -117,7 +117,7 @@ std::vector<std::array<double,2>> mbr_chull(
 
 }    // namespace dggs
 
-#if 0
+/*
 // Original Python code from:
 // https://stackoverflow.com/questions/13542855/algorithm-to-find-the-minimum-area-rectangle-for-given-points-in-order-to-comput
 
@@ -190,5 +190,4 @@ def minimum_bounding_rectangle(points):
 
     return rval
 }
-
-#endif
+*/
