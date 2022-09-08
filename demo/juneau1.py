@@ -3,6 +3,7 @@ import dggs.data
 from dggs.avalanche import avalanche, pra_post, domain_builder
 from dggs.util import paramutil,harnutil
 import os
+import setuptools.sandbox
 
 def add_akramms_rules(makefile, scene_dir):
 
@@ -56,6 +57,10 @@ def main():
         snowdepth_file=dggs.data.join('data', 'lader', 'sx3', 'gfdl_sx3_1986.nc'))
 
     add_akramms_rules(makefile, scene_dir)
-    makefile.generate('juneau1_mk')
+
+    setup_py = os.path.join(harnutil.HARNESS, 'akramms', 'setup.py')
+    setuptools.sandbox.run_setup(setup_py, ['clean', 'bdist_wheel'])
+
+    makefile.generate('juneau1_mk', run=True)
 
 main()

@@ -1,9 +1,10 @@
-AKRAMMS_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-GIT_DIR=$(dirname "$AKRAMMS_DIR")
+#AKRAMMS_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+#GIT_DIR=$(dirname "$AKRAMMS_DIR")
+
+LOADENV_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+$(python "$LOADENV_DIR/loadenv.py")
 
 conda activate avalanche
-export PYTHONPATH="$PYTHONPATH:$GIT_DIR/uafgi:$GIT_DIR/akramms:$(ls -1d $GIT_DIR/akramms/build/lib.*)"
-export PATH="$PATH:$GIT_DIR/akramms/sh"
 
 git config --global user.name "$USER"
 git config --global user.email "$EMAIL"
