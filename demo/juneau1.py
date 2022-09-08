@@ -14,10 +14,9 @@ def add_akramms_rules(makefile, scene_dir):
         avalanche.prepare_data_rule('davos', scene_dir, dggs.data.HARNESS_WINDOWS))
 
     # Get neighbor1 graph for DEM routing network
-    dem_leaf = os.path.split(scene_args['dem_file'])[1]
-    neighbor1_file = os.path.join(scene_dir, f'{dem_leaf[:-4]}_neighbor1.pik.gz')
-    makefile.add(domain_builder.neighbor1_rule(
-        scene_args['dem_file'], neighbor1_file, fill_sinks=True))
+    dem_file = scene_args['dem_file']
+    neighbor1_file = makefile.add(domain_builder.neighbor1_rule(
+        dem_file, scene_dir, fill_sinks=True)).outputs[0]
 
     # Loop over combos
     for return_period in scene_args['return_periods']:
@@ -35,11 +34,12 @@ def add_akramms_rules(makefile, scene_dir):
             for pra_file in pra_files:
                 pra_burn_file = '{}_burn.pik.gz'.format(pra_file[:-4])
                 makefile.add(
-                    domain_builder.burn_pra_rule(neighbor1_file, pra_file, pra_burn_file))
+                    domain_builder.burn_pra_rule(dem_file, pra_file, pra_burn_file))
 
-                domain_file = '{}_domains.shp'.format(pra_file[:-4])
+                chull_file = '{}_chull.shp'.format(pra_file[:-4])
+                domain_file = '{}_domain.shp'.format(pra_file[:-4])
                 makefile.add(
-                    domain_builder.domain_rule(neighbor1_file, pra_burn_file, domain_file))
+                    domain_builder.domain_rule(neighbor1_file, pra_burn_file, chull_file, domain_file))
 
 def main():
 

@@ -1,14 +1,17 @@
-import gzip,pickle
+from osgeo import gdal
+import gzip,pickle,os
 import numpy as np
 import shapely
 import d8graph
 from uafgi.util import shputil,shapelyutil,gdalutil,make
 
 # --------------------------------------------------------------------
-def neighbor1_rule(dem_file, neighbor1_file, fill_sinks=True):
+def neighbor1_rule(dem_file, odir, fill_sinks=True):
     """Compute and store the neighbors graph."""
 
-    #neighbor1_file = '{}_neighbor1.pik.gz'.format(dem_file[:-4])
+    dem_root = os.path.split(dem_file)[1][:-4]
+    neighbor1_file = os.path.join(odir, f'{dem_root}_neighbor1.tif')
+    dem_filled_file = os.path.join(odir, f'{dem_root}_filled.tif')
 
     def action(tdir):
         # Read the DEM
@@ -25,20 +28,17 @@ def neighbor1_rule(dem_file, neighbor1_file, fill_sinks=True):
         dem[dem == 0] = nodata    # Blank out zero-elevation squares (sea level)
 
         # Compute the degree-1 neighbor graph on the DEM
+        # (This also fills sinks in dem)
         neighbor1 = d8graph.neighbor_graph(dem, nodata, int(fill_sinks))
 
 
-        # For now, just store as Pickle.
-        # TODO: Store as GeoTIFF
-        with gzip.open(neighbor1_file, 'wb') as out:
-            pickle.dump(grid_info, out)
-            pickle.dump(nodata, out)
-            pickle.dump(neighbor1, out)
-            pickle.dump(dem, out)    # In case for later inspection
+        # Store neighbor1 and filled DEM as GeoTIFF
+        gdalutil.write_raster(neighbor1_file, grid_info, neighbor1, None, driver='GTiff', type=gdal.GDT_Int32)
+        gdalutil.write_raster(dem_filled_file, grid_info, dem, nodata, driver='GTiff', type=gdal.GDT_Float64)
 
-    return make.Rule(action, [dem_file], [neighbor1_file])
+    return make.Rule(action, [dem_file], [neighbor1_file, dem_filled_file])
 # --------------------------------------------------------------------
-def burn_pra_rule(neighbor1_file, pra_file, pra_burn_file):
+def burn_pra_rule(dem_file, pra_file, pra_burn_file):
     """Reads a PRA _rel.shp file into a dataframe; adds a column for
     the gridcell indices of the burned polygon; and writes out to a
     Pickle.gz file.
@@ -51,9 +51,8 @@ def burn_pra_rule(neighbor1_file, pra_file, pra_burn_file):
     """
 
     def action(tdir):
-        # Read the grid_info from the neighbor1 file
-        with gzip.open(neighbor1_file, 'rb') as fin:
-            grid_info = pickle.load(fin)
+        # Read the grid_info from the DEM
+        grid_info = gdalutil.grid_info(dem_file)
 
         # Read the PRAs from the shapefile
         pras_df = shputil.read_df(pra_file)
@@ -82,15 +81,17 @@ def burn_pra_rule(neighbor1_file, pra_file, pra_burn_file):
             pickle.dump(grid_info, out)
             pickle.dump(pras_df, out)
 
-    return make.Rule(action, [neighbor1_file, pra_file], [pra_burn_file])
+    return make.Rule(action, [dem_file, pra_file], [pra_burn_file])
 
 # --------------------------------------------------------------------
-def domain_rule(neighbor1_file, pra_burn_file, domain_file, margin=0):
+def domain_rule(neighbor1_file, pra_burn_file, chull_file, domain_file, margin=0):
     """Compute domains for each PRA.
     neighbor1_file: filename
         Result of neighbor1_rule
     pra_file: filename
         File of PRAs (result of pra_post_rule)
+    chull_file: filename
+        Output filename for convex hulls
     domain_file: filename
         Output filename (shapefile of domains)
     margin:
@@ -98,11 +99,7 @@ def domain_rule(neighbor1_file, pra_burn_file, domain_file, margin=0):
 
     def action(tdir):
         # Read the neighbor1 file
-        with gzip.open(neighbor1_file, 'rb') as fin:
-            grid_info = pickle.load(fin)
-            nodata = pickle.load(fin)
-            neighbor1 = pickle.load(fin)
-            # dem = pickle.load(fin)    # Not needed
+        grid_info, neighbor1, nodata = gdalutil.read_raster(neighbor1_file)
 
         # Read the PRAs
         with gzip.open(pra_burn_file, 'rb') as fin:
@@ -110,33 +107,25 @@ def domain_rule(neighbor1_file, pra_burn_file, domain_file, margin=0):
             pras_df = pickle.load(fin)
 
         # Find domains based on the PRAs
+        chulls = list()
         domains = list()
         for _,row in pras_df.iterrows():
             pra_burn = row['pra_burn']
 
             # Get the domain from the list of starting cells of the PRA (pra_burn)
             args = (neighbor1, pra_burn, grid_info.geotransform)
-            mbr = d8graph.find_domain(*args, margin=margin)
-            if mbr is None:
-                # Store info on items that didn't work
-                ret = d8graph.find_domain(*args, margin=margin, debug=True)
-                Id = row['Id']
-                with open(f'degen_{Id}.pik', 'wb') as out:
-                    pickle.dump((neighbor1_file, pra_burn_file, domain_file, margin), out)
-                    pickle.dump(Id, out)
-                    pickle.dump(ret, out)
-                sys.exit(-1)
-                domains.append(shapely.geometry.Polygon([]))
-            else:
-                # Find the domain based on the start cells
-                domain = shapely.geometry.Polygon(mbr)
-                domains.append(domain)
+            seen,chull_list,domain_list = d8graph.find_domain(*args, margin=margin, debug=1)
+            chulls.append(shapely.geometry.Polygon(chull_list))
+            domains.append(shapely.geometry.Polygon(domain_list))
 
-        # All done... construct new dataframe
+        # Store domains as a Shapefile
         domains_df = pras_df[['Id']]
         domains_df['shape'] = domains
-
-        # Store it as a Shapefile
         shputil.write_df(domains_df, 'shape', 'Polygon', domain_file, wkt=grid_info.wkt)
 
-    return make.Rule(action, [neighbor1_file, pra_burn_file], [domain_file])
+        # Store chulls as a Shapefile
+        chulls_df = pras_df[['Id']]
+        chulls_df['shape'] = chulls
+        shputil.write_df(chulls_df, 'shape', 'Polygon', chull_file, wkt=grid_info.wkt)
+
+    return make.Rule(action, [neighbor1_file, pra_burn_file], [chull_file, domain_file])

@@ -885,7 +885,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
         std::vector<std::array<double,2>> mbr(dggs::mbr_chull(chull_xy, margin));
         ret_mbr = polygon_to_python(mbr);
     } else {
-        ret_mbr = Py_BuildValue("");
+        ret_mbr = PyList_New(0);
     }
 
     if (debug) {
@@ -914,7 +914,7 @@ static PyMethodDef D8GraphMethods[] = {
 /* This initiates the module using the above definitions. */
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
-    "dggs.d8graph",    // Name of module
+    "d8graph",    // Name of module
     module_docstring,    // Per-module docstring
     -1,  /* size of per-interpreter state of the module,
                  or -1 if the module keeps state in global variables. */
