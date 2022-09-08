@@ -884,6 +884,8 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     if (chull_xy.size() >= 3) {
         std::vector<std::array<double,2>> mbr(dggs::mbr_chull(chull_xy, margin));
         ret_mbr = polygon_to_python(mbr);
+    } else {
+        ret_mbr = Py_BuildValue("");
     }
 
     if (debug) {

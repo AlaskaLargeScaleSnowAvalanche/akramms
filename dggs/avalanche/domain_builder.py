@@ -5,10 +5,10 @@ import d8graph
 from uafgi.util import shputil,shapelyutil,gdalutil,make
 
 # --------------------------------------------------------------------
-def neighbor1_rule(dem_file, fill_sinks=True):
+def neighbor1_rule(dem_file, neighbor1_file, fill_sinks=True):
     """Compute and store the neighbors graph."""
 
-    neighbor1_file = '{}_neighbor1.pik.gz'.format(dem_file[:-4])
+    #neighbor1_file = '{}_neighbor1.pik.gz'.format(dem_file[:-4])
 
     def action(tdir):
         # Read the DEM
@@ -122,8 +122,10 @@ def domain_rule(neighbor1_file, pra_burn_file, domain_file, margin=0):
                 ret = d8graph.find_domain(*args, margin=margin, debug=True)
                 Id = row['Id']
                 with open(f'degen_{Id}.pik', 'wb') as out:
+                    pickle.dump((neighbor1_file, pra_burn_file, domain_file, margin), out)
                     pickle.dump(Id, out)
                     pickle.dump(ret, out)
+                sys.exit(-1)
                 domains.append(shapely.geometry.Polygon([]))
             else:
                 # Find the domain based on the start cells

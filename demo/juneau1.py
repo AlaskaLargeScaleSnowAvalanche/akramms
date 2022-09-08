@@ -14,8 +14,10 @@ def add_akramms_rules(makefile, scene_dir):
         avalanche.prepare_data_rule('davos', scene_dir, dggs.data.HARNESS_WINDOWS))
 
     # Get neighbor1 graph for DEM routing network
-    neighbor1_file = makefile.add(
-        domain_builder.neighbor1_rule(scene_args['dem_file'], fill_sinks=True)).outputs[0]
+    dem_leaf = os.path.split(scene_args['dem_file'])[1]
+    neighbor1_file = os.path.join(scene_dir, f'{dem_leaf[:-4]}_neighbor1.pik.gz')
+    makefile.add(domain_builder.neighbor1_rule(
+        scene_args['dem_file'], neighbor1_file, fill_sinks=True))
 
     # Loop over combos
     for return_period in scene_args['return_periods']:
@@ -59,7 +61,10 @@ def main():
     add_akramms_rules(makefile, scene_dir)
 
     setup_py = os.path.join(harnutil.HARNESS, 'akramms', 'setup.py')
-    setuptools.sandbox.run_setup(setup_py, ['clean', 'bdist_wheel'])
+    prefix = os.path.join(harnutil.HARNESS, 'akramms', 'inst')
+    cmd = ['install', '--prefix', prefix]
+    print('setup.py ', cmd)
+    setuptools.sandbox.run_setup(setup_py, cmd)
 
     makefile.generate('juneau1_mk', run=True)
 
