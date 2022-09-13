@@ -13,6 +13,7 @@
 #include <iostream>
 #include <iomanip>
 #include <iterator>
+#include <cmath>
 
 // https://stackoverflow.com/questions/77005/how-to-automatically-generate-a-stacktrace-when-my-program-crashes
 #include <cstdio>
@@ -30,6 +31,94 @@ static char module_docstring[] =
 
 typedef float dem_t;    // The Digital Elevation Model is single prceision
 typedef int ix_t;
+
+
+// ==================================================================================
+// Converting to/from the Ulam Spiral
+// Clockwise spiral to match D8 ArcGIS
+//https://pro.arcgis.com/en/pro-app/2.8/tool-reference/spatial-analyst/flow-direction.htm
+
+inline std::array<ix_t,2> ulam_n_to_xy(ix_t n)
+{
+    // sqrt_n = np.sqrt(n)
+    double const sqrt_n = sqrt((double)n);
+
+    // m = int(np.floor(sqrt_n))
+    ix_t const m = (ix_t)floor(sqrt_n);
+    ix_t const m2 = (ix_t)(2*sqrt_n);
+    // if int(np.floor(2*sqrt_n))%2 == 0:
+    
+    // if int(np.floor(2*sqrt_n))%2 == 0:
+    ix_t k1x,k1y;
+    if (m2%2 == 0) {
+        k1x = n-m*(m+1);
+        k1y = 0;
+    } else {
+        k1x = 0;
+        k1y = n-m*(m+1);
+    }
+
+    // sgn = int(pow(-1,m))
+    ix_t const sgn = (m%2 == 0 ? 1 : -1);
+    // k2 = int(np.ceil(.5*m))
+    ix_t const k2 = (ix_t)ceil(.5*m);
+
+    ix_t const x = sgn * (k1x + k2);
+    ix_t const y = sgn * (k1y - k2);
+    return std::array{x,y};
+}
+
+inline ix_t ulam_xy_to_n(ix_t x, ix_t y)
+{
+    // sgn = -1 if x<y else 1
+    ix_t const sgn = (x<y ? -1 : 1);
+
+    // k = max(np.abs(x), np.abs(y))
+    ix_t const k = std::max(std::abs(x), std::abs(y));
+
+    // n = (4*k*k) + sgn * (2*k + x + y)
+    ix_t const n = (4*k*k) + sgn * (2*k + x + y);
+
+    return n;
+}
+
+// -------------------------------------------------------------------
+void neighbor1_to_ulam(npy_int *neighbor1, int const nj, int const ni)
+{
+    // (j0,i0) is coordinate of 
+    for (int j0=0; j0<nj; ++j0) {
+    for (int i0=0; i0<ni; ++i0) {
+        ix_t const ix0 = j0*ni + i0;
+        int const ix1 = neighbor1[ix0];
+
+        // 2D coordinate of detination point
+        int const j1 = ix1 / ni;
+        int const i1 = ix1 % ni;    // Probably compiles down to divmod
+
+        // Convert (deli,delj) to ulam spiral coordinate
+        int const deln = ulam_xy_to_n(j1-j0, i1-i0);    // Reverse coordinates to get clockwise spiral as in ArcGIS
+
+        neighbor1[ix0] = deln;
+    }}
+
+}
+
+void neighbor1_to_ix(npy_int *neighbor1, ix_t const nj, ix_t const ni)
+{
+    for (ix_t j0=0; j0<nj; ++j0) {
+    for (ix_t i0=0; i0<ni; ++i0) {
+        ix_t const ix0 = j0*ni + i0;
+
+        ix_t const deln = neighbor1[ix0];
+        std::array<ix_t,2> const delji(ulam_n_to_xy(deln));
+
+        ix_t const i1 = i0 + delji[1];  // Reverse coordinates to get clockwise spiral as in ArcGIS
+        ix_t const j1 = j0 + delji[0];
+        ix_t const ix1 = j1*ni + i1;
+
+        neighbor1[ix0] = ix1;
+    }}
+}
 
 
 // ==================================================================================
@@ -469,15 +558,15 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
     a 1D array by gridcell.  Gridcells in each EQ class are arranged
     in a linear fashion, so all of them are traversed in any graph
     search.
-    neighbors1:  [nj*ni]
+    neighbor1:  [nj*ni]
         Base of 1D array of gridcell neighbors.
         (Potentially this is a Numpy array.)
     */
-    void to_neighbors1(npy_int *neighbors1)
+    void to_neighbor1(npy_int *neighbor1)
     {
         // Initialize all to -1
         for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i) {
-            neighbors1[ix_i] = -2;
+            neighbor1[ix_i] = -2;
         }
 
         // ix_i is the index of the "current" eq class
@@ -495,14 +584,14 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
                 // If the lowest neighboring eq class is ourself, then
                 // we are a sink.  Record no outbound neighbor.
                 if (ix_i == ix_j) {
-                    neighbors1[ix_i] = -1;
+                    neighbor1[ix_i] = -1;
                     continue;
                 }
 #else
                 // If the lowest neighboring eq class is no lower than us, then we are a sink.
                 // Record no outbound neighbor.  AVOID CYCLES IN THE GRAPH!
                 if (dem[ix_j] >= dem[ix_i]) {
-                    neighbors1[ix_i] = -1;
+                    neighbor1[ix_i] = -1;
                     continue;
                 }
 #endif
@@ -513,7 +602,7 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
                 auto &members_i(eqclasses.members(ix_i));
                 ix_t max_member_i = *members_i.rbegin();   // Largest in i
                 ix_t min_member_j = eqclasses.min_member(ix_j);         // Smallest in j
-                neighbors1[max_member_i] = min_member_j;
+                neighbor1[max_member_i] = min_member_j;
 
                 // Create links *within* eq class i, from the min to
                 // the max gridcell.  Any flow into eq class i will
@@ -522,7 +611,7 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
                 auto ii0(members_i.begin());
                 auto ii1(ii0);   ++ii1;
                 while (ii1 != members_i.end()) {
-                    neighbors1[*ii0] = *ii1;
+                    neighbor1[*ii0] = *ii1;
                     ii0 = ii1;
                     ++ii1;
                 }
@@ -539,15 +628,15 @@ const std::vector<std::array<int,2>> D8Graph::dneigh = {
 
 // ====================================================================
 
-/** Does a breadth-first-search of the neighbors1 graph starting from
+/** Does a breadth-first-search of the neighbor1 graph starting from
 some gridcells.
 
 start_begin, start_end:
     begin and end iterators for starting gridcell indices
 */
 std::unordered_set<ix_t> find_domain(
-    ix_t const *neighbors1,
-    // int nj, int ni,     // Not needed, except for bounds checking on neighbors1 lookup
+    ix_t const *neighbor1,
+    // int nj, int ni,     // Not needed, except for bounds checking on neighbor1 lookup
     ix_t const *start_begin, ix_t const *start_end)
 {
     // State of breadth-first-search
@@ -559,7 +648,7 @@ std::unordered_set<ix_t> find_domain(
         // Add to our vector of neighbors if we haven't seen it yet.
         // Also add to our seen set (most efficient this way)
         for (ix_t ix : cur) {
-            ix_t ngh = neighbors1[ix];
+            ix_t ngh = neighbor1[ix];
             if (ngh < 0) continue;    // No neighbor for this node
 
             auto ii(seen.find(ngh));
@@ -615,9 +704,9 @@ max_sink_size: int DEFAULT 0
     Maximum number of cells to join together in equivalence classes
     (Currently deprecated: 0=don't fill sinks, >0=do fill sinks)
 
-Returns: neighbors1=np.array(nj, ni, dtype=np.int32)
+Returns: neighbor1=np.array(nj, ni, dtype=np.int32)
     Representation of the degree-1 graph
-    neighbors1[j,i] = 1D index of the downstream node.
+    neighbor1[j,i] = 1D index of the downstream node.
        ...or -1 if cell (j,i) is unused, or there is no downstream node.
 )XXX";
 static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObject *kwargs)
@@ -662,7 +751,7 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
     // Create output array (uninitialized)
     auto const ni = PyArray_DIM(dem,1);
     npy_intp const strides[] = {(npy_intp)(sizeof(int) * ni), (npy_intp)sizeof(int)};
-    PyArrayObject *neighbors1 = (PyArrayObject*) PyArray_NewFromDescr(
+    PyArrayObject *neighbor1 = (PyArrayObject*) PyArray_NewFromDescr(
         &PyArray_Type, 
         PyArray_DescrFromType(NPY_INT32),             // dtype='i'
         2,                                          // rank 2
@@ -679,13 +768,13 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
     PySys_WriteStdout("Filling sinks...\n");
     if (max_sink_size > 0) d8g.fill_sinks(max_sink_size);
 
-    PySys_WriteStdout("Converting to neighbors1 format\n");
+    PySys_WriteStdout("Converting to neighbor1 format\n");
 
-    PySys_WriteStdout("neighbors1 dims: %ld %ld\n", PyArray_DIM(neighbors1,0), PyArray_DIM(neighbors1,1));
-    d8g.to_neighbors1((npy_int *)PyArray_GETPTR2(neighbors1,0,0));
+    PySys_WriteStdout("neighbor1 dims: %ld %ld\n", PyArray_DIM(neighbor1,0), PyArray_DIM(neighbor1,1));
+    d8g.to_neighbor1((npy_int *)PyArray_GETPTR2(neighbor1,0,0));
 
     // ========================================================
-    return (PyObject *)neighbors1;
+    return (PyObject *)neighbor1;
 }
 // ----------------------------------------------------------------------------------------
 static bool ff_check_input_int(PyArrayObject *dem, char const *name, int rank)
@@ -759,9 +848,9 @@ static char const *d8graph_find_domain_docstring =
 R"(Given indices of starting nodes, "rolls a marble downhill."  Returns
 j (N-S) and i (E-W) gridcell coordinates of all nodes touched.
 
-neighbors1: np.array(nj, ni, dtype=np.int32)
+neighbor1: np.array(nj, ni, dtype=np.int32)
     Representation of the degree-1 graph
-    neighbors1[j,i] = 1D index of the downstream node.
+    neighbor1[j,i] = 1D index of the downstream node.
        ...or -1 if cell (j,i) is unused, or there is no downstream node.
 
 start: np.array(m, dtype='i')
@@ -779,7 +868,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
 {
     // ======================== Parse Python Input
     // Input arrays
-    PyArrayObject *neighbors1;
+    PyArrayObject *neighbor1;
     PyArrayObject *start;
     PyArrayObject *geotransform;
     double margin = 0;
@@ -787,31 +876,31 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
 
     // Parse args and kwargs
     static char const *kwlist[] = {
-        "neighbors1", "start", "geotransform",         // *args,
+        "neighbor1", "start", "geotransform",         // *args,
         "margin", "debug",        // **kwargs
         NULL};
     if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!O!|di",
         (char **)kwlist,
-        &PyArray_Type, &neighbors1,
+        &PyArray_Type, &neighbor1,
         &PyArray_Type, &start,
         &PyArray_Type, &geotransform,
         &margin, &debug
         )) return NULL;
 
     // ----------- Typecheck input arrays
-    if (!ff_check_input_int(neighbors1, "neighbors1", 2)) return NULL;
+    if (!ff_check_input_int(neighbor1, "neighbor1", 2)) return NULL;
     if (!ff_check_input_int(start, "start", 1)) return NULL;
     if (!ff_check_input_double(geotransform, "geotransform", 1)) return NULL;
 
-    // int const nj = PyArray_DIM(neighbors1,0);
-    int const ni = PyArray_DIM(neighbors1,1);
+    // int const nj = PyArray_DIM(neighbor1,0);
+    int const ni = PyArray_DIM(neighbor1,1);
 
     // ============================ Run the Core Computation
     // Run the flood fill algorithm, result in a set of 1D indices
     std::unordered_set<ix_t> seen(
         find_domain(
-            (ix_t *)PyArray_GETPTR2(neighbors1,0,0),
-            // PyArray_DIM(neighbors1,0), PyArray_DIM(neighbors1,1),    // Not needed
+            (ix_t *)PyArray_GETPTR2(neighbor1,0,0),
+            // PyArray_DIM(neighbor1,0), PyArray_DIM(neighbor1,1),    // Not needed
             (ix_t *)PyArray_GETPTR1(start, 0),
             (ix_t *)PyArray_GETPTR1(start, PyArray_DIM(start,0))));
 
