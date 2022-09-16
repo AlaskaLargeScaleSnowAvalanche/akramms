@@ -14,6 +14,7 @@
 #include <iomanip>
 #include <iterator>
 #include <cmath>
+#include <cwchar>
 
 // https://stackoverflow.com/questions/77005/how-to-automatically-generate-a-stacktrace-when-my-program-crashes
 #include <cstdio>
@@ -24,6 +25,9 @@
 #include <dggs/chull.hpp>
 #include <dggs/mbr.hpp>
 
+#include <map>
+#include <unordered_map>
+
 using namespace dggs;
 
 static char module_docstring[] = 
@@ -33,11 +37,64 @@ typedef float dem_t;    // The Digital Elevation Model is single prceision
 typedef int ix_t;
 
 
+// ----------------------------------------------------------------------------------------
+static bool ff_check_input_int(PyArrayObject *dem, char const *name, int rank)
+{
+    char msg[256];
+
+    // Check storage
+    if (!PyArray_ISCARRAY_RO(dem)) {
+        snprintf(msg, 256, "Parameter %s must be C-style, contiguous array.", name);
+        PyErr_SetString(PyExc_TypeError, msg);
+        return false;
+    }
+
+    // Check type
+    if (PyArray_DESCR(dem)->type_num != NPY_INT32) {
+        snprintf(msg, 256, "Parameter %s must have dtype int.", name);
+        PyErr_SetString(PyExc_TypeError, msg);
+        return false;
+    }
+
+    // Check rank
+    if (PyArray_NDIM(dem) != rank) {
+        snprintf(msg, 256, "Parameter %s must have rank %d", name, rank);
+        PyErr_SetString(PyExc_TypeError, msg);
+        return false;
+    }
+    return true;
+}
+static bool ff_check_input_double(PyArrayObject *dem, char const *name, int rank)
+{
+    char msg[256];
+
+    // Check storage
+    if (!PyArray_ISCARRAY_RO(dem)) {
+        snprintf(msg, 256, "Parameter %s must be C-style, contiguous array.", name);
+        PyErr_SetString(PyExc_TypeError, msg);
+        return false;
+    }
+
+    // Check type
+    if (PyArray_DESCR(dem)->type_num != NPY_DOUBLE) {
+        snprintf(msg, 256, "Parameter %s must have dtype double.", name);
+        PyErr_SetString(PyExc_TypeError, msg);
+        return false;
+    }
+
+    // Check rank
+    if (PyArray_NDIM(dem) != rank) {
+        snprintf(msg, 256, "Parameter %s must have rank %d", name, rank);
+        PyErr_SetString(PyExc_TypeError, msg);
+        return false;
+    }
+    return true;
+}
+// ----------------------------------------------------------------------------------------
 // ==================================================================================
 // Converting to/from the Ulam Spiral
 // Clockwise spiral to match D8 ArcGIS
 //https://pro.arcgis.com/en/pro-app/2.8/tool-reference/spatial-analyst/flow-direction.htm
-
 inline std::array<ix_t,2> ulam_n_to_xy(ix_t n)
 {
     // sqrt_n = np.sqrt(n)
@@ -83,6 +140,26 @@ inline ix_t ulam_xy_to_n(ix_t x, ix_t y)
 }
 
 // -------------------------------------------------------------------
+class UlamLookup {
+public:
+    std::array<std::array<int,2>,9> to_delji;
+    std::array<int,9> to_deln;
+
+    UlamLookup()
+    {
+        for (int deln=0; deln<=8; ++deln) {
+            std::array<ix_t,2> const delji(ulam_n_to_xy(deln));
+            int const delj = delji[0];
+            int const deli = delji[1];
+            int const k = (delj+1)*3 + (deli+1);
+            to_deln[k] = deln;
+            to_delji[deln] = delji;
+        }
+    }
+};
+
+UlamLookup const ulookup;
+// -------------------------------------------------------------------
 void neighbor1_to_ulam(npy_int *neighbor1, int const nj, int const ni)
 {
     // (j0,i0) is coordinate of 
@@ -91,16 +168,44 @@ void neighbor1_to_ulam(npy_int *neighbor1, int const nj, int const ni)
         ix_t const ix0 = j0*ni + i0;
         int const ix1 = neighbor1[ix0];
 
+        // Leave non-data gridcells untouched
+        if (ix1 < 0) continue;
+
         // 2D coordinate of detination point
         int const j1 = ix1 / ni;
         int const i1 = ix1 % ni;    // Probably compiles down to divmod
 
-        // Convert (deli,delj) to ulam spiral coordinate
-        int const deln = ulam_xy_to_n(j1-j0, i1-i0);    // Reverse coordinates to get clockwise spiral as in ArcGIS
+        int const delj = j1-j0;
+        int const deli = i1-i0;
 
+        // Take care of the most common case
+#if 1
+        if ((delj >= -1 && delj <= 1) && (deli >= -1 && deli <= 1)) {
+            int const k = (delj+1)*3 + (deli+1);
+            neighbor1[ix0] = ulookup.to_deln[k];
+            continue;
+        } else {
+            // Convert (deli,delj) to ulam spiral coordinate
+            int const deln = ulam_xy_to_n(j1-j0, i1-i0);    // Reverse coordinates to get clockwise spiral as in ArcGIS
+            neighbor1[ix0] = deln;
+        }
+#else
+        int const deln = ulam_xy_to_n(delj, deli);    // Reverse coordinates to get clockwise spiral as in ArcGIS
         neighbor1[ix0] = deln;
+#endif
+
     }}
 
+}
+
+
+inline std::array<ix_t,2> ulam_n_to_xy2(ix_t const deln)
+{
+    if (deln >= 0 && deln <= 8) {
+        return ulookup.to_delji[deln];
+    } else {
+        return ulam_n_to_xy(deln);
+    }
 }
 
 void neighbor1_to_ix(npy_int *neighbor1, ix_t const nj, ix_t const ni)
@@ -108,9 +213,18 @@ void neighbor1_to_ix(npy_int *neighbor1, ix_t const nj, ix_t const ni)
     for (ix_t j0=0; j0<nj; ++j0) {
     for (ix_t i0=0; i0<ni; ++i0) {
         ix_t const ix0 = j0*ni + i0;
-
         ix_t const deln = neighbor1[ix0];
+
+        // Leave non-data gridcells untouched
+        if (deln < 0) continue;
+
+        // The table lookup here doesn't save nearly as much time as
+        // the table lookup the other direction.
+#if 1
+        std::array<ix_t,2> const delji(ulam_n_to_xy2(deln));
+#else
         std::array<ix_t,2> const delji(ulam_n_to_xy(deln));
+#endif
 
         ix_t const i1 = i0 + delji[1];  // Reverse coordinates to get clockwise spiral as in ArcGIS
         ix_t const j1 = j0 + delji[0];
@@ -118,6 +232,60 @@ void neighbor1_to_ix(npy_int *neighbor1, ix_t const nj, ix_t const ni)
 
         neighbor1[ix0] = ix1;
     }}
+}
+
+bool to_wstring(PyObject *py_str, std::wstring &out)
+{
+    Py_ssize_t size;
+    wchar_t const *wdir = PyUnicode_AsWideCharString(py_str, &size);
+    if (!wdir) return false;
+    out = std::wstring(wdir, size);
+    PyMem_Free((void *)wdir);
+    return true;
+}
+
+static char const *d8graph_convert_neighbor1_docstring =
+R"(Converts between absolute and relative indexing of the neighbor1
+graph.  Relative indexing uses the Ulam sprial.)";
+
+static PyObject* d8graph_convert_neighbor1(PyObject *module, PyObject *args, PyObject *kwargs)
+{
+    // Input arrays
+    PyArrayObject *neighbor1;
+    PyObject *py_dir;
+
+    // Parse args and kwargs
+    static char const *kwlist[] = {
+        "neighbor1", "direction",         // *args,
+               // **kwargs
+        NULL};
+    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!U",
+        (char **)kwlist,
+        &PyArray_Type, &neighbor1,
+        &py_dir
+        )) return NULL;
+
+    // ----------- Typecheck input arrays
+    if (!ff_check_input_int(neighbor1, "neighbor1", 2)) return NULL;
+
+    // Convert Python str to std::string, and dispatch on it
+    std::wstring dir;
+    if (!to_wstring(py_dir, dir)) return NULL;
+    if (dir == L"absolute") {
+        neighbor1_to_ix(
+            (ix_t *)PyArray_GETPTR2(neighbor1,0,0),
+            PyArray_DIM(neighbor1, 0), PyArray_DIM(neighbor1, 1));
+        Py_INCREF(Py_None); return Py_None;
+    } else if (dir == L"relative") {
+        neighbor1_to_ulam(
+            (ix_t *)PyArray_GETPTR2(neighbor1,0,0),
+            PyArray_DIM(neighbor1, 0), PyArray_DIM(neighbor1, 1));
+        Py_INCREF(Py_None); return Py_None;
+    } else {
+        PyErr_SetString(PyExc_TypeError, "Unrecognized value of dir, must be 'absolute' or 'relative'");
+        return NULL;
+
+    }
 }
 
 
@@ -564,7 +732,7 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
     */
     void to_neighbor1(npy_int *neighbor1)
     {
-        // Initialize all to -1
+        // Initialize all to -2
         for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i) {
             neighbor1[ix_i] = -2;
         }
@@ -777,59 +945,6 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
     return (PyObject *)neighbor1;
 }
 // ----------------------------------------------------------------------------------------
-static bool ff_check_input_int(PyArrayObject *dem, char const *name, int rank)
-{
-    char msg[256];
-
-    // Check storage
-    if (!PyArray_ISCARRAY_RO(dem)) {
-        snprintf(msg, 256, "Parameter %s must be C-style, contiguous array.", name);
-        PyErr_SetString(PyExc_TypeError, msg);
-        return false;
-    }
-
-    // Check type
-    if (PyArray_DESCR(dem)->type_num != NPY_INT32) {
-        snprintf(msg, 256, "Parameter %s must have dtype int.", name);
-        PyErr_SetString(PyExc_TypeError, msg);
-        return false;
-    }
-
-    // Check rank
-    if (PyArray_NDIM(dem) != rank) {
-        snprintf(msg, 256, "Parameter %s must have rank %d", name, rank);
-        PyErr_SetString(PyExc_TypeError, msg);
-        return false;
-    }
-    return true;
-}
-static bool ff_check_input_double(PyArrayObject *dem, char const *name, int rank)
-{
-    char msg[256];
-
-    // Check storage
-    if (!PyArray_ISCARRAY_RO(dem)) {
-        snprintf(msg, 256, "Parameter %s must be C-style, contiguous array.", name);
-        PyErr_SetString(PyExc_TypeError, msg);
-        return false;
-    }
-
-    // Check type
-    if (PyArray_DESCR(dem)->type_num != NPY_DOUBLE) {
-        snprintf(msg, 256, "Parameter %s must have dtype double.", name);
-        PyErr_SetString(PyExc_TypeError, msg);
-        return false;
-    }
-
-    // Check rank
-    if (PyArray_NDIM(dem) != rank) {
-        snprintf(msg, 256, "Parameter %s must have rank %d", name, rank);
-        PyErr_SetString(PyExc_TypeError, msg);
-        return false;
-    }
-    return true;
-}
-// ----------------------------------------------------------------------------------------
 static PyObject *polygon_to_python(std::vector<std::array<double,2>> const &mbr)
 {
     PyObject *mbr_list = PyList_New(mbr.size());
@@ -994,6 +1109,10 @@ static PyMethodDef D8GraphMethods[] = {
     {"find_domain",
         (PyCFunction)d8graph_find_domain,
         METH_VARARGS | METH_KEYWORDS, d8graph_find_domain_docstring},
+
+    {"convert_neighbor1",
+        (PyCFunction)d8graph_convert_neighbor1,
+        METH_VARARGS | METH_KEYWORDS, d8graph_convert_neighbor1_docstring},
 
     // Sentinel
     {NULL, NULL, 0, NULL}

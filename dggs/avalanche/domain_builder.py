@@ -6,6 +6,18 @@ import d8graph
 from uafgi.util import shputil,shapelyutil,gdalutil,make
 
 # --------------------------------------------------------------------
+def read_neighbor1(neighbor1_file):
+    grid_info, neighbor1, nodata = gdalutil.read_raster(neighbor1_file)
+    d8graph.convert_neighbor1(neighbor1, 'absolute')
+    return grid_info, neighbor1, nodata
+
+def write_neighbor1(neighbor1_file, grid_info, neighbor1, nodata_value):
+    d8graph.convert_neighbor1(neighbor1, 'relative')
+    gdalutil.write_raster(
+        neighbor1_file, grid_info, neighbor1, nodata_value,
+        driver='GTiff', type=gdal.GDT_Int32)
+    d8graph.convert_neighbor1(neighbor1, 'absolute')
+# --------------------------------------------------------------------
 def neighbor1_rule(dem_file, odir, fill_sinks=True):
     """Compute and store the neighbors graph."""
 
