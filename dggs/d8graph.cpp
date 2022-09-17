@@ -93,6 +93,34 @@ static bool ff_check_input_double(PyArrayObject *dem, char const *name, int rank
     return true;
 }
 // ----------------------------------------------------------------------------------------
+static bool ff_check_same_dimensions(std::vector<std::pair<PyArrayObject *, std::string>> const &arrays)
+{
+    char msg[256];
+
+    for (size_t i=1; i<arrays.size(); ++i) {
+        // Check same rank
+        int const rank0 = PyArray_NDIM(arrays[i-1].first);
+        int const rank1 = PyArray_NDIM(arrays[i].first);
+        if (rank0 != rank1) {
+            snprintf(msg, 256, "Array %s (rank %d) and %s (rank %d) must have matching rank.",
+                arrays[i-1].second.c_str(), rank0,
+                arrays[i].second.c_str(), rank1);
+            PyErr_SetString(PyExc_TypeError, msg);
+            return false;
+        }
+
+        // Check same dimensions
+        for (int r=0; r<rank0; ++r) {
+            int const dim0 = PyArray_DIM(arrays[i-1].first, r);
+            int const dim1 = PyArray_DIM(arrays[i-1].first, r);
+            if (dim0 != dim1) {
+                snprintf(msg, 256, "Dimension %r of array %s (=%d) and %s (=%d) must match.", r,
+                arrays[i-1].second.c_str(), dim0,
+                arrays[i].second.c_str(), dim1);
+        }
+    }
+    return true;
+}
 // ==================================================================================
 // Converting to/from the Ulam Spiral
 // Clockwise spiral to match D8 ArcGIS
@@ -829,35 +857,55 @@ start_begin, start_end:
 */
 std::unordered_set<ix_t> find_domain(
     ix_t const *neighbor1,
-    // int nj, int ni,     // Not needed, except for bounds checking on neighbor1 lookup
-    ix_t const *start_begin, ix_t const *start_end)
+    ix_t const *dem_filled,
+    int const nj, int const ni,
+    double const *gt,    // Geotransform
+    ix_t const *start_begin, ix_t const *start_end,
+    double const min_alpha)
 {
-    // State of breadth-first-search
+    // Get info on highest-elevation gridcell in the start set (PRA)
+    // This will also be the most up-slope, and hence will have the highest
+    // inclination (alpha angle) compared to downslope gridcells.
+    // See: https://www.avalanche-center.org/Education/blog/?itemid=535
+    ix_t ix_highest = *std::max_element(start_begin, start_end,
+        [this](int const ix0, int const ix1) { return dem_filled[ix0] < dem_filled[ix1]; });
+    double const dem_highest = dem_filled[ix_highest];
+    int const j_highest = ix_highest / ni;
+    int const i_highest = ix_highest % ni;    // Probably compiles down to divmod
+    double const x_highest = gt[0] + i_highest*gt[1] + j_highest*gt[2];
+    double const y_highest = gt[3] + i_highest*gt[4] + j_highest*gt[5];
+
+    // Depth First Search
     std::unordered_set<ix_t> seen;
-    std::vector<ix_t> cur(start_begin, start_end);
-    std::vector<ix_t> neighbors;   // can have duplicates
-    for (;;) {
-        // Determine neighbor values of each current node
-        // Add to our vector of neighbors if we haven't seen it yet.
-        // Also add to our seen set (most efficient this way)
-        for (ix_t ix : cur) {
-            ix_t ngh = neighbor1[ix];
-            if (ngh < 0) continue;    // No neighbor for this node
+    for (ix_t const *startp = start_begin; startp != start_end; ++startp) {
+        int ix = *startp;
+        int nlevel = 0;
+        for (;;) {
+            // Stop if already visited
+            auto ii(seen.find(ix));
+            if (ii != seen.end()) break;
+            seen.insert(ix);
 
-            auto ii(seen.find(ngh));
-            if (ii == seen.end()) {
-                neighbors.push_back(ngh);
-                seen.insert(ngh);
-            }
+            // Obtain geographic coordinates of this gridcell
+            int const j = ix / ni;
+            int const i = ix % ni;    // Probably compiles down to divmod
+            double const x = gt[0] + i*gt[1] + j*gt[2];
+            double const y = gt[3] + i*gt[4] + j*gt[5];
+
+            // Compute angle of inclination from the top (alpha)
+            double const delx = x - x_highest;
+            double const dely = y - y_highest;
+            double const delxy = sqrt(dely*dely + delx*delx);
+            double const delz = dem_filled[ix] - dem_highest;
+            double const alpha = (180./M_PI) * abs(atan2(delz, delxy));
+
+            // Stop if alpha is low enough to suggest the runout would
+            // have stopped by this point (18 degrees should be OK)
+            if (alpha < min_alpha) break;
+
+            // Advance to next gridcell
+            ix = neighbor1[ix];
         }
-
-        // Exit condition: no more neighbors!
-        if (neighbors.size() == 0) break;
-
-        // neighbors becomes cur
-        // O(1) time see: https://www.geeksforgeeks.org/difference-between-stdswap-and-stdvectorswap/
-        std::swap(cur, neighbors);
-        neighbors.clear();
     }
 
     return seen;
@@ -1009,26 +1057,33 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     // ======================== Parse Python Input
     // Input arrays
     PyArrayObject *neighbor1;
-    PyArrayObject *start;
+    PyArrayObject *dem_filled;
     PyArrayObject *geotransform;
+    PyArrayObject *start;
     double margin = 0;
     int debug = 0;    // bool
+    double min_alpha = 18.;    // Minimum "alpha" angle at which avalanche expected to continue
 
     // Parse args and kwargs
     static char const *kwlist[] = {
-        "neighbor1", "start", "geotransform",         // *args,
-        "margin", "debug",        // **kwargs
+        "neighbor1", "dem_filled", "geotransform", "start",         // *args,
+        "margin", "debug", "min_alpha",        // **kwargs
         NULL};
     if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!O!|di",
         (char **)kwlist,
         &PyArray_Type, &neighbor1,
-        &PyArray_Type, &start,
+        &PyArray_Type, &dem_filled,
         &PyArray_Type, &geotransform,
-        &margin, &debug
+        &PyArray_Type, &start,
+        &margin, &debug, &min_alpha
         )) return NULL;
 
     // ----------- Typecheck input arrays
     if (!ff_check_input_int(neighbor1, "neighbor1", 2)) return NULL;
+    if (!ff_check_input_double(dem_filled, "dem_filled", 2)) return NULL;
+    if (!ff_check_same_dimension(
+        std::vector<std::pair<PyArrayObject *, std::string>>
+        {{neighbor1, "neighbor1"}, {dem_filled, "dem_filled"})) return NULL;
     if (!ff_check_input_int(start, "start", 1)) return NULL;
     if (!ff_check_input_double(geotransform, "geotransform", 1)) return NULL;
 
@@ -1040,9 +1095,12 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     std::unordered_set<ix_t> seen(
         find_domain(
             (ix_t *)PyArray_GETPTR2(neighbor1,0,0),
-            // PyArray_DIM(neighbor1,0), PyArray_DIM(neighbor1,1),    // Not needed
+            (ix_t *)PyArray_GETPTR2(dem_filled,0,0),
+            PyArray_DIM(neighbor1,0), PyArray_DIM(neighbor1,1),    // Not needed
+            (double *)PyArray_GETPTR1(geotransform, 0),
             (ix_t *)PyArray_GETPTR1(start, 0),
-            (ix_t *)PyArray_GETPTR1(start, PyArray_DIM(start,0))));
+            (ix_t *)PyArray_GETPTR1(start, PyArray_DIM(start,0)),
+            min_alpha));
 
     PySys_WriteStdout("Flood Fill went from %ld -> %ld gridcells.\n", PyArray_DIM(start,0), seen.size());
 
