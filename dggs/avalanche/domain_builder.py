@@ -7,11 +7,14 @@ from uafgi.util import shputil,shapelyutil,gdalutil,make
 
 # --------------------------------------------------------------------
 def read_neighbor1(neighbor1_file):
+    """Read the neighbor1 file, converting from on-disk relative
+    indexing to in-memory absolute indexing."""
     grid_info, neighbor1, nodata = gdalutil.read_raster(neighbor1_file)
     d8graph.convert_neighbor1(neighbor1, 'absolute')
     return grid_info, neighbor1, nodata
 
 def write_neighbor1(neighbor1_file, grid_info, neighbor1, nodata_value):
+    """Write the neighbor1 file, temporarily converting to relative indexing."""
     d8graph.convert_neighbor1(neighbor1, 'relative')
     gdalutil.write_raster(
         neighbor1_file, grid_info, neighbor1, nodata_value,
@@ -45,8 +48,8 @@ def neighbor1_rule(dem_file, odir, fill_sinks=True):
 
 
         # Store neighbor1 and filled DEM as GeoTIFF
-        gdalutil.write_raster(neighbor1_file, grid_info, neighbor1, None, driver='GTiff', type=gdal.GDT_Int32)
-        gdalutil.write_raster(dem_filled_file, grid_info, dem, nodata, driver='GTiff', type=gdal.GDT_Float64)
+        write_neighbor1(neighbor1_file, grid_info, neighbor1, None)
+        gdalutil.write_raster(dem_filled_file, grid_info, dem, nodata, type=gdal.GDT_Float64)
 
     return make.Rule(action, [dem_file], [neighbor1_file, dem_filled_file])
 # --------------------------------------------------------------------

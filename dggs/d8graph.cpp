@@ -30,6 +30,8 @@
 
 using namespace dggs;
 
+// #define OPTIMIZE_D8        // Adds complication, only speeds things up a little bit.
+
 static char module_docstring[] = 
 "D8Graph 1.0.0 extension module computes graphs and flow paths in digital elevation models.";
 
@@ -179,7 +181,7 @@ void neighbor1_to_ulam(npy_int *neighbor1, int const nj, int const ni)
         int const deli = i1-i0;
 
         // Take care of the most common case
-#if 1
+#if OPTIMIZE_D8
         if ((delj >= -1 && delj <= 1) && (deli >= -1 && deli <= 1)) {
             int const k = (delj+1)*3 + (deli+1);
             neighbor1[ix0] = ulookup.to_deln[k];
@@ -220,7 +222,7 @@ void neighbor1_to_ix(npy_int *neighbor1, ix_t const nj, ix_t const ni)
 
         // The table lookup here doesn't save nearly as much time as
         // the table lookup the other direction.
-#if 1
+#if OPTIMIZE_D8
         std::array<ix_t,2> const delji(ulam_n_to_xy2(deln));
 #else
         std::array<ix_t,2> const delji(ulam_n_to_xy(deln));
@@ -246,7 +248,32 @@ bool to_wstring(PyObject *py_str, std::wstring &out)
 
 static char const *d8graph_convert_neighbor1_docstring =
 R"(Converts between absolute and relative indexing of the neighbor1
-graph.  Relative indexing uses the Ulam sprial.)";
+graph.
+
+* Absolute indexing provides the 1D index of the next cell in the
+  neighbor1 graph.  Cells are numbered from 0 to the number of cells
+  in the neighbor1 array.
+
+* Relative indexing uses a clockwise Ulam sprial relative to the
+  source cell.  Numbering of the clockwise Ulam spiral matches the
+  order of the ArcGIS D8 algorithm, but is generalized beyond direct
+  neighbors.  Here are the first 24 elements of the clockwise Ulam
+  spiral, centered on the "*" gridcell:
+
+     20 21 22 23 24
+     19  6  7  8  9
+     18  5  *  1 10
+     17  4  3  2 11
+     16 15 14 13 12
+
+Args:
+    neighbor1: np.array(nj, ni, dtype=np.int32)
+        The degree-1 graph, in either absolute or relative indexing.
+    direction: 'absolute'|'relative'
+        'absolute': Convert from relative to absolute indexing
+        'relative': Convert from absolute to relative indexing
+        In both cases, negative indices (unused=-2, sink=-1) are preserved.
+.)";
 
 static PyObject* d8graph_convert_neighbor1(PyObject *module, PyObject *args, PyObject *kwargs)
 {
@@ -664,10 +691,12 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
             // Progressively merge with neighbors
             for (;;) {
 
+#if 1
                 // Edge nodes don't get merged, the unused gridcell
                 // nextdoor is by definition a place we can flow to from this
                 // gridcell.
                 if (edge[ix]) break;
+#endif
 
                 // Find index of the neighbor with the lowest elevation in the dem
                 // (that is small enough to merge)
@@ -693,16 +722,12 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
                 if (dem[ix] > dem[min_ix]) break;
 
                 // Set elevation for the EQ class to the (higher) elevation of the neighbor
-#if 1
+                // (Elevation of other gridcells in the EQ class will be adjusted later)
                 dem[ix] = dem[min_ix];
-#else            // This is too slow!
-                for (ix_t ix2 : eqclasses.members(ix)) {    // ngh == neighbors(ix)
-                    dem[ix2] = dem[min_ix];
-                }
-#endif
 
                 // Merge min_ix into ix, return neighbors of merged ix
-                merge(ix, min_ix, merge_count%1000 == 0);    // Merge into lower-elevation     index always
+//if (ix == 18729844 || min_ix == 18729844) printf("TRACE Merge %d <- %d\n", ix, min_ix);
+                merge(ix, min_ix, merge_count % 10000 == 0);    // Merge into lower-elevation     index always
                 ++merge_count;
 
 #if 0     // max_sink_size is too buggy
@@ -739,51 +764,51 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
 
         // ix_i is the index of the "current" eq class
         for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i) {
-            // Only consider lead gridcells of equivalence classes
-            if ((dem[ix_i] != nodata) && (eqclasses.parent(ix_i) == ix_i)) {
+            // Skip cells that aren't part of the grid
+            if (dem[ix_i] == nodata) continue;
 
-                // ix_j is index of lowest neighboring eq class
-                auto &ngh(neighbors(ix_i));
+            // Only consider each equivalence class once (when we are
+            // looking at its lead gridcell, which is not necessarily
+            // the largest or smallest)
+            if (eqclasses.parent(ix_i) != ix_i) continue;
 
-                ix_t ix_j = *std::min_element(ngh.begin(), ngh.end(),
-                    [this](int const ix0, int const ix1) { return dem[ix0] < dem[ix1]; });
+            // Consider how we will link FROM ix_i, TO something else
+            // if ix_i is a compound eq class, link from the HIGHEST INDEX gridcell in it
+            auto &members_i(eqclasses.members(ix_i));
+            ix_t max_member_i = *members_i.rbegin();   // Highest index in EQ Class ix_i
 
-#if 0           // NOT POSSIBLE: Because neihbors and eq class are disjoint!!!!
-                // If the lowest neighboring eq class is ourself, then
-                // we are a sink.  Record no outbound neighbor.
-                if (ix_i == ix_j) {
-                    neighbor1[ix_i] = -1;
-                    continue;
-                }
-#else
-                // If the lowest neighboring eq class is no lower than us, then we are a sink.
-                // Record no outbound neighbor.  AVOID CYCLES IN THE GRAPH!
-                if (dem[ix_j] >= dem[ix_i]) {
-                    neighbor1[ix_i] = -1;
-                    continue;
-                }
-#endif
+            // Set ix_j to index of lowest neighboring eq class
+            auto &ngh(neighbors(ix_i));
+            ix_t ix_j = *std::min_element(ngh.begin(), ngh.end(),
+                [this](int const ix0, int const ix1) { return dem[ix0] < dem[ix1]; });
 
-                // Now create graph link: ix_i -> ix_j
-                // if ix_i is a compound eq class, link from the LARGEST gridcell in it
-                // if ix_j is a compound eq class, link to the SMALLEST gridcell in it
-                auto &members_i(eqclasses.members(ix_i));
-                ix_t max_member_i = *members_i.rbegin();   // Largest in i
+            // Link to the next-lowest neighbor
+            if (dem[ix_j] < dem[ix_i]) {
+                // The lowest neighbor ix_j is LOWER than ix_i (typical case).
+                // Create graph link: ix_i -> ix_j
+                // if ix_j is a compound eq class, link to the LOWEST INDEX gridcell in it
                 ix_t min_member_j = eqclasses.min_member(ix_j);         // Smallest in j
                 neighbor1[max_member_i] = min_member_j;
+//if (members_i.find(18729844) != members_i.end()) printf("Found target 18729844 in %d, linking to %d\n", ix_i, ix_j);
+            } else {
+                // The lowest neighboring EQ class is no lower than us.
+                // So we are a sink.
+                // Record no outbound neighbor.  AVOID CYCLES IN THE GRAPH!
+                neighbor1[max_member_i] = -1;
+//if (members_i.find(18729844) != members_i.end()) printf("Found target 18729844 in %d, linking to %d\n", ix_i, -1);
+            }
 
-                // Create links *within* eq class i, from the min to
-                // the max gridcell.  Any flow into eq class i will
-                // enter at the min gridcell, then traverse all
-                // portions of the eq class.
-                auto ii0(members_i.begin());
-                auto ii1(ii0);   ++ii1;
-                while (ii1 != members_i.end()) {
-                    neighbor1[*ii0] = *ii1;
-                    ii0 = ii1;
-                    ++ii1;
-                }
-                
+            // Create links *within* eq class ix_i, from the lowest
+            // index to the highest index gridcell.  Any flow into eq
+            // class ix_i will enter at the lowest index gridcell,
+            // then traverse all portions of the eq class before
+            // exiting from the highest index.
+            auto ii0(members_i.begin());
+            auto ii1(ii0);   ++ii1;
+            while (ii1 != members_i.end()) {
+                neighbor1[*ii0] = *ii1;
+                ii0 = ii1;
+                ++ii1;
             }
         }
     }
