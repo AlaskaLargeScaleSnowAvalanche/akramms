@@ -51,7 +51,7 @@ PyArrayObject *np_new_1d(npy_intp shape0, int typenum)
 {
     PyArray_Descr *tdescr = PyArray_DescrFromType(typenum);
     npy_intp dims[] = {shape0};
-    npy_intp strides[] = {tdescr->typeobj->tp_basicsize};
+    npy_intp strides[] = {tdescr->elsize};
     return (PyArrayObject*) PyArray_NewFromDescr(&PyArray_Type, 
         tdescr, 1,    // rank 1
         dims, strides,
@@ -413,12 +413,14 @@ std::ostream& print_raster(std::ostream& out, TypeT const *arr, int const nj, in
     return out;
 }
 
+#if 0
 template<class TypeT>
 std::array<TypeT, 2> sorted(TypeT a, TypeT b)
 {
     if (a < b) return {a,b};
     return {b,a};
 }
+#endif
 
 // ==================================================================================
 PyObject *encode_sets(std::unordered_map<ix_t, std::set<ix_t>> const &eqclasses)
@@ -431,10 +433,10 @@ PyObject *encode_sets(std::unordered_map<ix_t, std::set<ix_t>> const &eqclasses)
     }
 
     // Allocate arrays
-    PyArrayObject *py_setbounds = np_new_1d((npy_intp)nsets+1, NPY_INT);
-    PyArrayObject *py_elements = np_new_1d((npy_intp)nelements, NPY_INT);
-    int *setbounds = (int *)PyArray_GETPTR1(py_setbounds, 0);
-    int *elements = (int *)PyArray_GETPTR1(py_elements, 0);
+    PyArrayObject *py_setbounds = np_new_1d((npy_intp)nsets+1, NPY_INT32);
+    PyArrayObject *py_elements = np_new_1d((npy_intp)nelements, NPY_INT32);
+    int *setbounds = (npy_int *)PyArray_GETPTR1(py_setbounds, 0);
+    int *elements = (npy_int *)PyArray_GETPTR1(py_elements, 0);
 
     // Copy sets over into the arrays
     ix_t iset = 0;
@@ -480,7 +482,7 @@ printf("BEGIN decode\n");
 
     // Iterate through each set and create the firstmap
     for (size_t i=0; i<nsets; ++i) {
-        if (i%100 == 0) printf("Working on %ld of %ld\n", i, nsets);
+//        if (i%100 == 0) printf("Working on %ld of %ld\n", i, nsets);
         int const j0 = elements[setbounds[i]];
         for (int j=setbounds[i]; j<setbounds[i+1]; ++j) {
             firstmap.insert(std::make_pair(elements[j], j0));
@@ -697,6 +699,7 @@ private:
             // Avoid "neighbor" gridcells that are unused
             int ji1 = j1*ni + i1;
             if (dem[ji1] == nodata) continue;
+            if (dem[ji1] == 0.0) continue;    // Avoid the ocean
 
             // Follow forwrding for neighbors that have been merged
             // NOTE: This could result in non-unique neighbor lists being returned!
@@ -927,6 +930,7 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
 //if (members_i.find(18729844) != members_i.end()) printf("Found target 18729844 in %d, linking to %d\n", ix_i, -1);
             }
 
+            // --------------------------------------------------
             // Create links *within* eq class ix_i, from the lowest
             // index to the highest index gridcell.  Any flow into eq
             // class ix_i will enter at the lowest index gridcell,
@@ -940,6 +944,30 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
                 ii0 = ii1;
                 ++ii1;
             }
+
+            // --------------------------------------------------
+            // Determine the ocean neighbors of this EQ Class
+            std::set<ix_t> ocean_neighbors;
+            for (ix_t ji0 : members_i) {
+                // Identify neighbors based on the 2D raster.
+                int const j0 = ji0 / ni;
+                int const i0 = ji0 % ni;    // Probably compiles down to divmod
+
+                // Look at neighboring nodes in 2D space
+                for (auto &dn : dneigh) {
+                    // Avoid outrunning our domain
+                    int const j1 = j0 + dn[0];
+                    int const i1 = i0 + dn[1];
+                    if ((j1<0) || (j1>=nj) || (i1<0) || (i1>=ni)) continue;
+
+                    // Keep only neighbor gridcells that are unused or ocean
+                    int ji1 = j1*ni + i1;
+                    if ((dem[ji1] === nodata) || (dem[ji1] == 0.0)) {
+                        ocean_neighbors.insert(ji1);
+                    }
+                }
+            }
+
         }
     }
 };
@@ -963,7 +991,7 @@ start_begin, start_end:
 std::unordered_set<ix_t> find_domain(
     std::unordered_map<ix_t, ix_t> const &firstmap,    // Lowest-index cell in each eq class
     ix_t const *neighbor1,
-    ix_t const *dem_filled,
+    double const *dem_filled,
     int const nj, int const ni,
     double const *gt,    // Geotransform
     ix_t const *start_begin, ix_t const *start_end,
@@ -975,6 +1003,7 @@ std::unordered_set<ix_t> find_domain(
     std::vector<ix_t> starts;
     std::unordered_set<ix_t> eqclasses_seen;    // Which eqclasses we've seen
 
+    // --------------------------------------------------------------
     auto add_eqclass_to_starts = [neighbor1,dem_filled,&starts,&eqclasses_seen](ix_t first_ix) -> void
     {
         // Make sure we haven't already added this EQ Class
@@ -982,15 +1011,21 @@ std::unordered_set<ix_t> find_domain(
         if (ii != eqclasses_seen.end()) return;
         eqclasses_seen.insert(first_ix);
 
+//printf("add_eqclass:"); for (ix_t ix=first_ix; ix>=0; ix = neighbor1[ix]) printf(" (%d %f)", ix); printf("\n");
+
+
         // Add the gridcells in the class
+        int count = 0;
         for (ix_t ix=first_ix; ;) {
-            starts.push_back(ix);
+//if (ix >= 0) printf("add_eqclass: %d %f\n", ix, dem_filled[ix]);
+            starts.push_back(ix);  ++count;
             ix_t const next_ix = neighbor1[ix];
             if (next_ix < 0) break;
             if (dem_filled[next_ix] != dem_filled[ix]) break;
+            ix = next_ix;
         }
+//printf("Added %d cells when adding EQClass to starts\n", count);
     };
-
     // --------------------------------------------------------------
 
     // Initialize our starting set (PRA), while expanding EQ classes that
@@ -1058,7 +1093,6 @@ std::unordered_set<ix_t> find_domain(
 
             // --------------------------------------------------------
             ix_t const next_ix = neighbor1[ix];
-
             // Quit this runout if it's finished itself.
             if (next_ix < 0) break;
 
@@ -1270,7 +1304,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
         find_domain(
             firstmap,
             (ix_t *)PyArray_GETPTR2(neighbor1,0,0),
-            (ix_t *)PyArray_GETPTR2(dem_filled,0,0),
+            (double *)PyArray_GETPTR2(dem_filled,0,0),
             PyArray_DIM(neighbor1,0), PyArray_DIM(neighbor1,1),    // Not needed
             (double *)PyArray_GETPTR1(geotransform, 0),
             (ix_t *)PyArray_GETPTR1(start, 0),

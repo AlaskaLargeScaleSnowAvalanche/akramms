@@ -41,12 +41,11 @@ def neighbor1_rule(dem_file, odir, fill_sinks=True):
 
 
         # Blank out zero-elevation squares because they are ocean (not land)
-        dem[dem == 0] = nodata    # Blank out zero-elevation squares (sea level)
+#        dem[dem == 0] = nodata    # Blank out zero-elevation squares (sea level)
 
         # Compute the degree-1 neighbor graph on the DEM
         # (This also fills sinks in dem)
         eqclasses, neighbor1 = d8graph.neighbor_graph(dem, nodata, int(fill_sinks))
-
 
         # Store eqclasses a pickle file; and neighbor1 and filled DEM as GeoTIFF
         with gzip.open(eqclasses_file, 'wb') as out:
@@ -125,6 +124,7 @@ def domain_rule(eqclasses_file, neighbor1_file, dem_filled_file, pra_burn_file, 
         # Read the neighbor1 file
         grid_info, neighbor1, nodata = read_neighbor1(neighbor1_file)
         _, dem_filled, _ = gdalutil.read_raster(dem_filled_file)
+#        print('Sample dem_filled[18729844] = {}'.format(dem_filled.reshape(-1)[18729844]))
 
         # Read the PRAs
         with gzip.open(pra_burn_file, 'rb') as fin:
@@ -139,7 +139,7 @@ def domain_rule(eqclasses_file, neighbor1_file, dem_filled_file, pra_burn_file, 
 
             # Get the domain from the list of starting cells of the PRA (pra_burn)
             args = (eqclasses, neighbor1, dem_filled, grid_info.geotransform, pra_burn)
-            seen,chull_list,domain_list = d8graph.find_domain(*args, margin=margin, debug=1, min_alpha=5.)
+            seen,chull_list,domain_list = d8graph.find_domain(*args, margin=margin, debug=1, min_alpha=18.)
             chulls.append(shapely.geometry.Polygon(chull_list))
             domains.append(shapely.geometry.Polygon(domain_list))
 
