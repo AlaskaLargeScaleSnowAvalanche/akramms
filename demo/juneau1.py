@@ -15,7 +15,7 @@ def add_akramms_rules(makefile, scene_dir):
 
     # Get neighbor1 graph for DEM routing network
     dem_file = scene_args['dem_file']
-    eqclasses_file,neighbor1_file,dem_filled_file = makefile.add(domain_builder.neighbor1_rule(
+    dem_filled_file,sinks_file,neighbor1_file = makefile.add(domain_builder.neighbor1_rule(
         dem_file, scene_dir, fill_sinks=True)).outputs
 
     # Loop over combos
@@ -40,7 +40,7 @@ def add_akramms_rules(makefile, scene_dir):
                 chull_file = '{}_chull.shp'.format(pra_file[:-4])
                 domain_file = '{}_domain.shp'.format(pra_file[:-4])
                 makefile.add(
-                    domain_builder.domain_rule(eqclasses_file, neighbor1_file, dem_filled_file, pra_burn_file, chull_file, domain_file))
+                    domain_builder.domain_rule(dem_filled_file, neighbor1_file, pra_burn_file, chull_file, domain_file))
 
 def main():
 

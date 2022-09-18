@@ -422,104 +422,6 @@ std::array<TypeT, 2> sorted(TypeT a, TypeT b)
 #endif
 
 // ==================================================================================
-PyObject *encode_sets(std::map<ix_t, std::set<ix_t>> const &eqclasses)
-{
-    // Determine size of arrays
-    size_t nsets = eqclasses.size();
-    size_t nelements = 0;
-    for (auto &item : eqclasses) {
-        nelements += item.second.size();
-    }
-
-    // Allocate arrays
-    PyArrayObject *py_keys = np_new_1d((npy_intp)nsets, NPY_INT32);
-    PyArrayObject *py_setbounds = np_new_1d((npy_intp)nsets+1, NPY_INT32);
-    PyArrayObject *py_elements = np_new_1d((npy_intp)nelements, NPY_INT32);
-    int *keys = (npy_int *)PyArray_GETPTR1(py_keys, 0);
-    int *setbounds = (npy_int *)PyArray_GETPTR1(py_setbounds, 0);
-    int *elements = (npy_int *)PyArray_GETPTR1(py_elements, 0);
-
-    // Copy sets over into the arrays
-    ix_t iset = 0;
-    ix_t iele = 0;
-    for (auto &item : eqclasses) {
-
-        // Record length of this set
-        auto &set(item.second);
-        keys[iset] = item.first;
-        setbounds[iset++] = iele;
-        ++iset;
-
-        // Record elements of this set
-        for (ix_t ix : set) {    // This is in sorted order
-            elements[iele++] = ix;
-        }
-    }
-    setbounds[iset++] = iele;
-
-    // Sanity check
-    assert(iset == nsets+1);
-    assert(iele == nelements);
-
-    // Return as Python tuple
-    return Py_BuildValue("OOO", py_keys, py_setbounds, py_elements);
-}
-// ------------------------------------------------------------
-std::map<ix_t, std::set<ix_t>> decode_sets(PyObject *tup)
-{
-printf("BEGIN decode1\n");
-    std::map<ix_t, std::set<ix_t>> ret;
-
-    PyArrayObject *py_keys = (PyArrayObject *)PyTuple_GetItem(tup, 0);
-    PyArrayObject *py_setbounds = (PyArrayObject *)PyTuple_GetItem(tup, 1);
-    PyArrayObject *py_elements = (PyArrayObject *)PyTuple_GetItem(tup, 2);
-
-    size_t nsets = PyArray_DIM(py_keys, 0);
-    int *keys = (int *)PyArray_GETPTR1(py_keys, 0);
-    int *setbounds = (int *)PyArray_GETPTR1(py_setbounds, 0);
-    int *elements = (int *)PyArray_GETPTR1(py_elements, 0);
-
-    // Iterate through each set and create the firstmap
-    for (size_t i=0; i<nsets; ++i) {
-        std::set<ix_t> set(&elements[setbounds[i]], &elements[setbounds[i+1]]);
-        ret.insert(std::make_pair(keys[i], std::set(&elements[setbounds[i]], &elements[setbounds[i+1]])));
-    }
-
-printf("END decode1\n");
-    return ret;
-}
-// ------------------------------------------------------------
-/**
-Returns:
-    Map indicating the lowest-index gridcell of the EQ Class that each
-    gridcell belongs to.  (Only for gridcells involved in an explicit
-    EQ Class).
-*/
-std::unordered_map<ix_t, ix_t> decode_firstmap(PyObject *tup)
-{
-printf("BEGIN decode2\n");
-    std::unordered_map<ix_t, ix_t> firstmap;
-
-    PyArrayObject *py_keys = (PyArrayObject *)PyTuple_GetItem(tup, 0);
-    PyArrayObject *py_setbounds = (PyArrayObject *)PyTuple_GetItem(tup, 1);
-    PyArrayObject *py_elements = (PyArrayObject *)PyTuple_GetItem(tup, 2);
-
-    size_t nsets = PyArray_DIM(py_setbounds, 0) - 1;
-    int *setbounds = (int *)PyArray_GETPTR1(py_setbounds, 0);
-    int *elements = (int *)PyArray_GETPTR1(py_elements, 0);
-
-    // Iterate through each set and create the firstmap
-    for (size_t i=0; i<nsets; ++i) {
-//        if (i%100 == 0) printf("Working on %ld of %ld\n", i, nsets);
-        int const j0 = elements[setbounds[i]];
-        for (int j=setbounds[i]; j<setbounds[i+1]; ++j) {
-            firstmap.insert(std::make_pair(elements[j], j0));
-        }
-    }
-
-printf("END decode2\n");
-    return firstmap;
-}
 // ------------------------------------------------------------
 /** Determines which eqclass the ith gridcell is a part of */
 ix_t _parent(std::unordered_map<ix_t, ix_t> const &forwards, ix_t gci)
@@ -547,7 +449,7 @@ public:
     EQClasses() {}    // Start off with everything in its own class
 
     /** Fetches the elements of the ith equivalence class */
-    std::set<ix_t> &members(int eqi)
+    std::set<ix_t> const &members(int eqi)
     {
         auto ii(eqclasses.find(eqi));
         if (ii != eqclasses.end()) {
@@ -636,21 +538,14 @@ public:
         return eqcj;
     }
 
-    /** Re-key EQ Classes to the minimum element in each one. */
-    void rekey()
-    {
-        std::map<ix_t, std::set<ix_t>> eqclasses1;
-        for (auto eqii(eqclasses.begin()); eqii != eqclasses.end(); ++eqii) {
-            ix_t key0 = eqii->first;
-            ix_t key1 = *(eqii->second.begin());
-            eqclasses1.insert(std::make_pair(key1, std::move(eqii->second)));
-        }
-        eqclasses = std::move(eqclasses1);
-    }
-
 };
 
 // ----------------------------------------------------------
+const std::vector<std::array<int,2>> dneigh = {
+    {-1,-1}, {-1,0}, {-1,1},
+    {0, -1},         {0, 1},
+    {1,-1},  {1,0},  {1,1}};
+
 /** A graph with implicit 8-way neighbors based on DEM and used /
 unused gridcells */
 class D8Graph {
@@ -676,7 +571,7 @@ private:
 
     // Increments to get to neighbors
     // These need to be in sorted order...
-    static const std::vector<std::array<int,2>> dneigh;
+//    static const std::vector<std::array<int,2>> dneigh;
 
     /** Determines whether a gridcell is an edge cell, i.e. borders on
     an unused cell or grid edge.  This function is called a the
@@ -715,7 +610,7 @@ public:
 
     }
 
-    size_t size() { return nj*ni; }
+    size_t size() const { return nj*ni; }
 
 private:
     /** Obtain list of neighbors based on raster. */
@@ -927,7 +822,7 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
         Base of 1D array of gridcell neighbors.
         (Potentially this is a Numpy array.)
     */
-    void to_neighbor1(npy_int *neighbor1) const
+    void to_neighbor1(npy_int *neighbor1)
     {
         // Initialize all to -2
         for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i) {
@@ -970,6 +865,7 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
 //if (members_i.find(18729844) != members_i.end()) printf("Found target 18729844 in %d, linking to %d\n", ix_i, -1);
             }
 
+#if 0
             // --------------------------------------------------
             // Create links *within* eq class ix_i, from the lowest
             // index to the highest index gridcell.  Any flow into eq
@@ -984,226 +880,160 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
                 ii0 = ii1;
                 ++ii1;
             }
+#endif
+
         }
     }
 
-    std::map<ix_t, std::set<ix_t>> ocean_neighborss() const
+
+    /** Constructs a map of the sinks that have been filled in. */
+    void to_sinks(npy_int *sinks) const
     {
-        std::map<ix_t, std::set<ix_t>> ocean_neighborss;
-        for (auto eqii(eqclasses.eqclasses.begin()); eqii != eqclasses.eqclasses.end(); ++eqii) {
-            std::set<ix_t> ocean_neighbors;    // Will be ocean neighbors of this EQ Class
-            std::set<ix_t> const &members(eqii->second);    // Members of this EQ Class
-
-            for (ix_t ji0 : members) {
-                // Identify neighbors based on the 2D raster.
-                int const j0 = ji0 / ni;
-                int const i0 = ji0 % ni;    // Probably compiles down to divmod
-
-                // Look at neighboring nodes in 2D space
-                for (auto &dn : dneigh) {
-                    // Avoid outrunning our domain
-                    int const j1 = j0 + dn[0];
-                    int const i1 = i0 + dn[1];
-                    if ((j1<0) || (j1>=nj) || (i1<0) || (i1>=ni)) continue;
-
-                    // Keep only neighbor gridcells that are unused or ocean
-                    int ji1 = j1*ni + i1;
-                    if ((dem[ji1] === nodata) || (dem[ji1] == 0.0)) {
-                        ocean_neighbors.insert(ji1);
-                    }
-                }
-            }
-//            if (ocean_neighbors.size() > 0)
-                ocean_neighborss.insert(std::make_pair(eqii->first, std::move(ocean_neighbors)));
+        // Initialize all to -1
+        for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i) {
+            sinks[ix_i] = -1;
         }
-        return ocean_neighborss;
+
+        for (auto eqii(eqclasses.eqclasses.begin()); eqii != eqclasses.eqclasses.end(); ++eqii) {
+            ix_t key = eqii->first;
+            for (ix_t ix : eqii->second) sinks[ix] = key;
+        }
     }
+
+
 };
 
 
 
-const std::vector<std::array<int,2>> D8Graph::dneigh = {
-    {-1,-1}, {-1,0}, {-1,1},
-    {0, -1},         {0, 1},
-    {1,-1},  {1,0},  {1,1}};
 
 // ====================================================================
 
 // ------------------------------------------------------------
 
 
-/** Does a depth-first-search of the neighbor1 graph starting from
+
+// -------------------------------------------------------------
+/** Does a breadth-first-search of the neighbor1 graph starting from
 some gridcells.
 
 start_begin, start_end:
     begin and end iterators for starting gridcell indices
 */
-std::unordered_set<ix_t> find_domain(
-    std::unordered_map<ix_t, ix_t> const &firstmap,    // Lowest-index cell in each eq class
+std::unordered_set<ix_t> avalanche_runout(
+    double const *dem_filled,    // Our main source of information on neighbors
+    double dem_nodata,
     ix_t const *neighbor1,
-    std::map<ix_t, std::set<ix_t>> const &ocean_neighborss,
-    double const *dem_filled,
-    int const nj, int const ni,
+    int nj, int ni,     // Not needed, except for bounds checking on neighbor1 lookup
     double const *gt,    // Geotransform
     ix_t const *start_begin, ix_t const *start_end,
     double const min_alpha)
 {
-    // Adds a gridcell to the list of cells we need to start from.
-    // If the cell is part of an EQ class, adds the entire class.
-    // EQ Classes are identified by the LOWEST-VALUE index in them.
-    std::vector<ix_t> starts;
-    std::unordered_set<ix_t> eqclasses_seen;    // Which eqclasses we've seen
-    std::set<ix_t> ocean_starts;
-
-    // --------------------------------------------------------------
-    auto add_eqclass_to_starts =
-        [neighbor1,dem_filled,&starts,&eqclasses_seen]
-        (ix_t first_ix) -> void
-    {
-        // Make sure we haven't already added this EQ Class
-        auto ii(eqclasses_seen.find(first_ix));
-        if (ii != eqclasses_seen.end()) return;
-        eqclasses_seen.insert(first_ix);
-
-//printf("add_eqclass:"); for (ix_t ix=first_ix; ix>=0; ix = neighbor1[ix]) printf(" (%d %f)", ix); printf("\n");
-
-        // Add gridcells in the class to starts
-        int count = 0;
-        for (ix_t ix=first_ix; ;) {
-//if (ix >= 0) printf("add_eqclass: %d %f\n", ix, dem_filled[ix]);
-            starts.push_back(ix);  ++count;
-            ix_t const next_ix = neighbor1[ix];
-            if (next_ix < 0) break;
-            if (dem_filled[next_ix] != dem_filled[ix]) break;
-            ix = next_ix;
-        }
-//printf("Added %d cells when adding EQClass to starts\n", count);
-
-    };
-    // --------------------------------------------------------------
-
-    // Initialize our starting set (PRA), while expanding EQ classes that
-    // might be within it.
-    for (auto ixp=start_begin; ixp != start_end; ++ixp) {
-        ix_t const ix = *ixp;
-
-        auto ii(firstmap.find(ix));
-        if (ii != firstmap.end()) {
-            add_eqclass_to_starts(ii->second);
-        } else {
-            starts.push_back(ix);
-        }
-        
-    }
-
+    double const min_tan_alpha = tan(min_alpha);
 
     // Get info on highest-elevation gridcell in the start set.
     // This will also be the most up-slope, and hence will have the highest
     // inclination (alpha angle) compared to downslope gridcells.
     // See: https://www.avalanche-center.org/Education/blog/?itemid=535
-    ix_t ix_highest = *std::max_element(starts.begin(), starts.end(),
+    ix_t ix_origin = *std::max_element(start_begin, start_end,
         [dem_filled](int const ix0, int const ix1) { return dem_filled[ix0] < dem_filled[ix1]; });
-    double const dem_highest = dem_filled[ix_highest];
-    int const j_highest = ix_highest / ni;
-    int const i_highest = ix_highest % ni;    // Probably compiles down to divmod
-    double const x_highest = gt[0] + i_highest*gt[1] + j_highest*gt[2];
-    double const y_highest = gt[3] + i_highest*gt[4] + j_highest*gt[5];
+    double const z_origin = dem_filled[ix_origin];
+    int const j_origin = ix_origin / ni;
+    int const i_origin = ix_origin % ni;    // Probably compiles down to divmod
+    double const x_origin = gt[0] + i_origin*gt[1] + j_origin*gt[2];
+    double const y_origin = gt[3] + i_origin*gt[4] + j_origin*gt[5];
 
-    // Depth First Search
+
+    // State of breadth-first-search
     std::unordered_set<ix_t> seen;
-    while (starts.size() > 0) {
-        ix_t ix = starts.back(); starts.pop_back();
-        for (;;) {
-            // Stop if already visited
-            {auto ii(seen.find(ix));
-            if (ii != seen.end()) break;}
 
-            // -------------------------------------
-            // Stop if alpha is low enough to suggest
-            // the runout would have stopped by this point (18 degrees
-            // should be OK).  In that case, we should never have been
-            // looking at this gridcell to begin with (it might be WAY
-            // out of bounds).  So don't even add to the seen set.
+    // Current bunch of gridcells we're considering
+    
+    // -------------------------------------------------------
+    auto add_neighbor =
+        [dem_filled,&seen,gt,min_tan_alpha,x_origin,y_origin,z_origin,ni]
+        (ix_t ix, std::vector<ix_t> &neighbors) -> void
+    {
+        int const j = ix / ni;
+        int const i = ix % ni;    // Probably compiles down to divmod
 
-            // Obtain geographic coordinates of this gridcell
-            int const j = ix / ni;
-            int const i = ix % ni;    // Probably compiles down to divmod
-            double const x = gt[0] + i*gt[1] + j*gt[2];
-            double const y = gt[3] + i*gt[4] + j*gt[5];
+        // Don't add if we've already seen this neighbor
+        if (seen.find(ix) != seen.end()) return;
 
-            // Compute angle of inclination from the top (alpha)
-            double const delx = x - x_highest;
-            double const dely = y - y_highest;
-            double const delxy = sqrt(dely*dely + delx*delx);
-            double const delz = dem_filled[ix] - dem_highest;
-            double const alpha = (180./M_PI) * abs(atan2(delz, delxy));
+        // Obtain geographic coordinates of this gridcell
+//        int const j = ix / ni;
+//        int const i = ix % ni;    // Probably compiles down to divmod
+        double const x = gt[0] + i*gt[1] + j*gt[2];
+        double const y = gt[3] + i*gt[4] + j*gt[5];
 
-            if (alpha < min_alpha) break;
+        // Compute slope of inclination from the top (tan(alpha))
+        double const delx = x - x_origin;
+        double const dely = y - y_origin;
+        double const delxy = sqrt(dely*dely + delx*delx);
+        double const delz = z_origin - dem_filled[ix];
+        double const tan_alpha = delz / delxy;
+        // double const alpha = (180./M_PI) * abs(atan2(delz, delxy));
 
-            // ----------------------------------------------------
-            // This gridcell is within alpha range, so add it to the
-            // seen set.
-            seen.insert(ix);
+        // Quit if our azimuth (alpha) angle to the top of the
+        // avalanche is too small.
+        if (tan_alpha < min_tan_alpha) return;
 
-            // -------------------------------------------------------
-            // Add any ocean neighbors
-            auto ocnii(ocean_neighborss.find(ix)) {
-            }
+        // OK looks like a good neighbor!
+        neighbors.push_back(ix);
+    };
+    // ------------------------------------------------------
 
-            // --------------------------------------------------------
-            ix_t const next_ix = neighbor1[ix];
-            // Quit this runout if it's finished itself.
-            if (next_ix < 0) break;
+    for (std::vector<ix_t> cur(start_begin, start_end); cur.size()>0; ) {
+        // Next bunch of gridcells we will be considering
+        std::vector<ix_t> neighbors;   // can have duplicates
 
-            // Determine if next step is in an EQ class
-            // If so, add the entire EQ class to starts, and quit this start.
-            {auto ii(firstmap.find(next_ix));
-            if (ii != firstmap.end()) {
-                add_eqclass_to_starts(ii->second);
-                break;
-            }}
-
-            // Determine if this gridcell borders any ocean gridcells
-
-            // Add ocean neighbors to ocean_starts
-            auto ocnii(ocean_neighborss.find(first_ix));
-            if (ocnii != ocean_neighborss.end()) {
-                // This is an EQ Class with many potential ocean neighbors
-                auto &ocean_neighbors(ocnii->second);
-                ocean_starts.insert(ocean_neighbors.begin(), ocean_neighbors.end());
+        // Determine neighbor values of each current node
+        // Add to our vector of neighbors if we haven't seen it yet.
+        // Also add to our seen set (most efficient this way)
+        for (ix_t ji0 : cur) {
+            if (false) {
             } else {
-                // Identify ocean neighbors based on the 2D raster.
-                int const ji0 = first_ix;
+                // Get our list of neighbors directly from the filled DEM
+                std::vector<ix_t> min_ix;
+                // Iterate through neighbors of this gridcell
                 int const j0 = ji0 / ni;
                 int const i0 = ji0 % ni;    // Probably compiles down to divmod
 
-                // Look at neighboring nodes in 2D space
+                // Get list of minimum neighbors (that we haven't seen
+                // before) based on the 2D DEM
+                double min_ele = dem_filled[ji0];
+                min_ix.clear();
                 for (auto &dn : dneigh) {
                     // Avoid outrunning our domain
                     int const j1 = j0 + dn[0];
                     int const i1 = i0 + dn[1];
                     if ((j1<0) || (j1>=nj) || (i1<0) || (i1>=ni)) continue;
+                    ix_t const ji1 = j1*ni + i1;
 
-                    // Keep only neighbor gridcells that are unused or ocean
-                    int ji1 = j1*ni + i1;
-                    if ((dem[ji1] === nodata) || (dem[ji1] == 0.0)) {
-                        ocean_starts.insert(ji1);
+                    // Unused cells look like elevation 0.0 to us now, same as ocean.
+                    // Also, account for dem in case it's giving negative numbers for bathymetry
+                    double const ele1 = (
+                         (dem_filled[ji1] == dem_nodata || ele1 < 0.0) ? 0.0 : dem_filled[ji1]);
+
+                    if (ele1 < min_ele) {
+                        // Found a new minimum!
+                        min_ix.clear();min_ix.push_back(ji1);
+                    } else if (ele1 == min_ele) {
+                        // Found another equal minimum neighbor
+                        min_ix.push_back(ji1);
                     }
                 }
-              }        
 
-            // --------------------------------------------------------
-            // Next gridcell is just a regular cell.  Advance and continue.
-            ix = next_ix;
+                // Add our minimum neighbors to the list of neighbors for next step
+                for (ix_t ix : min_ix) add_neighbor(ix, neighbors);
+            }
         }
-    }
 
-    // We're done searching all LAND-based gridcells.  Now look out in
-    // the ocean, based on ocean_starts.
+        // cur becomes neighbors
+        cur = std::move(neighbors);
+    }
 
     return seen;
 }
-
 
 
 // =========================================================================
@@ -1293,6 +1123,14 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
         NULL,        // Allocate new memory
         // PyArray_FLAGS(dem), ...
         NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED, NULL);
+    PyArrayObject *sinks = (PyArrayObject*) PyArray_NewFromDescr(
+        &PyArray_Type, 
+        PyArray_DescrFromType(NPY_INT32),             // dtype='i'
+        2,                                          // rank 2
+        PyArray_DIMS(dem), strides,    // Same shape as DEM
+        NULL,        // Allocate new memory
+        // PyArray_FLAGS(dem), ...
+        NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED, NULL);
 
     // ========================================================
     // Do the computation
@@ -1307,20 +1145,11 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
     PySys_WriteStdout("neighbor1 dims: %ld %ld\n", PyArray_DIM(neighbor1,0), PyArray_DIM(neighbor1,1));
 
     // Convert graph to degree-1, with neighbors running through each EQ Class
+    d8g.to_sinks((npy_int *)PyArray_GETPTR2(sinks,0,0));
     d8g.to_neighbor1((npy_int *)PyArray_GETPTR2(neighbor1,0,0));
 
-    // Now that we have neighbor1, we can re-do the keying on our
-    // EQClasses.  NOTE: This will break links in d8g that use the old
-    // keying; but we don't need d8g anymore.
-    d8g.eqclasses.rekey();
-
-    // Encode the EQClasses as two Numpy arrays
-    PyObject *eqclasses = encode_sets(d8g.eqclasses.eqclasses);
-
-    // Encode ocean neighbors of each EQClass as two Numpy arrays
-    PyObject *ocean_neighborss = encode_sets(d8g.ocean_neighborss());
     // ========================================================
-    return Py_BuildValue("OOO", eqclasses, (PyObject *)neighbor1, ocean_neighborss);
+    return Py_BuildValue("OO", (PyObject *)sinks, (PyObject *)neighbor1);
 }
 // ----------------------------------------------------------------------------------------
 static PyObject *polygon_to_python(std::vector<std::array<double,2>> const &mbr)
@@ -1361,10 +1190,9 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
 {
     // ======================== Parse Python Input
     // Input arrays
-    PyObject *eqclasses_py;
-    PyArrayObject *neighbor1;
-    PyArrayObject *ocean_neighbors_py;
     PyArrayObject *dem_filled;
+    double dem_nodata = 0.0;
+    PyArrayObject *neighbor1;
     PyArrayObject *geotransform;
     PyArrayObject *start;
     double margin = 0;
@@ -1373,15 +1201,14 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
 
     // Parse args and kwargs
     static char const *kwlist[] = {
-        "eqclasses", "neighbor1", "ocean_neighbors", "dem_filled", "geotransform", "start",         // *args,
+        "dem_filled", "dem_nodata", "neighbor1", "geotransform", "start",         // *args,
         "margin", "debug", "min_alpha",        // **kwargs
         NULL};
-    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "OO!O!O!O!|did",
+    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!dO!O!O!|did",
         (char **)kwlist,
-        &eqclasses_py,    // (keys, setbounds, elements)
-        &PyArray_Type, &neighbor1,
-        &ocean_neighbors_py,    // (keys, setbounds, elements)
         &PyArray_Type, &dem_filled,
+        &dem_nodata,
+        &PyArray_Type, &neighbor1,
         &PyArray_Type, &geotransform,
         &PyArray_Type, &start,
         &margin, &debug, &min_alpha
@@ -1400,18 +1227,14 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     int const ni = PyArray_DIM(neighbor1,1);
 
 
-    std::unordered_map<ix_t, std::set<ix_t>> ocean_neighbors(decode_sets(ocean_neighbors_py));
-    std::unordered_map<ix_t, ix_t> firstmap(decode_firstmap(eqclasses_py));
-
     // ============================ Run the Core Computation
     // Run the flood fill algorithm, result in a set of 1D indices
     std::unordered_set<ix_t> seen(
-        find_domain(
-            firstmap,
-            (ix_t *)PyArray_GETPTR2(neighbor1,0,0),
-            ocean_neighbors,
+        avalanche_runout(
             (double *)PyArray_GETPTR2(dem_filled,0,0),
-            PyArray_DIM(neighbor1,0), PyArray_DIM(neighbor1,1),    // Not needed
+            dem_nodata,
+            (ix_t *)PyArray_GETPTR2(neighbor1,0,0),
+            PyArray_DIM(dem_filled,0), PyArray_DIM(dem_filled,1),    // Not needed
             (double *)PyArray_GETPTR1(geotransform, 0),
             (ix_t *)PyArray_GETPTR1(start, 0),
             (ix_t *)PyArray_GETPTR1(start, PyArray_DIM(start,0)),
