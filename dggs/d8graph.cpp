@@ -5,9 +5,10 @@
 //#include "structmember.h"    // Map C struct members to Python attributes
 #include <numeric>    // iota
 // https://docs.python.org/3.9/extending/newtypes_tutorial.html
-#include <unordered_map>
 #include <set>
+#include <map>
 #include <unordered_set>
+#include <unordered_map>
 #include <vector>
 #include <array>
 #include <iostream>
@@ -25,8 +26,6 @@
 #include <dggs/chull.hpp>
 #include <dggs/mbr.hpp>
 
-#include <map>
-#include <unordered_map>
 
 using namespace dggs;
 
@@ -423,7 +422,7 @@ std::array<TypeT, 2> sorted(TypeT a, TypeT b)
 #endif
 
 // ==================================================================================
-PyObject *encode_sets(std::unordered_map<ix_t, std::set<ix_t>> const &eqclasses)
+PyObject *encode_sets(std::map<ix_t, std::set<ix_t>> const &eqclasses)
 {
     // Determine size of arrays
     size_t nsets = eqclasses.size();
@@ -433,8 +432,10 @@ PyObject *encode_sets(std::unordered_map<ix_t, std::set<ix_t>> const &eqclasses)
     }
 
     // Allocate arrays
+    PyArrayObject *py_keys = np_new_1d((npy_intp)nsets, NPY_INT32);
     PyArrayObject *py_setbounds = np_new_1d((npy_intp)nsets+1, NPY_INT32);
     PyArrayObject *py_elements = np_new_1d((npy_intp)nelements, NPY_INT32);
+    int *keys = (npy_int *)PyArray_GETPTR1(py_keys, 0);
     int *setbounds = (npy_int *)PyArray_GETPTR1(py_setbounds, 0);
     int *elements = (npy_int *)PyArray_GETPTR1(py_elements, 0);
 
@@ -445,7 +446,9 @@ PyObject *encode_sets(std::unordered_map<ix_t, std::set<ix_t>> const &eqclasses)
 
         // Record length of this set
         auto &set(item.second);
+        keys[iset] = item.first;
         setbounds[iset++] = iele;
+        ++iset;
 
         // Record elements of this set
         for (ix_t ix : set) {    // This is in sorted order
@@ -459,7 +462,31 @@ PyObject *encode_sets(std::unordered_map<ix_t, std::set<ix_t>> const &eqclasses)
     assert(iele == nelements);
 
     // Return as Python tuple
-    return Py_BuildValue("OO", py_setbounds, py_elements);
+    return Py_BuildValue("OOO", py_keys, py_setbounds, py_elements);
+}
+// ------------------------------------------------------------
+std::map<ix_t, std::set<ix_t>> decode_sets(PyObject *tup)
+{
+printf("BEGIN decode1\n");
+    std::map<ix_t, std::set<ix_t>> ret;
+
+    PyArrayObject *py_keys = (PyArrayObject *)PyTuple_GetItem(tup, 0);
+    PyArrayObject *py_setbounds = (PyArrayObject *)PyTuple_GetItem(tup, 1);
+    PyArrayObject *py_elements = (PyArrayObject *)PyTuple_GetItem(tup, 2);
+
+    size_t nsets = PyArray_DIM(py_keys, 0);
+    int *keys = (int *)PyArray_GETPTR1(py_keys, 0);
+    int *setbounds = (int *)PyArray_GETPTR1(py_setbounds, 0);
+    int *elements = (int *)PyArray_GETPTR1(py_elements, 0);
+
+    // Iterate through each set and create the firstmap
+    for (size_t i=0; i<nsets; ++i) {
+        std::set<ix_t> set(&elements[setbounds[i]], &elements[setbounds[i+1]]);
+        ret.insert(std::make_pair(keys[i], std::set(&elements[setbounds[i]], &elements[setbounds[i+1]])));
+    }
+
+printf("END decode1\n");
+    return ret;
 }
 // ------------------------------------------------------------
 /**
@@ -468,13 +495,14 @@ Returns:
     gridcell belongs to.  (Only for gridcells involved in an explicit
     EQ Class).
 */
-std::unordered_map<ix_t, ix_t> decode_sets_to_firstmap(PyObject *tup)
+std::unordered_map<ix_t, ix_t> decode_firstmap(PyObject *tup)
 {
-printf("BEGIN decode\n");
+printf("BEGIN decode2\n");
     std::unordered_map<ix_t, ix_t> firstmap;
 
-    PyArrayObject *py_setbounds = (PyArrayObject *)PyTuple_GetItem(tup, 0);
-    PyArrayObject *py_elements = (PyArrayObject *)PyTuple_GetItem(tup, 1);
+    PyArrayObject *py_keys = (PyArrayObject *)PyTuple_GetItem(tup, 0);
+    PyArrayObject *py_setbounds = (PyArrayObject *)PyTuple_GetItem(tup, 1);
+    PyArrayObject *py_elements = (PyArrayObject *)PyTuple_GetItem(tup, 2);
 
     size_t nsets = PyArray_DIM(py_setbounds, 0) - 1;
     int *setbounds = (int *)PyArray_GETPTR1(py_setbounds, 0);
@@ -489,7 +517,7 @@ printf("BEGIN decode\n");
         }
     }
 
-printf("END decode\n");
+printf("END decode2\n");
     return firstmap;
 }
 // ------------------------------------------------------------
@@ -508,7 +536,7 @@ class EQClasses {
 public:
     // EQClass with >1 element
     // Inner vector is SORTED
-    std::unordered_map<ix_t, std::set<ix_t>> eqclasses;
+    std::map<ix_t, std::set<ix_t>> eqclasses;
 
 private:
     // Stand-in for single-element eqclasses
@@ -608,6 +636,18 @@ public:
         return eqcj;
     }
 
+    /** Re-key EQ Classes to the minimum element in each one. */
+    void rekey()
+    {
+        std::map<ix_t, std::set<ix_t>> eqclasses1;
+        for (auto eqii(eqclasses.begin()); eqii != eqclasses.end(); ++eqii) {
+            ix_t key0 = eqii->first;
+            ix_t key1 = *(eqii->second.begin());
+            eqclasses1.insert(std::make_pair(key1, std::move(eqii->second)));
+        }
+        eqclasses = std::move(eqclasses1);
+    }
+
 };
 
 // ----------------------------------------------------------
@@ -628,7 +668,7 @@ private:
     std::vector<bool> edge;
 
     // Explicit neighbors for merged EQ classes
-    std::unordered_map<ix_t, std::set<ix_t>> neighborss;
+    std::map<ix_t, std::set<ix_t>> neighborss;
     // Buffer used to return neighbors
     std::array<std::set<ix_t>, 2> _neighbors_rets;
     int reti = 0;    // Double buffering
@@ -887,7 +927,7 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
         Base of 1D array of gridcell neighbors.
         (Potentially this is a Numpy array.)
     */
-    void to_neighbor1(npy_int *neighbor1)
+    void to_neighbor1(npy_int *neighbor1) const
     {
         // Initialize all to -2
         for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i) {
@@ -944,11 +984,17 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
                 ii0 = ii1;
                 ++ii1;
             }
+        }
+    }
 
-            // --------------------------------------------------
-            // Determine the ocean neighbors of this EQ Class
-            std::set<ix_t> ocean_neighbors;
-            for (ix_t ji0 : members_i) {
+    std::map<ix_t, std::set<ix_t>> ocean_neighborss() const
+    {
+        std::map<ix_t, std::set<ix_t>> ocean_neighborss;
+        for (auto eqii(eqclasses.eqclasses.begin()); eqii != eqclasses.eqclasses.end(); ++eqii) {
+            std::set<ix_t> ocean_neighbors;    // Will be ocean neighbors of this EQ Class
+            std::set<ix_t> const &members(eqii->second);    // Members of this EQ Class
+
+            for (ix_t ji0 : members) {
                 // Identify neighbors based on the 2D raster.
                 int const j0 = ji0 / ni;
                 int const i0 = ji0 % ni;    // Probably compiles down to divmod
@@ -967,10 +1013,14 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
                     }
                 }
             }
-
+//            if (ocean_neighbors.size() > 0)
+                ocean_neighborss.insert(std::make_pair(eqii->first, std::move(ocean_neighbors)));
         }
+        return ocean_neighborss;
     }
 };
+
+
 
 const std::vector<std::array<int,2>> D8Graph::dneigh = {
     {-1,-1}, {-1,0}, {-1,1},
@@ -982,7 +1032,7 @@ const std::vector<std::array<int,2>> D8Graph::dneigh = {
 // ------------------------------------------------------------
 
 
-/** Does a breadth-first-search of the neighbor1 graph starting from
+/** Does a depth-first-search of the neighbor1 graph starting from
 some gridcells.
 
 start_begin, start_end:
@@ -991,6 +1041,7 @@ start_begin, start_end:
 std::unordered_set<ix_t> find_domain(
     std::unordered_map<ix_t, ix_t> const &firstmap,    // Lowest-index cell in each eq class
     ix_t const *neighbor1,
+    std::map<ix_t, std::set<ix_t>> const &ocean_neighborss,
     double const *dem_filled,
     int const nj, int const ni,
     double const *gt,    // Geotransform
@@ -1002,9 +1053,12 @@ std::unordered_set<ix_t> find_domain(
     // EQ Classes are identified by the LOWEST-VALUE index in them.
     std::vector<ix_t> starts;
     std::unordered_set<ix_t> eqclasses_seen;    // Which eqclasses we've seen
+    std::set<ix_t> ocean_starts;
 
     // --------------------------------------------------------------
-    auto add_eqclass_to_starts = [neighbor1,dem_filled,&starts,&eqclasses_seen](ix_t first_ix) -> void
+    auto add_eqclass_to_starts =
+        [neighbor1,dem_filled,&starts,&eqclasses_seen]
+        (ix_t first_ix) -> void
     {
         // Make sure we haven't already added this EQ Class
         auto ii(eqclasses_seen.find(first_ix));
@@ -1013,8 +1067,7 @@ std::unordered_set<ix_t> find_domain(
 
 //printf("add_eqclass:"); for (ix_t ix=first_ix; ix>=0; ix = neighbor1[ix]) printf(" (%d %f)", ix); printf("\n");
 
-
-        // Add the gridcells in the class
+        // Add gridcells in the class to starts
         int count = 0;
         for (ix_t ix=first_ix; ;) {
 //if (ix >= 0) printf("add_eqclass: %d %f\n", ix, dem_filled[ix]);
@@ -1025,6 +1078,7 @@ std::unordered_set<ix_t> find_domain(
             ix = next_ix;
         }
 //printf("Added %d cells when adding EQClass to starts\n", count);
+
     };
     // --------------------------------------------------------------
 
@@ -1091,6 +1145,11 @@ std::unordered_set<ix_t> find_domain(
             // seen set.
             seen.insert(ix);
 
+            // -------------------------------------------------------
+            // Add any ocean neighbors
+            auto ocnii(ocean_neighborss.find(ix)) {
+            }
+
             // --------------------------------------------------------
             ix_t const next_ix = neighbor1[ix];
             // Quit this runout if it's finished itself.
@@ -1104,11 +1163,43 @@ std::unordered_set<ix_t> find_domain(
                 break;
             }}
 
+            // Determine if this gridcell borders any ocean gridcells
+
+            // Add ocean neighbors to ocean_starts
+            auto ocnii(ocean_neighborss.find(first_ix));
+            if (ocnii != ocean_neighborss.end()) {
+                // This is an EQ Class with many potential ocean neighbors
+                auto &ocean_neighbors(ocnii->second);
+                ocean_starts.insert(ocean_neighbors.begin(), ocean_neighbors.end());
+            } else {
+                // Identify ocean neighbors based on the 2D raster.
+                int const ji0 = first_ix;
+                int const j0 = ji0 / ni;
+                int const i0 = ji0 % ni;    // Probably compiles down to divmod
+
+                // Look at neighboring nodes in 2D space
+                for (auto &dn : dneigh) {
+                    // Avoid outrunning our domain
+                    int const j1 = j0 + dn[0];
+                    int const i1 = i0 + dn[1];
+                    if ((j1<0) || (j1>=nj) || (i1<0) || (i1>=ni)) continue;
+
+                    // Keep only neighbor gridcells that are unused or ocean
+                    int ji1 = j1*ni + i1;
+                    if ((dem[ji1] === nodata) || (dem[ji1] == 0.0)) {
+                        ocean_starts.insert(ji1);
+                    }
+                }
+              }        
+
             // --------------------------------------------------------
             // Next gridcell is just a regular cell.  Advance and continue.
             ix = next_ix;
         }
     }
+
+    // We're done searching all LAND-based gridcells.  Now look out in
+    // the ocean, based on ocean_starts.
 
     return seen;
 }
@@ -1214,11 +1305,22 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
     PySys_WriteStdout("Converting to neighbor1 format\n");
 
     PySys_WriteStdout("neighbor1 dims: %ld %ld\n", PyArray_DIM(neighbor1,0), PyArray_DIM(neighbor1,1));
+
+    // Convert graph to degree-1, with neighbors running through each EQ Class
     d8g.to_neighbor1((npy_int *)PyArray_GETPTR2(neighbor1,0,0));
+
+    // Now that we have neighbor1, we can re-do the keying on our
+    // EQClasses.  NOTE: This will break links in d8g that use the old
+    // keying; but we don't need d8g anymore.
+    d8g.eqclasses.rekey();
+
+    // Encode the EQClasses as two Numpy arrays
     PyObject *eqclasses = encode_sets(d8g.eqclasses.eqclasses);
 
+    // Encode ocean neighbors of each EQClass as two Numpy arrays
+    PyObject *ocean_neighborss = encode_sets(d8g.ocean_neighborss());
     // ========================================================
-    return Py_BuildValue("OO", eqclasses, (PyObject *)neighbor1);
+    return Py_BuildValue("OOO", eqclasses, (PyObject *)neighbor1, ocean_neighborss);
 }
 // ----------------------------------------------------------------------------------------
 static PyObject *polygon_to_python(std::vector<std::array<double,2>> const &mbr)
@@ -1259,8 +1361,9 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
 {
     // ======================== Parse Python Input
     // Input arrays
-    PyObject *eqclasses;
+    PyObject *eqclasses_py;
     PyArrayObject *neighbor1;
+    PyArrayObject *ocean_neighbors_py;
     PyArrayObject *dem_filled;
     PyArrayObject *geotransform;
     PyArrayObject *start;
@@ -1270,13 +1373,14 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
 
     // Parse args and kwargs
     static char const *kwlist[] = {
-        "eqclasses", "neighbor1", "dem_filled", "geotransform", "start",         // *args,
+        "eqclasses", "neighbor1", "ocean_neighbors", "dem_filled", "geotransform", "start",         // *args,
         "margin", "debug", "min_alpha",        // **kwargs
         NULL};
     if(!PyArg_ParseTupleAndKeywords(args, kwargs, "OO!O!O!O!|did",
         (char **)kwlist,
-        &eqclasses,    // (setbounds, elements)
+        &eqclasses_py,    // (keys, setbounds, elements)
         &PyArray_Type, &neighbor1,
+        &ocean_neighbors_py,    // (keys, setbounds, elements)
         &PyArray_Type, &dem_filled,
         &PyArray_Type, &geotransform,
         &PyArray_Type, &start,
@@ -1296,7 +1400,8 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     int const ni = PyArray_DIM(neighbor1,1);
 
 
-    std::unordered_map<ix_t, ix_t> firstmap(decode_sets_to_firstmap(eqclasses));
+    std::unordered_map<ix_t, std::set<ix_t>> ocean_neighbors(decode_sets(ocean_neighbors_py));
+    std::unordered_map<ix_t, ix_t> firstmap(decode_firstmap(eqclasses_py));
 
     // ============================ Run the Core Computation
     // Run the flood fill algorithm, result in a set of 1D indices
@@ -1304,6 +1409,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
         find_domain(
             firstmap,
             (ix_t *)PyArray_GETPTR2(neighbor1,0,0),
+            ocean_neighbors,
             (double *)PyArray_GETPTR2(dem_filled,0,0),
             PyArray_DIM(neighbor1,0), PyArray_DIM(neighbor1,1),    // Not needed
             (double *)PyArray_GETPTR1(geotransform, 0),
@@ -1314,7 +1420,6 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     PySys_WriteStdout("Flood Fill went from %ld -> %ld gridcells.\n", PyArray_DIM(start,0), seen.size());
 
     // ================ Return raw results of the flood fill
-
     PyArrayObject *ret_seen = nullptr;
     if (debug) {
         // Sort result
