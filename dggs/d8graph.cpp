@@ -806,7 +806,7 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
 
             }
         }
-end_loop:
+//end_loop:
 
         // Set DEM level for all cells in each eqclass
         for (auto eqii(eqclasses.eqclasses.begin()); eqii != eqclasses.eqclasses.end(); ++eqii) {
@@ -931,7 +931,7 @@ std::unordered_set<ix_t> avalanche_runout(
     ix_t const *start_begin, ix_t const *start_end,
     double const min_alpha)
 {
-    double const min_tan_alpha = tan(min_alpha);
+    double const min_tan_alpha = tan((M_PI/180.)*min_alpha);
 
     // Get info on highest-elevation gridcell in the start set.
     // This will also be the most up-slope, and hence will have the highest
@@ -952,8 +952,14 @@ std::unordered_set<ix_t> avalanche_runout(
     // Current bunch of gridcells we're considering
     
     // -------------------------------------------------------
+    auto _elev = [dem_filled,dem_nodata](ix_t ix) -> double
+    {
+        double ele1 = dem_filled[ix];
+        if (ele1 == dem_nodata || ele1 < 0.0) ele1 = 0.0;
+        return ele1;
+    };
     auto add_neighbor =
-        [dem_filled,&seen,gt,min_tan_alpha,x_origin,y_origin,z_origin,ni]
+        [dem_filled,&seen,gt,min_tan_alpha,x_origin,y_origin,z_origin,ni,_elev]
         (ix_t ix, std::vector<ix_t> &neighbors) -> void
     {
         int const j = ix / ni;
@@ -967,21 +973,24 @@ std::unordered_set<ix_t> avalanche_runout(
 //        int const i = ix % ni;    // Probably compiles down to divmod
         double const x = gt[0] + i*gt[1] + j*gt[2];
         double const y = gt[3] + i*gt[4] + j*gt[5];
+        double const z = _elev(ix);
 
         // Compute slope of inclination from the top (tan(alpha))
         double const delx = x - x_origin;
         double const dely = y - y_origin;
         double const delxy = sqrt(dely*dely + delx*delx);
-        double const delz = z_origin - dem_filled[ix];
+        double const delz = z_origin - z;
         double const tan_alpha = delz / delxy;
         // double const alpha = (180./M_PI) * abs(atan2(delz, delxy));
 
         // Quit if our azimuth (alpha) angle to the top of the
         // avalanche is too small.
+//        printf("tan_alpha %g %g\n", tan_alpha, min_tan_alpha);
         if (tan_alpha < min_tan_alpha) return;
 
         // OK looks like a good neighbor!
         neighbors.push_back(ix);
+        seen.insert(ix);
     };
     // ------------------------------------------------------
 
@@ -1003,7 +1012,7 @@ std::unordered_set<ix_t> avalanche_runout(
 
                 // Get list of minimum neighbors (that we haven't seen
                 // before) based on the 2D DEM
-                double min_ele = dem_filled[ji0];
+                double min_ele = _elev(ji0);
                 min_ix.clear();
                 for (auto &dn : dneigh) {
                     // Avoid outrunning our domain
@@ -1014,8 +1023,7 @@ std::unordered_set<ix_t> avalanche_runout(
 
                     // Unused cells look like elevation 0.0 to us now, same as ocean.
                     // Also, account for dem in case it's giving negative numbers for bathymetry
-                    double ele1 = dem_filled[ji1];
-                    if (ele1 == dem_nodata || ele1 < 0.0) ele1 = 0;
+                    double const ele1 = _elev(ji1);
 
                     if (ele1 < min_ele) {
                         // Found a new minimum!
