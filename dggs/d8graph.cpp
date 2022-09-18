@@ -849,6 +849,14 @@ const std::vector<std::array<int,2>> D8Graph::dneigh = {
     {1,-1},  {1,0},  {1,1}};
 
 // ====================================================================
+/** Determines which eqclass the ith gridcell is a part of */
+ix_t _parent(std::unordered_map<ix_t, ix_t> const &forwards, ix_t gci)
+{
+    auto ii(forwards.find(gci));
+    if (ii != forwards.end()) return ii->second;
+    return gci;
+}
+
 
 /** Does a breadth-first-search of the neighbor1 graph starting from
 some gridcells.
@@ -858,17 +866,58 @@ start_begin, start_end:
 */
 std::unordered_set<ix_t> find_domain(
     ix_t const *neighbor1,
+    std::unordered_map<ix_t, ix_t> const &firsts,    // Lowest-index cell in each eq class
     ix_t const *dem_filled,
     int const nj, int const ni,
     double const *gt,    // Geotransform
     ix_t const *start_begin, ix_t const *start_end,
     double const min_alpha)
 {
-    // Get info on highest-elevation gridcell in the start set (PRA)
+
+    // Adds a gridcell to the list of cells we need to start from.
+    // If the cell is part of an EQ class, adds the entire class.
+    // EQ Classes are identified by the LOWEST-VALUE index in them.
+    std::vector<ix_t> starts;
+    std::unordered_set<ix_t> eqclasses_seen;    // Which eqclasses we've seen
+
+    auto add_eqclass_to_starts = [neighbor1,&starts,dem_filled](ix_t first_ix) -> void
+    {
+        // Make sure we haven't already added this EQ Class
+        auto ii(eqclasses_seen.find(first_ix));
+        if (ii != eqclass_seen.end()) continue;
+        eqclasses_seen.insert(first_ix);
+
+        // Add the gridcells in the class
+        for (ix_t ix=first_ix; ;) {
+            starts.push_back(ix);
+            ix_t const next_ix = neighbor1[ix];
+            if (next_ix < 0) break;
+            if (dem_filled[next_ix] != dem_filled[ix]) break;
+        }
+    }
+
+    // --------------------------------------------------------------
+
+    // Initialize our starting set (PRA), while expanding EQ classes that
+    // might be within it.
+    for (auto ixp=start_begin; ixp != start_end; ++ixp) {
+        ix_t const ix = *ixp;
+
+        auto ii(firsts.find(ix));
+        if (ii != firsts.end()) {
+            add_eqclass_to_starts(starts, ii->second);
+        } else {
+            starts.push_back(ix);
+        }
+        
+    }
+
+
+    // Get info on highest-elevation gridcell in the start set.
     // This will also be the most up-slope, and hence will have the highest
     // inclination (alpha angle) compared to downslope gridcells.
     // See: https://www.avalanche-center.org/Education/blog/?itemid=535
-    ix_t ix_highest = *std::max_element(start_begin, start_end,
+    ix_t ix_highest = *std::max_element(starts.begin(), starts.end(),
         [dem_filled](int const ix0, int const ix1) { return dem_filled[ix0] < dem_filled[ix1]; });
     double const dem_highest = dem_filled[ix_highest];
     int const j_highest = ix_highest / ni;
@@ -878,13 +927,19 @@ std::unordered_set<ix_t> find_domain(
 
     // Depth First Search
     std::unordered_set<ix_t> seen;
-    for (ix_t const *startp = start_begin; startp != start_end; ++startp) {
-        int ix = *startp;
+    while (starts.size() > 0) {
+        ix_t ix = starts.back(); starts.pop_back();
         for (;;) {
             // Stop if already visited
-            auto ii(seen.find(ix));
-            if (ii != seen.end()) break;
-            seen.insert(ix);
+            {auto ii(seen.find(ix));
+            if (ii != seen.end()) break;}
+
+            // -------------------------------------
+            // Stop if alpha is low enough to suggest
+            // the runout would have stopped by this point (18 degrees
+            // should be OK).  In that case, we should never have been
+            // looking at this gridcell to begin with (it might be WAY
+            // out of bounds).  So don't even add to the seen set.
 
             // Obtain geographic coordinates of this gridcell
             int const j = ix / ni;
@@ -899,15 +954,30 @@ std::unordered_set<ix_t> find_domain(
             double const delz = dem_filled[ix] - dem_highest;
             double const alpha = (180./M_PI) * abs(atan2(delz, delxy));
 
-            // Stop if alpha is low enough to suggest the runout would
-            // have stopped by this point (18 degrees should be OK)
             if (alpha < min_alpha) break;
 
-            // Advance to next gridcell
-            ix = neighbor1[ix];
+            // ----------------------------------------------------
+            // This gridcell is within alpha range, so add it to the
+            // seen set.
+            seen.insert(ix);
 
-            // Stop if no more neighbor
-            if (ix < 0) break;
+            // --------------------------------------------------------
+            ix_t const next_ix = neighbor1[ix];
+
+            // Quit this runout if it's finished itself.
+            if (next_ix < 0) break;
+
+            // Determine if next step is in an EQ class
+            // If so, add the entire EQ class to starts, and quit this start.
+            auto ii(firsts.find(next_ix));
+            if (ii != firsts.end()) {
+                add_eqclass_to_starts(starts, ii->second);
+                break;
+            }
+
+            // --------------------------------------------------------
+            // Next gridcell is just a regular cell.  Advance and continue.
+            ix = next_ix;
         }
     }
 
