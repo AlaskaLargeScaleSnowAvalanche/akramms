@@ -114,9 +114,10 @@ static bool ff_check_same_dimensions(std::vector<std::pair<PyArrayObject *, std:
             int const dim0 = PyArray_DIM(arrays[i-1].first, r);
             int const dim1 = PyArray_DIM(arrays[i-1].first, r);
             if (dim0 != dim1) {
-                snprintf(msg, 256, "Dimension %r of array %s (=%d) and %s (=%d) must match.", r,
+                snprintf(msg, 256, "Dimension %d of array %s (=%d) and %s (=%d) must match.", r,
                 arrays[i-1].second.c_str(), dim0,
                 arrays[i].second.c_str(), dim1);
+            }
         }
     }
     return true;
@@ -868,7 +869,7 @@ std::unordered_set<ix_t> find_domain(
     // inclination (alpha angle) compared to downslope gridcells.
     // See: https://www.avalanche-center.org/Education/blog/?itemid=535
     ix_t ix_highest = *std::max_element(start_begin, start_end,
-        [this](int const ix0, int const ix1) { return dem_filled[ix0] < dem_filled[ix1]; });
+        [dem_filled](int const ix0, int const ix1) { return dem_filled[ix0] < dem_filled[ix1]; });
     double const dem_highest = dem_filled[ix_highest];
     int const j_highest = ix_highest / ni;
     int const i_highest = ix_highest % ni;    // Probably compiles down to divmod
@@ -879,7 +880,6 @@ std::unordered_set<ix_t> find_domain(
     std::unordered_set<ix_t> seen;
     for (ix_t const *startp = start_begin; startp != start_end; ++startp) {
         int ix = *startp;
-        int nlevel = 0;
         for (;;) {
             // Stop if already visited
             auto ii(seen.find(ix));
@@ -905,6 +905,9 @@ std::unordered_set<ix_t> find_domain(
 
             // Advance to next gridcell
             ix = neighbor1[ix];
+
+            // Stop if no more neighbor
+            if (ix < 0) break;
         }
     }
 
@@ -1069,7 +1072,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
         "neighbor1", "dem_filled", "geotransform", "start",         // *args,
         "margin", "debug", "min_alpha",        // **kwargs
         NULL};
-    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!O!|di",
+    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!O!O!|did",
         (char **)kwlist,
         &PyArray_Type, &neighbor1,
         &PyArray_Type, &dem_filled,
@@ -1081,9 +1084,9 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     // ----------- Typecheck input arrays
     if (!ff_check_input_int(neighbor1, "neighbor1", 2)) return NULL;
     if (!ff_check_input_double(dem_filled, "dem_filled", 2)) return NULL;
-    if (!ff_check_same_dimension(
+    if (!ff_check_same_dimensions(
         std::vector<std::pair<PyArrayObject *, std::string>>
-        {{neighbor1, "neighbor1"}, {dem_filled, "dem_filled"})) return NULL;
+        {{neighbor1, "neighbor1"}, {dem_filled, "dem_filled"}})) return NULL;
     if (!ff_check_input_int(start, "start", 1)) return NULL;
     if (!ff_check_input_double(geotransform, "geotransform", 1)) return NULL;
 

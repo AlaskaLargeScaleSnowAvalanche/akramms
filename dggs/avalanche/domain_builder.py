@@ -99,10 +99,12 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):
     return make.Rule(action, [dem_file, pra_file], [pra_burn_file])
 
 # --------------------------------------------------------------------
-def domain_rule(neighbor1_file, pra_burn_file, chull_file, domain_file, margin=0):
+def domain_rule(neighbor1_file, dem_filled_file, pra_burn_file, chull_file, domain_file, margin=0):
     """Compute domains for each PRA.
     neighbor1_file: filename
         Result of neighbor1_rule
+    dem_filled_file: filename
+        DEM that with sinks filled (while computing neighbor1)
     pra_file: filename
         File of PRAs (result of pra_post_rule)
     chull_file: filename
@@ -114,7 +116,8 @@ def domain_rule(neighbor1_file, pra_burn_file, chull_file, domain_file, margin=0
 
     def action(tdir):
         # Read the neighbor1 file
-        grid_info, neighbor1, nodata = gdalutil.read_raster(neighbor1_file)
+        grid_info, neighbor1, nodata = read_neighbor1(neighbor1_file)
+        _, dem_filled, _ = gdalutil.read_raster(dem_filled_file)
 
         # Read the PRAs
         with gzip.open(pra_burn_file, 'rb') as fin:
@@ -128,8 +131,8 @@ def domain_rule(neighbor1_file, pra_burn_file, chull_file, domain_file, margin=0
             pra_burn = row['pra_burn']
 
             # Get the domain from the list of starting cells of the PRA (pra_burn)
-            args = (neighbor1, pra_burn, grid_info.geotransform)
-            seen,chull_list,domain_list = d8graph.find_domain(*args, margin=margin, debug=1)
+            args = (neighbor1, dem_filled, grid_info.geotransform, pra_burn)
+            seen,chull_list,domain_list = d8graph.find_domain(*args, margin=margin, debug=1, min_alpha=5.)
             chulls.append(shapely.geometry.Polygon(chull_list))
             domains.append(shapely.geometry.Polygon(domain_list))
 
