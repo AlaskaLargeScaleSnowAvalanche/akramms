@@ -25,6 +25,7 @@ def neighbor1_rule(dem_file, odir, fill_sinks=True):
     """Compute and store the neighbors graph."""
 
     dem_root = os.path.split(dem_file)[1][:-4]
+    eqclasses_file = os.path.join(odir, f'{dem_root}_eqclasses.pik.gz')
     neighbor1_file = os.path.join(odir, f'{dem_root}_neighbor1.tif')
     dem_filled_file = os.path.join(odir, f'{dem_root}_filled.tif')
 
@@ -44,14 +45,16 @@ def neighbor1_rule(dem_file, odir, fill_sinks=True):
 
         # Compute the degree-1 neighbor graph on the DEM
         # (This also fills sinks in dem)
-        neighbor1 = d8graph.neighbor_graph(dem, nodata, int(fill_sinks))
+        eqclasses, neighbor1 = d8graph.neighbor_graph(dem, nodata, int(fill_sinks))
 
 
-        # Store neighbor1 and filled DEM as GeoTIFF
+        # Store eqclasses a pickle file; and neighbor1 and filled DEM as GeoTIFF
+        with gzip.open(eqclasses_file, 'wb') as out:
+            pickle.dump(eqclasses, out)
         write_neighbor1(neighbor1_file, grid_info, neighbor1, None)
         gdalutil.write_raster(dem_filled_file, grid_info, dem, nodata, type=gdal.GDT_Float64)
 
-    return make.Rule(action, [dem_file], [neighbor1_file, dem_filled_file])
+    return make.Rule(action, [dem_file], [eqclasses_file, neighbor1_file, dem_filled_file])
 # --------------------------------------------------------------------
 def burn_pra_rule(dem_file, pra_file, pra_burn_file):
     """Reads a PRA _rel.shp file into a dataframe; adds a column for
@@ -99,7 +102,7 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):
     return make.Rule(action, [dem_file, pra_file], [pra_burn_file])
 
 # --------------------------------------------------------------------
-def domain_rule(neighbor1_file, dem_filled_file, pra_burn_file, chull_file, domain_file, margin=0):
+def domain_rule(eqclasses_file, neighbor1_file, dem_filled_file, pra_burn_file, chull_file, domain_file, margin=0):
     """Compute domains for each PRA.
     neighbor1_file: filename
         Result of neighbor1_rule
@@ -115,6 +118,10 @@ def domain_rule(neighbor1_file, dem_filled_file, pra_burn_file, chull_file, doma
         Margin to add around convex hull to minimum bounding rectangle."""
 
     def action(tdir):
+        # Read the EQ Classes
+        with gzip.open(eqclasses_file, 'rb') as fin:
+            eqclasses = pickle.load(fin)
+
         # Read the neighbor1 file
         grid_info, neighbor1, nodata = read_neighbor1(neighbor1_file)
         _, dem_filled, _ = gdalutil.read_raster(dem_filled_file)
@@ -131,7 +138,7 @@ def domain_rule(neighbor1_file, dem_filled_file, pra_burn_file, chull_file, doma
             pra_burn = row['pra_burn']
 
             # Get the domain from the list of starting cells of the PRA (pra_burn)
-            args = (neighbor1, dem_filled, grid_info.geotransform, pra_burn)
+            args = (eqclasses, neighbor1, dem_filled, grid_info.geotransform, pra_burn)
             seen,chull_list,domain_list = d8graph.find_domain(*args, margin=margin, debug=1, min_alpha=5.)
             chulls.append(shapely.geometry.Polygon(chull_list))
             domains.append(shapely.geometry.Polygon(domain_list))

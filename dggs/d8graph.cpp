@@ -40,6 +40,26 @@ typedef int ix_t;
 
 
 // ----------------------------------------------------------------------------------------
+/** Simple allocation of 1D Numpy array
+shape0:
+    Length of array
+typenum:
+    Type to allocation, eg NPY_INT, NPY_DOUBLE
+    https://numpy.org/devdocs/reference/c-api/dtype.html#c.NPY_TYPES
+*/
+PyArrayObject *np_new_1d(npy_intp shape0, int typenum)
+{
+    PyArray_Descr *tdescr = PyArray_DescrFromType(typenum);
+    npy_intp dims[] = {shape0};
+    npy_intp strides[] = {tdescr->typeobj->tp_basicsize};
+    return (PyArrayObject*) PyArray_NewFromDescr(&PyArray_Type, 
+        tdescr, 1,    // rank 1
+        dims, strides,
+        NULL,        // Allocate new memory
+        // PyArray_FLAGS(dem), ...
+        NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED, NULL);
+}
+// ----------------------------------------------------------------------------------------
 static bool ff_check_input_int(PyArrayObject *dem, char const *name, int rank)
 {
     char msg[256];
@@ -401,6 +421,84 @@ std::array<TypeT, 2> sorted(TypeT a, TypeT b)
 }
 
 // ==================================================================================
+PyObject *encode_sets(std::unordered_map<ix_t, std::set<ix_t>> const &eqclasses)
+{
+    // Determine size of arrays
+    size_t nsets = eqclasses.size();
+    size_t nelements = 0;
+    for (auto &item : eqclasses) {
+        nelements += item.second.size();
+    }
+
+    // Allocate arrays
+    PyArrayObject *py_setbounds = np_new_1d((npy_intp)nsets+1, NPY_INT);
+    PyArrayObject *py_elements = np_new_1d((npy_intp)nelements, NPY_INT);
+    int *setbounds = (int *)PyArray_GETPTR1(py_setbounds, 0);
+    int *elements = (int *)PyArray_GETPTR1(py_elements, 0);
+
+    // Copy sets over into the arrays
+    ix_t iset = 0;
+    ix_t iele = 0;
+    for (auto &item : eqclasses) {
+
+        // Record length of this set
+        auto &set(item.second);
+        setbounds[iset++] = iele;
+
+        // Record elements of this set
+        for (ix_t ix : set) {    // This is in sorted order
+            elements[iele++] = ix;
+        }
+    }
+    setbounds[iset++] = iele;
+
+    // Sanity check
+    assert(iset == nsets+1);
+    assert(iele == nelements);
+
+    // Return as Python tuple
+    return Py_BuildValue("OO", py_setbounds, py_elements);
+}
+// ------------------------------------------------------------
+/**
+Returns:
+    Map indicating the lowest-index gridcell of the EQ Class that each
+    gridcell belongs to.  (Only for gridcells involved in an explicit
+    EQ Class).
+*/
+std::unordered_map<ix_t, ix_t> decode_sets_to_firstmap(PyObject *tup)
+{
+printf("BEGIN decode\n");
+    std::unordered_map<ix_t, ix_t> firstmap;
+
+    PyArrayObject *py_setbounds = (PyArrayObject *)PyTuple_GetItem(tup, 0);
+    PyArrayObject *py_elements = (PyArrayObject *)PyTuple_GetItem(tup, 1);
+
+    size_t nsets = PyArray_DIM(py_setbounds, 0) - 1;
+    int *setbounds = (int *)PyArray_GETPTR1(py_setbounds, 0);
+    int *elements = (int *)PyArray_GETPTR1(py_elements, 0);
+
+    // Iterate through each set and create the firstmap
+    for (size_t i=0; i<nsets; ++i) {
+        if (i%100 == 0) printf("Working on %ld of %ld\n", i, nsets);
+        int const j0 = elements[setbounds[i]];
+        for (int j=setbounds[i]; j<setbounds[i+1]; ++j) {
+            firstmap.insert(std::make_pair(elements[j], j0));
+        }
+    }
+
+printf("END decode\n");
+    return firstmap;
+}
+// ------------------------------------------------------------
+/** Determines which eqclass the ith gridcell is a part of */
+ix_t _parent(std::unordered_map<ix_t, ix_t> const &forwards, ix_t gci)
+{
+    auto ii(forwards.find(gci));
+    if (ii != forwards.end()) return ii->second;
+    return gci;
+}
+
 class EQClasses {
     // Cell this has been merged into (if it's been merged)
     std::unordered_map<ix_t, ix_t> forwards;
@@ -514,9 +612,11 @@ public:
 /** A graph with implicit 8-way neighbors based on DEM and used /
 unused gridcells */
 class D8Graph {
+public:
     // Maintain nodes of our graph as equivalence classes
     EQClasses eqclasses;
 
+private:
     // Maintain a DEM (imported from Python), giving us our neighbors
     dem_t *dem;
     int const nj;
@@ -833,6 +933,7 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
             // then traverse all portions of the eq class before
             // exiting from the highest index.
             auto ii0(members_i.begin());
+
             auto ii1(ii0);   ++ii1;
             while (ii1 != members_i.end()) {
                 neighbor1[*ii0] = *ii1;
@@ -849,13 +950,8 @@ const std::vector<std::array<int,2>> D8Graph::dneigh = {
     {1,-1},  {1,0},  {1,1}};
 
 // ====================================================================
-/** Determines which eqclass the ith gridcell is a part of */
-ix_t _parent(std::unordered_map<ix_t, ix_t> const &forwards, ix_t gci)
-{
-    auto ii(forwards.find(gci));
-    if (ii != forwards.end()) return ii->second;
-    return gci;
-}
+
+// ------------------------------------------------------------
 
 
 /** Does a breadth-first-search of the neighbor1 graph starting from
@@ -865,26 +961,25 @@ start_begin, start_end:
     begin and end iterators for starting gridcell indices
 */
 std::unordered_set<ix_t> find_domain(
+    std::unordered_map<ix_t, ix_t> const &firstmap,    // Lowest-index cell in each eq class
     ix_t const *neighbor1,
-    std::unordered_map<ix_t, ix_t> const &firsts,    // Lowest-index cell in each eq class
     ix_t const *dem_filled,
     int const nj, int const ni,
     double const *gt,    // Geotransform
     ix_t const *start_begin, ix_t const *start_end,
     double const min_alpha)
 {
-
     // Adds a gridcell to the list of cells we need to start from.
     // If the cell is part of an EQ class, adds the entire class.
     // EQ Classes are identified by the LOWEST-VALUE index in them.
     std::vector<ix_t> starts;
     std::unordered_set<ix_t> eqclasses_seen;    // Which eqclasses we've seen
 
-    auto add_eqclass_to_starts = [neighbor1,&starts,dem_filled](ix_t first_ix) -> void
+    auto add_eqclass_to_starts = [neighbor1,dem_filled,&starts,&eqclasses_seen](ix_t first_ix) -> void
     {
         // Make sure we haven't already added this EQ Class
         auto ii(eqclasses_seen.find(first_ix));
-        if (ii != eqclass_seen.end()) continue;
+        if (ii != eqclasses_seen.end()) return;
         eqclasses_seen.insert(first_ix);
 
         // Add the gridcells in the class
@@ -894,7 +989,7 @@ std::unordered_set<ix_t> find_domain(
             if (next_ix < 0) break;
             if (dem_filled[next_ix] != dem_filled[ix]) break;
         }
-    }
+    };
 
     // --------------------------------------------------------------
 
@@ -903,9 +998,9 @@ std::unordered_set<ix_t> find_domain(
     for (auto ixp=start_begin; ixp != start_end; ++ixp) {
         ix_t const ix = *ixp;
 
-        auto ii(firsts.find(ix));
-        if (ii != firsts.end()) {
-            add_eqclass_to_starts(starts, ii->second);
+        auto ii(firstmap.find(ix));
+        if (ii != firstmap.end()) {
+            add_eqclass_to_starts(ii->second);
         } else {
             starts.push_back(ix);
         }
@@ -969,11 +1064,11 @@ std::unordered_set<ix_t> find_domain(
 
             // Determine if next step is in an EQ class
             // If so, add the entire EQ class to starts, and quit this start.
-            auto ii(firsts.find(next_ix));
-            if (ii != firsts.end()) {
-                add_eqclass_to_starts(starts, ii->second);
+            {auto ii(firstmap.find(next_ix));
+            if (ii != firstmap.end()) {
+                add_eqclass_to_starts(ii->second);
                 break;
-            }
+            }}
 
             // --------------------------------------------------------
             // Next gridcell is just a regular cell.  Advance and continue.
@@ -1086,9 +1181,10 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
 
     PySys_WriteStdout("neighbor1 dims: %ld %ld\n", PyArray_DIM(neighbor1,0), PyArray_DIM(neighbor1,1));
     d8g.to_neighbor1((npy_int *)PyArray_GETPTR2(neighbor1,0,0));
+    PyObject *eqclasses = encode_sets(d8g.eqclasses.eqclasses);
 
     // ========================================================
-    return (PyObject *)neighbor1;
+    return Py_BuildValue("OO", eqclasses, (PyObject *)neighbor1);
 }
 // ----------------------------------------------------------------------------------------
 static PyObject *polygon_to_python(std::vector<std::array<double,2>> const &mbr)
@@ -1129,6 +1225,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
 {
     // ======================== Parse Python Input
     // Input arrays
+    PyObject *eqclasses;
     PyArrayObject *neighbor1;
     PyArrayObject *dem_filled;
     PyArrayObject *geotransform;
@@ -1139,11 +1236,12 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
 
     // Parse args and kwargs
     static char const *kwlist[] = {
-        "neighbor1", "dem_filled", "geotransform", "start",         // *args,
+        "eqclasses", "neighbor1", "dem_filled", "geotransform", "start",         // *args,
         "margin", "debug", "min_alpha",        // **kwargs
         NULL};
-    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!O!O!|did",
+    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "OO!O!O!O!|did",
         (char **)kwlist,
+        &eqclasses,    // (setbounds, elements)
         &PyArray_Type, &neighbor1,
         &PyArray_Type, &dem_filled,
         &PyArray_Type, &geotransform,
@@ -1163,10 +1261,14 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     // int const nj = PyArray_DIM(neighbor1,0);
     int const ni = PyArray_DIM(neighbor1,1);
 
+
+    std::unordered_map<ix_t, ix_t> firstmap(decode_sets_to_firstmap(eqclasses));
+
     // ============================ Run the Core Computation
     // Run the flood fill algorithm, result in a set of 1D indices
     std::unordered_set<ix_t> seen(
         find_domain(
+            firstmap,
             (ix_t *)PyArray_GETPTR2(neighbor1,0,0),
             (ix_t *)PyArray_GETPTR2(dem_filled,0,0),
             PyArray_DIM(neighbor1,0), PyArray_DIM(neighbor1,1),    // Not needed
@@ -1186,16 +1288,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
         std::sort(seen_vec.begin(), seen_vec.end());
 
         // ============================= Construct Python Output
-        // Allocate output array of seen indices
-        npy_intp out_dims[] = {(npy_intp) seen.size()};
-        npy_intp out_strides[] = {(npy_intp) sizeof(int)};
-        ret_seen = (PyArrayObject*) PyArray_NewFromDescr(&PyArray_Type, 
-            PyArray_DescrFromType(NPY_INT32),             // dtype='i'
-            1,                                          // rank 1
-            out_dims, out_strides,
-            NULL,        // Allocate new memory
-            // PyArray_FLAGS(dem), ...
-            NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED, NULL);
+        ret_seen = np_new_1d((npy_intp)seen.size(), NPY_INT32);
 
         // Copy to ret_seen
         for (size_t k=0; k<seen_vec.size(); ++k) {
