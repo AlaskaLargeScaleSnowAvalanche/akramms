@@ -797,6 +797,8 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
                 merge(ix, min_ix, merge_count % 10000 == 0);    // Merge into lower-elevation     index always
                 ++merge_count;
 
+//if (merge_count >= 30000) goto end_loop;
+
 #if 0     // max_sink_size is too buggy
                 // Stop if we've gotten too large
                 if (merged_eqclass.size() > max_sink_size) break;
@@ -804,6 +806,7 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
 
             }
         }
+end_loop:
 
         // Set DEM level for all cells in each eqclass
         for (auto eqii(eqclasses.eqclasses.begin()); eqii != eqclasses.eqclasses.end(); ++eqii) {
@@ -1011,8 +1014,8 @@ std::unordered_set<ix_t> avalanche_runout(
 
                     // Unused cells look like elevation 0.0 to us now, same as ocean.
                     // Also, account for dem in case it's giving negative numbers for bathymetry
-                    double const ele1 = (
-                         (dem_filled[ji1] == dem_nodata || ele1 < 0.0) ? 0.0 : dem_filled[ji1]);
+                    double ele1 = dem_filled[ji1];
+                    if (ele1 == dem_nodata || ele1 < 0.0) ele1 = 0;
 
                     if (ele1 < min_ele) {
                         // Found a new minimum!
@@ -1113,6 +1116,7 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
 
     // -----------------------------------------
     // Create output array (uninitialized)
+    // auto const nj = PyArray_DIM(dem,0);
     auto const ni = PyArray_DIM(dem,1);
     npy_intp const strides[] = {(npy_intp)(sizeof(int) * ni), (npy_intp)sizeof(int)};
     PyArrayObject *neighbor1 = (PyArrayObject*) PyArray_NewFromDescr(

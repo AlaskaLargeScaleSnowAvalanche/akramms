@@ -17,6 +17,7 @@ def add_akramms_rules(makefile, scene_dir):
     dem_file = scene_args['dem_file']
     dem_filled_file,sinks_file,neighbor1_file = makefile.add(domain_builder.neighbor1_rule(
         dem_file, scene_dir, fill_sinks=True)).outputs
+    return
 
     # Loop over combos
     for return_period in scene_args['return_periods']:

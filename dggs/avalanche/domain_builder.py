@@ -41,7 +41,7 @@ def neighbor1_rule(dem_file, odir, fill_sinks=True):
 
 
         # Blank out zero-elevation squares because they are ocean (not land)
-#        dem[dem == 0] = nodata    # Blank out zero-elevation squares (sea level)
+        dem[dem == 0] = nodata    # Blank out zero-elevation squares (sea level)
 
         # Compute the degree-1 neighbor graph on the DEM
         # (This also fills sinks in dem)
@@ -49,7 +49,7 @@ def neighbor1_rule(dem_file, odir, fill_sinks=True):
 
         # ---------- Store Output
         gdalutil.write_raster(dem_filled_file, grid_info, dem, nodata, type=gdal.GDT_Float64)
-        gdalutil.write_raster(sinks_file, grid_info, dem, -1)
+        gdalutil.write_raster(sinks_file, grid_info, sinks, -1)
         write_neighbor1(neighbor1_file, grid_info, neighbor1, None)
 
     return make.Rule(action, [dem_file], [dem_filled_file, sinks_file, neighbor1_file])
@@ -116,13 +116,9 @@ def domain_rule(dem_filled_file, neighbor1_file, pra_burn_file, chull_file, doma
         Margin to add around convex hull to minimum bounding rectangle."""
 
     def action(tdir):
-        # Read the EQ Classes
-        with gzip.open(eqclasses_file, 'rb') as fin:
-            eqclasses = pickle.load(fin)
-
-        # Read the neighbor1 file
-        grid_info, neighbor1, _ = read_neighbor1(neighbor1_file)
+        # Read dem_filled and neighbor1
         _, dem_filled, dem_nodata = gdalutil.read_raster(dem_filled_file)
+        grid_info, neighbor1, _ = read_neighbor1(neighbor1_file)
 #        print('Sample dem_filled[18729844] = {}'.format(dem_filled.reshape(-1)[18729844]))
 
         # Read the PRAs
