@@ -432,10 +432,10 @@ ix_t _parent(std::unordered_map<ix_t, ix_t> const &forwards, ix_t gci)
 }
 
 class EQClasses {
+public:
     // Cell this has been merged into (if it's been merged)
     std::unordered_map<ix_t, ix_t> forwards;
 
-public:
     // EQClass with >1 element
     // Inner vector is SORTED
     std::map<ix_t, std::set<ix_t>> eqclasses;
@@ -612,7 +612,6 @@ public:
 
     size_t size() const { return nj*ni; }
 
-private:
     /** Obtain list of neighbors based on raster. */
     std::set<ix_t> &d8_neighbors_list(int ji0, std::set<ix_t> &ngh)
     {
@@ -833,58 +832,38 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
         }
 
         // ix_i is the index of the "current" eq class
+        std::set<ix_t> ngh;
         for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i) {
             // Skip cells that aren't part of the grid
             if (dem[ix_i] == nodata) continue;
 
-            // Only consider each equivalence class once (when we are
-            // looking at its lead gridcell, which is not necessarily
-            // the largest or smallest)
-            if (eqclasses.parent(ix_i) != ix_i) continue;
+            // Don't set neighbor1 if we are in an EQClass
+            {auto ii(eqclasses.forwards.find(ix_i));
+            if (ii != eqclasses.forwards.end()) continue;}
 
-            // Consider how we will link FROM ix_i, TO something else
-            // if ix_i is a compound eq class, link from the HIGHEST INDEX gridcell in it
-            auto &members_i(eqclasses.members(ix_i));
-            ix_t max_member_i = *members_i.rbegin();   // Highest index in EQ Class ix_i
+            // Get list of neighbors
+            d8_neighbors_list(ix_i, ngh);
+
+            // Don't set if this is an edge cell
+            if (ngh.size() < 8) continue;
+
+
+            // Don't set if any neighbors are in an EQClass
+            ix_t ix_j;
+            for (ix_t ix_j : ngh) {
+                auto ii(eqclasses.forwards.find(ix_j));
+                if (ii != eqclasses.forwards.end()) goto continue_outer;
+            }
 
             // Set ix_j to index of lowest neighboring eq class
-            auto &ngh(neighbors(ix_i));
-            ix_t ix_j = *std::min_element(ngh.begin(), ngh.end(),
+            ix_j = *std::min_element(ngh.begin(), ngh.end(),
                 [this](int const ix0, int const ix1) { return dem[ix0] < dem[ix1]; });
 
             // Link to the next-lowest neighbor
             if (dem[ix_j] < dem[ix_i]) {
-                // The lowest neighbor ix_j is LOWER than ix_i (typical case).
-                // Create graph link: ix_i -> ix_j
-                // if ix_j is a compound eq class, link to the LOWEST INDEX gridcell in it
-                ix_t min_member_j = eqclasses.min_member(ix_j);         // Smallest in j
-                neighbor1[max_member_i] = min_member_j;
-//if (members_i.find(18729844) != members_i.end()) printf("Found target 18729844 in %d, linking to %d\n", ix_i, ix_j);
-            } else {
-                // The lowest neighboring EQ class is no lower than us.
-                // So we are a sink.
-                // Record no outbound neighbor.  AVOID CYCLES IN THE GRAPH!
-                neighbor1[max_member_i] = -1;
-//if (members_i.find(18729844) != members_i.end()) printf("Found target 18729844 in %d, linking to %d\n", ix_i, -1);
+                neighbor1[ix_i] = ix_j;
             }
-
-#if 0
-            // --------------------------------------------------
-            // Create links *within* eq class ix_i, from the lowest
-            // index to the highest index gridcell.  Any flow into eq
-            // class ix_i will enter at the lowest index gridcell,
-            // then traverse all portions of the eq class before
-            // exiting from the highest index.
-            auto ii0(members_i.begin());
-
-            auto ii1(ii0);   ++ii1;
-            while (ii1 != members_i.end()) {
-                neighbor1[*ii0] = *ii1;
-                ii0 = ii1;
-                ++ii1;
-            }
-#endif
-
+continue_outer: ;
         }
     }
 
@@ -959,7 +938,7 @@ std::unordered_set<ix_t> avalanche_runout(
         return ele1;
     };
     auto add_neighbor =
-        [dem_filled,&seen,gt,min_tan_alpha,x_origin,y_origin,z_origin,ni,_elev]
+        [&seen,gt,min_tan_alpha,x_origin,y_origin,z_origin,ni,&_elev]
         (ix_t ix, std::vector<ix_t> &neighbors) -> void
     {
         int const j = ix / ni;
