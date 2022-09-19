@@ -112,6 +112,7 @@ static bool ff_check_input_double(PyArrayObject *dem, char const *name, int rank
     return true;
 }
 // ----------------------------------------------------------------------------------------
+#if 0    // unused
 static bool ff_check_same_dimensions(std::vector<std::pair<PyArrayObject *, std::string>> const &arrays)
 {
     char msg[256];
@@ -141,6 +142,7 @@ static bool ff_check_same_dimensions(std::vector<std::pair<PyArrayObject *, std:
     }
     return true;
 }
+#endif
 // ==================================================================================
 // Converting to/from the Ulam Spiral
 // Clockwise spiral to match D8 ArcGIS
@@ -904,11 +906,12 @@ start_begin, start_end:
 std::unordered_set<ix_t> avalanche_runout(
     double const *dem_filled,    // Our main source of information on neighbors
     double dem_nodata,
-    ix_t const *neighbor1,
+//    ix_t const *neighbor1,    // This optimization is not needed, runout is VERY fast anyway.
     int nj, int ni,     // Not needed, except for bounds checking on neighbor1 lookup
     double const *gt,    // Geotransform
     ix_t const *start_begin, ix_t const *start_end,
-    double const min_alpha)
+    double const min_alpha,
+    double const max_runout)
 {
     double const min_tan_alpha = tan((M_PI/180.)*min_alpha);
 
@@ -938,34 +941,42 @@ std::unordered_set<ix_t> avalanche_runout(
         return ele1;
     };
     auto add_neighbor =
-        [&seen,gt,min_tan_alpha,x_origin,y_origin,z_origin,ni,&_elev]
-        (ix_t ix, std::vector<ix_t> &neighbors) -> void
+        [&seen,gt,min_tan_alpha,max_runout,x_origin,y_origin,z_origin,ni,&_elev]
+        (ix_t ix, std::vector<ix_t> &neighbors, bool check_min_alpha) -> void
     {
-        int const j = ix / ni;
-        int const i = ix % ni;    // Probably compiles down to divmod
-
         // Don't add if we've already seen this neighbor
         if (seen.find(ix) != seen.end()) return;
 
+        // Stop if we've hit the edge of the (valid) domain.
+        // Clearly a useful avalanche simulation will not be possible.
+
         // Obtain geographic coordinates of this gridcell
-//        int const j = ix / ni;
-//        int const i = ix % ni;    // Probably compiles down to divmod
+        int const j = ix / ni;
+        int const i = ix % ni;    // Probably compiles down to divmod
         double const x = gt[0] + i*gt[1] + j*gt[2];
         double const y = gt[3] + i*gt[4] + j*gt[5];
-        double const z = _elev(ix);
-
-        // Compute slope of inclination from the top (tan(alpha))
         double const delx = x - x_origin;
         double const dely = y - y_origin;
         double const delxy = sqrt(dely*dely + delx*delx);
-        double const delz = z_origin - z;
-        double const tan_alpha = delz / delxy;
-        // double const alpha = (180./M_PI) * abs(atan2(delz, delxy));
 
-        // Quit if our azimuth (alpha) angle to the top of the
-        // avalanche is too small.
-//        printf("tan_alpha %g %g\n", tan_alpha, min_tan_alpha);
-        if (tan_alpha < min_tan_alpha) return;
+        // See if we've gone too far.  Some small PRAs ("Tiny")
+        // occur at relatively low elevation, and hence alpha will
+        // never get down to 18 degrees.  This is especially a problem
+        // for PRAs near the edge of the domain.
+        if (delxy > max_runout) return;
+
+        if (check_min_alpha) {
+            // Compute slope of inclination from the top (tan(alpha))
+            double const z = _elev(ix);
+            double const delz = z_origin - z;
+            double const tan_alpha = delz / delxy;
+            // double const alpha = (180./M_PI) * abs(atan2(delz, delxy));
+
+            // Quit if our azimuth (alpha) angle to the top of the
+            // avalanche is too small.
+    //        printf("tan_alpha %g %g\n", tan_alpha, min_tan_alpha);
+            if (tan_alpha < min_tan_alpha) return;
+        }
 
         // OK looks like a good neighbor!
         neighbors.push_back(ix);
@@ -980,6 +991,7 @@ std::unordered_set<ix_t> avalanche_runout(
         // Determine neighbor values of each current node
         // Add to our vector of neighbors if we haven't seen it yet.
         // Also add to our seen set (most efficient this way)
+        bool first = true;
         for (ix_t ji0 : cur) {
             if (false) {
             } else {
@@ -1000,6 +1012,10 @@ std::unordered_set<ix_t> avalanche_runout(
                     if ((j1<0) || (j1>=nj) || (i1<0) || (i1>=ni)) continue;
                     ix_t const ji1 = j1*ni + i1;
 
+                    // Stop if the runout is leaving our DEM.  There will be no
+                    // way to get a realistic avalanche run from it.
+                    if (dem_filled[ji1] == dem_nodata) return std::unordered_set<ix_t>();
+
                     // Unused cells look like elevation 0.0 to us now, same as ocean.
                     // Also, account for dem in case it's giving negative numbers for bathymetry
                     double const ele1 = _elev(ji1);
@@ -1014,7 +1030,8 @@ std::unordered_set<ix_t> avalanche_runout(
                 }
 
                 // Add our minimum neighbors to the list of neighbors for next step
-                for (ix_t ix : min_ix) add_neighbor(ix, neighbors);
+                for (ix_t ix : min_ix) add_neighbor(ix, neighbors, !first);
+                first = false;
             }
         }
 
@@ -1183,39 +1200,41 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     // Input arrays
     PyArrayObject *dem_filled;
     double dem_nodata = 0.0;
-    PyArrayObject *neighbor1;
+    // PyArrayObject *neighbor1;
     PyArrayObject *geotransform;
     PyArrayObject *start;
     double margin = 0;
     int debug = 0;    // bool
     double min_alpha = 18.;    // Minimum "alpha" angle at which avalanche expected to continue
+    double max_runout = 10000.;    // Maximum distance avalanche can go [m]
 
     // Parse args and kwargs
     static char const *kwlist[] = {
-        "dem_filled", "dem_nodata", "neighbor1", "geotransform", "start",         // *args,
-        "margin", "debug", "min_alpha",        // **kwargs
+        "dem_filled", "dem_nodata", //"neighbor1",
+        "geotransform", "start",         // *args,
+        "margin", "debug", "min_alpha", "max_runout",        // **kwargs
         NULL};
-    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!dO!O!O!|did",
+    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!dO!O!|didd",
         (char **)kwlist,
         &PyArray_Type, &dem_filled,
         &dem_nodata,
-        &PyArray_Type, &neighbor1,
+        //&PyArray_Type, &neighbor1,
         &PyArray_Type, &geotransform,
         &PyArray_Type, &start,
-        &margin, &debug, &min_alpha
+        &margin, &debug, &min_alpha, &max_runout
         )) return NULL;
 
     // ----------- Typecheck input arrays
-    if (!ff_check_input_int(neighbor1, "neighbor1", 2)) return NULL;
+//    if (!ff_check_input_int(neighbor1, "neighbor1", 2)) return NULL;
     if (!ff_check_input_double(dem_filled, "dem_filled", 2)) return NULL;
-    if (!ff_check_same_dimensions(
-        std::vector<std::pair<PyArrayObject *, std::string>>
-        {{neighbor1, "neighbor1"}, {dem_filled, "dem_filled"}})) return NULL;
+//    if (!ff_check_same_dimensions(
+//        std::vector<std::pair<PyArrayObject *, std::string>>
+//        {{neighbor1, "neighbor1"}, {dem_filled, "dem_filled"}})) return NULL;
     if (!ff_check_input_int(start, "start", 1)) return NULL;
     if (!ff_check_input_double(geotransform, "geotransform", 1)) return NULL;
 
-    // int const nj = PyArray_DIM(neighbor1,0);
-    int const ni = PyArray_DIM(neighbor1,1);
+    // int const nj = PyArray_DIM(dem_filled,0);
+    int const ni = PyArray_DIM(dem_filled,1);
 
 
     // ============================ Run the Core Computation
@@ -1224,14 +1243,16 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
         avalanche_runout(
             (double *)PyArray_GETPTR2(dem_filled,0,0),
             dem_nodata,
-            (ix_t *)PyArray_GETPTR2(neighbor1,0,0),
+//            (ix_t *)PyArray_GETPTR2(neighbor1,0,0),
             PyArray_DIM(dem_filled,0), PyArray_DIM(dem_filled,1),    // Not needed
             (double *)PyArray_GETPTR1(geotransform, 0),
             (ix_t *)PyArray_GETPTR1(start, 0),
             (ix_t *)PyArray_GETPTR1(start, PyArray_DIM(start,0)),
-            min_alpha));
+            min_alpha, max_runout));
 
     PySys_WriteStdout("Flood Fill went from %ld -> %ld gridcells.\n", PyArray_DIM(start,0), seen.size());
+    // No domain possible if we left the DEM domain in the runout.
+    if (seen.size() == 0) { Py_INCREF(Py_None); return Py_None; }
 
     // ================ Return raw results of the flood fill
     PyArrayObject *ret_seen = nullptr;

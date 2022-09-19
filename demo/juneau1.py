@@ -31,8 +31,8 @@ def add_akramms_rules(makefile, scene_dir):
                 pra_post.pra_post_rule(scene_dir, return_period, forest, require_all=False)).outputs
 
             # Domain finder for post-process output
-#            for pra_file in pra_files:
-            for pra_file in pra_files[3:]:    # TESTING: Do only L (large)
+            for pra_file in pra_files:
+#            for pra_file in pra_files[3:]:    # TESTING: Do only L (large)
                 pra_burn_file = '{}_burn.pik.gz'.format(pra_file[:-4])
                 makefile.add(
                     domain_builder.burn_pra_rule(dem_file, pra_file, pra_burn_file))
@@ -40,7 +40,7 @@ def add_akramms_rules(makefile, scene_dir):
                 chull_file = '{}_chull.shp'.format(pra_file[:-4])
                 domain_file = '{}_domain.shp'.format(pra_file[:-4])
                 makefile.add(
-                    domain_builder.domain_rule(dem_filled_file, neighbor1_file, pra_burn_file, chull_file, domain_file))
+                    domain_builder.domain_rule(dem_filled_file, pra_burn_file, chull_file, domain_file, min_alpha=18., margin=1000.))
 
 def main():
 
@@ -67,6 +67,6 @@ def main():
     print('setup.py ', cmd)
     setuptools.sandbox.run_setup(setup_py, cmd)
 
-    makefile.generate('juneau1_mk', run=True)
+    makefile.generate('juneau1_mk')#, run=True)
 
 main()

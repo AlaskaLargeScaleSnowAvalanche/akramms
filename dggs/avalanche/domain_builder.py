@@ -46,11 +46,19 @@ def neighbor1_rule(dem_file, odir, fill_sinks=True):
         # Compute the degree-1 neighbor graph on the DEM
         # (This also fills sinks in dem)
         sinks, neighbor1 = d8graph.neighbor_graph(dem, nodata, int(fill_sinks))
+        dem_filled = dem    # dem has now been filled in, change name appropriately
 
-        # ---------- Store Output
-        gdalutil.write_raster(dem_filled_file, grid_info, dem, nodata, type=gdal.GDT_Float64)
+        # Write sinks and neighbor1 so we can forget about them
         gdalutil.write_raster(sinks_file, grid_info, sinks, -1)
+        sinks = None
         write_neighbor1(neighbor1_file, grid_info, neighbor1, None)
+        neighbor1 = None
+
+        # -----------------------------------------------------------
+        # dem has now been filled in.  Re-read the original DEM to mask-in ocean areas.
+        _, dem, _ = gdalutil.read_raster(dem_file)
+        dem_filled[dem==0.0] = 0.0
+        gdalutil.write_raster(dem_filled_file, grid_info, dem, nodata, type=gdal.GDT_Float64)
 
     return make.Rule(action, [dem_file], [dem_filled_file, sinks_file, neighbor1_file])
 # --------------------------------------------------------------------
@@ -100,7 +108,7 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):
     return make.Rule(action, [dem_file, pra_file], [pra_burn_file])
 
 # --------------------------------------------------------------------
-def domain_rule(dem_filled_file, neighbor1_file, pra_burn_file, chull_file, domain_file, margin=0):
+def domain_rule(dem_filled_file, pra_burn_file, chull_file, domain_file, min_alpha=18., max_runout=10000., margin=0.):
     """Compute domains for each PRA.
     neighbor1_file: filename
         Result of neighbor1_rule
@@ -117,8 +125,8 @@ def domain_rule(dem_filled_file, neighbor1_file, pra_burn_file, chull_file, doma
 
     def action(tdir):
         # Read dem_filled and neighbor1
-        _, dem_filled, dem_nodata = gdalutil.read_raster(dem_filled_file)
-        grid_info, neighbor1, _ = read_neighbor1(neighbor1_file)
+        grid_info, dem_filled, dem_nodata = gdalutil.read_raster(dem_filled_file)
+#        grid_info, neighbor1, _ = read_neighbor1(neighbor1_file)
 #        print('Sample dem_filled[18729844] = {}'.format(dem_filled.reshape(-1)[18729844]))
 
         # Read the PRAs
@@ -133,19 +141,25 @@ def domain_rule(dem_filled_file, neighbor1_file, pra_burn_file, chull_file, doma
             pra_burn = row['pra_burn']
 
             # Get the domain from the list of starting cells of the PRA (pra_burn)
-            args = (dem_filled, dem_nodata, neighbor1, grid_info.geotransform, pra_burn)
-            seen,chull_list,domain_list = d8graph.find_domain(*args, margin=margin, debug=1, min_alpha=18.)
-            chulls.append(shapely.geometry.Polygon(chull_list))
-            domains.append(shapely.geometry.Polygon(domain_list))
-
-        # Store domains as a Shapefile
-        domains_df = pras_df[['Id']]
-        domains_df['shape'] = domains
-        shputil.write_df(domains_df, 'shape', 'Polygon', domain_file, wkt=grid_info.wkt)
+            args = (dem_filled, dem_nodata, grid_info.geotransform, pra_burn)
+            ret = d8graph.find_domain(*args, margin=margin, debug=1, min_alpha=min_alpha, max_runout=max_runout)
+            if ret is not None:
+                seen,chull_list,domain_list = ret
+                chulls.append(shapely.geometry.Polygon(chull_list))
+                domains.append(shapely.geometry.Polygon(domain_list))
+            else:
+                # Not able to make a domain
+                chulls.append(shapely.geometry.Polygon([]))
+                domains.append(shapely.geometry.Polygon([]))
 
         # Store chulls as a Shapefile
         chulls_df = pras_df[['Id']]
         chulls_df['shape'] = chulls
         shputil.write_df(chulls_df, 'shape', 'Polygon', chull_file, wkt=grid_info.wkt)
 
-    return make.Rule(action, [neighbor1_file, pra_burn_file], [chull_file, domain_file])
+        # Store domains as a Shapefile
+        domains_df = pras_df[['Id']]
+        domains_df['shape'] = domains
+        shputil.write_df(domains_df, 'shape', 'Polygon', domain_file, wkt=grid_info.wkt)
+
+    return make.Rule(action, [dem_filled_file, pra_burn_file], [chull_file, domain_file])
