@@ -1,3 +1,4 @@
+import functools
 import os
 import numpy as np
 from dggs.util import paramutil
@@ -131,6 +132,7 @@ DEFAULTS = {
 
 )}
 
+@functools.lru_cache()
 def load(scene_dir):
     """Reads the scene """
     ret = paramutil.load_nc(os.path.join(scene_dir, 'scene.nc'))

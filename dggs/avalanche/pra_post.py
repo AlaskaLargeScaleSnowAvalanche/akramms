@@ -96,7 +96,7 @@ def _pra_post_iter1():
 
 
 
-def pra_post_rule(scene_dir, return_period, forest, require_all=True):
+def release_rule(scene_dir, return_period, forest, ramms_dir, require_all=True):
     """
     scene_dir:
         Uses params: name ("site"), resample_cell_size ("res")
@@ -104,6 +104,11 @@ def pra_post_rule(scene_dir, return_period, forest, require_all=True):
     return_period:
         Return period we are calculating for.
         Must be included in scene_args['return_periods']
+    ramms_dir:
+        Top-level directory for RAMMS run that's being created.
+        Typically equal to:
+           ramms.ramms_dir(scene_dir, scene_args['name'], return_period, forest)
+
     forest: bool  (formerly "Naming")
         Whether we are doing with / without forest
     sx3_file:
@@ -126,9 +131,10 @@ def pra_post_rule(scene_dir, return_period, forest, require_all=True):
         f'PRA_{process_tree.return_period_category(return_period)}',
         f'PRA_{return_period}y_{For}.shp'))
 
+#    ramms_dir = ramms.ramms_dir(scene_dir, scene_args['name'], return_period, forest)
     for catname in _pra_post_iter1():
         cat_letter = catname[0].upper()
-        outputs.append(os.path.join(scene_dir,
+        outputs.append(os.path.join(ramms_dir, 'RELEASE',
             f'{name}_{For}_{resolution}m_{return_period}{cat_letter}_rel.shp'))
 
     # Add one-off input files

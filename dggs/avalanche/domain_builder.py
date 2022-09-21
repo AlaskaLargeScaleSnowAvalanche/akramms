@@ -162,4 +162,4 @@ def domain_rule(dem_filled_file, pra_burn_file, chull_file, domain_file, min_alp
         domains_df['shape'] = domains
         shputil.write_df(domains_df, 'shape', 'Polygon', domain_file, wkt=grid_info.wkt)
 
-    return make.Rule(action, [dem_filled_file, pra_burn_file], [chull_file, domain_file])
+    return make.Rule(action, [dem_filled_file, pra_burn_file], [domain_file, chull_file])

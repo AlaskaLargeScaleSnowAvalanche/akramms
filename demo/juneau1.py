@@ -1,6 +1,6 @@
 from uafgi.util import make
 import dggs.data
-from dggs.avalanche import avalanche, pra_post, domain_builder
+from dggs.avalanche import avalanche, pra_post, domain_builder, ramms
 from dggs.util import paramutil,harnutil
 import os
 import setuptools.sandbox
@@ -22,25 +22,41 @@ def add_akramms_rules(makefile, scene_dir):
     for return_period in scene_args['return_periods']:
         for forest in scene_args['forests']:
 
+            # One RAMMS directory per loop iteration...
+            ramms_dir = ramms.ramms_dir(scene_dir, return_period, forest)
+
+            # Create the RAMMS dir via symlinks
+            rammsdir_files = makefile.add(
+                ramms.rammsdir_rule(scene_dir, return_period, forest)).outputs
+
             # Run eCognition
             makefile.add(avalanche.run_ecog_rule(scene_dir, return_period, forest))
 
             # Post-Process eCognition Output
             # [f'{name}_{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
-            pra_files = makefile.add(
-                pra_post.pra_post_rule(scene_dir, return_period, forest, require_all=False)).outputs
+            release_files = makefile.add(
+                pra_post.release_rule(scene_dir, return_period, forest, ramms_dir, require_all=False)).outputs
 
             # Domain finder for post-process output
-            for pra_file in pra_files:
-#            for pra_file in pra_files[3:]:    # TESTING: Do only L (large)
-                pra_burn_file = '{}_burn.pik.gz'.format(pra_file[:-4])
+            domain_files = list()
+            for pra_file in release_files:
+#            for pra_file in release_files[3:]:    # TESTING: Do only L (large)
+                pra_burn_file = '{}_burn.pik.gz'.format(pra_file[:-4])    # Same dir, .pik.gz does not pollute directory of .shp
                 makefile.add(
                     domain_builder.burn_pra_rule(dem_file, pra_file, pra_burn_file))
 
-                chull_file = '{}_chull.shp'.format(pra_file[:-4])
-                domain_file = '{}_domain.shp'.format(pra_file[:-4])
+                # Different directory for chull and domain
+                pra_name = os.path.split(pra_file)[1][:-4]
+                chull_file = os.path.join(ramms_dir, 'CHULL', '{}_chull.shp'.format(pra_name))
+                domain_file = os.path.join(ramms_dir, 'DOMAIN', '{}_dom.shp'.format(pra_name))
                 makefile.add(
                     domain_builder.domain_rule(dem_filled_file, pra_burn_file, chull_file, domain_file, min_alpha=18., margin=1000.))
+                domain_files.append(domain_file)
+
+            # Now we have the input files for a RAMMS run:
+            #    rammsdir_files, release_files, domain_files
+
+
 
 def main():
 
