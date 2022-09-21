@@ -194,6 +194,12 @@ def release_rule(scene_dir, return_period, forest, ramms_dir, require_all=True):
         # df[VOL_vname] = df['area_m2'] / np.cos(df['Mean_Slope']*degree) * df[d0_vname]
         df[VOL_vname] = (df['area_m2'] * df[d0_vname]) / np.cos(df['Mean_Slope']*degree)
 
+        # Create directories needed for output files
+        dirs = set(os.path.split(x)[0] for x in outputs)
+        for dir in dirs:
+            print(f'Creating directory: {dir}')
+            os.makedirs(dir, exist_ok=True)
+
         # Split into segments and save
         outputsi = iter(outputs)
         for catname,low,high in zip(_pra_post_iter1(), _post_cat_bounds[:-1], _post_cat_bounds[1:]):

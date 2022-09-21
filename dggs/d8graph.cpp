@@ -1250,7 +1250,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
             (ix_t *)PyArray_GETPTR1(start, PyArray_DIM(start,0)),
             min_alpha, max_runout));
 
-    PySys_WriteStdout("Flood Fill went from %ld -> %ld gridcells.\n", PyArray_DIM(start,0), seen.size());
+//    PySys_WriteStdout("Flood Fill went from %ld -> %ld gridcells.\n", PyArray_DIM(start,0), seen.size());
     // No domain possible if we left the DEM domain in the runout.
     if (seen.size() == 0) { Py_INCREF(Py_None); return Py_None; }
 

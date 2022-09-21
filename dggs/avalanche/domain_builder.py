@@ -84,7 +84,8 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):
 
         # Burn the PRAs into rasters; and extract lists of start_cells
         pra_burns = list()
-        for _,row in pras_df.iterrows():
+        npra = len(pras_df)
+        for ipra,(_,row) in enumerate(pras_df.iterrows()):
             pra = row['shape']
 
             # Burn the PRA polygon into a raster
@@ -96,7 +97,7 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):
             pra_ras1d = pra_ras.reshape(-1)
             pra_burn = np.where(pra_ras1d)[0].astype('i')
 
-            print('PRA {} burned with {} cells'.format(row['Id'], len(pra_burn)))
+            print('PRA {} ({} of {}) burned with {} cells'.format(row['Id'], ipra, npra, len(pra_burn)))
             pra_burns.append(pra_burn)
 
         # Add to the dataframe and save
@@ -122,6 +123,8 @@ def domain_rule(dem_filled_file, pra_burn_file, chull_file, domain_file, min_alp
         Output filename (shapefile of domains)
     margin:
         Margin to add around convex hull to minimum bounding rectangle."""
+
+    outputs = [domain_file, chull_file]
 
     def action(tdir):
         # Read dem_filled and neighbor1
@@ -152,6 +155,12 @@ def domain_rule(dem_filled_file, pra_burn_file, chull_file, domain_file, min_alp
                 chulls.append(shapely.geometry.Polygon([]))
                 domains.append(shapely.geometry.Polygon([]))
 
+        # Create directories needed for output files
+        dirs = set(os.path.split(x)[0] for x in outputs)
+        for dir in dirs:
+            print(f'Creating directory: {dir}')
+            os.makedirs(dir, exist_ok=True)
+
         # Store chulls as a Shapefile
         chulls_df = pras_df[['Id']]
         chulls_df['shape'] = chulls
@@ -162,4 +171,4 @@ def domain_rule(dem_filled_file, pra_burn_file, chull_file, domain_file, min_alp
         domains_df['shape'] = domains
         shputil.write_df(domains_df, 'shape', 'Polygon', domain_file, wkt=grid_info.wkt)
 
-    return make.Rule(action, [dem_filled_file, pra_burn_file], [domain_file, chull_file])
+    return make.Rule(action, [dem_filled_file, pra_burn_file], outputs)

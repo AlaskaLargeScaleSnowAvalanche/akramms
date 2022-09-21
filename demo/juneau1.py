@@ -5,7 +5,7 @@ from dggs.util import paramutil,harnutil
 import os
 import setuptools.sandbox
 
-def add_akramms_rules(makefile, scene_dir):
+def add_akramms_rules(makefile, scene_dir, debug=False):
 
     scene_args = avalanche.params.load(scene_dir)
 
@@ -24,10 +24,6 @@ def add_akramms_rules(makefile, scene_dir):
 
             # One RAMMS directory per loop iteration...
             ramms_dir = ramms.ramms_dir(scene_dir, return_period, forest)
-
-            # Create the RAMMS dir via symlinks
-            rammsdir_files = makefile.add(
-                ramms.rammsdir_rule(scene_dir, return_period, forest)).outputs
 
             # Run eCognition
             makefile.add(avalanche.run_ecog_rule(scene_dir, return_period, forest))
@@ -49,13 +45,17 @@ def add_akramms_rules(makefile, scene_dir):
                 pra_name = os.path.split(pra_file)[1][:-4]
                 chull_file = os.path.join(ramms_dir, 'CHULL', '{}_chull.shp'.format(pra_name))
                 domain_file = os.path.join(ramms_dir, 'DOMAIN', '{}_dom.shp'.format(pra_name))
-                makefile.add(
-                    domain_builder.domain_rule(dem_filled_file, pra_burn_file, chull_file, domain_file, min_alpha=18., margin=1000.))
+                makefile.add(domain_builder.domain_rule(
+                    dem_filled_file, pra_burn_file, chull_file, domain_file, min_alpha=18., margin=1000.))
                 domain_files.append(domain_file)
 
             # Now we have the input files for a RAMMS run:
             #    rammsdir_files, release_files, domain_files
-
+            rammsdir_files = makefile.add(ramms.rammsdir_rule(
+                scene_dir, return_period, forest, dggs.data.HARNESS_WINDOWS,
+                debug=debug)).outputs[0]
+            scenario_file = rammsdir_files[0]
+            linked_files = rammsdir_files[1:]
 
 
 def main():
