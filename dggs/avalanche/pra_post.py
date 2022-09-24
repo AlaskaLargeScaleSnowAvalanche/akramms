@@ -157,7 +157,18 @@ def release_rule(scene_dir, return_period, forest, ramms_dir, require_all=True):
         df = df.rename(columns={'fid': 'Id'})    # RAMMS etc. want it named "Id"
         df['sx3'] = df['pra'].map(snow_lookup.value_at_centroid)    # Raw snow depth
 
-        # --- Elevation correction
+        # --- Elevation correction Reduces amount of snow with
+        # steepness.  All traditional.  We measure 3-day snow depth
+        # increase in flat field at a station.  But PRAs are very
+        # different.  So they're putting it from flat to 28 degrees.
+        # Then they add the lapse rate.  Then they do a second slope
+        # angle correction for steeper terrain.  In the end, add
+        # windblown snow parameter.  This is how every PRA gets its
+        # own d0 dependent on slope angle and elevation.
+
+        # GW: In SE Alaska, steep terrain can hold several meters of
+        # snow in something almost 70 degrees from time to time.
+
         snowdepth_correction = (df['Mean_DEM'] - scene_args['reference_elevation']) *.01 * scene_args['gradient_snowdepth']
         sx3_corrected = (df['sx3'] + snowdepth_correction)
         # TODO: Why are we multiplying by cos(28) = .883?

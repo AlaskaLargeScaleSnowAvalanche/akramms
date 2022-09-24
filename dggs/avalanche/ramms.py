@@ -42,7 +42,7 @@ END
 """
 
 def rammsdir_rule(scene_dir, return_period, forest, HARNESS_REMOTE,
-    debug=False, alt_lim_top=1500, alt_lim_low=1000, ncpu=2, cohesion=50):
+    debug=False, alt_lim_top=1500, alt_lim_low=1000, ncpu=2, ncpu_preprocess=2, cohesion=50):
     """Generates the scenario file, which becomes key to running RAMMS.
     HARNESS_REMOTE:
         Location of ~/git on remote Windows machine (parent of akramms/ repo)
@@ -89,6 +89,7 @@ def rammsdir_rule(scene_dir, return_period, forest, HARNESS_REMOTE,
         kwargs['scenario_name'] = xscenario_name
         kwargs['remote_ramms_dir'] = harnutil.remote_windows_name(xramms_dir, HARNESS_REMOTE)
         kwargs['ncpu'] = str(ncpu)
+        kwargs['ncpu_preprocess'] = str(ncpu_preprocess)
         kwargs['cohesion'] = str(cohesion)
         if debug:
             kwargs['debug'] = '1'
@@ -108,16 +109,35 @@ def rammsdir_rule(scene_dir, return_period, forest, HARNESS_REMOTE,
     inputs = [d[0] for d in links]
     linked_files = [d[1] for d in links]
     outputs = [scenario_file] + linked_files
+    print('rammsdir ',outputs)
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
 
-#def ramms_rule(scene_dir, scenario_file, HARNESS_REMOTE):
-#
-#    def action(tdir):
-#        print('Running RAMMS ', linked_files[0])
-#
-#    return make.Rule(action,
-#        list(itertools.chain(linked_files, input_files)),
-#        [])    # We don't really know the output files yet
-#
-#
+def ramms_rule(hostname, scenario_file, input_files, HARNESS_REMOTE,
+    idlrt_exe=r'C:\Program Files\Harris/IDL88/bin/bin.x86_64/idlrt.exe'
+    ramms_lshm_sav=r'C:\Users\efischer\Downloads\RAMMS_LSHM_NEW2022\ramms_lshm.sav'):
+
+    def action(tdir):
+        print('Running RAMMS ', scenario_file)
+
+        # Create remote dir
+        cmd = ['ssh', hostname, 'mkdir', '-p', os.path.split(scenario_file)[0]]
+        print(cmd)
+        subprocess.run(cmd, check=True)
+
+        # Sync RAMMS files to remote dir
+        harnutil.rsync_files([scenario_file] + input_files, HARNESS_REMOTE)
+
+        # Run RAMMS
+        cmd = ['ssh', hostname,
+            IDLRT_EXE, ramms_lshm_sav,
+            '-args', harnutil.remote_windows_name(scenario_file, HARNESS_REMOTE)]
+        print(cmd)
+        subprocess.run(cmd, check=True)
+
+
+    return make.Rule(action,
+        [scenario_file] + input_files,
+        [scenario_file+'.xxx'])    # We don't really know the output files yet
+
+

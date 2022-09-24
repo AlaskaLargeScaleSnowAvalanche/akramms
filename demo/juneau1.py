@@ -1,17 +1,17 @@
-from uafgi.util import make
+from uafgi.util import make,shputil
 import dggs.data
 from dggs.avalanche import avalanche, pra_post, domain_builder, ramms
 from dggs.util import paramutil,harnutil
 import os
 import setuptools.sandbox
 
-def add_akramms_rules(makefile, scene_dir, debug=False):
+def add_akramms_rules(makefile, scene_dir, debug=False, windows_host='davos'):
 
     scene_args = avalanche.params.load(scene_dir)
 
     # Run ArcGIS script to prepare files for eCognition
     makefile.add(
-        avalanche.prepare_data_rule('davos', scene_dir, dggs.data.HARNESS_WINDOWS))
+        avalanche.prepare_data_rule(windows_host, scene_dir, dggs.data.HARNESS_WINDOWS))
 
     # Get neighbor1 graph for DEM routing network
     dem_file = scene_args['dem_file']
@@ -53,10 +53,20 @@ def add_akramms_rules(makefile, scene_dir, debug=False):
             #    rammsdir_files, release_files, domain_files
             rammsdir_files = makefile.add(ramms.rammsdir_rule(
                 scene_dir, return_period, forest, dggs.data.HARNESS_WINDOWS,
-                debug=debug)).outputs[0]
+                debug=debug)).outputs
             scenario_file = rammsdir_files[0]
             linked_files = rammsdir_files[1:]
 
+            # Rsync files for RAMMS and run.
+            print('a ',release_files)
+            print('b ',domain_files)
+            print('c ',scenario_file)
+            print('d ',linked_files)
+            ramms_files = shputil.expand_list(release_files + domain_files) + linked_files
+            makefile.add(ramms.ramms_rule(
+                windows_host, scenario_file, ramms_files, dggs.data.HARNESS_WINDOWS))
+
+            break    # DEBUG
 
 def main():
 
@@ -83,6 +93,6 @@ def main():
     print('setup.py ', cmd)
     setuptools.sandbox.run_setup(setup_py, cmd)
 
-    makefile.generate('juneau1_mk')#, run=True)
+    makefile.generate('juneau1_mk', run=True)
 
 main()

@@ -38,3 +38,28 @@ def remote_linux_name(fname):
     """Assumes same home directory structure on remote Linux host"""
     ret = os.path.join('~', os.path.relpath(fname, os.environ['HOME']))
     return ret
+
+def rsync_files(fnames, remote_host, REMOTE_HARNESS, tdir, flags=['--copy-links', '-avz']):
+    """Syncs a list of files into the same location in the remote harness.
+
+    fnames: [filename, ...]
+        Files to transfer to remote harness
+        (These files must be within the implied local harness)
+    REMOTE_HARNESS:
+        Root of remote harness
+    """
+
+    # Get names of the files, relative to the harness
+    fnames_rel = [os.path.relpath(x, HARNESS) for x in fnames]
+
+    # Write the names to a file contain a list of filenames
+    list_file = tdir.filename(prefix='rsyncs_')
+    with open(list_file, 'w') as out:
+        out.write('\n'.join(fnames_rel))
+        out.write('\n')
+
+    # Run rsync
+    cmd = ['rsync'] + flags + ['--files-from={}'.format(list_file),
+        HARNESS+'/',
+        f'{remote_host}:{REMOTE_HARNESS}', list_file], 
+    subprocess.run(cmd)
