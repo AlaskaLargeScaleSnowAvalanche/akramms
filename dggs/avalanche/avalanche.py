@@ -263,7 +263,7 @@ def prepare_data_rule(hostname, scene_dir, HARNESS_REMOTE):
             subprocess.run(cmd, check=True)
 
         # Run script on remote host
-        cmd = ['ssh', hostname, 'python', harnutil.bash_name(f'{HARNESS_REMOTE}\\akramms\\sh\\prepare_scene.py'), remote_scene_dir]
+        cmd = ['ssh', hostname, 'sh', harnutil.bash_name(f'{HARNESS_REMOTE}\\akramms\\sh\\prepare_scene.sh'), remote_scene_dir]
         print(cmd)
         subprocess.run(cmd, check=True)
 

@@ -1,4 +1,4 @@
-import os
+import os,subprocess
 import functools
 
 def _harness_dir():
@@ -54,12 +54,15 @@ def rsync_files(fnames, remote_host, REMOTE_HARNESS, tdir, flags=['--copy-links'
 
     # Write the names to a file contain a list of filenames
     list_file = tdir.filename(prefix='rsyncs_')
+#    list_file = 'files.txt'
     with open(list_file, 'w') as out:
         out.write('\n'.join(fnames_rel))
         out.write('\n')
 
     # Run rsync
+    rharn = bash_name(REMOTE_HARNESS)
     cmd = ['rsync'] + flags + ['--files-from={}'.format(list_file),
         HARNESS+'/',
-        f'{remote_host}:{REMOTE_HARNESS}', list_file], 
+        f'{remote_host}:{rharn}']
+    print(cmd)
     subprocess.run(cmd)

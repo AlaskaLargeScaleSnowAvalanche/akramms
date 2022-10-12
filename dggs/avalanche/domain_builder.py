@@ -140,7 +140,9 @@ def domain_rule(dem_filled_file, pra_burn_file, chull_file, domain_file, min_alp
         # Find domains based on the PRAs
         chulls = list()
         domains = list()
-        for _,row in pras_df.iterrows():
+        for n,(_,row) in enumerate(pras_df.iterrows()):
+            if n%1000 == 0:
+                print(f'Found {n} domains.')
             pra_burn = row['pra_burn']
 
             # Get the domain from the list of starting cells of the PRA (pra_burn)

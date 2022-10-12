@@ -33,16 +33,18 @@ def add_akramms_rules(makefile, scene_dir, debug=False, windows_host='davos'):
             release_files = makefile.add(
                 pra_post.release_rule(scene_dir, return_period, forest, ramms_dir, require_all=False)).outputs
 
+            # TESTING: Do only L
+            release_files = release_files[3:]
+
             # Domain finder for post-process output
             domain_files = list()
             for pra_file in release_files:
-#            for pra_file in release_files[3:]:    # TESTING: Do only L (large)
                 pra_burn_file = '{}_burn.pik.gz'.format(pra_file[:-4])    # Same dir, .pik.gz does not pollute directory of .shp
                 makefile.add(
                     domain_builder.burn_pra_rule(dem_file, pra_file, pra_burn_file))
 
                 # Different directory for chull and domain
-                pra_name = os.path.split(pra_file)[1][:-4]
+                pra_name = os.path.split(pra_file)[1][:-8]
                 chull_file = os.path.join(ramms_dir, 'CHULL', '{}_chull.shp'.format(pra_name))
                 domain_file = os.path.join(ramms_dir, 'DOMAIN', '{}_dom.shp'.format(pra_name))
                 makefile.add(domain_builder.domain_rule(
@@ -54,17 +56,13 @@ def add_akramms_rules(makefile, scene_dir, debug=False, windows_host='davos'):
             rammsdir_files = makefile.add(ramms.rammsdir_rule(
                 scene_dir, return_period, forest, dggs.data.HARNESS_WINDOWS,
                 debug=debug)).outputs
-            scenario_file = rammsdir_files[0]
+            run_ramms_sh = rammsdir_files[0]
             linked_files = rammsdir_files[1:]
 
             # Rsync files for RAMMS and run.
-            print('a ',release_files)
-            print('b ',domain_files)
-            print('c ',scenario_file)
-            print('d ',linked_files)
             ramms_files = shputil.expand_list(release_files + domain_files) + linked_files
             makefile.add(ramms.ramms_rule(
-                windows_host, scenario_file, ramms_files, dggs.data.HARNESS_WINDOWS))
+                windows_host, run_ramms_sh, ramms_files, dggs.data.HARNESS_WINDOWS, dry_run=False))
 
             break    # DEBUG
 
@@ -93,6 +91,6 @@ def main():
     print('setup.py ', cmd)
     setuptools.sandbox.run_setup(setup_py, cmd)
 
-    makefile.generate('juneau1_mk', run=True)
+    makefile.generate('juneau1_mk', run=True, ncpu=1)
 
 main()
