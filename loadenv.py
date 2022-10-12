@@ -25,9 +25,10 @@ pythonpath += [
     os.path.join(HARNESS, 'uafgi'),
     os.path.join(HARNESS, 'akramms'),
 ]
-for leaf in os.listdir(SITE_PACKAGES):
-    if leaf.endswith('.egg'):
-        pythonpath.append(os.path.join(SITE_PACKAGES, leaf))
+if os.path.exists(SITE_PACKAGES):
+    for leaf in os.listdir(SITE_PACKAGES):
+        if leaf.endswith('.egg'):
+            pythonpath.append(os.path.join(SITE_PACKAGES, leaf))
 
 print('export PYTHONPATH={}'.format(os.pathsep.join(pythonpath)))
 
