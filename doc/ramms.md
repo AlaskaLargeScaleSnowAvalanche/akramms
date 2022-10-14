@@ -294,6 +294,7 @@ For each domain, runs the `.bat` and then `.out.bat` file.
     - Writing ID GEOTIFF File... 
     - Writing COUNT GEOTIFF File... 
     Finished writing GEOTIFF files! 
+```
 
 ### Step 4: Delete Temporary Files
 
