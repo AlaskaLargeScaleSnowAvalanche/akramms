@@ -148,12 +148,15 @@ def ramms_rule(hostname, run_ramms_sh, input_files, HARNESS_REMOTE, dry_run=Fals
 
         # Run RAMMS
         cmd1 = ['ssh', hostname, 'sh', harnutil.remote_windows_name(run_ramms_sh, HARNESS_REMOTE, bash=True)]
-        print(' '.join(cmd1))
-        if not dry_run:
-            proc1 = subprocess.Popen(cmd)
-            cmd2 = ['ssh', hostname, 'tail', '-f', harnutil.remote_windows_name(log_file,  HARNESS_REMOTE, bash=True)]
-            print(' '.join(cmd2))
-            subprocess.run(cmd1, check=True)            
+        subprocess.run(cmd1, check=True)            
+
+
+#        print(' '.join(cmd1))
+#        if not dry_run:
+#            proc1 = subprocess.Popen(cmd)
+#            cmd2 = ['ssh', hostname, 'tail', '-f', harnutil.remote_windows_name(log_file,  HARNESS_REMOTE, bash=True)]
+#            print(' '.join(cmd2))
+#            subprocess.run(cmd1, check=True)            
 
     return make.Rule(action,
         [run_ramms_sh] + input_files,
