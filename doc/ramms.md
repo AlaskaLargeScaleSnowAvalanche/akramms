@@ -22,6 +22,7 @@ This is a description of files RAMMS produces, and what each of them are.
   * `DEM/`, `FOREST/`: Created by `ramms.py`.  Copies of the DEM and Forest GeoTIFF files for RAMMS.
   * `RELEASE/`: Shapefiles created by eCognition post-processor (with snow depth set).  Can be multiple shapefiles; but easiest if there is only ONE shapefile.
   * `DOMAIN/`: Shapefiles created by Domain Finder, corresponds to shapefiles in `RELEASE/`.
+  * `scenario.txt`: Top-level RAMMS control file created by `ramms.py` Python code.
   * `run_ramms.bat` / `run_ramms.sh`: Shell script to launch top-level RAMMS (used via ssh from Linux machine).
   * `RESULTS/`: RAMMS does all its stuff in this directory.
 
