@@ -175,52 +175,88 @@ def run(idlrt_exe, ramms_sav, ramms_dir):
     except FileNotFoundError:
         pass
 
+    # Avoid extra IDL's lying around that would eat our license
+    cmd = ['taskkill.exe', '/F', '/IM', 'idlrt.exe']
+    subprocess.run(cmd)
+
     # Start the main process running
     cmd1 = [idlrt_exe, ramms_sav, '-args',
         os.path.join(ramms_dir, 'scenario.txt')]
     print(' '.join("'{}'".format(x) for x in cmd1))
-    proc1 = subprocess.Popen(cmd1, shell=True)
-    proc1_pid = proc1.pid    # Grab now in case it's not available later
 
-#    subprocess.run(cmd1)
-    print('BBBBBBB')
+    proc1 = subprocess.Popen(cmd1)
+#    print('started')
+#    time.sleep(10)
+#    print('Done sleeping ', proc1.returncode)
+#    return
 
     try:
-        # Wait for logfile to appear
-        print(f'Waiting for {logfile}', end='')
-        while (not os.path.exists(logfile)):
-            print('.', end='')
-            sys.stdout.flush()
+        xout = None
+        fin = None
+        xout = open('x.out', 'w')
+        proc1 = subprocess.Popen(cmd1, stdout=xout, stderr=subprocess.STDOUT)
 
+        timeout = 0.5
+        state = 0
+        while True:
+#            # Addend to main process
+#            try:
+#                print('Communicate')
+#                stdout, stderr = proc1.communicate(input, timeout=timeout)
+#            except subprocess.TimeoutExpired:
+#                pass
+
+            time.sleep(0.5)
+
+            # See if it exited unexpectedly
             retcode = proc1.poll()
             if (retcode != None):
                 print('IDL RAMMS exited with status code {}'.format(retcode))
-                return
+                raise subprocess.CalledProcessError(retcode, cmd1)
 
-            time.sleep(0.2)
+            # Open logfile if it has appeared
+            if fin is None:
+                print('.', end='')
+                sys.stdout.flush()
+                if os.path.exists(logfile):
+                    print('Opening logfile')
+                    fin = open(logfile)
+                    fin.seek(0, os.SEEK_END) 
+                    print()
+                continue
 
-        # Read out the logfile
-        with open(logfile) as fin:
-            # Seek to EOF
-            fin.seek(0, os.SEEK_END)
-            while True:
-                # Read line of file, sleep if it's not there
-                line = fin.readline()
-                if not line:
-                    time.sleep(.5)
-                    continue
+            # Read out everything in logfile since last time we looked
+            line = fin.readline()
+            if not line:
+                break    # Nothing more to read for now
 
-                # Line is updated, process it
-                print(line, end='')
-                if _doneRE.match(line) is not None:
-                    break
+            # Process the line we read
+            print(line, end='')
+            if _doneRE.match(line) is not None:
+                raise EOFError()   # Break out of double loop
+
+    except EOFError:
+        # Proper signal of end of IDL output; exit gracefully
+        pass
+
     finally:
-        # Kill the remaining process
-        # https://winaero.com/kill-process-windows-10/
-        cmd = ['taskkill.exe', '/F', '/PID', str(proc1_pid)]
-        print(' '.join("'{}'".format(x) for x in cmd))
-        subprocess.run(cmd, check=False)
+        if fin is not None:
+            fin.close()
 
-        # Just in case, wait for it to exit.
-        proc1.communicate()
-        print('************ ALL DONE!!! ****************')
+        if proc1 is not None:
+            # Kill the remaining process
+            # https://winaero.com/kill-process-windows-10/
+            cmd = ['taskkill.exe', '/F', '/PID', str(proc1.pid)]
+            print(' '.join("'{}'".format(x) for x in cmd))
+            subprocess.run(cmd, check=False)
+
+            # Just in case, wait for it to exit.
+#            proc1.communicate()
+            print('************ ALL DONE!!! ****************')
+
+        if xout is not None:
+            xout.close()
+
+
+
+#  taskkill /f /im idlrt.exe
