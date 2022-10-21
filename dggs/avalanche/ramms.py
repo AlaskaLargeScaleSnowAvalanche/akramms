@@ -1,4 +1,4 @@
-import os,subprocess
+import os,subprocess,re,sys,time
 from dggs.avalanche import avalanche
 from dggs.util import harnutil
 from uafgi.util import make,ioutil
@@ -42,9 +42,6 @@ END
 """
 
 def rammsdir_rule(scene_dir, return_period, forest, HARNESS_REMOTE,
-    idlrt_exe=r'C:\Program Files\Harris/IDL88/bin/bin.x86_64/idlrt.exe',
-#    ramms_lshm_sav=r'C:\Users\efischer\Downloads\RAMMS_LSHM_NEW2022\ramms_lshm.sav',
-    ramms_lshm_sav=r'C:\opt\220922-RAMMS-x0928\ramms_lshm.sav',
     debug=False, alt_lim_top=1500, alt_lim_low=1000, ncpu=8, ncpu_preprocess=4, cohesion=50):
 
     """Generates the scenario file, which becomes key to running RAMMS.
@@ -163,3 +160,67 @@ def ramms_rule(hostname, run_ramms_sh, input_files, HARNESS_REMOTE, dry_run=Fals
         [run_ramms_sh+'.xxx'])    # We don't really know the output files yet
 
 
+# ----------------------------------------------------------
+#_doneRE = re.compile(r"\s*Creating MUXI-Files...")    # Demo
+_doneRE = re.compile(r"\s*Finsihed writing GEOTIFF files!")    # Prod
+def run(idlrt_exe, ramms_sav, ramms_dir):
+
+    print(f'***** Running Top-Leve RAMMS on {ramms_dir}')
+    logfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock.log')
+    print(f'logfile = {logfile}')
+
+    # Remove logfile (if it exists)
+    try:
+        os.remove(logfile)
+    except FileNotFoundError:
+        pass
+
+    # Start the main process running
+    cmd1 = [idlrt_exe, ramms_sav, '-args',
+        os.path.join(ramms_dir, 'scenario.txt')]
+    print(' '.join("'{}'".format(x) for x in cmd1))
+    proc1 = subprocess.Popen(cmd1, shell=True)
+    proc1_pid = proc1.pid    # Grab now in case it's not available later
+
+#    subprocess.run(cmd1)
+    print('BBBBBBB')
+
+    try:
+        # Wait for logfile to appear
+        print(f'Waiting for {logfile}', end='')
+        while (not os.path.exists(logfile)):
+            print('.', end='')
+            sys.stdout.flush()
+
+            retcode = proc1.poll()
+            if (retcode != None):
+                print('IDL RAMMS exited with status code {}'.format(retcode))
+                return
+
+            time.sleep(0.2)
+
+        # Read out the logfile
+        with open(logfile) as fin:
+            # Seek to EOF
+            fin.seek(0, os.SEEK_END)
+            while True:
+                # Read line of file, sleep if it's not there
+                line = fin.readline()
+                if not line:
+                    time.sleep(.5)
+                    continue
+
+                # Line is updated, process it
+                print(line, end='')
+                if _doneRE.match(line) is not None:
+                    break
+    finally:
+        # Kill the remaining process
+        # https://winaero.com/kill-process-windows-10/
+        cmd = ['taskkill.exe', '/F', '/PID', str(proc1_pid)]
+        print(' '.join("'{}'".format(x) for x in cmd))
+        subprocess.run(cmd, check=False)
+
+        # Just in case, wait for it to exit.
+        proc1.communicate()
+        print('************ ALL DONE!!! ****************')

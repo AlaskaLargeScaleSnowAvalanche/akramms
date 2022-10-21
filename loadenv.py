@@ -28,7 +28,8 @@ pythonpath += [
 if os.path.exists(SITE_PACKAGES):
     for leaf in os.listdir(SITE_PACKAGES):
         if leaf.endswith('.egg'):
-            pythonpath.append(os.path.join(SITE_PACKAGES, leaf))
+            x = os.path.join(SITE_PACKAGES, leaf)
+            pythonpath.append(x)
 
 print('export PYTHONPATH={}'.format(os.pathsep.join(pythonpath)))
 

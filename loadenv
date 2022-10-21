@@ -1,10 +1,11 @@
 #AKRAMMS_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 #GIT_DIR=$(dirname "$AKRAMMS_DIR")
 
-LOADENV_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-$(python "$LOADENV_DIR/loadenv.py")
 
-conda activate avalanche
+LOADENV_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+$(python "$LOADENV_DIR/loadenv.py" | dos2unix)
+
+conda activate avalanche   # Must be after above loadenv.py
 
 git config --global user.name "$USER"
 git config --global user.email "$EMAIL"
