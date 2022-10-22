@@ -153,7 +153,9 @@ def kill_idl():
 
 
 #_doneRE = re.compile(r"\s*Creating MUXI-Files...")    # Demo
-_doneRE = re.compile(r"\s*Finsihed writing GEOTIFF files!")    # Prod
+_doneRE = re.compile(r'\s*Starting LSHM SIMULATIONS')
+#_doneRE = re.compile(r"\s*Finsihed writing GEOTIFF files!")    # Prod
+
 def run_on_windows(idlrt_exe, ramms_sav, ramms_dir):
     """Call this to run top-level RAMMS locally on Windows.
     idlrt_exe:
@@ -218,7 +220,7 @@ def run_on_windows(idlrt_exe, ramms_sav, ramms_dir):
                     break    # Nothing more to read for now
 
                 # Process the line we read
-                print(line, end='')
+                print(line+'*', end='')
                 if _doneRE.match(line) is not None:
                     raise EOFError()   # Break out of double loop
 
