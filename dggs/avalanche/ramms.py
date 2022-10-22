@@ -146,11 +146,22 @@ def ramms_rule(hostname, ramms_dir, input_files, HARNESS_REMOTE, dry_run=False):
 
 # ----------------------------------------------------------
 def kill_idl():
-    cmd = ['taskkill.exe', '/F', '/IM', 'idlrt.exe']
-    subprocess.run(cmd)
-    cmd = ['taskkill.exe', '/F', '/IM', 'idl_opserver.exe']
-    subprocess.run(cmd)
+    sleep=False
 
+    for cmd in (
+        ['taskkill.exe', '/F', '/IM', 'idlrt.exe'],
+        ['taskkill.exe', '/F', '/IM', 'idl_opserver.exe']):
+
+        try:
+            subprocess.run(cmd, check=True)
+            sleep=True
+        except subprocess.CalledProcessError:
+            pass
+
+    # Wait around for NTFS to unlock files used by tasks
+    if sleep:
+        print('Sleeping because tasks were killed')
+        time.sleep(1)
 
 #_doneRE = re.compile(r"\s*Creating MUXI-Files...")    # Demo
 _doneRE = re.compile(r'\s*Starting LSHM SIMULATIONS')
@@ -171,15 +182,16 @@ def run_on_windows(idlrt_exe, ramms_sav, ramms_dir):
     print(f'***** Running Top-Level RAMMS on {ramms_dir}')
 
 
+    # Avoid extra IDL's lying around that would eat our license
+    kill_idl()
+
     # Remove logfile (if it exists)
+    # (must come after kill_idl())
     logfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock.log')
     try:
         os.remove(logfile)
     except FileNotFoundError:
         pass
-
-    # Avoid extra IDL's lying around that would eat our license
-    kill_idl()
 
     # Create batch file to run
     scenario_txt = os.path.join(ramms_dir, 'scenario.txt')
@@ -241,3 +253,18 @@ def run_on_windows(idlrt_exe, ramms_sav, ramms_dir):
             # Just in case, wait for it to exit.
             proc1.communicate()
             print('************ ALL DONE!!! ****************')
+
+
+_shpRE = re.compile(r'(.+_.+)_(.+_.+)_.*\.shp')
+def rundirs(ramms_dir):
+    """Gets the directories containing the individual RAMMS runs."""
+    rundirs = list()
+    for file in os.listdir(os.path.join(ramms_dir, 'RELEASE')):
+        match = _shpRE.match(file)
+        if match is None:
+            continue
+        prefix = match.group(1)
+        suffix = match.group(2)
+        rundirs.append(os.path.join(ramms_dir, 'RESULTS', prefix, suffix))
+
+    return rundirs
