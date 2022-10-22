@@ -134,7 +134,7 @@ def ramms_rule(hostname, input_files, HARNESS_REMOTE, dry_run=False):
         # Run RAMMS
         remote_run_ramms_sh = harnutil.remote_windows_name(
                 os.path.join(HARNESS, 'akrams', 'sh', 'run_ramms.sh'),
-                HARNESS_REMOTE, bash=True)]
+                HARNESS_REMOTE, bash=True)
 
         cmd1 = ['ssh', hostname, 'sh', remote_run_ramms_sh]
         print(' '.join(cmd1))
@@ -156,7 +156,7 @@ def kill_idl():
 
 _doneRE = re.compile(r"\s*Creating MUXI-Files...")    # Demo
 #_doneRE = re.compile(r"\s*Finsihed writing GEOTIFF files!")    # Prod
-def run_windows(idlrt_exe, ramms_sav, ramms_dir):
+def run_on_windows(idlrt_exe, ramms_sav, ramms_dir):
     """Call this to run top-level RAMMS locally on Windows.
     idlrt_exe:
         Windows path to idlrt.exe IDL runtime

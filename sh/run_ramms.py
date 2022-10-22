@@ -19,4 +19,4 @@ parser.add_argument('ramms_dir', metavar='<RAMMS run directory>',
     help='Directory prepared to run RAMMS')
 
 args = parser.parse_args()
-ramms.run(args.idlrt, args.ramms, args.ramms_dir)
+ramms.run_on_windows(args.idlrt, args.ramms, args.ramms_dir)
