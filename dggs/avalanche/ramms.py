@@ -41,7 +41,7 @@ ALT_LIM_LOW  {alt_lim_low}
 END
 """
 
-def rammsdir_rule(scene_dir, return_period, forest, HARNESS_REMOTE,
+def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, HARNESS_REMOTE,
     debug=False, alt_lim_top=1500, alt_lim_low=1000, ncpu=8, ncpu_preprocess=4, cohesion=50):
 
     """Generates the scenario file, which becomes key to running RAMMS.
@@ -54,8 +54,8 @@ def rammsdir_rule(scene_dir, return_period, forest, HARNESS_REMOTE,
     name = scene_args['name']
     For = 'For' if forest else 'NoFor'
 
-    xscenario_name = scenario_name(scene_dir, return_period, forest)
-    xramms_dir = ramms_dir(scene_dir, xscenario_name)
+#    xscenario_name = scenario_name(scene_dir, return_period, forest)
+#    xramms_dir = ramms_dir(scene_dir, xscenario_name)
     scenario_file = os.path.join(xramms_dir, 'scenario.txt')
 
 
@@ -109,9 +109,6 @@ def rammsdir_rule(scene_dir, return_period, forest, HARNESS_REMOTE,
         with open(scenario_file, 'w') as out:
             out.write(scenario_tpl.format(**kwargs))
 
-        # Create RAMMS run script
-        args = [ramms_lshm_sav, '-args', harnutil.remote_windows_name(scenario_file, HARNESS_REMOTE)]
-
     inputs = [d[0] for d in links]
     linked_files = [d[1] for d in links]
     outputs = [scenario_file] + linked_files
@@ -119,31 +116,32 @@ def rammsdir_rule(scene_dir, return_period, forest, HARNESS_REMOTE,
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
 # sh ~/av/akramms/sh/run_ramms.sh 'c:\Users\efischer\av\prj\juneau1\RAMMS\juneau130yFor'
-def ramms_rule(hostname, input_files, HARNESS_REMOTE, dry_run=False):
+def ramms_rule(hostname, ramms_dir, input_files, HARNESS_REMOTE, dry_run=False):
 
     def action(tdir):
-        print('Running RAMMS ', run_ramms_sh)
+        print('Running RAMMS ', ramms_dir)
 
         # Create remote dir
-        cmd = ['ssh', hostname, 'mkdir', '-p', harnutil.remote_windows_name(os.path.split(run_ramms_sh)[0], HARNESS_REMOTE, bash=True)]
+        cmd = ['ssh', hostname, 'mkdir', '-p', harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True)]
         subprocess.run(cmd, check=True)
 
         # Sync RAMMS files to remote dir
-        harnutil.rsync_files([run_ramms_sh] + input_files, hostname, HARNESS_REMOTE, tdir)
+        harnutil.rsync_files(input_files, hostname, HARNESS_REMOTE, tdir)
 
         # Run RAMMS
         remote_run_ramms_sh = harnutil.remote_windows_name(
-                os.path.join(HARNESS, 'akrams', 'sh', 'run_ramms.sh'),
+                os.path.join(harnutil.HARNESS, 'akramms', 'sh', 'run_ramms.sh'),
                 HARNESS_REMOTE, bash=True)
 
-        cmd1 = ['ssh', hostname, 'sh', remote_run_ramms_sh]
-        print(' '.join(cmd1))
+        cmd = ['ssh', hostname, 'sh', remote_run_ramms_sh,
+            harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True)]
+        print(' '.join(cmd))
         if not dry_run:
-            subprocess.run(cmd1, check=True)            
+            subprocess.run(cmd, check=True)            
 
     return make.Rule(action,
-        [run_ramms_sh] + input_files,
-        [run_ramms_sh+'.xxx'])    # We don't really know the output files yet
+        input_files,
+        ['.xxx'])    # We don't really know the output files yet
 
 
 # ----------------------------------------------------------
@@ -168,7 +166,7 @@ def run_on_windows(idlrt_exe, ramms_sav, ramms_dir):
         Nothing if OK.
         Raises Exception if it did not complete.
     """
-    print(f'***** Running Top-Leve RAMMS on {ramms_dir}')
+    print(f'***** Running Top-Level RAMMS on {ramms_dir}')
 
 
     # Remove logfile (if it exists)

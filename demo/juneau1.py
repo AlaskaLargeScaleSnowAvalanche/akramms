@@ -23,7 +23,8 @@ def add_akramms_rules(makefile, scene_dir, debug=False, windows_host='davos'):
         for forest in scene_args['forests']:
 
             # One RAMMS directory per loop iteration...
-            ramms_dir = ramms.ramms_dir(scene_dir, return_period, forest)
+            scenario_name = ramms.scenario_name(scene_dir, return_period, forest)
+            ramms_dir = ramms.ramms_dir(scene_dir, scenario_name)
 
             # Run eCognition
             makefile.add(avalanche.run_ecog_rule(scene_dir, return_period, forest))
@@ -54,15 +55,13 @@ def add_akramms_rules(makefile, scene_dir, debug=False, windows_host='davos'):
             # Now we have the input files for a RAMMS run:
             #    rammsdir_files, release_files, domain_files
             rammsdir_files = makefile.add(ramms.rammsdir_rule(
-                scene_dir, return_period, forest, dggs.data.HARNESS_WINDOWS,
+                ramms_dir, scenario_name, scene_dir, return_period, forest, dggs.data.HARNESS_WINDOWS,
                 debug=debug)).outputs
-            run_ramms_sh = rammsdir_files[0]
-            linked_files = rammsdir_files[1:]
 
             # Rsync files for RAMMS and run.
-            ramms_files = shputil.expand_list(release_files + domain_files) + linked_files
+            ramms_files = shputil.expand_list(release_files + domain_files) + rammsdir_files
             makefile.add(ramms.ramms_rule(
-                windows_host, run_ramms_sh, ramms_files, dggs.data.HARNESS_WINDOWS, dry_run=False))
+                windows_host, ramms_dir, ramms_files, dggs.data.HARNESS_WINDOWS, dry_run=False))
 
             break    # DEBUG
 
