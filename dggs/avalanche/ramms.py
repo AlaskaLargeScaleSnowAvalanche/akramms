@@ -57,8 +57,6 @@ def rammsdir_rule(scene_dir, return_period, forest, HARNESS_REMOTE,
     xscenario_name = scenario_name(scene_dir, return_period, forest)
     xramms_dir = ramms_dir(scene_dir, xscenario_name)
     scenario_file = os.path.join(xramms_dir, 'scenario.txt')
-    run_ramms_sh = os.path.join(xramms_dir, 'run_ramms.sh')
-    run_ramms_bat = os.path.join(xramms_dir, 'run_ramms.bat')
 
 
     # ---- DEM File
@@ -114,25 +112,15 @@ def rammsdir_rule(scene_dir, return_period, forest, HARNESS_REMOTE,
         # Create RAMMS run script
         args = [ramms_lshm_sav, '-args', harnutil.remote_windows_name(scenario_file, HARNESS_REMOTE)]
 
-        cmd = [harnutil.bash_name(idlrt_exe)] + args
-        with open(run_ramms_sh, 'w') as out:
-            out.write("'{}'\n".format("' '".join(cmd)))
-
-        cmd = [idlrt_exe] + args
-        with open(run_ramms_bat, 'w') as out:
-            out.write("'{}'\n".format("' '".join(cmd)))
-
-
     inputs = [d[0] for d in links]
     linked_files = [d[1] for d in links]
-    outputs = [run_ramms_sh, run_ramms_bat, scenario_file] + linked_files
+    outputs = [scenario_file] + linked_files
     print('rammsdir ',outputs)
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
+# sh ~/av/akramms/sh/run_ramms.sh 'c:\Users\efischer\av\prj\juneau1\RAMMS\juneau130yFor'
+def ramms_rule(hostname, input_files, HARNESS_REMOTE, dry_run=False):
 
-def ramms_rule(hostname, run_ramms_sh, input_files, HARNESS_REMOTE, dry_run=False):
-
-    log_file = os.path.join(os.path.dirname(run_ramms_sh), 'RESULTS', 'lshm_rock.log')
     def action(tdir):
         print('Running RAMMS ', run_ramms_sh)
 
@@ -144,16 +132,14 @@ def ramms_rule(hostname, run_ramms_sh, input_files, HARNESS_REMOTE, dry_run=Fals
         harnutil.rsync_files([run_ramms_sh] + input_files, hostname, HARNESS_REMOTE, tdir)
 
         # Run RAMMS
-        cmd1 = ['ssh', hostname, 'sh', harnutil.remote_windows_name(run_ramms_sh, HARNESS_REMOTE, bash=True)]
-        subprocess.run(cmd1, check=True)            
+        remote_run_ramms_sh = harnutil.remote_windows_name(
+                os.path.join(HARNESS, 'akrams', 'sh', 'run_ramms.sh'),
+                HARNESS_REMOTE, bash=True)]
 
-
-#        print(' '.join(cmd1))
-#        if not dry_run:
-#            proc1 = subprocess.Popen(cmd)
-#            cmd2 = ['ssh', hostname, 'tail', '-f', harnutil.remote_windows_name(log_file,  HARNESS_REMOTE, bash=True)]
-#            print(' '.join(cmd2))
-#            subprocess.run(cmd1, check=True)            
+        cmd1 = ['ssh', hostname, 'sh', remote_run_ramms_sh]
+        print(' '.join(cmd1))
+        if not dry_run:
+            subprocess.run(cmd1, check=True)            
 
     return make.Rule(action,
         [run_ramms_sh] + input_files,
@@ -161,54 +147,56 @@ def ramms_rule(hostname, run_ramms_sh, input_files, HARNESS_REMOTE, dry_run=Fals
 
 
 # ----------------------------------------------------------
-#_doneRE = re.compile(r"\s*Creating MUXI-Files...")    # Demo
-_doneRE = re.compile(r"\s*Finsihed writing GEOTIFF files!")    # Prod
-def run(idlrt_exe, ramms_sav, ramms_dir):
+def kill_idl():
+    cmd = ['taskkill.exe', '/F', '/IM', 'idlrt.exe']
+    subprocess.run(cmd)
+    cmd = ['taskkill.exe', '/F', '/IM', 'idl_opserver.exe']
+    subprocess.run(cmd)
 
+
+_doneRE = re.compile(r"\s*Creating MUXI-Files...")    # Demo
+#_doneRE = re.compile(r"\s*Finsihed writing GEOTIFF files!")    # Prod
+def run_windows(idlrt_exe, ramms_sav, ramms_dir):
+    """Call this to run top-level RAMMS locally on Windows.
+    idlrt_exe:
+        Windows path to idlrt.exe IDL runtime
+    ramms_sav:
+        Windows path to lhsm RAMMS .sav file
+    ramms_dir:
+        RAMMS directory to run
+    Returns:
+        Nothing if OK.
+        Raises Exception if it did not complete.
+    """
     print(f'***** Running Top-Leve RAMMS on {ramms_dir}')
-    logfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock.log')
-    print(f'logfile = {logfile}')
+
 
     # Remove logfile (if it exists)
+    logfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock.log')
     try:
         os.remove(logfile)
     except FileNotFoundError:
         pass
 
     # Avoid extra IDL's lying around that would eat our license
-    cmd = ['taskkill.exe', '/F', '/IM', 'idlrt.exe']
-    subprocess.run(cmd)
+    kill_idl()
 
-    # Start the main process running
-    cmd1 = [idlrt_exe, ramms_sav, '-args',
-        os.path.join(ramms_dir, 'scenario.txt')]
-    print(' '.join("'{}'".format(x) for x in cmd1))
-
-    proc1 = subprocess.Popen(cmd1)
-#    print('started')
-#    time.sleep(10)
-#    print('Done sleeping ', proc1.returncode)
-#    return
+    # Create batch file to run
+    scenario_txt = os.path.join(ramms_dir, 'scenario.txt')
+    batfile = os.path.join(ramms_dir, 'run_ramms.bat')
+    with open(batfile, 'w') as out:
+        out.write(f'"{idlrt_exe}" "{ramms_sav}" -args "{scenario_txt}"\n')
 
     try:
-        xout = None
         fin = None
-        xout = open('x.out', 'w')
-        proc1 = subprocess.Popen(cmd1, stdout=xout, stderr=subprocess.STDOUT)
+        proc1 = subprocess.Popen(batfile)
 
         timeout = 0.5
         state = 0
         while True:
-#            # Addend to main process
-#            try:
-#                print('Communicate')
-#                stdout, stderr = proc1.communicate(input, timeout=timeout)
-#            except subprocess.TimeoutExpired:
-#                pass
-
             time.sleep(0.5)
 
-            # See if it exited unexpectedly
+            # See if RAMMS exited unexpectedly
             retcode = proc1.poll()
             if (retcode != None):
                 print('IDL RAMMS exited with status code {}'.format(retcode))
@@ -226,14 +214,15 @@ def run(idlrt_exe, ramms_sav, ramms_dir):
                 continue
 
             # Read out everything in logfile since last time we looked
-            line = fin.readline()
-            if not line:
-                break    # Nothing more to read for now
+            while True:
+                line = fin.readline()
+                if not line:
+                    break    # Nothing more to read for now
 
-            # Process the line we read
-            print(line, end='')
-            if _doneRE.match(line) is not None:
-                raise EOFError()   # Break out of double loop
+                # Process the line we read
+                print(line, end='')
+                if _doneRE.match(line) is not None:
+                    raise EOFError()   # Break out of double loop
 
     except EOFError:
         # Proper signal of end of IDL output; exit gracefully
@@ -245,18 +234,8 @@ def run(idlrt_exe, ramms_sav, ramms_dir):
 
         if proc1 is not None:
             # Kill the remaining process
-            # https://winaero.com/kill-process-windows-10/
-            cmd = ['taskkill.exe', '/F', '/PID', str(proc1.pid)]
-            print(' '.join("'{}'".format(x) for x in cmd))
-            subprocess.run(cmd, check=False)
+            kill_idl()
 
             # Just in case, wait for it to exit.
-#            proc1.communicate()
+            proc1.communicate()
             print('************ ALL DONE!!! ****************')
-
-        if xout is not None:
-            xout.close()
-
-
-
-#  taskkill /f /im idlrt.exe
