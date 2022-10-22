@@ -39,7 +39,7 @@ def remote_linux_name(fname):
     ret = os.path.join('~', os.path.relpath(fname, os.environ['HOME']))
     return ret
 
-def rsync_files(fnames, remote_host, REMOTE_HARNESS, tdir, flags=['--copy-links', '-avz']):
+def rsync_files(fnames, remote_host, REMOTE_HARNESS, tdir, flags=['--copy-links', '-avz'], direction='up'):
     """Syncs a list of files into the same location in the remote harness.
 
     fnames: [filename, ...]
@@ -51,6 +51,7 @@ def rsync_files(fnames, remote_host, REMOTE_HARNESS, tdir, flags=['--copy-links'
 
     # Get names of the files, relative to the harness
     fnames_rel = [os.path.relpath(x, HARNESS) for x in fnames]
+    print('rsyncing: {}'.format(fnames_rel))
 
     # Write the names to a file contain a list of filenames
     list_file = tdir.filename(prefix='rsyncs_')
@@ -61,8 +62,15 @@ def rsync_files(fnames, remote_host, REMOTE_HARNESS, tdir, flags=['--copy-links'
 
     # Run rsync
     rharn = bash_name(REMOTE_HARNESS)
-    cmd = ['rsync'] + flags + ['--files-from={}'.format(list_file),
-        HARNESS+'/',
-        f'{remote_host}:{rharn}']
+    if direction == 'up':
+        cmd = ['rsync'] + flags + ['--files-from={}'.format(list_file),
+            HARNESS+'/',
+            f'{remote_host}:{rharn}']
+    else:
+        cmd = ['rsync'] + flags + ['--files-from={}'.format(list_file),
+            f'{remote_host}:{rharn}/',
+            HARNESS,
+            ]
+
     print(cmd)
     subprocess.run(cmd)

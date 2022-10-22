@@ -1,6 +1,7 @@
 import os,subprocess,re,sys,time
 from dggs.avalanche import avalanche
 from dggs.util import harnutil
+import dggs.data
 from uafgi.util import make,ioutil
 import itertools, functools
 
@@ -101,7 +102,7 @@ def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, 
             kwargs['test_nr_tpl'] = "TEST_NR    20\n"
         else:
             kwargs['debug'] = '0'
-            kwargs['keep_data'] = '0'
+            kwargs['keep_data'] = '1'
             kwargs['test_nr_tpl'] = ""
         kwargs['alt_lim_top'] = str(alt_lim_top)
         kwargs['alt_lim_low'] = str(alt_lim_low)
@@ -116,7 +117,13 @@ def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, 
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
 # sh ~/av/akramms/sh/run_ramms.sh 'c:\Users\efischer\av\prj\juneau1\RAMMS\juneau130yFor'
-def ramms_rule(hostname, ramms_dir, input_files, HARNESS_REMOTE, dry_run=False):
+def ramms_prep_rule(hostname, ramms_dir, release_files, input_files, HARNESS_REMOTE, dry_run=False):
+    """
+    input_files:
+        All input files for the RAMMS run (superset of release_files)
+    """
+
+    logfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock.log')
 
     def action(tdir):
         print('Running RAMMS ', ramms_dir)
@@ -137,11 +144,36 @@ def ramms_rule(hostname, ramms_dir, input_files, HARNESS_REMOTE, dry_run=False):
             harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True)]
         print(' '.join(cmd))
         if not dry_run:
-            subprocess.run(cmd, check=True)            
+            subprocess.run(cmd, check=True)
+
+
+        # Get results back
+        err = None
+        for run_dir in run_dirs(release_files):
+            os.makedirs(run_dir, exist_ok=True)
+            print('Retrieving dir ', run_dir)
+            cmd = ['rsync', '-avz',
+                '{}:{}/'.format(hostname, harnutil.remote_windows_name(run_dir, HARNESS_REMOTE, bash=True)),
+                run_dir]
+            print(' '.join(cmd))
+            try:
+                subprocess.run(cmd, check=True)
+            except subprocess.CalledProcessError as exp:
+                err = exp
+        if err is not None:
+            raise err
+
+        # Get logfile back
+        cmd = ['rsync',
+            '{}:{}'.format(hostname, harnutil.remote_windows_name(logfile, HARNESS_REMOTE, bash=True)),
+            logfile]
+        print(' '.join(cmd))
+        subprocess.run(cmd, check=True)
+
 
     return make.Rule(action,
         input_files,
-        ['.xxx'])    # We don't really know the output files yet
+        [logfile])    # We don't really know the output files yet
 
 
 # ----------------------------------------------------------
@@ -297,16 +329,19 @@ def run_on_windows(idlrt_exe, ramms_distro, ramms_dir):
 
 
 _shpRE = re.compile(r'(.+_.+)_(.+_.+)_.*\.shp')
-def rundirs(ramms_dir):
-    """Gets the directories containing the individual RAMMS runs."""
-    rundirs = list()
-    for file in os.listdir(os.path.join(ramms_dir, 'RELEASE')):
-        match = _shpRE.match(file)
-        if match is None:
-            continue
+def run_dirs(release_files):
+    """Gets the directories containing the individual RAMMS runs.
+    release_files:
+        Names of the release files processed in a RAMMS run"""
+    run_dirs = list()
+    for release_file in release_files:
+        print('rf ',release_file)
+        RELEASE_dir,shapefile = os.path.split(release_file)
+        ramms_dir,_ = os.path.split(RELEASE_dir)
+
+        match = _shpRE.match(shapefile)
         prefix = match.group(1)
         suffix = match.group(2)
-        rundirs.append(os.path.join(ramms_dir, 'RESULTS', prefix, suffix))
+        run_dirs.append(os.path.join(ramms_dir, 'RESULTS', prefix, suffix))
 
-    return rundirs
-
+    return run_dirs

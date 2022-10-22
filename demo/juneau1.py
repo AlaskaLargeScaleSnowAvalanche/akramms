@@ -2,7 +2,7 @@ from uafgi.util import make,shputil
 import dggs.data
 from dggs.avalanche import avalanche, pra_post, domain_builder, ramms
 from dggs.util import paramutil,harnutil
-import os
+import os,sys
 import setuptools.sandbox
 
 def add_akramms_rules(makefile, scene_dir, debug=False, windows_host='davos'):
@@ -36,6 +36,7 @@ def add_akramms_rules(makefile, scene_dir, debug=False, windows_host='davos'):
 
             # TESTING: Do only L
             release_files = release_files[3:]
+            print('release_files ',release_files)
 
             # Domain finder for post-process output
             domain_files = list()
@@ -60,8 +61,8 @@ def add_akramms_rules(makefile, scene_dir, debug=False, windows_host='davos'):
 
             # Rsync files for RAMMS and run.
             ramms_files = shputil.expand_list(release_files + domain_files) + rammsdir_files
-            makefile.add(ramms.ramms_rule(
-                windows_host, ramms_dir, ramms_files, dggs.data.HARNESS_WINDOWS, dry_run=False))
+            makefile.add(ramms.ramms_prep_rule(
+                windows_host, ramms_dir, release_files, ramms_files, dggs.data.HARNESS_WINDOWS, dry_run=False))
 
             break    # DEBUG
 
