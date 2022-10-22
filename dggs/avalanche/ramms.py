@@ -222,6 +222,8 @@ def run_on_windows(idlrt_exe, ramms_sav, ramms_dir):
                 if _doneRE.match(line) is not None:
                     raise EOFError()   # Break out of double loop
 
+            sys.stdout.flush()
+
     except EOFError:
         # Proper signal of end of IDL output; exit gracefully
         pass
