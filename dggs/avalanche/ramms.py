@@ -152,8 +152,8 @@ def kill_idl():
     subprocess.run(cmd)
 
 
-_doneRE = re.compile(r"\s*Creating MUXI-Files...")    # Demo
-#_doneRE = re.compile(r"\s*Finsihed writing GEOTIFF files!")    # Prod
+#_doneRE = re.compile(r"\s*Creating MUXI-Files...")    # Demo
+_doneRE = re.compile(r"\s*Finsihed writing GEOTIFF files!")    # Prod
 def run_on_windows(idlrt_exe, ramms_sav, ramms_dir):
     """Call this to run top-level RAMMS locally on Windows.
     idlrt_exe:
