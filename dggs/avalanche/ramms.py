@@ -145,6 +145,44 @@ def ramms_rule(hostname, ramms_dir, input_files, HARNESS_REMOTE, dry_run=False):
 
 
 # ----------------------------------------------------------
+# https://dev.to/teckert/changing-directory-with-a-python-context-manager-2bj8
+@contextmanager
+def set_directory(path: Path):
+    """Sets the cwd within the context
+
+    Args:
+        path (Path): The path to the cwd
+
+    Yields:
+        None
+
+    """
+
+    origin = Path().absolute()
+    try:
+        os.chdir(path)
+        yield
+    finally:
+        os.chdir(origin)
+
+def configure_ramms_distro(ramms_distro):
+    """Make sure the RAMMS distribution has been fiddled properly"""
+
+    bin = os.path.join(ramms_distro, 'bin')
+    with set_directory(bin):
+        if not os.path.exists('ramms_aval_LHM_orig.exe'):
+            # Need to move
+            print('Moving to ramms_aval_LHM_orig.exe')
+            os.rename('ramms_aval_LHM.exe', 'ramms_aval_LHM_orig.exe')
+
+        if not os.path.exists('ramms_aval_LHM.exe'):
+            # Need to build
+            src = os.path.join(harnutil.HARNESS, 'akramms', 'ramms_aval_LHM_stub.cpp')
+            cmd = ['g++', src, '-o', 'ramms_aval_LHM.exe']
+            print(' '.join(cmd))
+            subprocess.run(cmd, check=True)
+
+# -----------------------------------------------------
 def kill_idl():
     sleep=False
 
@@ -167,12 +205,12 @@ def kill_idl():
 _doneRE = re.compile(r'\s*Starting LSHM SIMULATIONS')
 #_doneRE = re.compile(r"\s*Finsihed writing GEOTIFF files!")    # Prod
 
-def run_on_windows(idlrt_exe, ramms_sav, ramms_dir):
+def run_on_windows(idlrt_exe, ramms_distro, ramms_dir):
     """Call this to run top-level RAMMS locally on Windows.
     idlrt_exe:
         Windows path to idlrt.exe IDL runtime
-    ramms_sav:
-        Windows path to lhsm RAMMS .sav file
+    ramms_distro:
+        Top-level directory of RAMMS distribution
     ramms_dir:
         RAMMS directory to run
     Returns:
@@ -181,6 +219,8 @@ def run_on_windows(idlrt_exe, ramms_sav, ramms_dir):
     """
     print(f'***** Running Top-Level RAMMS on {ramms_dir}')
 
+    # Make sure we've added our stub properly
+    configure_ramms_distro(ramms_distro)
 
     # Avoid extra IDL's lying around that would eat our license
     kill_idl()
@@ -194,6 +234,7 @@ def run_on_windows(idlrt_exe, ramms_sav, ramms_dir):
         pass
 
     # Create batch file to run
+    ramms_sav = os.path.join(ramms_distro, 'ramms_lshm.sav')
     scenario_txt = os.path.join(ramms_dir, 'scenario.txt')
     batfile = os.path.join(ramms_dir, 'run_ramms.bat')
     with open(batfile, 'w') as out:
@@ -268,3 +309,4 @@ def rundirs(ramms_dir):
         rundirs.append(os.path.join(ramms_dir, 'RESULTS', prefix, suffix))
 
     return rundirs
+

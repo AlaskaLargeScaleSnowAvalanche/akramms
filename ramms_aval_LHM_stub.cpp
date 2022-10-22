@@ -40,6 +40,7 @@ int main(int argc, char **argv)
         }
         printf("\n");
 
+#if 0
         // Create an "out2.bat" file
         std::string const &out_file(args[2]);
         std::string const out2_file = out_file + "2";
@@ -53,7 +54,7 @@ int main(int argc, char **argv)
         out << exe_dir << "\\gzip.exe -f " << out_file << "2" << std::endl;
         out << "echo Simulation finished successfully > " << out_file << "2.end";
         out.close();
-
+#endif
         return 0;
         
     }
