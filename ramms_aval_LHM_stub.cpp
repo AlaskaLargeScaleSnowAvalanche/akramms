@@ -30,7 +30,6 @@ int main(int argc, char **argv)
         }
         printf("%s\n", cmd.c_str());
         return system(cmd.c_str());
-        return 0;    // Pretend like all was OK
     } else if (argc == 3) {
         // ramms_aval_LHM.exe juneau1_For_5m_30L_11392.av2 juneau1_For_5m_30L_11392.out
         // Capture this call, do not run
