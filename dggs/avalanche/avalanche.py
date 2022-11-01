@@ -338,7 +338,7 @@ def run_ecog_rule(scene_dir, return_period, forest):
         import os
         import pyproj
 
-        # Base Docke rcommand
+        # Base Docker command
         cmd = ['docker', 'run', '--rm', '--network', 'host']
 
         # Tell eCognition to make more output.
