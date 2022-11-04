@@ -1,8 +1,10 @@
-import os,subprocess,re,sys,time
+import os,subprocess,re,sys,time,itertools
+import htcondor
+import contextlib
 from dggs.avalanche import avalanche
 from dggs.util import harnutil
 import dggs.data
-from uafgi.util import make,ioutil
+from uafgi.util import make,ioutil,shputil
 import itertools, functools
 
 @functools.lru_cache()
@@ -149,7 +151,9 @@ def ramms_prep_rule(hostname, ramms_dir, release_files, input_files, HARNESS_REM
 
         # Get results back
         err = None
-        for run_dir in run_dirs(release_files):
+        for info in run_infos(release_files):
+            run_dir = info['run_dir']
+
             os.makedirs(run_dir, exist_ok=True)
             print('Retrieving dir ', run_dir)
             cmd = ['rsync', '-avz',
@@ -178,8 +182,8 @@ def ramms_prep_rule(hostname, ramms_dir, release_files, input_files, HARNESS_REM
 
 # ----------------------------------------------------------
 # https://dev.to/teckert/changing-directory-with-a-python-context-manager-2bj8
-@contextmanager
-def set_directory(path: Path):
+@contextlib.contextmanager
+def set_directory(path):
     """Sets the cwd within the context
 
     Args:
@@ -328,20 +332,162 @@ def run_on_windows(idlrt_exe, ramms_distro, ramms_dir):
             print('************ ALL DONE!!! ****************')
 
 
+# ---------------------------------------------------------------
 _shpRE = re.compile(r'(.+_.+)_(.+_.+)_.*\.shp')
-def run_dirs(release_files):
-    """Gets the directories containing the individual RAMMS runs.
-    release_files:
-        Names of the release files processed in a RAMMS run"""
-    run_dirs = list()
+def run_infos(release_files, fetch_ids=False):
+    """fetch_ids:
+        Should we fetch the individual avalanche IDs?
+    """
+
+    infos = list()
     for release_file in release_files:
-        print('rf ',release_file)
+
         RELEASE_dir,shapefile = os.path.split(release_file)
         ramms_dir,_ = os.path.split(RELEASE_dir)
 
         match = _shpRE.match(shapefile)
+
         prefix = match.group(1)
         suffix = match.group(2)
-        run_dirs.append(os.path.join(ramms_dir, 'RESULTS', prefix, suffix))
+        run_dir = os.path.join(ramms_dir, 'RESULTS', prefix, suffix)
 
-    return run_dirs
+        info = {
+            'prefix': prefix,
+            'suffix': suffix,
+            'run_dir': run_dir,
+        }
+
+        # Read columns of the release dataframe
+        if fetch_ids:
+            release_df = shputil.read_df(release_file, read_shapes=False)
+            info['ids'] = sorted(list(release_df['Id']))
+
+        infos.append(info)
+
+    return infos
+
+#def run_dirs(release_files):
+#    """Gets the directories containing the individual RAMMS runs.
+#    One top-level RAMMS runs involves many release files and many run_dirs.
+#
+#    release_files:
+#        Names of the release files processed in a RAMMS run"""
+#    run_dirs = list()
+#    for release_file in release_files:
+#        RELEASE_dir,shapefile = os.path.split(release_file)
+#        ramms_dir,_ = os.path.split(RELEASE_dir)
+#
+#        match = _shpRE.match(shapefile)
+#        prefix = match.group(1)
+#        suffix = match.group(2)
+#        run_dirs.append(os.path.join(ramms_dir, 'RESULTS', prefix, suffix))
+#
+#    return run_dirs
+
+# ---------------------------------------------------------------
+# ---------------------------------------------------------------
+submit_tpl = \
+"""universe                = docker
+docker_image            = localhost:5000/ramms
+executable              = /usr/bin/python
+arguments               = /opt/runaval.py {base}
+
+initialdir              = {dir}
+transfer_input_files    = {base}.av2,{base}.dom,{base}.rel,{base}.xyz,{base}.xy-coord,{base}.var
+transfer_output_files   = {base}.out.log,{base}.out.gz
+should_transfer_files   = YES
+when_to_transfer_output = ON_EXIT
+on_exit_hold            = False
+on_exit_remove          = True
+
+output                  = {base}.job.out
+error                   = {base}.job.err
+log                     = {base}.job.log
+request_cpus            = 1
+request_memory          = 1000M
+queue 1
+"""
+
+def submit_job(run_dir, prefix, suffix, id):
+    """Submits an individual avalanche simulation to HTCondor, after
+    RAMMS top-level IDL has run.
+
+    run_dir:
+        Directory of the avalanche run (see run_dirs() above)
+    id:
+        ID of the release polygon associated with the avalance.
+    """
+
+    prefix, suffix = os.path.normpath(path).split(os.sep)[-2:]
+    base = f'{prefix}_{suffix}_{id}'
+    submit_txt = submit_tpl.format(base=base, dir=run_dir)
+
+    cmd = ['condor_submit', '-batch-name', base]
+    proc = subprocess.Popen(cmd, cwd=run_dir, stdin=subprocess.PIPE)
+    proc.communicate(input=submit_txt.encode('utf-8'))
+    proc.wait()
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, cmd)
+
+def job_status(release_files):
+    """Determines status of ALL Condor jobs for a RAMMS run."""
+
+    # Info on each release file of the RAMMS run
+    infos = run_infos(release_files, fetch_ids=True)
+
+    # Initialize set of IDs that we need to regenerate, and that we know are finished
+    regen = set()
+    finished = set()
+
+    # Collect together statuses based on info from directory
+    dir_statuses = list()
+    for info in infos:
+        stem = '{}_{}'.format(info['prefix'], info['suffix'])
+
+        print('ids ',info['ids'])
+        regen_ids.update(info['ids'])
+
+        # Find all avalanche files in the run_dir related to this shapefile
+        job_fileRE = re.compile(r'^{}_(\d+)\.(.*)$'.format(stem))
+        id_suffixes = list()    # [(id,suffix), ...]
+        for leaf in os.listdir(info['run_dir']):
+            match = job_fileRE.match(leaf)
+            if match is None:
+                continue
+            id_suffixes.append((int(match.group(1)), match.group(2)))
+        id_suffixes.sort()
+
+        # Create: suffixes = {id0: {suffixes}, id1: {suffixes}, ...}
+        suffixess = dict((id,set(x[1] for x in tuples))
+            for id,tuples in itertools.groupby(id_suffixes, lambda x: x[0]))
+        for k,v in suffixess.items():
+            print(k,v)
+
+        # Identify avalanches that have finished: .out.gz exists and has non-zero size
+        for id,suffixes in suffixess.items():
+            if (id in regen_ids) and ('out.gz' in suffixes):
+                statinfo = os.stat(os.path.join(info['run_dir'], '{}_{}.out.gz'.format(stem, id)))
+                if statinfo.st_size != 0:
+                    regen_ids.remove(id)
+                    finished.add(id)
+
+        # Identify avalanches that have been submitted / are still running
+        schedd = htcondor.Schedd()   # get the Python representation of the scheduler
+        jobRE_str = r'^{}_([0-9]+)$'.format(stem)
+        jobRE = re.compile(jobRE_str)
+        ads = schedd.query(    # One Ad per job
+            constraint=f'regexp("{jobRE_str}", JobBatchName)',
+            projection=['ClusterId', 'ProcId', 'JobBatchName', 'JobStatus'])
+
+        ok_statuses = {htcondor.JobStatus.IDLE, htcondor.JobStatus.RUNNING, htcondor.JobStatus.TRANSFERRING_OUTPUT, htcondor.JobStatus.SUSPENDED}
+        for ad in ads:
+            match = jobRE.match(ad['JobBatchName'])
+            id = int(match.group(1))
+
+            if ad['JobStatus'] in ok_statuses:
+                regen_ids.remove(id)
+
+    # Return result
+    return regen,finished
+
+TODO: Return full job names, not just polygon ID

@@ -1,12 +1,15 @@
 import sys,re,subprocess,os
 
+base = sys.argv[1]
+#base = os.environ['avalanche']
+
+
+RAMMS_DIR = os.getcwd()    # HTCondor sets this
 HOME = '/tmp/home'
-RAMMS_DIR = '/ramms'    # Volume mount
-base = os.environ['avalanche']
 
 av2_file = os.path.join(RAMMS_DIR, f'{base}.av2')
-av3_file = os.path.join(HOME, f'{base}.av3')
-#av3_file = os.path.join(RAMMS_DIR, f'{base}.av3')
+#av3_file = os.path.join(HOME, f'{base}.av3')   # For some reason this crashes inside the RAMMS C++
+av3_file = os.path.join(RAMMS_DIR, f'{base}.av3')
 log_base = os.path.join(RAMMS_DIR, base)
 #out_file = f'{log_base}.out'
 
@@ -40,8 +43,8 @@ subprocess.run(cmd, check=True, env=env)
 write_av3(av2_file, av3_file)
 
 # Launch RAMMS exe to run one avalanche
-if False:
-    os.chdir('/ramms')
+os.chdir(RAMMS_DIR)
+if True:
     cmd = ['wine', '/opt/ramms/bin/ramms_aval_LHM_orig.exe', av3_file, f'{log_base}.out']
     print(' '.join(cmd))
     subprocess.run(cmd, check=True, env=env)

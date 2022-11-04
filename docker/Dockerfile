@@ -36,7 +36,7 @@ WORKDIR /ramms
 
 # Arguments to pass to ENTRYPOINT (sh)
 #CMD wine /opt/ramms/bin/ramms_aval_LHM_orig.exe ${av2} ${out}
-CMD python /opt/runaval.py
+#CMD python /opt/runaval.py
 
 
 # (avalanche) efischer@antevorta:~/av/prj/juneau1/RAMMS/juneau130yFor/RESULTS/juneau1_For/5m_30L$ docker run -v "$(pwd)":/ramms -e avalanche=juneau1_For_5m_30L_6213 -u 1001:1001 -it ramms
