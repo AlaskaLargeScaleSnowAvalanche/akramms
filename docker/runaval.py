@@ -1,4 +1,4 @@
-import sys,re,subprocess,os
+import sys,re,subprocess,os,gzip,shutil
 
 base = sys.argv[1]
 #base = os.environ['avalanche']
@@ -41,6 +41,14 @@ subprocess.run(cmd, check=True, env=env)
 
 # Write the .av3 file
 write_av3(av2_file, av3_file)
+
+# Gunzip files; leave original .gz in scratch dir
+for ext in ('var', 'xy-coord', 'xyz'):
+    ifname = os.path.join(RAMMS_DIR, f'{base}.{ext}.gz')
+    ofname = os.path.join(RAMMS_DIR, f'{base}.{ext}')
+    with gzip.open(ifname, 'rb') as fin:
+        with open(ofname, 'wb') as out:
+            shutil.copyfileobj(fin, out)
 
 # Launch RAMMS exe to run one avalanche
 os.chdir(RAMMS_DIR)

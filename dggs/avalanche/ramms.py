@@ -1,11 +1,13 @@
-import os,subprocess,re,sys,time,itertools
-import htcondor
+import os,subprocess,re,sys,time,itertools,gzip
 import contextlib
+import itertools, functools,shutil
+import numpy as np
+import shapely
+import htcondor
 from dggs.avalanche import avalanche
 from dggs.util import harnutil
 import dggs.data
 from uafgi.util import make,ioutil,shputil
-import itertools, functools
 
 @functools.lru_cache()
 def scenario_name(scene_dir, return_period, forest):
@@ -276,6 +278,7 @@ def run_on_windows(idlrt_exe, ramms_distro, ramms_dir):
     with open(batfile, 'w') as out:
         out.write(f'"{idlrt_exe}" "{ramms_sav}" -args "{scenario_txt}"\n')
 
+    # Run RAMMS
     try:
         fin = None
         proc1 = subprocess.Popen(batfile)
@@ -331,6 +334,25 @@ def run_on_windows(idlrt_exe, ramms_distro, ramms_dir):
             proc1.communicate()
             print('************ ALL DONE!!! ****************')
 
+    # gzip all .var, .xy-coord and .xyz files
+    gzipRE = re.compile(r'[^.]*\.var$|[^.]*\.xy-coord$|[^.]*\.xyz$')
+    for path,dirs,files in os.walk(os.path.join(ramms_dir, 'RESULTS')):
+        for f in files:
+            if gzipRE.match(f) is not None:
+                # Gzip the file
+                ifname = os.path.join(path, f)
+                ofname = os.path.join(path, f+'.gz')
+                print(f'Gzipping {ifname}')
+                with open(ifname, 'rb') as fin:
+                    with gzip.open(ofname, 'wb') as out:
+                        shutil.copyfileobj(fin, out)
+
+                # Delete the original
+                try:
+                    os.remove(ifname)
+                except FileNotFoundError:
+                    pass
+                    
 
 # ---------------------------------------------------------------
 _shpRE = re.compile(r'(.+_.+)_(.+_.+)_.*\.shp')
@@ -354,6 +376,7 @@ def run_infos(release_files, fetch_ids=False):
         info = {
             'prefix': prefix,
             'suffix': suffix,
+            'stem': f'{prefix}_{suffix}',
             'run_dir': run_dir,
         }
 
@@ -393,7 +416,7 @@ executable              = /usr/bin/python
 arguments               = /opt/runaval.py {base}
 
 initialdir              = {dir}
-transfer_input_files    = {base}.av2,{base}.dom,{base}.rel,{base}.xyz,{base}.xy-coord,{base}.var
+transfer_input_files    = {base}.av2,{base}.dom,{base}.rel,{base}.xyz.gz,{base}.xy-coord.gz,{base}.var.gz
 transfer_output_files   = {base}.out.log,{base}.out.gz
 should_transfer_files   = YES
 when_to_transfer_output = ON_EXIT
@@ -429,6 +452,22 @@ def submit_job(run_dir, prefix, suffix, id):
     if proc.returncode != 0:
         raise subprocess.CalledProcessError(proc.returncode, cmd)
 
+def analyze_rundir(run_dir, stem):
+    # Find all avalanche files in the run_dir related to this shapefile
+    job_fileRE = re.compile(r'^{}_(\d+)\.(.*)$'.format(stem))
+    id_suffixes = list()    # [(id,suffix), ...]
+    for leaf in os.listdir(run_dir):
+        match = job_fileRE.match(leaf)
+        if match is None:
+            continue
+        id_suffixes.append((int(match.group(1)), match.group(2)))
+    id_suffixes.sort()
+
+    # Create: suffixes = {id0: {suffixes}, id1: {suffixes}, ...}
+    return ((id,set(x[1] for x in tuples)) \
+        for id,tuples in itertools.groupby(id_suffixes, lambda x: x[0]))
+
+
 def job_status(release_files):
     """Determines status of ALL Condor jobs for a RAMMS run."""
 
@@ -436,40 +475,31 @@ def job_status(release_files):
     infos = run_infos(release_files, fetch_ids=True)
 
     # Initialize set of IDs that we need to regenerate, and that we know are finished
-    regen = set()
-    finished = set()
+    partition = {'todo': list(), 'inprocess': list(), 'finished': list(), 'failed': list()}
 
     # Collect together statuses based on info from directory
-    dir_statuses = list()
     for info in infos:
-        stem = '{}_{}'.format(info['prefix'], info['suffix'])
+        partition_ids = {'inprocess': set(), 'finished': set(), 'failed': set()}
+        stem = info['stem']
 
-        print('ids ',info['ids'])
-        regen_ids.update(info['ids'])
+        # List of polygon IDs from the shapefile
+        partition_ids['todo'] = set(info['ids']) 
+        todo_ids = partition_ids['todo']    # alias
+        finished_ids = partition_ids['finished']
+        inprocess_ids = partition_ids['inprocess']
+        failed_ids = partition_ids['failed']
 
-        # Find all avalanche files in the run_dir related to this shapefile
-        job_fileRE = re.compile(r'^{}_(\d+)\.(.*)$'.format(stem))
-        id_suffixes = list()    # [(id,suffix), ...]
-        for leaf in os.listdir(info['run_dir']):
-            match = job_fileRE.match(leaf)
-            if match is None:
-                continue
-            id_suffixes.append((int(match.group(1)), match.group(2)))
-        id_suffixes.sort()
-
-        # Create: suffixes = {id0: {suffixes}, id1: {suffixes}, ...}
-        suffixess = dict((id,set(x[1] for x in tuples))
-            for id,tuples in itertools.groupby(id_suffixes, lambda x: x[0]))
-        for k,v in suffixess.items():
-            print(k,v)
-
-        # Identify avalanches that have finished: .out.gz exists and has non-zero size
-        for id,suffixes in suffixess.items():
-            if (id in regen_ids) and ('out.gz' in suffixes):
-                statinfo = os.stat(os.path.join(info['run_dir'], '{}_{}.out.gz'.format(stem, id)))
-                if statinfo.st_size != 0:
-                    regen_ids.remove(id)
-                    finished.add(id)
+        for id,suffixes in analyze_rundir(info['run_dir'], stem):
+            # Identify avalanches that have finished: .out.gz exists and has non-zero size
+            if (id in todo_ids):
+                if 'out.gz' in suffixes:
+                    statinfo = os.stat(os.path.join(info['run_dir'], '{}_{}.out.gz'.format(stem, id)))
+                    todo_ids.remove(id)
+                    (failed_ids if statinfo.st_size == 0 else finished_ids).add(id)
+                elif 'job.log' in suffixes:
+                    # The job ran but produced no output; mark as failed.
+                    todo_ids.remove(id)
+                    failed_ids.add(id)
 
         # Identify avalanches that have been submitted / are still running
         schedd = htcondor.Schedd()   # get the Python representation of the scheduler
@@ -485,9 +515,67 @@ def job_status(release_files):
             id = int(match.group(1))
 
             if ad['JobStatus'] in ok_statuses:
-                regen_ids.remove(id)
+                todo_ids.remove(id)
+                inprocess_ids.add(id)
 
-    # Return result
-    return regen,finished
+        # Turn IDs into full-fledged job names
+        for key,names in partition.items():
+            names.extend(f'{stem}_{id}' for id in sorted(list(partition_ids[key])))
 
-TODO: Return full job names, not just polygon ID
+    return partition
+
+# --------------------------------------------------------
+def read_polygon(poly_file):
+    """Reads a RAMMS polygon file (eg: .dom) into a Shapely Polygon."""
+
+    with open(poly_file) as fin:
+        line = next(fin).split(' ')
+        # Get just the x,y coordinates, no count at beginning, no repeat at end
+        coords = [float(x) for x in line[1:-2]]
+
+    return shapely.geometry.Polygon(list(zip(coords[::2], coords[1::2])))
+
+def write_polygon(p, poly_file):
+    with open(poly_file, 'w') as out:
+        coords = list(p.boundary.coords)
+        out.write('{}'.format(len(coords)))
+        for x,y in coords:
+            out.write(f' {x} {y}')
+        out.write('\n')
+# --------------------------------------------------------
+def _scale_vec(vec,margin):
+    """Adds a certain length to a vector.  Helper function."""
+    veclen = np.linalg.norm(vec)
+    if (veclen+margin) < 0:
+        raise ValueError('Margin is larger than side')
+    factor = margin / veclen
+    return factor*vec
+
+def edge_lengths(p):
+    pts = np.array(p.boundary.coords)
+    edges = np.diff(pts, axis=0)
+    return np.linalg.norm(edges,axis=1)
+
+def add_margin(p,margin):
+    """Adds a margin to a (rotated) rectangle, i.e. a domain rectangle.
+    p: shapely.geometry.Polygon
+        The rectangle
+    margin:
+        Absolute amount to add to length and width.
+        If negative, subtract this amount; cannot subtract more than original length
+    """
+    pts = np.array(p.boundary.coords)
+    print('pts0:\n',pts)
+    edges = np.diff(pts, axis=0)
+    print('edge lengths: ', np.linalg.norm(edges,axis=1))
+    margin2 = .5*margin
+    pts[0,:] += (_scale_vec(edges[3,:],margin2) - _scale_vec(edges[0,:],margin2))
+    pts[1,:] += (_scale_vec(edges[0,:],margin2) - _scale_vec(edges[1,:],margin2))
+    pts[2,:] += (_scale_vec(edges[1,:],margin2) - _scale_vec(edges[2,:],margin2))
+    pts[3,:] += (_scale_vec(edges[2,:],margin2) - _scale_vec(edges[3,:],margin2))
+
+    print('pts1:\n',pts)
+    p = shapely.geometry.Polygon(list(zip(pts[:-1,0], pts[:-1,1])))
+    print('p: ',p)
+    return p
+# --------------------------------------------------------
