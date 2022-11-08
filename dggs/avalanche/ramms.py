@@ -154,14 +154,14 @@ def ramms_prep_rule(hostname, ramms_dir, release_files, input_files, HARNESS_REM
 
         # Get results back
         err = None
-        for info in run_infos(release_files):
-            run_dir = info['run_dir']
+        for release_file in release_files:
+            jb = parse_release_file(release_file)
 
-            os.makedirs(run_dir, exist_ok=True)
-            print('Retrieving dir ', run_dir)
+            os.makedirs(jb.run_dir, exist_ok=True)
+            print('Retrieving dir ', jb.run_dir)
             cmd = ['rsync', '-avz',
-                '{}:{}/'.format(hostname, harnutil.remote_windows_name(run_dir, HARNESS_REMOTE, bash=True)),
-                run_dir]
+                '{}:{}/'.format(hostname, harnutil.remote_windows_name(jb.run_dir, HARNESS_REMOTE, bash=True)),
+                jb.run_dir]
             print(' '.join(cmd))
             try:
                 subprocess.run(cmd, check=True)
@@ -356,68 +356,34 @@ def run_on_windows(idlrt_exe, ramms_distro, ramms_dir):
                     
 
 # ---------------------------------------------------------------
+JobBase = collections.namedtuple('JobSpec', ('run_dir', 'base', 'prefix', 'suffix'))
 _run_dirRE = re.compile(r'^(.+_.+)_(.+_.+)$')
-def parse_job_name(job_name):
+@functools.lru_cache()
+def parse_job_base(ramms_dir, base):
+    """
+    base:
+        String of base of job names, with an avalanche ID.
+        Eg: juneau1_For_5m_30L
+    """
     match = _run_dirRE.match(job_name)
     prefix = match.group(1)
     suffix = match.group(2)
-    return prefix,suffix
-
-def get_run_dir(ramms_dir, prefix, suffix):
     run_dir = os.path.join(ramms_dir, 'RESULTS', prefix, suffix)
-    return run_dir
+    return JobBase(run_dir, base, prefix, suffix)
 
+@functools.lru_cache()
+def parse_release_file(release_file):
+    """Parses the full name of a release file into a JobBase named tuple."""
 
-#_shpRE = re.compile(r'(.+_.+)_(.+_.+)_.*\.shp')
-def run_infos(release_files, fetch_ids=False):
-    """fetch_ids:
-        Should we fetch the individual avalanche IDs?
-    """
+    RELEASE_dir,shapefile = os.path.split(release_file)
+    ramms_dir = os.path.split(RELEASE_dir)[0]
+    base = shapefile[:-8]    # remove _rel.shp
+    return parse_job_base(ramms_dir, base)
 
-    infos = list()
-    for release_file in release_files:
-
-        RELEASE_dir,shapefile = os.path.split(release_file)
-        ramms_dir = os.path.split(RELEASE_dir)[0]
-        job_name = shapefile[:-8]    # remove _rel.shp
-        prefix,suffix = parse_job_name(job_name)
-        run_dir = get_run_dir(ramms_dir, prefix, suffix)
-
-        info = {
-#            'prefix': prefix,
-#            'suffix': suffix,
-            'job_base': f'{prefix}_{suffix}',
-            'run_dir': run_dir,
-        }
-
-        # Read columns of the release dataframe
-        if fetch_ids:
-            release_df = shputil.read_df(release_file, read_shapes=False)
-            info['ids'] = sorted(list(release_df['Id']))
-
-        infos.append(info)
-
-    return infos
-
-#def run_dirs(release_files):
-#    """Gets the directories containing the individual RAMMS runs.
-#    One top-level RAMMS runs involves many release files and many run_dirs.
-#
-#    release_files:
-#        Names of the release files processed in a RAMMS run"""
-#    run_dirs = list()
-#    for release_file in release_files:
-#        RELEASE_dir,shapefile = os.path.split(release_file)
-#        ramms_dir,_ = os.path.split(RELEASE_dir)
-#
-#        match = _shpRE.match(shapefile)
-#        prefix = match.group(1)
-#        suffix = match.group(2)
-#        run_dirs.append(os.path.join(ramms_dir, 'RESULTS', prefix, suffix))
-#
-#    return run_dirs
-
-# ---------------------------------------------------------------
+def get_job_ids(release_file):
+    """Reads a release file, and returns a (sorted) list of PRA IDs in that file."""
+    release_df = shputil.read_df(release_file, read_shapes=False)
+    return sorted(list(release_df['Id']))
 # ---------------------------------------------------------------
 submit_tpl = \
 """universe                = docker
@@ -448,18 +414,12 @@ def submit_job(run_dir, job_name):
     run_dir:
         Directory of the avalanche run (see run_dirs() above; underneath ramms_dir)
         Eg: ...RAMMS/juneau130yFor/RESULTS/juneau1_For/5m_30L
-    job_base:
-        Base name of the job, equal to '{prefix}_{suffix}'
-            Eg: juneau1_For_5m_30L
-    id:
-        ID of the release polygon associated with the avalance.
+    job_name:
+        Full name of job, including ID
+            Eg: juneau1_For_5m_30L_1833
     """
 
     print('Submitting job: {}'.format(job_name))
-#    return
-
-    #prefix, suffix = os.path.normpath(path).split(os.sep)[-2:]
-    #base = f'{prefix}_{suffix}_{id}'
     submit_txt = submit_tpl.format(job_name=job_name, run_dir=run_dir)
 
     cmd = ['condor_submit', '-batch-name', job_name]
@@ -470,7 +430,15 @@ def submit_job(run_dir, job_name):
         raise subprocess.CalledProcessError(proc.returncode, cmd)
 
 def analyze_rundir(run_dir, job_base):
-    # Find all avalanche files in the run_dir related to this shapefile
+    """Find all avalanche files in the run_dir related to this shapefile
+    Returns: {id: [suffix, ...], ...}
+        For each avalanche ID in run_dir, a list of the related files
+        that exist, identified by filename suffix.
+
+        Eg: if avalanche ID 8733 exists in run_dir, an entry might look like:
+            8733: {'av2', 'xyz.gz', 'xy-coord.gz', 'var.gz', 'dom', 'rel', ...}
+
+    """
     job_fileRE = re.compile(r'^{}_(\d+)\.(.*)$'.format(job_base))
     id_suffixes = list()    # [(id,suffix), ...]
     for leaf in os.listdir(run_dir):
@@ -484,91 +452,148 @@ def analyze_rundir(run_dir, job_base):
     return ((id,set(x[1] for x in tuples)) \
         for id,tuples in itertools.groupby(id_suffixes, lambda x: x[0]))
 
-_job_status_labels = ('todo', 'finished', 'inprocess', 'failed')
-JobStatus = collections.namedtuple('JobStatus', _job_status_labels)
+
+def query_condor(job_base):
+    """
+    job_base:
+        Base name of jobs we are querying for.
+    Returns: {job_name: status}
+        status: int
+            Status of job.  See enumeration htcondor.JobStatus:
+                https://htcondor.readthedocs.io/en/latest/apis/python-bindings/api/htcondor.html?highlight=jobstatus#htcondor.JobStatus
+            JobStatus codes:
+                 1 I IDLE
+                 2 R RUNNING
+                 3 X REMOVED
+                 4 C COMPLETED
+                 5 H HELD
+                 6 > TRANSFERRING_OUTPUT
+                 7 S SUSPENDED
+
+    """
+    # Query Condor
+    schedd = htcondor.Schedd()   # get the Python representation of the scheduler
+    jobRE_str = r'^{}_([0-9]+)$'.format(jb.base)
+    jobRE = re.compile(jobRE_str)
+    ads = schedd.query(    # One Ad per job
+        constraint=f'regexp("{jobRE_str}", JobBatchName)',
+        projection=['ClusterId', 'ProcId', 'JobBatchName', 'JobPartition'])
+    condor_statuses = {ad['JobBatchName']: ad['JobPartition'] for ad in ads}
+
+
+# Categorize each job int one of four sets
+_job_partition_labels = ('todo', 'finished', 'inprocess', 'failed')
+JobPartition = collections.namedtuple('JobPartition', _job_partition_labels)
 
 def job_status(release_files):
     """Determines status of ALL Condor jobs for a RAMMS run."""
 
     # Info on each release file of the RAMMS run
-    infos = run_infos(release_files, fetch_ids=True)
+#    infos = run_infos(release_files, fetch_ids=True)
 
     # Initialize set of IDs that we need to regenerate, and that we know are finished
-    partition = {x:list() for x in _job_status_labels}
+    partition = {x:list() for x in _job_partition_labels}
 
     # Collect together statuses based on info from directory
-    for info in infos:
+    for release_file in release_files:
+        jb = parse_release_file(release_file)
+        ids = get_job_ids(release_file)
+
+        # Initialize partition with everything in TODO state
         partition_ids = {'inprocess': set(), 'finished': set(), 'failed': set()}
-        job_base = info['job_base']
+        partition_ids['todo'] = set(ids)
+
+        # Set up aliases
+        todo_ids = partition_ids['todo']
+        inprocess_ids = partition_ids['inprocess']
+        finished_ids = partition_ids['finished']
+        failed_ids = partition_ids['failed']
+
 
         # Query Condor
         schedd = htcondor.Schedd()   # get the Python representation of the scheduler
-        jobRE_str = r'^{}_([0-9]+)$'.format(job_base)
+        jobRE_str = r'^{}_([0-9]+)$'.format(jb.base)
         jobRE = re.compile(jobRE_str)
         ads = schedd.query(    # One Ad per job
             constraint=f'regexp("{jobRE_str}", JobBatchName)',
-            projection=['ClusterId', 'ProcId', 'JobBatchName', 'JobStatus'])
-        condor_statuses = {ad['JobBatchName']: ad['JobStatus'] for ad in ads}
+            projection=['ClusterId', 'ProcId', 'JobBatchName', 'JobPartition'])
+        condor_statuses = {ad['JobBatchName']: ad['JobPartition'] for ad in ads}
 
-        # List of polygon IDs from the shapefile
-        partition_ids['todo'] = set(info['ids']) 
-        todo_ids = partition_ids['todo']    # alias
-        finished_ids = partition_ids['finished']
-        inprocess_ids = partition_ids['inprocess']
-        failed_ids = partition_ids['failed']
-
-        for id,suffixes in analyze_rundir(info['run_dir'], job_base):
-            if (id in todo_ids):
-                # Identify avalanches that have finished: .out.gz exists and has non-zero size
-                if ('out.gz' in suffixes) and (f'{job_base}_{id}' not in condor_statuses):
-                    statinfo = os.stat(os.path.join(info['run_dir'], '{}_{}.out.gz'.format(job_base, id)))
-                    #print(f'failed or finished: {id}', statinfo.st_size)
-                    todo_ids.remove(id)
-                    (failed_ids if statinfo.st_size == 0 else finished_ids).add(id)
-                elif 'job.log' in suffixes:
-                    print(f'failed1: {id}')
-                    # The job ran but produced no output; mark as failed.
-                    todo_ids.remove(id)
-                    failed_ids.add(id)
-
-                else:
-                    # Mark jobs as failed if required input files are not there.
-                    for ext in ['av2', 'rel', 'dom', 'var.gz', 'xy-coord.gz', 'xyz.gz']:
-                        fn = os.path.join(info['run_dir'], f'{job_base}_{id}.{ext}')
-                        if not os.path.exists(fn):
-                            print(f'failed2: {id}')
-                            todo_ids.remove(id)
-                            failed_ids.add(id)
-                            break
 
         # Identify avalanches that have been submitted / are still running
-        ok_statuses = {htcondor.JobStatus.IDLE, htcondor.JobStatus.RUNNING, htcondor.JobStatus.TRANSFERRING_OUTPUT, htcondor.JobStatus.SUSPENDED}
-
-        move_by_status = {
-            htcondor.JobStatus.IDLE: inprocess_ids,
-            htcondor.JobStatus.RUNNING: inprocess_ids, 
-            htcondor.JobStatus.TRANSFERRING_OUTPUT: inprocess_ids, 
-            htcondor.JobStatus.SUSPENDED: failed_ids,
+        op_by_status = {
+            htcondor.JobStatus.IDLE: 'inprocess',
+            htcondor.JobStatus.RUNNING: 'inprocess',
+            htcondor.JobStatus.TRANSFERRING_OUTPUT: 'inprocess',
+            htcondor.JobStatus.SUSPENDED: 'failed',
         }
-        for ad in ads:
-            match = jobRE.match(ad['JobBatchName'])
-            id = int(match.group(1))
-            if id in todo_ids:
-                move_ids = move_by_status[ad['JobStatus']]
-                todo_ids.remove(id)
-                move_ids.add(id)
+
+        # List files on disk
+        job_suffixes = dict(analyze_rundir(jb.run_dir, jb.base))
+
+        # --------------------------------------------------
+
+        # Consider each job in turn from our master list
+        for id in list(todo_ids):
+            op = 'todo'    # Default op is no change
+            job_name = f'{jb.base}_{id}'
+
+            try:
+                # See if Condor tells is what's going on with the job
+
+                if job_name in condor_statuses:
+                    status = condor_statuses[job_name]
+                    if status in op_by_status:
+                        op = op_by_status[status]
+                        raise StopIteration()
+
+                # Not in Condor?  Either it hasn't launched, or it's finished / failed
+                # Let's look at the files on disk to decide.
+
+                # Identify avalanches that have finished: .out.gz exists and has non-zero size
+                # (User can reset jobs by removing *.job.log)
+                suffixes = job_suffixes[id]
+                if ('out.gz' in suffixes):
+                    statinfo = os.stat(os.path.join(jb.run_dir, '{}_{}.out.gz'.format(jb.base, id)))
+
+                    if (statinfo.st_size==0):
+                        op = 'failed' if 'job.log' in suffixes else 'todo'
+                    else:
+                        # The run produced good output!
+                        op = 'finished'
+                    raise StopIteration()
+
+                # The job ran but produced no output; mark as failed.
+                if 'job.log' in suffixes:
+                    print(f'failed1: {id}')
+                    op = 'failed'
+                    raise StopIteration()
+
+                # Mark jobs as failed if required input files are not there.
+                for ext in ['av2', 'rel', 'dom', 'var.gz', 'xy-coord.gz', 'xyz.gz']:
+                    fn = os.path.join(jb.run_dir, f'{jb.base}_{id}.{ext}')
+                    if not os.path.exists(fn):
+                        op = 'failed'
+                        raise StopIteration()
+
+            except StopIteration:
+                pass
+
+            todo_ids.remove(id)
+            partition_ids[op].add(id)
+
 
         # Turn IDs into full-fledged job names
         for key,names in partition.items():
-            lst = [(info['run_dir'], f'{job_base}_{id}') for id in sorted(list(partition_ids[key]))]
+            lst = [(jb.run_dir, f'{jb.base}_{id}') for id in sorted(list(partition_ids[key]))]
             names.extend(lst)
 
-    return JobStatus(*(partition[x] for x in _job_status_labels))
+    return JobPartition(*(partition[x] for x in _job_partition_labels))
 
 # --------------------------------------------------------
 def read_polygon(poly_file):
     """Reads a RAMMS polygon file (eg: .dom) into a Shapely Polygon."""
-
+    print(f'Reading {poly_file}')
     with open(poly_file) as fin:
         line = next(fin).split(' ')
         # Get just the x,y coordinates, no count at beginning, no repeat at end
@@ -606,7 +631,6 @@ def add_margin(p,margin):
         If negative, subtract this amount; cannot subtract more than original length
     """
     pts = np.array(p.boundary.coords)
-    print('pts0:\n',pts)
     edges = np.diff(pts, axis=0)
     print('edge lengths: ', np.linalg.norm(edges,axis=1))
     margin2 = .5*margin
@@ -623,24 +647,23 @@ def print_job_status(st):
         print(f'=========== {k}:')
         print([x[1] for x in v])
 
-def run_simulations0(ramms_dir, release_files):
+def run_simulations0(ramms_dir, release_files, sleep=10*60):
     """Submits simulations and babysits them, polling periodically until they are done.
     ramms_dir:
         Eg: /home/efischer/av/prj/juneau1/RAMMS/juneau130yFor
     Returns:
-        JobStatus
+        JobPartition
     """
 
     while True:
         st = job_status(release_files)
-
         print_job_status(st)
 
         # Write out latest status in user-readable format
         now = datetime.datetime.now()
         with open(os.path.join(ramms_dir, 'status_summary.txt'), 'w') as out:
             out.write(f'RAMMS Avalanche Job Status as of: {now:%Y-%m-%d %H:%M:%S}\n')
-            for lab in _job_status_labels:
+            for lab in _job_partition_labels:
                 out.write(f'================= {lab}\n')
                 jobs = getattr(st, lab)
                 out.write('\n'.join('    '+job_name for run_dir,job_name in jobs))
@@ -658,3 +681,89 @@ def run_simulations0(ramms_dir, release_files):
         print('Sleeping...')
         time.sleep(10)
 
+    return st
+
+# -------------------------------------------------------
+def expand_domain(run_dir, job_name, enlarge_increment=1000.):
+    print('Expanding domain for {}'.format(job_name))
+
+    dom_file = os.path.join(run_dir, f'{job_name}.dom')
+    domRE = re.compile(r'^{}.dom.v(\d+)$'.format(dom_file))
+
+    # Figure out largest .dom.vXXX file that exists
+    max_version = 0
+    for file in os.listdir(run_dir):
+        match = domRE.match(file)
+        if match is None:
+            continue
+        max_verison = max(max_version, int(match.group(1)))
+
+    # Copy to one bigger
+    shutil.copy2(dom_file, dom_file + '.v{}'.format(max_version+1))
+
+    # Read the .dom file, make it bigger by 1000m, and write it back
+    dom = read_polygon(dom_file)
+    dom = add_margin(dom, enlarge_increment)
+    write_polygon(dom, dom_file)    # New timestamp
+
+
+def run_simulations(ramms_dir, release_files, sleep=10*60, enlarge_increment=1000.):
+#    while True:
+    if True:
+        # Run all simulations
+#        st = run_simulations0(ramms_dir, release_files, sleep=sleep)
+        st = job_status(release_files)
+        print_job_status(st)
+        return
+
+        # If nothing failed, we're done!
+        if len(st.failed) == 0:
+            return st
+
+        found_problem = False
+        for run_dir,job_name in st.finished:
+
+            # Identify simulations that overran the domain
+            # (but otherwise look like they finished)
+            out_log = os.path.join(run_dir, f'{job_name}.out.log')
+            with open(out_log) as fin:
+                for line in fin:
+                    if line.startswith(' FINAL OUTFLOW VOLUME:'):
+
+                        # This job overran its domain
+                        expand_domain(run_dir, job_name, enlarge_increment=enlarge_increment)
+
+                        # Reset status
+                        try:
+                            os.remove(os.path.join(run_dir, f'{job_name}.out.gz'))
+                        except FileNotFoundError:
+                            pass
+
+                        try:
+                            os.remove(os.path.join(run_dir, f'{job_name}.job.log'))
+                        except FileNotFoundError:
+                            pass
+
+                        # Mark for another goaround
+                        found_problem = True
+
+                        # No more digging into this log file
+                        break
+
+        # If we didn't find / fix any errors, return status
+        # Any further errors will have to be dealt with manually.
+        if not found_problem:
+            return st
+
+
+# Operations for command line program:
+# 1. show status of overall RAMMS run / single release shapefile / single avalanche
+# 2. Inspect single run: show domain size, and other stuff
+# 3. Mark a shapefile complete IN SPITE OF outstanding failed avlanches
+#
+# Try grepping the out.log file as soon as the run completes, mark it as bad immediately somehow
+
+# -------------------------------------------------------
+def inspect_job(ramms_dir, job_name):
+    prefix,suffix = parse_job_name(job_name)
+    
