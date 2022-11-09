@@ -356,24 +356,24 @@ def run_on_windows(idlrt_exe, ramms_distro, ramms_dir):
                     
 
 # ---------------------------------------------------------------
-JobBase = collections.namedtuple('JobSpec', ('run_dir', 'base', 'prefix', 'suffix'))
-_run_dirRE = re.compile(r'^(.+_.+)_(.+_.+)$')
+ParsedJobBase = collections.namedtuple('JobSpec', ('run_dir', 'base', 'prefix', 'suffix'))
+_job_baseRE = re.compile(r'^(.+_.+)_(.+_.+)$')
 @functools.lru_cache()
-def parse_job_base(ramms_dir, base):
+def parse_job_base(ramms_dir, job_base):
     """
     base:
         String of base of job names, with an avalanche ID.
         Eg: juneau1_For_5m_30L
     """
-    match = _run_dirRE.match(job_name)
+    match = _job_baseRE.match(job_base)
     prefix = match.group(1)
     suffix = match.group(2)
     run_dir = os.path.join(ramms_dir, 'RESULTS', prefix, suffix)
-    return JobBase(run_dir, base, prefix, suffix)
+    return ParsedJobBase(run_dir, job_base, prefix, suffix)
 
 @functools.lru_cache()
 def parse_release_file(release_file):
-    """Parses the full name of a release file into a JobBase named tuple."""
+    """Parses the full name of a release file into a ParsedJobBase named tuple."""
 
     RELEASE_dir,shapefile = os.path.split(release_file)
     ramms_dir = os.path.split(RELEASE_dir)[0]
@@ -441,11 +441,12 @@ def analyze_rundir(run_dir, job_base):
     """
     job_fileRE = re.compile(r'^{}_(\d+)\.(.*)$'.format(job_base))
     id_suffixes = list()    # [(id,suffix), ...]
-    for leaf in os.listdir(run_dir):
-        match = job_fileRE.match(leaf)
-        if match is None:
-            continue
-        id_suffixes.append((int(match.group(1)), match.group(2)))
+    if os.path.isdir(run_dir):
+        for leaf in os.listdir(run_dir):
+            match = job_fileRE.match(leaf)
+            if match is None:
+                continue
+            id_suffixes.append((int(match.group(1)), match.group(2)))
     id_suffixes.sort()
 
     # Create: suffixes = {id0: {suffixes}, id1: {suffixes}, ...}
@@ -484,6 +485,13 @@ def query_condor(job_base):
 # Categorize each job int one of four sets
 _job_partition_labels = ('todo', 'finished', 'inprocess', 'failed')
 JobPartition = collections.namedtuple('JobPartition', _job_partition_labels)
+
+class JobStatus:
+    NONE = 0         # RAMMS input files don't exist
+    TODO = 1         # Ready to submit to HTCondor but no evidence that has been done
+    INPROCESS = 2    # HTCondor is dealing with it
+    FINISHED = 3     # The avalanche has finished, and it's successful
+    FAILED = 4       # The job finished but did not produce full / correct output
 
 def job_status(release_files):
     """Determines status of ALL Condor jobs for a RAMMS run."""
@@ -529,6 +537,9 @@ def job_status(release_files):
         }
 
         # List files on disk
+#        ard = analyze_rundir(jb.run_dir, jb.base)
+#        print('run_dir ',jb.run_dir)
+#        print('ard ',ard)
         job_suffixes = dict(analyze_rundir(jb.run_dir, jb.base))
 
         # --------------------------------------------------
@@ -767,3 +778,37 @@ def run_simulations(ramms_dir, release_files, sleep=10*60, enlarge_increment=100
 def inspect_job(ramms_dir, job_name):
     prefix,suffix = parse_job_name(job_name)
     
+def get_ramms_dirs(dir):
+    """Given a directory above or below the RAMMS directory, finds a
+    "ramms dir," which is one level below RAMMS/."""
+
+    # See if we're in a subdirectory
+    dir = os.path.abspath(dir)
+    dirs = dir.split(os.sep)
+    for i in range(len(dirs)):
+        if dirs[i] == 'RAMMS':
+            # RAMMS/ is the last part of the path, we have multiple dirs.
+            if len(dirs) == i:
+                break
+
+            # We have a path one lower than RAMMS, use it.
+            return [os.sep.join(dirs[:i+2])]
+
+
+    # Maybe we're above, eg: ~/av/prj/juneau1
+    sd = os.path.join(dir, 'RAMMS')
+    if os.path.exists(sd):
+        dir = sd
+    else:
+        raise ValueError(f'No RAMMS dir found for {dir}')
+
+    # Now we know dir == ..../RAMMS.  Find all subdirs
+    ramms_dirs = list()
+    for x in os.listdir(dir):
+        subdir = os.path.join(dir,x)
+        if os.path.isdir(subdir):
+            ramms_dirs.append(subdir)
+
+    return ramms_dirs
+
+

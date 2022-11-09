@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+#
+
+import argparse,itertools,os
+from dggs.avalanche import ramms
+
+# ------------------------------------------------------------------------
+# https://mike.depalatis.net/blog/simplifying-argparse.html
+# https://gist.github.com/mivade/384c2c41c3a29c637cb6c603d4197f9f
+
+cli = argparse.ArgumentParser()
+subparsers = cli.add_subparsers(dest="subcommand")
+
+def argument(*name_or_flags, **kwargs):
+    """Convenience function to properly format arguments to pass to the
+    subcommand decorator.
+    """
+    return (list(name_or_flags), kwargs)
+
+def subcommand(args=[], parent=subparsers):
+    def decorator(func):
+        parser = parent.add_parser(func.__name__, description=func.__doc__)
+        for arg in args:
+            parser.add_argument(*arg[0], **arg[1])
+        parser.set_defaults(func=func)
+    return decorator
+# ------------------------------------------------------------------------
+
+@subcommand([argument('ramms', help='RAMMS directory or release file to inspect')])
+def ps(args):
+
+    if args.ramms.endswith('.shp'):
+        # User provide a single shapefile
+        release_files = [arg.ramms]
+    else:
+        # User provided a RAMMS dir; find the dir and then shapefiles within in
+        ramms_dirs = ramms.get_ramms_dirs(args.ramms)
+        release_files = list()
+        for ramms_dir in ramms_dirs:
+            release_dir = os.path.join(ramms_dir, 'RELEASE')
+            release_files += [os.path.join(release_dir, x) for x in os.listdir(release_dir) if x.endswith('_rel.shp')]
+
+    status = ramms.job_status(release_files)
+    ramms.print_job_status(status)
+
+
+
+
+def main():
+    args = cli.parse_args()
+    if args.subcommand is None:
+        cli.print_help()
+    else:
+        args.func(args)
+
+main()
