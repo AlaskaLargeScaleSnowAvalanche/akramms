@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #
 
-import argparse,itertools,os
+import argparse,itertools,os,subprocess
 from dggs.avalanche import ramms
 
 # ------------------------------------------------------------------------
@@ -28,22 +28,37 @@ def subcommand(args=[], parent=subparsers):
 
 @subcommand([argument('ramms', help='RAMMS directory or release file to inspect')])
 def ps(args):
+    """Provides status of RAMMS avalanches"""
+    release_files = ramms.get_release_files(args.ramms)
 
-    if args.ramms.endswith('.shp'):
-        # User provide a single shapefile
-        release_files = [arg.ramms]
-    else:
-        # User provided a RAMMS dir; find the dir and then shapefiles within in
-        ramms_dirs = ramms.get_ramms_dirs(args.ramms)
-        release_files = list()
-        for ramms_dir in ramms_dirs:
-            release_dir = os.path.join(ramms_dir, 'RELEASE')
-            release_files += [os.path.join(release_dir, x) for x in os.listdir(release_dir) if x.endswith('_rel.shp')]
+    df = ramms.job_statuses(release_files)
+    ramms.print_job_statuses(df)
 
-    status = ramms.job_status(release_files)
-    ramms.print_job_status(status)
+@subcommand([
+    argument('run_dir', help='Run directory to use'),
+    argument('id', type=int, help='ID of avalanche in run_dir to run')])
+def run(args):
+    """Runs a single RAMMS avalanche on the local machine, via Docker"""
 
+    run_dir = os.path.abspath(args.run_dir)
+    parts = run_dir.split(os.sep)
+    job_name = '{}_{}_{}'.format(parts[-2], parts[-1], args.id)
 
+    ramms.submit_job(run_dir, job_name)
+
+@subcommand([argument('ramms', help='RAMMS directory or release file to inspect')])
+def submit(args):
+    """Runs RAMMS for many avalanches"""
+
+    release_files = ramms.get_release_files(args.ramms)
+    df = ramms.job_statuses(release_files)
+
+    df = df[df.job_status == ramms.JobStatus.TODO]
+    for _,row in df.iterrows():
+        parts = row['run_dir'].split(os.sep)
+        job_name = '{}_{}_{}'.format(parts[-2], parts[-1], row['id'])
+#        print('submit ', row['run_dir'], job_name)
+        ramms.submit_job(row['run_dir'], job_name)
 
 
 def main():

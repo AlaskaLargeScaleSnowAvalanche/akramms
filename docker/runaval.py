@@ -1,4 +1,4 @@
-import sys,re,subprocess,os,gzip,shutil
+import sys,re,subprocess,os,gzip,shutil,zipfile,traceback
 
 base = sys.argv[1]
 #base = os.environ['avalanche']
@@ -29,6 +29,9 @@ def write_av3(av2_file, av3_file):
                     leaf = fname.split('\\')[-1]
                     out.write(f'{match.group(1)}{leaf}\n')
 # ----------------------------------------
+print('Starting runaval.py')
+files_for_zip = set()
+
 # Set up environment
 env = dict(os.environ)
 env['HOME'] = HOME
@@ -50,6 +53,7 @@ for ext in ('var', 'xy-coord', 'xyz'):
         with open(ofname, 'wb') as out:
             shutil.copyfileobj(fin, out)
 
+# ----------------------
 # Launch RAMMS exe to run one avalanche
 os.chdir(RAMMS_DIR)
 if True:
@@ -60,17 +64,52 @@ else:
     # Write dummy output for testing
     with open(f'{log_base}.out', 'w') as out:
         out.write('Sample output\n')
+    with open(f'{log_base}.out.log', 'w') as out:
+        out.write('Sample log file\n')
+        out.write(' FINAL OUTFLOW VOLUME: 17')
 
-# gzip the output to temporary file
-cmd = ['gzip', '-c', f'{log_base}.out']
-with open(f'{log_base}.out.gz.tmp', 'wb') as out:
-    subprocess.run(cmd, check=True, env=env, stdout=out)
+# We were successful... add outputs to our zip
+files_for_zip.add(f'{log_base}.out')
+files_for_zip.add(f'{log_base}.out.log')
+# ----------------------
 
-# Atomically write the final output file
-os.rename(f'{log_base}.out.gz.tmp', f'{log_base}.out.gz')
+# See if avalanche overran its domain
+with open(f'{log_base}.out.log') as fin:
+    for line in fin:
+        if line.startswith(' FINAL OUTFLOW VOLUME:'):
+            with open(f'{log_base}.out.overrun', 'w') as out:
+                out.write('Avalanche overran its domain\n')
+            files_for_zip.add(f'{log_base}.out.overrun')
 
-# Remove the uncompressed file
-try:
-    os.remove(f'{log_base}.out')
-except OSError:
-    pass
+#except Exception as e:
+#    # Something went wrong... dump it to the log file
+#    with open(f'{log_base}.out.log', 'a') as out:
+#        out.write('\n')
+#        out.write(str(e))
+#        out.write(traceback.format_exc())
+#
+#    files_for_zip.add(f'{log_base}.out.log')
+
+# Put all outputs in a single zip file
+with zipfile.ZipFile(f'{log_base}.out.zip', 'w') as out_zip:
+    for file in sorted(list(files_for_zip)):
+        out_zip.write(file)
+
+
+
+
+
+
+## gzip the output to temporary file
+#cmd = ['gzip', '-c', f'{log_base}.out']
+#with open(f'{log_base}.out.gz.tmp', 'wb') as out:
+#    subprocess.run(cmd, check=True, env=env, stdout=out)
+#
+## Atomically write the final output file
+#os.rename(f'{log_base}.out.gz.tmp', f'{log_base}.out.gz')
+#
+## Remove the uncompressed file
+#try:
+#    os.remove(f'{log_base}.out')
+#except OSError:
+#    pass

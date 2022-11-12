@@ -9,6 +9,7 @@ from dggs.avalanche import avalanche
 from dggs.util import harnutil
 import dggs.data
 from uafgi.util import make,ioutil,shputil
+import pandas as pd
 
 @functools.lru_cache()
 def scenario_name(scene_dir, return_period, forest):
@@ -365,6 +366,7 @@ def parse_job_base(ramms_dir, job_base):
         String of base of job names, with an avalanche ID.
         Eg: juneau1_For_5m_30L
     """
+    print('job_base ',job_base)
     match = _job_baseRE.match(job_base)
     prefix = match.group(1)
     suffix = match.group(2)
@@ -377,6 +379,7 @@ def parse_release_file(release_file):
 
     RELEASE_dir,shapefile = os.path.split(release_file)
     ramms_dir = os.path.split(RELEASE_dir)[0]
+    print('shapefile ',shapefile)
     base = shapefile[:-8]    # remove _rel.shp
     return parse_job_base(ramms_dir, base)
 
@@ -385,6 +388,8 @@ def get_job_ids(release_file):
     release_df = shputil.read_df(release_file, read_shapes=False)
     return sorted(list(release_df['Id']))
 # ---------------------------------------------------------------
+DOCKER_IMAGE = 'localhost:5000/ramms'
+
 submit_tpl = \
 """universe                = docker
 docker_image            = localhost:5000/ramms
@@ -393,7 +398,7 @@ arguments               = /opt/runaval.py {job_name}
 
 initialdir              = {run_dir}
 transfer_input_files    = {job_name}.av2,{job_name}.dom,{job_name}.rel,{job_name}.xyz.gz,{job_name}.xy-coord.gz,{job_name}.var.gz
-transfer_output_files   = {job_name}.out.log,{job_name}.out.gz
+transfer_output_files   = {job_name}.out.zip
 should_transfer_files   = YES
 when_to_transfer_output = ON_EXIT
 on_exit_hold            = False
@@ -407,7 +412,7 @@ request_memory          = 1000M
 queue 1
 """
 
-def submit_job(run_dir, job_name):
+def submit_job(run_dir, job_name):#, local=False):
     """Submits an individual avalanche simulation to HTCondor, after
     RAMMS top-level IDL has run.
 
@@ -417,7 +422,16 @@ def submit_job(run_dir, job_name):
     job_name:
         Full name of job, including ID
             Eg: juneau1_For_5m_30L_1833
+    local:
+        If True, run immediately on local machine, do not use HTCondor.
     """
+
+#    if local:
+#        print('Running: {}'.format(job_name))
+#        cmd = ['docker', 'run', DOCKER_IMAGE, '/usr/bin/python', '/opt/runaval.py', job_name]
+#        subprocess.run(cmd, cwd=run_dir, check=True)
+#        return
+
 
     print('Submitting job: {}'.format(job_name))
     submit_txt = submit_tpl.format(job_name=job_name, run_dir=run_dir)
@@ -483,40 +497,29 @@ def query_condor(job_base):
 
 
 # Categorize each job int one of four sets
-_job_partition_labels = ('todo', 'finished', 'inprocess', 'failed')
-JobPartition = collections.namedtuple('JobPartition', _job_partition_labels)
-
+job_status_labels = ('none', 'incomplete', 'todo', 'inprocess', 'finished', 'failed')
 class JobStatus:
-    NONE = 0         # RAMMS input files don't exist
-    TODO = 1         # Ready to submit to HTCondor but no evidence that has been done
-    INPROCESS = 2    # HTCondor is dealing with it
-    FINISHED = 3     # The avalanche has finished, and it's successful
-    FAILED = 4       # The job finished but did not produce full / correct output
+    NONE = 0         # No RAMMS input files exist
+    INCOMPLETE = 1   # Some but not all RAMMS input files exist
+    TODO = 2         # Ready to submit to HTCondor but no evidence that has been done
+    INPROCESS = 3    # HTCondor is dealing with it
+    FINISHED = 4     # The avalanche has finished, and it's successful
+    FAILED = 5       # The job finished but did not produce full / correct output
 
-def job_status(release_files):
+def job_statuses(release_files):
     """Determines status of ALL Condor jobs for a RAMMS run."""
 
     # Info on each release file of the RAMMS run
 #    infos = run_infos(release_files, fetch_ids=True)
 
     # Initialize set of IDs that we need to regenerate, and that we know are finished
-    partition = {x:list() for x in _job_partition_labels}
+#    partition = {x:list() for x in _job_partition_labels}
 
     # Collect together statuses based on info from directory
+    statuses = list()
     for release_file in release_files:
         jb = parse_release_file(release_file)
         ids = get_job_ids(release_file)
-
-        # Initialize partition with everything in TODO state
-        partition_ids = {'inprocess': set(), 'finished': set(), 'failed': set()}
-        partition_ids['todo'] = set(ids)
-
-        # Set up aliases
-        todo_ids = partition_ids['todo']
-        inprocess_ids = partition_ids['inprocess']
-        finished_ids = partition_ids['finished']
-        failed_ids = partition_ids['failed']
-
 
         # Query Condor
         schedd = htcondor.Schedd()   # get the Python representation of the scheduler
@@ -545,62 +548,70 @@ def job_status(release_files):
         # --------------------------------------------------
 
         # Consider each job in turn from our master list
-        for id in list(todo_ids):
-            op = 'todo'    # Default op is no change
+        for id in ids:
+            key = (jb.run_dir, id)
+
             job_name = f'{jb.base}_{id}'
 
-            try:
-                # See if Condor tells is what's going on with the job
+            # If nothing for this key exists, then probably top-level
+            # RAMMS has not been run yet for this run_dir
+            if id not in job_suffixes:
+                statuses.append((jb.run_dir, id, JobStatus.NONE))
+                continue
+            suffixes = job_suffixes[id]
 
-                if job_name in condor_statuses:
-                    status = condor_statuses[job_name]
-                    if status in op_by_status:
-                        op = op_by_status[status]
-                        raise StopIteration()
+            # Mark as INCOMPLETE if not all input files are there
+            input_suffixes = ('rel', 'dom', 'av2', 'var.gz', 'xy-coord.gz', 'xyz.gz')
+            ninputs = sum(x in suffixes for x in input_suffixes)
 
-                # Not in Condor?  Either it hasn't launched, or it's finished / failed
-                # Let's look at the files on disk to decide.
+            if ninputs == 0:
+                statuses.append((jb.run_dir, id, JobStatus.NONE))
+                continue
 
-                # Identify avalanches that have finished: .out.gz exists and has non-zero size
-                # (User can reset jobs by removing *.job.log)
-                suffixes = job_suffixes[id]
-                if ('out.gz' in suffixes):
-                    statinfo = os.stat(os.path.join(jb.run_dir, '{}_{}.out.gz'.format(jb.base, id)))
+            if ninputs < len(input_suffixes):
+                statuses.append((jb.run_dir, id, JobStatus.INCOMPLETE))
+                continue
 
-                    if (statinfo.st_size==0):
-                        op = 'failed' if 'job.log' in suffixes else 'todo'
+
+            # See if Condor tells is what's going on with the job
+            if job_name in condor_statuses:
+                status = condor_statuses[job_name]
+                if status in op_by_status:
+                    statuses.append((jb.run_dir, id, op_by_status[status]))
+                    continue
+
+            # Not in Condor?  Either it hasn't launched, or it's finished / failed
+            # Let's look at the files on disk to decide.
+
+            # Identify avalanches that have finished: .out.gz exists and has non-zero size
+            # (User can reset jobs by removing *.job.log)
+            if ('out.gz' in suffixes):
+                statinfo = os.stat(os.path.join(jb.run_dir, '{}_{}.out.gz'.format(jb.base, id)))
+
+                if (statinfo.st_size==0):
+                    if 'job.log' in suffixes:
+                        statuses.append((jb.run_dir, id, JobStatus.FAILED))
                     else:
-                        # The run produced good output!
-                        op = 'finished'
-                    raise StopIteration()
+                        statuses.append((jb.run_dir, id, JobStatus.TODO))
+                else:
+                    # The run produced good output!
+                    statuses.append((jb.run_dir, id, JobStatus.FINISHED))
+                continue
 
-                # The job ran but produced no output; mark as failed.
-                if 'job.log' in suffixes:
-                    print(f'failed1: {id}')
-                    op = 'failed'
-                    raise StopIteration()
-
-                # Mark jobs as failed if required input files are not there.
-                for ext in ['av2', 'rel', 'dom', 'var.gz', 'xy-coord.gz', 'xyz.gz']:
-                    fn = os.path.join(jb.run_dir, f'{jb.base}_{id}.{ext}')
-                    if not os.path.exists(fn):
-                        op = 'failed'
-                        raise StopIteration()
-
-            except StopIteration:
-                pass
-
-            todo_ids.remove(id)
-            partition_ids[op].add(id)
+            # The job ran but produced no output; mark as failed.
+            if 'job.log' in suffixes:
+                print(f'failed1: {id}')
+                statuses.append((jb.run_dir, id, JobStatus.FAILED))
+                continue
 
 
-        # Turn IDs into full-fledged job names
-        for key,names in partition.items():
-            lst = [(jb.run_dir, f'{jb.base}_{id}') for id in sorted(list(partition_ids[key]))]
-            names.extend(lst)
+            # Default to TODO
+            statuses.append((jb.run_dir, id, JobStatus.TODO))
 
-    return JobPartition(*(partition[x] for x in _job_partition_labels))
 
+    df = pd.DataFrame(statuses, columns=('run_dir', 'id', 'job_status'))
+    df = df.sort_values(by=['run_dir', 'job_status', 'id'])
+    return df
 # --------------------------------------------------------
 def read_polygon(poly_file):
     """Reads a RAMMS polygon file (eg: .dom) into a Shapely Polygon."""
@@ -653,10 +664,11 @@ def add_margin(p,margin):
     p = shapely.geometry.Polygon(list(zip(pts[:-1,0], pts[:-1,1])))
     return p
 # --------------------------------------------------------
-def print_job_status(st):
-    for k,v in st._asdict().items():
-        print(f'=========== {k}:')
-        print([x[1] for x in v])
+def print_job_statuses(df):
+    for (run_dir, job_status), group in df.groupby(['run_dir', 'job_status']):
+
+        print('=========== {} {}:'.format(job_status_labels[job_status], run_dir))
+        print(sorted(group['id'].tolist()))
 
 def run_simulations0(ramms_dir, release_files, sleep=10*60):
     """Submits simulations and babysits them, polling periodically until they are done.
@@ -667,8 +679,8 @@ def run_simulations0(ramms_dir, release_files, sleep=10*60):
     """
 
     while True:
-        st = job_status(release_files)
-        print_job_status(st)
+        st = job_statuses(release_files)
+        print_job_statuses(st)
 
         # Write out latest status in user-readable format
         now = datetime.datetime.now()
@@ -681,11 +693,11 @@ def run_simulations0(ramms_dir, release_files, sleep=10*60):
                 out.write('\n')
 
         # Nothing more to do: everything is either finished or failed.
-        if len(st.todo) == 0 and len(st.inprocess) == 0:
+        if len(st['todo']) == 0 and len(st['inprocess']) == 0:
             break
 
         # Submit all the jobs that need to be submitted
-        for run_dir,job_name in st.todo:
+        for run_dir,job_name in st['todo']:
             submit_job(run_dir, job_name)
         
         # Come back later
@@ -723,16 +735,16 @@ def run_simulations(ramms_dir, release_files, sleep=10*60, enlarge_increment=100
     if True:
         # Run all simulations
 #        st = run_simulations0(ramms_dir, release_files, sleep=sleep)
-        st = job_status(release_files)
-        print_job_status(st)
+        st = job_statuses(release_files)
+        print_job_statuses(st)
         return
 
         # If nothing failed, we're done!
-        if len(st.failed) == 0:
+        if len(st['failed']) == 0:
             return st
 
         found_problem = False
-        for run_dir,job_name in st.finished:
+        for run_dir,job_name in st['finished']:
 
             # Identify simulations that overran the domain
             # (but otherwise look like they finished)
@@ -777,38 +789,47 @@ def run_simulations(ramms_dir, release_files, sleep=10*60, enlarge_increment=100
 # -------------------------------------------------------
 def inspect_job(ramms_dir, job_name):
     prefix,suffix = parse_job_name(job_name)
-    
-def get_ramms_dirs(dir):
+
+def _ramms_to_release(ramms_dirs):
+    """Given a bunch of RAMMS directories, returns the release files in them."""
+    release_files = list()
+    for ramms_dir in ramms_dirs:
+        RELEASE_dir = os.path.join(ramms_dir, 'RELEASE')
+        for file in os.listdir(RELEASE_dir):
+            if file.endswith('_rel.shp'):
+                release_files.append(os.path.join(RELEASE_dir, file))
+
+    return release_files
+
+def get_release_files(spec):
     """Given a directory above or below the RAMMS directory, finds a
     "ramms dir," which is one level below RAMMS/."""
 
+    # *** The spec is a directory corresponding to a SINGLE shapefile
+    # ** The spec is a SINGLE shapefile
+    if spec.endswith('.shp'):
+        return [spec]
+
+    dir = os.path.abspath(spec)
+    parts = dir.split(os.sep)
+
+    # See if we're in, eg:
+    #   RAMMS/juneau130yFor/RESULTS/juneau1_For/5m_30L$ 
+    # Return just the shapefile
+    if len(parts) >=3 and parts[-3] == 'RESULTS':
+        parts2 = parts[:-3] + ['RELEASE', '{}_{}_rel.shp'.format(parts[-2], parts[-1])]
+        return [os.sep.join(parts2)]
+
+
     # See if we're in a subdirectory
-    dir = os.path.abspath(dir)
-    dirs = dir.split(os.sep)
-    for i in range(len(dirs)):
-        if dirs[i] == 'RAMMS':
+    for i in range(len(parts)):
+        if parts[i] == 'RAMMS':
             # RAMMS/ is the last part of the path, we have multiple dirs.
-            if len(dirs) == i:
-                break
+            if len(parts) == i:
+                ramms_dirs = [os.path.join(x) for x in os.listdir(dir)]
+                return _ramms_to_release(ramms_dirs)
+            else:
+                # We have a path one lower than RAMMS, use it.
+                return _ramms_to_release([os.sep.join(parts[:i+2])])
 
-            # We have a path one lower than RAMMS, use it.
-            return [os.sep.join(dirs[:i+2])]
-
-
-    # Maybe we're above, eg: ~/av/prj/juneau1
-    sd = os.path.join(dir, 'RAMMS')
-    if os.path.exists(sd):
-        dir = sd
-    else:
-        raise ValueError(f'No RAMMS dir found for {dir}')
-
-    # Now we know dir == ..../RAMMS.  Find all subdirs
-    ramms_dirs = list()
-    for x in os.listdir(dir):
-        subdir = os.path.join(dir,x)
-        if os.path.isdir(subdir):
-            ramms_dirs.append(subdir)
-
-    return ramms_dirs
-
-
+    raise ValueError('Could not interpret spec {} as one or more RAMMS dirs'.format(spec))
