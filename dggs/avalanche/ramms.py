@@ -528,16 +528,28 @@ def job_statuses(release_files):
         ads = schedd.query(    # One Ad per job
             constraint=f'regexp("{jobRE_str}", JobBatchName)',
             projection=['ClusterId', 'ProcId', 'JobBatchName', 'JobPartition'])
-        condor_statuses = {ad['JobBatchName']: ad['JobPartition'] for ad in ads}
 
+        # IDentify status coming from Condor
+        op_by_status = {
+            htcondor.JobStatus.IDLE: JobStatus.INPROCESS,
+            htcondor.JobStatus.RUNNING: JobStatus.INPROCESS,
+            htcondor.JobStatus.TRANSFERRING_OUTPUT: JobStatus.INPROCESS,
+            htcondor.JobStatus.SUSPENDED: JobStatus.FAILED,
+        }
+        condor_statuses = dict()
+        for ad in ads:
+            job_name = ad['JobBatchName']
+            if 'JobPartition' in ad:
+                jp = ad['JobPartition']
+                try:
+                    condor_statuses[job_name] = op_by_status[jp]
+                except:
+                    pass
+            else:
+                # It's been submitted but not yet run
+                condor_statuses[job_name] = JobStatus.INPROCESS
 
         # Identify avalanches that have been submitted / are still running
-        op_by_status = {
-            htcondor.JobStatus.IDLE: 'inprocess',
-            htcondor.JobStatus.RUNNING: 'inprocess',
-            htcondor.JobStatus.TRANSFERRING_OUTPUT: 'inprocess',
-            htcondor.JobStatus.SUSPENDED: 'failed',
-        }
 
         # List files on disk
 #        ard = analyze_rundir(jb.run_dir, jb.base)
@@ -575,17 +587,18 @@ def job_statuses(release_files):
 
             # See if Condor tells is what's going on with the job
             if job_name in condor_statuses:
-                status = condor_statuses[job_name]
-                if status in op_by_status:
-                    statuses.append((jb.run_dir, id, op_by_status[status]))
-                    continue
+                statuses.append((jb.run_dir, id, condor_statuses[job_name]))
+                continue
 
             # Not in Condor?  Either it hasn't launched, or it's finished / failed
             # Let's look at the files on disk to decide.
 
             # Identify avalanches that have finished: .out.gz exists and has non-zero size
             # (User can reset jobs by removing *.job.log)
-            if ('out.gz' in suffixes):
+            if ('out.zip' in suffixes):
+                statuses.append((jb.run_dir, id, JobStatus.FINISHED))
+                continue
+
                 statinfo = os.stat(os.path.join(jb.run_dir, '{}_{}.out.gz'.format(jb.base, id)))
 
                 if (statinfo.st_size==0):

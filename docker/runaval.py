@@ -91,9 +91,9 @@ with open(f'{log_base}.out.log') as fin:
 #    files_for_zip.add(f'{log_base}.out.log')
 
 # Put all outputs in a single zip file
-with zipfile.ZipFile(f'{log_base}.out.zip', 'w') as out_zip:
+with zipfile.ZipFile(f'{log_base}.out.zip', 'w', zipfile.ZIP_DEFLATED) as out_zip:
     for file in sorted(list(files_for_zip)):
-        out_zip.write(file)
+        out_zip.write(file, arcname=file)    # arcname is simple file without path
 
 
 
