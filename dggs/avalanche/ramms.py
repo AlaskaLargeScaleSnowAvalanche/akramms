@@ -1,5 +1,5 @@
 import os,subprocess,re,sys,itertools,gzip,collections
-import datetime,time
+import datetime,time,zipfile
 import contextlib
 import itertools, functools,shutil
 import numpy as np
@@ -497,14 +497,15 @@ def query_condor(job_base):
 
 
 # Categorize each job int one of four sets
-job_status_labels = ('none', 'incomplete', 'todo', 'inprocess', 'finished', 'failed')
+job_status_labels = ('none', 'incomplete', 'todo', 'inprocess', 'finished', 'overrun', 'failed')
 class JobStatus:
     NONE = 0         # No RAMMS input files exist
     INCOMPLETE = 1   # Some but not all RAMMS input files exist
     TODO = 2         # Ready to submit to HTCondor but no evidence that has been done
     INPROCESS = 3    # HTCondor is dealing with it
     FINISHED = 4     # The avalanche has finished, and it's successful
-    FAILED = 5       # The job finished but did not produce full / correct output
+    OVERRUN = 5      # Avalanche overran the boundary; auto-resubmit
+    FAILED = 6       # The job finished but did not produce full / correct output
 
 def job_statuses(release_files):
     """Determines status of ALL Condor jobs for a RAMMS run."""
@@ -596,27 +597,28 @@ def job_statuses(release_files):
             # Identify avalanches that have finished: .out.gz exists and has non-zero size
             # (User can reset jobs by removing *.job.log)
             if ('out.zip' in suffixes):
-                statuses.append((jb.run_dir, id, JobStatus.FINISHED))
-                continue
+                out_zip = os.path.join(jb.run_dir, '{}_{}.out.zip'.format(jb.base, id))
 
-                statinfo = os.stat(os.path.join(jb.run_dir, '{}_{}.out.gz'.format(jb.base, id)))
-
+                # Check for abandoned job
+                statinfo = os.stat(out_zip)
                 if (statinfo.st_size==0):
-                    if 'job.log' in suffixes:
-                        statuses.append((jb.run_dir, id, JobStatus.FAILED))
-                    else:
-                        statuses.append((jb.run_dir, id, JobStatus.TODO))
+                    # The HTCondor output file has been created, but
+                    # no sign of the HTCondor job to write it at the
+                    # end.  Sounds like things were killed, send
+                    # status back to TODO.
+                    statuses.append((jb.run_dir, id, JobStatus.TODO))
+                    continue
+
+                # We tentatively think the job is finished.  But let's
+                # look inside the zip file to make sure the domain
+                # wasn't overrun.
+                with zipfile.ZipFile(out_zip, 'r') as in_zip:
+                    arcnames = [os.path.split(x)[1] for x in in_zip.namelist()]
+                if any(x.endswith('.out.overrun') for x in arcnames):
+                    statuses.append((jb.run_dir, id, JobStatus.OVERRUN))
                 else:
-                    # The run produced good output!
                     statuses.append((jb.run_dir, id, JobStatus.FINISHED))
                 continue
-
-            # The job ran but produced no output; mark as failed.
-            if 'job.log' in suffixes:
-                print(f'failed1: {id}')
-                statuses.append((jb.run_dir, id, JobStatus.FAILED))
-                continue
-
 
             # Default to TODO
             statuses.append((jb.run_dir, id, JobStatus.TODO))
