@@ -185,42 +185,26 @@ def ramms_prep_rule(hostname, ramms_dir, release_files, input_files, HARNESS_REM
 
 
 # ----------------------------------------------------------
-# https://dev.to/teckert/changing-directory-with-a-python-context-manager-2bj8
-@contextlib.contextmanager
-def set_directory(path):
-    """Sets the cwd within the context
+# # https://dev.to/teckert/changing-directory-with-a-python-context-manager-2bj8
+# @contextlib.contextmanager
+# def set_directory(path):
+#     """Sets the cwd within the context
+# 
+#     Args:
+#         path (Path): The path to the cwd
+# 
+#     Yields:
+#         None
+# 
+#     """
+# 
+#     origin = Path().absolute()
+#     try:
+#         os.chdir(path)
+#         yield
+#     finally:
+#         os.chdir(origin)
 
-    Args:
-        path (Path): The path to the cwd
-
-    Yields:
-        None
-
-    """
-
-    origin = Path().absolute()
-    try:
-        os.chdir(path)
-        yield
-    finally:
-        os.chdir(origin)
-
-def configure_ramms_distro(ramms_distro):
-    """Make sure the RAMMS distribution has been fiddled properly"""
-
-    bin = os.path.join(ramms_distro, 'bin')
-    with set_directory(bin):
-        if not os.path.exists('ramms_aval_LHM_orig.exe'):
-            # Need to move
-            print('Moving to ramms_aval_LHM_orig.exe')
-            os.rename('ramms_aval_LHM.exe', 'ramms_aval_LHM_orig.exe')
-
-        if not os.path.exists('ramms_aval_LHM.exe'):
-            # Need to build
-            src = os.path.join(harnutil.HARNESS, 'akramms', 'ramms_aval_LHM_stub.cpp')
-            cmd = ['g++', src, '-o', 'ramms_aval_LHM.exe']
-            print(' '.join(cmd))
-            subprocess.run(cmd, check=True)
 
 # -----------------------------------------------------
 def kill_idl():
@@ -497,9 +481,9 @@ def query_condor(job_base):
 
 
 # Categorize each job int one of four sets
-job_status_labels = ('none', 'incomplete', 'todo', 'inprocess', 'finished', 'overrun', 'failed')
+job_status_labels = ('noinput', 'incomplete', 'todo', 'inprocess', 'finished', 'overrun', 'failed')
 class JobStatus:
-    NONE = 0         # No RAMMS input files exist
+    NOINPUT = 0         # No RAMMS input files exist
     INCOMPLETE = 1   # Some but not all RAMMS input files exist
     TODO = 2         # Ready to submit to HTCondor but no evidence that has been done
     INPROCESS = 3    # HTCondor is dealing with it
@@ -569,7 +553,7 @@ def job_statuses(release_files):
             # If nothing for this key exists, then probably top-level
             # RAMMS has not been run yet for this run_dir
             if id not in job_suffixes:
-                statuses.append((jb.run_dir, id, JobStatus.NONE))
+                statuses.append((jb.run_dir, id, JobStatus.NOINPUT))
                 continue
             suffixes = job_suffixes[id]
 
@@ -578,7 +562,7 @@ def job_statuses(release_files):
             ninputs = sum(x in suffixes for x in input_suffixes)
 
             if ninputs == 0:
-                statuses.append((jb.run_dir, id, JobStatus.NONE))
+                statuses.append((jb.run_dir, id, JobStatus.NOINPUT))
                 continue
 
             if ninputs < len(input_suffixes):
