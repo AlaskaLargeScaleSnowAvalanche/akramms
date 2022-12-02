@@ -190,10 +190,11 @@ def run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last_
             time.sleep(0.5)
 
             # See if RAMMS exited unexpectedly
+            # Or if it exited before we could kill it and returned an error status code
             retcode = proc1.poll()
-            if (retcode != None):
+            if (retcode != None and retcode != 0):
                 print('IDL RAMMS exited with status code {}'.format(retcode))
-                raise subprocess.CalledProcessError(retcode, cmd1)
+                raise subprocess.CalledProcessError(retcode, batfile)
 
             # Open logfile if it has appeared
             if fin is None:
