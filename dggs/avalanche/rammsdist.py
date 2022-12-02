@@ -140,7 +140,7 @@ def kill_idl():
 _doneRE = re.compile(r'\s*Starting LSHM SIMULATIONS')
 #_doneRE = re.compile(r"\s*Finsihed writing GEOTIFF files!")    # Prod
 
-def run_on_windows(idlrt_exe, ramms_version, ramms_dir):
+def run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last_ramms_phase):
     """Call this to run top-level RAMMS locally on Windows.
     idlrt_exe:
         Windows path to idlrt.exe IDL runtime
@@ -148,6 +148,10 @@ def run_on_windows(idlrt_exe, ramms_version, ramms_dir):
         Version of RAMMS to run (eg: '221101')
     ramms_dir:
         RAMMS directory to run
+    first_ramms_phase: 1|2|3
+        First phase of RAMMS to execute on this run (eg: 1)
+    last_ramms_phase: 1|2|3
+        Last phase of RAMMS to execute on this run (eg: 1)
     Returns:
         Nothing if OK.
         Raises Exception if it did not complete.
@@ -173,7 +177,7 @@ def run_on_windows(idlrt_exe, ramms_version, ramms_dir):
     scenario_txt = os.path.join(ramms_dir, 'scenario.txt')
     batfile = os.path.join(ramms_dir, 'run_ramms.bat')
     with open(batfile, 'w') as out:
-        out.write(f'"{idlrt_exe}" "{ramms_sav}" -args "{scenario_txt}"\n')
+        out.write(f'"{idlrt_exe}" "{ramms_sav}" -args "{scenario_txt}" {first_ramms_phase} {last_ramms_phase}\n')
 
     # Run RAMMS
     try:
