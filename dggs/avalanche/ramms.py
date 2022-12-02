@@ -123,8 +123,9 @@ def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, 
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
 # sh ~/av/akramms/sh/run_ramms.sh 'c:\Users\efischer\av\prj\juneau1\RAMMS\juneau130yFor'
-def ramms_prep_rule(hostname, ramms_dir, release_files, input_files, HARNESS_REMOTE, dry_run=False):
-    """
+def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_REMOTE, dry_run=False):
+    """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)
+
     input_files:
         All input files for the RAMMS run (superset of release_files)
     """
@@ -185,28 +186,8 @@ def ramms_prep_rule(hostname, ramms_dir, release_files, input_files, HARNESS_REM
         [logfile])    # We don't really know the output files yet
 
 
-# ----------------------------------------------------------
-# # https://dev.to/teckert/changing-directory-with-a-python-context-manager-2bj8
-# @contextlib.contextmanager
-# def set_directory(path):
-#     """Sets the cwd within the context
-# 
-#     Args:
-#         path (Path): The path to the cwd
-# 
-#     Yields:
-#         None
-# 
-#     """
-# 
-#     origin = Path().absolute()
-#     try:
-#         os.chdir(path)
-#         yield
-#     finally:
-#         os.chdir(origin)
-
-
+# =========================================================================================
+# ===== RAMMS Stage 2: Manage avalanche jobs
 
 # ---------------------------------------------------------------
 ParsedJobBase = collections.namedtuple('JobSpec', ('run_dir', 'base', 'prefix', 'suffix'))
@@ -537,7 +518,79 @@ def print_job_statuses(df):
         print('=========== {} {}:'.format(job_status_labels[job_status], run_dir))
         print(sorted(group['id'].tolist()))
 
+def _ramms_to_release(ramms_dirs):
+    """Given a bunch of RAMMS directories, returns the release files in them."""
+    release_files = list()
+    for ramms_dir in ramms_dirs:
+        RELEASE_dir = os.path.join(ramms_dir, 'RELEASE')
+        for file in os.listdir(RELEASE_dir):
+            if file.endswith('_rel.shp'):
+                release_files.append(os.path.join(RELEASE_dir, file))
+
+    return release_files
+
+def get_release_files(spec):
+    """Given a directory above or below the RAMMS directory, finds a
+    "ramms dir," which is one level below RAMMS/."""
+
+    # *** The spec is a directory corresponding to a SINGLE shapefile
+    # ** The spec is a SINGLE shapefile
+    if spec.endswith('.shp'):
+        return [spec]
+
+    dir = os.path.abspath(spec)
+    parts = dir.split(os.sep)
+
+    # See if we're in, eg:
+    #   RAMMS/juneau130yFor/RESULTS/juneau1_For/5m_30L$ 
+    # Return just the shapefile
+    if len(parts) >=3 and parts[-3] == 'RESULTS':
+        parts2 = parts[:-3] + ['RELEASE', '{}_{}_rel.shp'.format(parts[-2], parts[-1])]
+        return [os.sep.join(parts2)]
+
+
+    # See if we're in a subdirectory
+    for i in range(len(parts)):
+        if parts[i] == 'RAMMS':
+            # RAMMS/ is the last part of the path, we have multiple dirs.
+            if len(parts) == i:
+                ramms_dirs = [os.path.join(x) for x in os.listdir(dir)]
+                return _ramms_to_release(ramms_dirs)
+            else:
+                # We have a path one lower than RAMMS, use it.
+                return _ramms_to_release([os.sep.join(parts[:i+2])])
+
+    raise ValueError('Could not interpret spec {} as one or more RAMMS dirs'.format(spec))
+
+# --------------------------------------------------------------------
+def submit_jobs(release_files):
+    """Does an initial (or subsequent) submit of jobs for a set of
+    release files.  Submits jobs that can be submitted, and that have
+    not yet been.
+
+    Returns:
+        df:
+            Job statuses BEFORE submissions were made
+    """
+
+    df = job_statuses(release_files)
+
+    df = df[df.job_status == JobStatus.TODO]
+    for _,row in df.iterrows():
+        parts = row['run_dir'].split(os.sep)
+        job_name = '{}_{}_{}'.format(parts[-2], parts[-1], row['id'])
+#        print('submit ', row['run_dir'], job_name)
+        submit_job(row['run_dir'], job_name)
+
+    return df
+
+# =============================================================================
+# =============================================================================
+# =============================================================================
+# Code not currently being used; but will need it for domain enlarging
+
 def run_simulations0(ramms_dir, release_files, sleep=10*60):
+
     """Submits simulations and babysits them, polling periodically until they are done.
     ramms_dir:
         Eg: /home/efischer/av/prj/juneau1/RAMMS/juneau130yFor
@@ -654,49 +707,6 @@ def run_simulations(ramms_dir, release_files, sleep=10*60, enlarge_increment=100
 # Try grepping the out.log file as soon as the run completes, mark it as bad immediately somehow
 
 # -------------------------------------------------------
-def inspect_job(ramms_dir, job_name):
-    prefix,suffix = parse_job_name(job_name)
+#def inspect_job(ramms_dir, job_name):
+#    prefix,suffix = parse_job_name(job_name)
 
-def _ramms_to_release(ramms_dirs):
-    """Given a bunch of RAMMS directories, returns the release files in them."""
-    release_files = list()
-    for ramms_dir in ramms_dirs:
-        RELEASE_dir = os.path.join(ramms_dir, 'RELEASE')
-        for file in os.listdir(RELEASE_dir):
-            if file.endswith('_rel.shp'):
-                release_files.append(os.path.join(RELEASE_dir, file))
-
-    return release_files
-
-def get_release_files(spec):
-    """Given a directory above or below the RAMMS directory, finds a
-    "ramms dir," which is one level below RAMMS/."""
-
-    # *** The spec is a directory corresponding to a SINGLE shapefile
-    # ** The spec is a SINGLE shapefile
-    if spec.endswith('.shp'):
-        return [spec]
-
-    dir = os.path.abspath(spec)
-    parts = dir.split(os.sep)
-
-    # See if we're in, eg:
-    #   RAMMS/juneau130yFor/RESULTS/juneau1_For/5m_30L$ 
-    # Return just the shapefile
-    if len(parts) >=3 and parts[-3] == 'RESULTS':
-        parts2 = parts[:-3] + ['RELEASE', '{}_{}_rel.shp'.format(parts[-2], parts[-1])]
-        return [os.sep.join(parts2)]
-
-
-    # See if we're in a subdirectory
-    for i in range(len(parts)):
-        if parts[i] == 'RAMMS':
-            # RAMMS/ is the last part of the path, we have multiple dirs.
-            if len(parts) == i:
-                ramms_dirs = [os.path.join(x) for x in os.listdir(dir)]
-                return _ramms_to_release(ramms_dirs)
-            else:
-                # We have a path one lower than RAMMS, use it.
-                return _ramms_to_release([os.sep.join(parts[:i+2])])
-
-    raise ValueError('Could not interpret spec {} as one or more RAMMS dirs'.format(spec))

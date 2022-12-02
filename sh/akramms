@@ -51,15 +51,7 @@ def submit(args):
     """Runs RAMMS for many avalanches"""
 
     release_files = ramms.get_release_files(args.ramms)
-    df = ramms.job_statuses(release_files)
-
-    df = df[df.job_status == ramms.JobStatus.TODO]
-    for _,row in df.iterrows():
-        parts = row['run_dir'].split(os.sep)
-        job_name = '{}_{}_{}'.format(parts[-2], parts[-1], row['id'])
-#        print('submit ', row['run_dir'], job_name)
-        ramms.submit_job(row['run_dir'], job_name)
-
+    ramms.submit_jobs(release_files)
 
 def main():
     args = cli.parse_args()

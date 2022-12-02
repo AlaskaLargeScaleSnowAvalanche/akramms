@@ -59,16 +59,35 @@ def add_akramms_rules(makefile, scene_dir, debug=False, windows_host='davos'):
                 ramms_dir, scenario_name, scene_dir, return_period, forest, dggs.data.HARNESS_WINDOWS,
                 debug=debug)).outputs
 
-            # Rsync files for RAMMS and run.
+            # RAMMS Stage 1: IDL Prep
             ramms_files = shputil.expand_list(release_files + domain_files) + rammsdir_files
-            makefile.add(ramms.ramms_prep_rule(
+            makefile.add(ramms.ramms_stage1_rule(
                 windows_host, ramms_dir, release_files, ramms_files, dggs.data.HARNESS_WINDOWS, dry_run=False))
+
+            # Queue the resulting individual avalanche jobs
+            # immediately to HTCondor.  They can start running, even
+            # as we process the next set of release files.
+            ramms.submit_jobs(release_files)
 
             break    # DEBUG
 
+def akramms_stage1(scene_dir):
+    makefile = make.Makefile()
+    add_akramms_rules(makefile, scene_dir)
+
+    # We do this to make sure the domain finder C++ code is compiled.
+    setup_py = os.path.join(harnutil.HARNESS, 'akramms', 'setup.py')
+    prefix = os.path.join(harnutil.HARNESS, 'akramms', 'inst')
+    cmd = ['install', '--prefix', prefix]
+    print('setup.py ', cmd)
+    setuptools.sandbox.run_setup(setup_py, cmd)
+
+    makefile.generate('juneau1_mk', run=True, ncpu=1)
+
+
+
 def main():
 
-    makefile = make.Makefile()
 
     # Set up a new workspace directory, and set ALL parameters for our computation
     # (across ArcGIS, eCognition, RAMMS, etc)
@@ -83,14 +102,6 @@ def main():
         snowdepth_geo=dggs.data.join('data', 'lader', 'sx3', 'geo_southeast.nc'),
         snowdepth_file=dggs.data.join('data', 'lader', 'sx3', 'gfdl_sx3_1986.nc'))
 
-    add_akramms_rules(makefile, scene_dir)
-
-    setup_py = os.path.join(harnutil.HARNESS, 'akramms', 'setup.py')
-    prefix = os.path.join(harnutil.HARNESS, 'akramms', 'inst')
-    cmd = ['install', '--prefix', prefix]
-    print('setup.py ', cmd)
-    setuptools.sandbox.run_setup(setup_py, cmd)
-
-    makefile.generate('juneau1_mk', run=True, ncpu=1)
+    akramms_stage1(scene_dir)
 
 main()
