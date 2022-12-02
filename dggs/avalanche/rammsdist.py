@@ -137,7 +137,12 @@ def kill_idl():
         time.sleep(1)
 
 #_doneRE = re.compile(r"\s*Creating MUXI-Files...")    # Demo
-_doneRE = re.compile(r'\s*Starting LSHM SIMULATIONS')
+# RAMMS IDL prints this when it is done with Phase 1
+_doneREs = {
+    1 : re.compile(r'\s*(Starting LSHM SIMULATIONS|LSHM Analysis finished successfully)'),
+    3 : re.compile(r'Hello World'),
+}
+
 #_doneRE = re.compile(r"\s*Finsihed writing GEOTIFF files!")    # Prod
 
 def run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last_ramms_phase):
@@ -215,7 +220,7 @@ def run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last_
 
                 # Process the line we read
                 print(line+'*', end='')
-                if _doneRE.match(line) is not None:
+                if _doneREs[last_ramms_phase].match(line) is not None:
                     raise EOFError()   # Break out of double loop
 
             sys.stdout.flush()
