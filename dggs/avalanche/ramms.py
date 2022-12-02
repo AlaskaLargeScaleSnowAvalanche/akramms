@@ -123,6 +123,21 @@ def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, 
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
 # sh ~/av/akramms/sh/run_ramms.sh 'c:\Users\efischer\av\prj\juneau1\RAMMS\juneau130yFor'
+def run_ramms(ramms_dir, first_phase, last_phase, HARNESS_REMOTE):
+    # Run RAMMS
+    remote_run_ramms_sh = harnutil.remote_windows_name(
+            os.path.join(harnutil.HARNESS, 'akramms', 'sh', 'run_ramms.sh'),
+            # --ramms-version 221101
+            HARNESS_REMOTE, bash=True)
+
+    cmd = ['ssh', hostname, 'sh', remote_run_ramms_sh,
+        harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True),
+        str(first_phase), str(last_phase)]    # Stage 1 to 1
+    print(' '.join(cmd))
+    if not dry_run:
+        subprocess.run(cmd, check=True)
+
+
 def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_REMOTE, dry_run=False, submit=True):
     """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)
 
@@ -143,18 +158,7 @@ def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_R
         harnutil.rsync_files(input_files, hostname, HARNESS_REMOTE, tdir)
 
         # Run RAMMS
-        remote_run_ramms_sh = harnutil.remote_windows_name(
-                os.path.join(harnutil.HARNESS, 'akramms', 'sh', 'run_ramms.sh'),
-                # --ramms-version 221101
-                HARNESS_REMOTE, bash=True)
-
-        cmd = ['ssh', hostname, 'sh', remote_run_ramms_sh,
-            harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True),
-            str(1), str(1)]    # Stage 1 to 1
-        print(' '.join(cmd))
-        if not dry_run:
-            subprocess.run(cmd, check=True)
-
+        run_ramms(ramms_dir, 1, 1, HARNESS_REMOTE)
 
         # Get results back
         err = None
