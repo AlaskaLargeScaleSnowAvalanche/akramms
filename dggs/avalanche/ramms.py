@@ -123,7 +123,7 @@ def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, 
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
 # sh ~/av/akramms/sh/run_ramms.sh 'c:\Users\efischer\av\prj\juneau1\RAMMS\juneau130yFor'
-def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_REMOTE, dry_run=False):
+def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_REMOTE, dry_run=False, submit=True):
     """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)
 
     input_files:
@@ -180,6 +180,10 @@ def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_R
         print(' '.join(cmd))
         subprocess.run(cmd, check=True)
 
+        # Submit the individual avalanche runs immediately so we can
+        # get going while preparing more RAMMS directories.
+        if submit:
+            submit_jobs(release_files)
 
     return make.Rule(action,
         input_files,
@@ -585,6 +589,19 @@ def submit_jobs(release_files):
     return df
 
 # =============================================================================
+# ===== RAMMS Stage 3
+def ramms_stage3_rule(hostname, ramms_dir, release_files, HARNESS_REMOTE):
+
+    # Unpack / gzip individual avalanche .zip files
+
+    # rsync to 
+
+    pass
+
+
+
+
+
 # =============================================================================
 # =============================================================================
 # Code not currently being used; but will need it for domain enlarging

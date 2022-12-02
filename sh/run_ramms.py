@@ -18,10 +18,10 @@ parser.add_argument('--ramms', metavar='<RAMMS distro dir>',
 parser.add_argument('ramms_dir', metavar='<RAMMS run directory>',
     help='Directory prepared to run RAMMS')
 
-parser.add_argument('first_ramms_phase', type=int, required=True,
+parser.add_argument('first_ramms_phase', type=int,
     help='First phase of RAMMS to run (1|2|3)')
 
-parser.add_argument('last_ramms_phase', type=int, required=True,
+parser.add_argument('last_ramms_phase', type=int,
     help='Last phase of RAMMS to run (1|2|3)')
 
 args = parser.parse_args()
