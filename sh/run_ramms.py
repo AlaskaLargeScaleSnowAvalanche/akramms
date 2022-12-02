@@ -25,4 +25,4 @@ parser.add_argument('last_ramms_phase', type=int,
     help='Last phase of RAMMS to run (1|2|3)')
 
 args = parser.parse_args()
-ramms.run_on_windows(args.idlrt, args.ramms, args.ramms_dir, args.first_ramms_phase, args.last_ramms_phase)
+rammsdist.run_on_windows(args.idlrt, args.ramms, args.ramms_dir, args.first_ramms_phase, args.last_ramms_phase)

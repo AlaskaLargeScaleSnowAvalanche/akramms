@@ -149,7 +149,8 @@ def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_R
                 HARNESS_REMOTE, bash=True)
 
         cmd = ['ssh', hostname, 'sh', remote_run_ramms_sh,
-            harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True)]
+            harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True),
+            str(1), str(1)]    # Stage 1 to 1
         print(' '.join(cmd))
         if not dry_run:
             subprocess.run(cmd, check=True)
