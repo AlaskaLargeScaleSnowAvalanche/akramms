@@ -11,9 +11,9 @@ parser.add_argument('--idlrt', metavar='<IDL .exe file>',
 #    default=r'C:\opt\220922-RAMMS-x0928\IDL85\bin\bin.x86_64\idlrt.exe',
     help='Main IDL executable idlrt.exe')
 
-parser.add_argument('--ramms', metavar='<RAMMS distro dir>',
-    default=r'C:\opt\220922-RAMMS-x0928',
-    help='Top-Level RAMMS Distribution')
+parser.add_argument('--ramms-version', metavar='<RAMMS distro version>',
+    default=r'221101',
+    help='Version of RAMMS to use')
 
 parser.add_argument('ramms_dir', metavar='<RAMMS run directory>',
     help='Directory prepared to run RAMMS')
@@ -25,4 +25,4 @@ parser.add_argument('last_ramms_phase', type=int,
     help='Last phase of RAMMS to run (1|2|3)')
 
 args = parser.parse_args()
-rammsdist.run_on_windows(args.idlrt, args.ramms, args.ramms_dir, args.first_ramms_phase, args.last_ramms_phase)
+rammsdist.run_on_windows(args.idlrt, args.ramms_version, args.ramms_dir, args.first_ramms_phase, args.last_ramms_phase)
