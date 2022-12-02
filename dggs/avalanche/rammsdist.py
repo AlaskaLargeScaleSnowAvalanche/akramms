@@ -175,7 +175,7 @@ def run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last_
     # Create batch file to run
     ramms_sav = os.path.join(ramms_distro, 'ramms_lshm.sav')
     scenario_txt = os.path.join(ramms_dir, 'scenario.txt')
-    batfile = os.path.join(ramms_dir, 'run_ramms.bat')
+    batfile = os.path.join(ramms_dir, f'run_ramms_{first_ramms_phase}_{last_ramms_phase}.bat')
     with open(batfile, 'w') as out:
         out.write(f'"{idlrt_exe}" "{ramms_sav}" -args "{scenario_txt}" {first_ramms_phase} {last_ramms_phase}\n')
 
