@@ -64,6 +64,7 @@ def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, 
 #    xscenario_name = scenario_name(scene_dir, return_period, forest)
 #    xramms_dir = ramms_dir(scene_dir, xscenario_name)
     scenario_file = os.path.join(xramms_dir, 'scenario.txt')
+    assert os.exists(scenario_file)
 
 
     # ---- DEM File
@@ -240,7 +241,7 @@ arguments               = /opt/runaval.py {job_name}
 
 initialdir              = {run_dir}
 transfer_input_files    = {job_name}.av2,{job_name}.dom,{job_name}.rel,{job_name}.xyz.gz,{job_name}.xy-coord.gz,{job_name}.var.gz
-transfer_output_files   = {job_name}.out.zip
+transfer_output_files   = {job_name}.log.zip,{job_name}.out.gz
 should_transfer_files   = YES
 when_to_transfer_output = ON_EXIT
 on_exit_hold            = False
@@ -438,11 +439,11 @@ def job_statuses(release_files):
 
             # Identify avalanches that have finished: .out.gz exists and has non-zero size
             # (User can reset jobs by removing *.job.log)
-            if ('out.zip' in suffixes):
-                out_zip = os.path.join(jb.run_dir, '{}_{}.out.zip'.format(jb.base, id))
+            if ('log.zip' in suffixes) and ('out.gz' in suffixes):
+                log_zip = os.path.join(jb.run_dir, '{}_{}.log.zip'.format(jb.base, id))
 
                 # Check for abandoned job
-                statinfo = os.stat(out_zip)
+                statinfo = os.stat(log_zip)
                 if (statinfo.st_size==0):
                     # The HTCondor output file has been created, but
                     # no sign of the HTCondor job to write it at the
@@ -454,7 +455,7 @@ def job_statuses(release_files):
                 # We tentatively think the job is finished.  But let's
                 # look inside the zip file to make sure the domain
                 # wasn't overrun.
-                with zipfile.ZipFile(out_zip, 'r') as in_zip:
+                with zipfile.ZipFile(log_zip, 'r') as in_zip:
                     arcnames = [os.path.split(x)[1] for x in in_zip.namelist()]
                 if any(x.endswith('.out.overrun') for x in arcnames):
                     statuses.append((jb.run_dir, id, JobStatus.OVERRUN))
@@ -572,7 +573,7 @@ def get_release_files(spec):
     raise ValueError('Could not interpret spec {} as one or more RAMMS dirs'.format(spec))
 
 # --------------------------------------------------------------------
-def submit_jobs(release_files):
+def submit_jobs(release_files, ids=None):
     """Does an initial (or subsequent) submit of jobs for a set of
     release files.  Submits jobs that can be submitted, and that have
     not yet been.
@@ -586,10 +587,11 @@ def submit_jobs(release_files):
 
     df = df[df.job_status == JobStatus.TODO]
     for _,row in df.iterrows():
-        parts = row['run_dir'].split(os.sep)
-        job_name = '{}_{}_{}'.format(parts[-2], parts[-1], row['id'])
-#        print('submit ', row['run_dir'], job_name)
-        submit_job(row['run_dir'], job_name)
+        if ids is None or row['id'] in ids:
+            parts = row['run_dir'].split(os.sep)
+            job_name = '{}_{}_{}'.format(parts[-2], parts[-1], row['id'])
+#            print('submit ', row['run_dir'], job_name)
+            submit_job(row['run_dir'], job_name)
 
     return df
 

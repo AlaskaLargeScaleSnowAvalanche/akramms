@@ -69,7 +69,7 @@ else:
         out.write(' FINAL OUTFLOW VOLUME: 17')
 
 # We were successful... add outputs to our zip
-files_for_zip.add(f'{log_base}.out')
+# files_for_zip.add(f'{log_base}.out')
 files_for_zip.add(f'{log_base}.out.log')
 # ----------------------
 
@@ -91,26 +91,22 @@ with open(f'{log_base}.out.log') as fin:
 #    files_for_zip.add(f'{log_base}.out.log')
 
 # Put all outputs in a single zip file
-with zipfile.ZipFile(f'{log_base}.out.zip', 'w', zipfile.ZIP_DEFLATED) as out_zip:
+with zipfile.ZipFile(f'{log_base}.log.zip', 'w', zipfile.ZIP_DEFLATED) as out_zip:
     for file in sorted(list(files_for_zip)):
         arcname = os.path.split(file)[1]
         out_zip.write(file, arcname=arcname)    # arcname is simple file without path
 
+# ------------------------------------------------------
+# gzip the output to temporary file
+cmd = ['gzip', '-c', f'{log_base}.out']
+with open(f'{log_base}.out.gz.tmp', 'wb') as out:
+    subprocess.run(cmd, check=True, env=env, stdout=out)
 
+# Atomically write the final output file
+os.rename(f'{log_base}.out.gz.tmp', f'{log_base}.out.gz')
 
-
-
-
-## gzip the output to temporary file
-#cmd = ['gzip', '-c', f'{log_base}.out']
-#with open(f'{log_base}.out.gz.tmp', 'wb') as out:
-#    subprocess.run(cmd, check=True, env=env, stdout=out)
-#
-## Atomically write the final output file
-#os.rename(f'{log_base}.out.gz.tmp', f'{log_base}.out.gz')
-#
-## Remove the uncompressed file
-#try:
-#    os.remove(f'{log_base}.out')
-#except OSError:
-#    pass
+# Remove the uncompressed file
+try:
+    os.remove(f'{log_base}.out')
+except OSError:
+    pass

@@ -46,12 +46,17 @@ def run(args):
 
     ramms.submit_job(run_dir, job_name)
 
-@subcommand([argument('ramms', help='RAMMS directory or release file to inspect')])
+@subcommand([
+    argument('ramms', help='RAMMS directory or release file to inspect'),
+    argument('ids', type=int, nargs='*', help='ID of avalanche in run_dir to run')])
 def submit(args):
     """Runs RAMMS for many avalanches"""
 
+    ids = None if len(args.ids) == 0 else args.ids
+
+    # Separate into numeric-only and non-numerica args in the spec
     release_files = ramms.get_release_files(args.ramms)
-    ramms.submit_jobs(release_files)
+    ramms.submit_jobs(release_files, ids=ids)
 
 def main():
     args = cli.parse_args()
