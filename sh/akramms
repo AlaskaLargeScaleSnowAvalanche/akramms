@@ -58,6 +58,33 @@ def submit(args):
     release_files = ramms.get_release_files(args.ramms)
     ramms.submit_jobs(release_files, ids=ids)
 
+@subcommand([
+    argument('ramms', help='RAMMS directory or release file to inspect'),
+    argument('ids', type=int, nargs='*', help='ID of avalanche in run_dir to run')])
+def enlarge(args):
+    """Enlarges domain of jobs that overran"""
+
+    ids = None if len(args.ids) == 0 else args.ids
+
+    # Separate into numeric-only and non-numerica args in the spec
+    release_files = ramms.get_release_files(args.ramms)
+    ramms.enlarge_domains(release_files, ids=ids)
+
+@subcommand([
+    argument('ramms', help='RAMMS directory or release file to inspect'),
+    argument('ids', type=int, nargs='*', help='ID of avalanche in run_dir to inspect')])
+def info(args):
+    ids = None if len(args.ids) == 0 else args.ids
+    release_files = ramms.get_release_files(args.ramms)
+    infos_df = ramms.infos(release_files, ids=ids)
+
+
+#    df = infos_df[infos_df['final_outflow_volume'] == 0.00]
+    df = infos_df
+#    df = df[df['final_outflow_volume'] == 0]
+
+    print(df)
+
 def main():
     args = cli.parse_args()
     if args.subcommand is None:

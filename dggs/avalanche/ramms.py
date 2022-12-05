@@ -1,4 +1,5 @@
-import os,subprocess,re,sys,itertools,gzip,collections
+import os,subprocess,re,sys,itertools,gzip,collections,io
+import numpy as np
 import datetime,time,zipfile
 import contextlib
 import itertools, functools,shutil
@@ -471,57 +472,6 @@ def job_statuses(release_files):
     df = df.sort_values(by=['run_dir', 'job_status', 'id'])
     return df
 # --------------------------------------------------------
-def read_polygon(poly_file):
-    """Reads a RAMMS polygon file (eg: .dom) into a Shapely Polygon."""
-    print(f'Reading {poly_file}')
-    with open(poly_file) as fin:
-        line = next(fin).split(' ')
-        # Get just the x,y coordinates, no count at beginning, no repeat at end
-        coords = [float(x) for x in line[1:-2]]
-
-    return shapely.geometry.Polygon(list(zip(coords[::2], coords[1::2])))
-
-def write_polygon(p, poly_file):
-    with open(poly_file, 'w') as out:
-        coords = list(p.boundary.coords)
-        out.write('{}'.format(len(coords)))
-        for x,y in coords:
-            out.write(f' {x} {y}')
-        out.write('\n')
-# --------------------------------------------------------
-def _scale_vec(vec,margin):
-    """Adds a certain length to a vector.  Helper function."""
-    veclen = np.linalg.norm(vec)
-    if (veclen+margin) < 0:
-        raise ValueError('Margin is larger than side')
-    factor = margin / veclen
-    return factor*vec
-
-def edge_lengths(p):
-    pts = np.array(p.boundary.coords)
-    edges = np.diff(pts, axis=0)
-    return np.linalg.norm(edges,axis=1)
-
-def add_margin(p,margin):
-    """Adds a margin to a (rotated) rectangle, i.e. a domain rectangle.
-    p: shapely.geometry.Polygon
-        The rectangle
-    margin:
-        Absolute amount to add to length and width.
-        If negative, subtract this amount; cannot subtract more than original length
-    """
-    pts = np.array(p.boundary.coords)
-    edges = np.diff(pts, axis=0)
-    print('edge lengths: ', np.linalg.norm(edges,axis=1))
-    margin2 = .5*margin
-    pts[0,:] += (_scale_vec(edges[3,:],margin2) - _scale_vec(edges[0,:],margin2))
-    pts[1,:] += (_scale_vec(edges[0,:],margin2) - _scale_vec(edges[1,:],margin2))
-    pts[2,:] += (_scale_vec(edges[1,:],margin2) - _scale_vec(edges[2,:],margin2))
-    pts[3,:] += (_scale_vec(edges[2,:],margin2) - _scale_vec(edges[3,:],margin2))
-
-    p = shapely.geometry.Polygon(list(zip(pts[:-1,0], pts[:-1,1])))
-    return p
-# --------------------------------------------------------
 def print_job_statuses(df):
     for (run_dir, job_status), group in df.groupby(['run_dir', 'job_status']):
 
@@ -584,7 +534,6 @@ def submit_jobs(release_files, ids=None):
     """
 
     df = job_statuses(release_files)
-
     df = df[df.job_status == JobStatus.TODO]
     for _,row in df.iterrows():
         if ids is None or row['id'] in ids:
@@ -594,6 +543,202 @@ def submit_jobs(release_files, ids=None):
             submit_job(row['run_dir'], job_name)
 
     return df
+
+# -------------------------------------------------------
+# ======================================================================
+# ============= RAMMS Stage 2: Enlarge and re-submit domains that overran
+
+def read_polygon(poly_file):
+    """Reads a RAMMS polygon file (eg: .dom) into a Shapely Polygon."""
+    with open(poly_file) as fin:
+        line = next(fin).split(' ')
+        # Get just the x,y coordinates, no count at beginning, no repeat at end
+        coords = [float(x) for x in line[1:-2]]
+
+    return shapely.geometry.Polygon(list(zip(coords[::2], coords[1::2])))
+
+def write_polygon(p, poly_file):
+    with open(poly_file, 'w') as out:
+        coords = list(p.boundary.coords)
+        out.write('{}'.format(len(coords)))
+        for x,y in coords:
+            out.write(f' {x} {y}')
+        out.write('\n')
+# --------------------------------------------------------
+def _scale_vec(vec,margin):
+    """Adds a certain length to a vector.  Helper function."""
+    veclen = np.linalg.norm(vec)
+    if (veclen+margin) < 0:
+        raise ValueError('Margin is larger than side')
+    factor = margin / veclen
+    return factor*vec
+
+def edge_lengths(p):
+    pts = np.array(p.boundary.coords)
+    edges = np.diff(pts, axis=0)
+    return np.linalg.norm(edges,axis=1)
+
+def add_margin(p,margin):
+    """Adds a margin to a (rotated) rectangle, i.e. a domain rectangle.
+    p: shapely.geometry.Polygon
+        The rectangle
+    margin:
+        Absolute amount to add to length and width.
+        If negative, subtract this amount; cannot subtract more than original length
+    """
+    pts = np.array(p.boundary.coords)
+    edges = np.diff(pts, axis=0)
+    margin2 = .5*margin
+    pts[0,:] += (_scale_vec(edges[3,:],margin2) - _scale_vec(edges[0,:],margin2))
+    pts[1,:] += (_scale_vec(edges[0,:],margin2) - _scale_vec(edges[1,:],margin2))
+    pts[2,:] += (_scale_vec(edges[1,:],margin2) - _scale_vec(edges[2,:],margin2))
+    pts[3,:] += (_scale_vec(edges[2,:],margin2) - _scale_vec(edges[3,:],margin2))
+
+    p = shapely.geometry.Polygon(list(zip(pts[:-1,0], pts[:-1,1])))
+    return p
+# -----------------------------------------------------------
+def enlarge_domain(run_dir, job_name, enlarge_increment=5000.):
+
+    # Read the .dom file and make it bigger by 1000m
+    dom_file = os.path.join(run_dir, f'{job_name}.dom')
+    log_zip_file = os.path.join(run_dir, f'{job_name}.log.zip')
+    dom0 = read_polygon(dom_file)
+    dom1 = add_margin(dom0, enlarge_increment)
+    with np.printoptions(precision=0, suppress=True):
+        print('{}:\n  {} -> {}'.format(job_name, edge_lengths(dom0), edge_lengths(dom1)))
+
+    # ----Rename old .dom file and write new one
+    if True:
+        domRE = re.compile(r'^{}.dom.v(\d+)$'.format(dom_file))
+
+        # Figure out largest .dom.vXXX file that exists
+        max_version = 0
+        for file in os.listdir(run_dir):
+            match = domRE.match(file)
+            if match is None:
+                continue
+            max_verison = max(max_version, int(match.group(1)))
+
+        # Copy to one bigger, then overwrite
+        shutil.copy2(dom_file, dom_file + '.v{}'.format(max_version+1))
+        shutil.copy2(log_zip_file, log_zip_file + '.v{}'.format(max_version+1))
+        write_polygon(dom1, dom_file)    # New timestamp
+
+
+def enlarge_domains(release_files, ids=None):
+    df = job_statuses(release_files)
+    df = df[df.job_status == JobStatus.OVERRUN]
+    for _,row in df.iterrows():
+        run_dir = row.run_dir
+        parts = run_dir.split(os.sep)
+        job_name = '{}_{}_{}'.format(parts[-2], parts[-1], row['id'])
+        if ids is None or row['id'] in ids:
+
+            # ONLY enlarge if the .log.zip file is newer than the .dom file
+            # (Otherwise, we apparently already enlarged but have not yet re-run)
+            log_file = os.path.join(run_dir, f'{job_name}.log.zip')
+            dom_file = os.path.join(run_dir, f'{job_name}.dom')
+            log_tm = os.path.getmtime(log_file)
+            try:
+                dom_tm = os.path.getmtime(dom_file)
+            except OSError:    # File not exist
+                dom_tm = -1
+            if log_tm > dom_tm:
+                enlarge_domain(run_dir, job_name)
+            submit_job(run_dir, job_name)
+
+    return df
+
+# -------------------------------------------------------
+_parseRE = re.compile(
+    r'(^\s*FINAL OUTFLOW VOLUME:\s+(?P<final_outflow_volume>[^\s]+)\s+m3)' +
+    '|' +
+    r'(^\s*INITIAL FLOW VOLUME:\s+(?P<initial_outflow_volume>[^\s]+)\s+m3)')
+
+
+def _parse_aval_log(log_in):
+
+    ret = dict()    # Key values pulled out of the file
+    for line in log_in:
+        match = _parseRE.match(line)
+        if match is not None:
+            match_names = [name for name, value in match.groupdict().items() if value is not None]
+            # Remember first of each match value
+            for name in match_names:
+                if name not in ret:
+                    ret[name] = match.group(name)
+
+    return ret
+
+def parse_aval_log(log_in):
+    if isinstance(log_in, str):    # Open zip file
+        with zipfile.ZipFile(log_in, 'r') as izip:
+            arcnames = [os.path.split(x)[1] for x in izip.namelist()]
+            lognames = [x for x in arcnames if x.endswith('.out.log')]
+            bytes = izip.read(lognames[0])
+            fin = io.TextIOWrapper(io.BytesIO(bytes))
+            return _parse_aval_log(fin)
+    else:
+        return _parse_aval_log(fin)
+
+# -------------------------------------------------------
+def infos(release_files, ids=None):
+    if ids is None:
+        ids = set([])
+    else:
+        ids = set(ids)
+
+    infos = list()
+    for release_file in release_files:
+        jb = parse_release_file(release_file)
+        exist_ids = get_job_ids(release_file)
+
+        # Get list of ids to inspect
+        if len(ids) == 0:
+            process_ids = exist_ids
+        else:
+            process_ids = {x for x in exist_ids if x in ids}
+
+
+        # Inspect them
+        for id in process_ids:
+            job_name = f'{jb.base}_{id}'
+            info = {'job_name': job_name, 'id': id}
+
+            # Add info from the logfile (if it exists)
+            job_log_zip = f'{job_name}.log.zip'
+            try:
+                for k,v in parse_aval_log(job_log_zip).items():
+                    info[k] = float(v)
+#                info = {**info, **parse_aval_log(job_log_zip)}
+            except FileNotFoundError:
+                pass
+            except zipfile.BadZipFile:
+                pass
+
+            # Add info from the release file
+            rel_file = f'{job_name}.rel'
+            try:
+                rel = read_polygon(rel_file)
+                info['release_area'] = rel.area
+            except FileNotFoundError:
+                pass
+
+            # Add info from the domain file
+            dom_file = f'{job_name}.dom'
+            try:
+                dom = read_polygon(dom_file)
+                info['domain_area'] = dom.area
+            except FileNotFoundError:
+                pass
+
+            # Find out how much domain and release intersect
+            if 'domain_area' in info and 'release_area' in info:
+                info['intersect_area'] = dom.intersection(rel).area
+
+            infos.append(info)
+
+    return pd.DataFrame(infos)
 
 # =============================================================================
 # ===== RAMMS Stage 3
@@ -650,77 +795,7 @@ def run_simulations0(ramms_dir, release_files, sleep=10*60):
 
     return st
 
-# -------------------------------------------------------
-def expand_domain(run_dir, job_name, enlarge_increment=1000.):
-    print('Expanding domain for {}'.format(job_name))
 
-    dom_file = os.path.join(run_dir, f'{job_name}.dom')
-    domRE = re.compile(r'^{}.dom.v(\d+)$'.format(dom_file))
-
-    # Figure out largest .dom.vXXX file that exists
-    max_version = 0
-    for file in os.listdir(run_dir):
-        match = domRE.match(file)
-        if match is None:
-            continue
-        max_verison = max(max_version, int(match.group(1)))
-
-    # Copy to one bigger
-    shutil.copy2(dom_file, dom_file + '.v{}'.format(max_version+1))
-
-    # Read the .dom file, make it bigger by 1000m, and write it back
-    dom = read_polygon(dom_file)
-    dom = add_margin(dom, enlarge_increment)
-    write_polygon(dom, dom_file)    # New timestamp
-
-
-def run_simulations(ramms_dir, release_files, sleep=10*60, enlarge_increment=1000.):
-#    while True:
-    if True:
-        # Run all simulations
-#        st = run_simulations0(ramms_dir, release_files, sleep=sleep)
-        st = job_statuses(release_files)
-        print_job_statuses(st)
-        return
-
-        # If nothing failed, we're done!
-        if len(st['failed']) == 0:
-            return st
-
-        found_problem = False
-        for run_dir,job_name in st['finished']:
-
-            # Identify simulations that overran the domain
-            # (but otherwise look like they finished)
-            out_log = os.path.join(run_dir, f'{job_name}.out.log')
-            with open(out_log) as fin:
-                for line in fin:
-                    if line.startswith(' FINAL OUTFLOW VOLUME:'):
-
-                        # This job overran its domain
-                        expand_domain(run_dir, job_name, enlarge_increment=enlarge_increment)
-
-                        # Reset status
-                        try:
-                            os.remove(os.path.join(run_dir, f'{job_name}.out.gz'))
-                        except FileNotFoundError:
-                            pass
-
-                        try:
-                            os.remove(os.path.join(run_dir, f'{job_name}.job.log'))
-                        except FileNotFoundError:
-                            pass
-
-                        # Mark for another goaround
-                        found_problem = True
-
-                        # No more digging into this log file
-                        break
-
-        # If we didn't find / fix any errors, return status
-        # Any further errors will have to be dealt with manually.
-        if not found_problem:
-            return st
 
 
 # Operations for command line program:
