@@ -26,9 +26,12 @@ def main():
 
 #    release_files = akramms.run_stage1(scene_dir)
 
-#    akramms_stage2(release_files)    # Enlarge domains, get it done
+    release_files = ramms.get_release_files(os.path.join(scene_dir, 'RAMMS/juneau130yFor/RESULTS/juneau1_For/5m_30L'))
+    print(release_files)
 
-    ramms_dir = os.path.join(scene_dir, 'RAMMS/juneau130yFor')#/RESULTS/juneau1_For/5m_30L')
-    ramms.run_ramms('davos', ramms_dir, 3, 3, dggs.data.HARNESS_WINDOWS)
+    akramms.run_stage2(release_files)    # Enlarge domains, get it done
+
+#    ramms_dir = os.path.join(scene_dir, 'RAMMS/juneau130yFor')#/RESULTS/juneau1_For/5m_30L')
+#    ramms.run_ramms('davos', ramms_dir, 3, 3, dggs.data.HARNESS_WINDOWS)
 
 main()

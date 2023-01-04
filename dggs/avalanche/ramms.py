@@ -6,7 +6,7 @@ import itertools, functools,shutil
 import numpy as np
 import shapely
 import htcondor
-from dggs.avalanche import avalanche
+from dggs.avalanche import avalanche,akramms
 from dggs.util import harnutil
 import dggs.data
 from uafgi.util import make,ioutil,shputil
@@ -65,7 +65,7 @@ def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, 
 #    xscenario_name = scenario_name(scene_dir, return_period, forest)
 #    xramms_dir = ramms_dir(scene_dir, xscenario_name)
     scenario_file = os.path.join(xramms_dir, 'scenario.txt')
-    assert os.exists(scenario_file)
+    assert os.path.exists(scenario_file)
 
 
     # ---- DEM File

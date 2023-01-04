@@ -1,7 +1,7 @@
 import scipy.spatial
 from osgeo import gdal
 from dggs.avalanche import params,process_tree
-from uafgi.util import shputil,gdalutil,wrfutil,make
+from uafgi.util import shputil,gdalutil,wrfutil,make,cfutil
 import os,sys
 import subprocess
 import json
@@ -47,7 +47,11 @@ import gridfill
 #    """
 
 class WrfLookup:
-    def __init__(self, scene_wkt, data_fname, vname, geo_fname):
+    def __init__(self, scene_wkt, data_fname, vname, geo_fname, units=None):
+        """
+        units: str
+            Units to convert to
+        """
 
         # Determine WRF coordinates
         self.geo_info = wrfutil.wrf_info(geo_fname)
@@ -66,8 +70,11 @@ class WrfLookup:
         # Load the data file
         with netCDF4.Dataset(data_fname) as nc:
             # Masked array
-            masked_data = nc.variables[vname][:,:]    # sx3(j=south_north,i=west_east)
-        self.data,converged = gridfill.fill(masked_data, 1, 0, .1)#, itermax=10000)
+            ncv = nc.variables[vname]
+            orig_units = ncv.units
+            masked_data = ncv[:,:]    # sx3(j=south_north,i=west_east)
+        data_rawunits, converged = gridfill.fill(masked_data, 1, 0, .1)#, itermax=10000)
+        self.data = cfutil.convert(data_rawunits, orig_units, units)
 
 #        # Write a GeoTIFF file of our results
 #        wrfutil.write_geotiff(self.geo_info, self.data, 'x.tif')
@@ -144,7 +151,9 @@ def release_rule(scene_dir, return_period, forest, ramms_dir, require_all=True):
     def action(tdir):
 
         # Create lookup for snow depth in WRF output file
-        snow_lookup = WrfLookup(scene_args['coordinate_system'], scene_args['snowdepth_file'], 'sx3', scene_args['snowdepth_geo'])
+        snow_lookup = WrfLookup(
+            scene_args['coordinate_system'], scene_args['snowdepth_file'],
+            'sx3', scene_args['snowdepth_geo'], units='m')
         snow_info = snow_lookup.geo_info
 
         degree = np.pi / 180.
@@ -155,7 +164,10 @@ def release_rule(scene_dir, return_period, forest, ramms_dir, require_all=True):
         print('======== Reading {}'.format(inputs[0]))
         df = shputil.read_df(inputs[0], shape='pra')
         df = df.rename(columns={'fid': 'Id'})    # RAMMS etc. want it named "Id"
-        df['sx3'] = df['pra'].map(snow_lookup.value_at_centroid)    # Raw snow depth
+        sx3_mm_swe = df['pra'].map(snow_lookup.value_at_centroid)    # Raw snow amount [kg m-2]
+        by_SNOW_DENSITY = 1. / 100.    # [m^3 kg-1]
+        df['sx3'] = sx3_mm_swe * by_SNOW_DENSITY    # Depth of SNOW [m]
+
 
         # --- Elevation correction Reduces amount of snow with
         # steepness.  All traditional.  We measure 3-day snow depth
@@ -184,6 +196,9 @@ def release_rule(scene_dir, return_period, forest, ramms_dir, require_all=True):
             df['d0star'] = sx3_corrected * np.cos(28. * degree)
         else:
             df['d0star'] = sx3_corrected
+
+
+        # DEBUG: 
 
         # --- Slope angle correction (slopecorr)
         # TODO: Discuss with Gabe.  Do we want to apply slope angle correction?
