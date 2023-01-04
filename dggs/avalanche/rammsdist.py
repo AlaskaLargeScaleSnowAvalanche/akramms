@@ -1,4 +1,4 @@
-import time
+import time,gzip
 import os,subprocess,re,sys,itertools,collections,shutil,zipfile
 from uafgi.util import ioutil
 from dggs.util import harnutil
