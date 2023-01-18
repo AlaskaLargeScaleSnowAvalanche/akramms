@@ -119,6 +119,9 @@ def install_ramms_on_windows(version):
 # ==============================================================
 # -----------------------------------------------------
 def kill_idl():
+    sys.stdout.flush()
+    sys.stderr.flush()
+
     sleep=False
 
     for cmd in (
@@ -127,6 +130,8 @@ def kill_idl():
 
         try:
             subprocess.run(cmd, check=True)
+            sys.stdout.flush()
+            sys.stderr.flush()
             sleep=True
         except subprocess.CalledProcessError:
             pass
@@ -135,6 +140,8 @@ def kill_idl():
     if sleep:
         print('Sleeping because tasks were killed')
         time.sleep(1)
+
+# -----------------------------------------------------
 
 #_doneRE = re.compile(r"\s*Creating MUXI-Files...")    # Demo
 # RAMMS IDL prints this when it is done with Phase 1
@@ -221,6 +228,7 @@ def run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last_
                 # Process the line we read
                 print(line+'*', end='')
                 if _doneREs[last_ramms_phase].match(line) is not None:
+                    sys.stdout.flush()
                     raise EOFError()   # Break out of double loop
 
             sys.stdout.flush()
@@ -240,6 +248,8 @@ def run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last_
             # Just in case, wait for it to exit.
             proc1.communicate()
             print('************ ALL DONE!!! ****************')
+            sys.stdout.flush()
+            sys.stderr.flush()
 
     # gzip all .var, .xy-coord and .xyz files
     gzipRE = re.compile(r'[^.]*\.var$|[^.]*\.xy-coord$|[^.]*\.xyz$')

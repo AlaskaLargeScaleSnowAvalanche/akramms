@@ -24,7 +24,7 @@ def main():
         snowdepth_geo=dggs.data.join('data', 'lader', 'sx3', 'geo_southeast.nc'),
         snowdepth_file=dggs.data.join('data', 'lader', 'sx3', 'gfdl_sx3_1986.nc'))
 
-#    release_files = akramms.run_stage1(scene_dir)
+    release_files = akramms.run_stage1(scene_dir)
 
     release_files = ramms.get_release_files(os.path.join(scene_dir, 'RAMMS/juneau130yFor/RESULTS/juneau1_For/5m_30L'))
     print(release_files)
