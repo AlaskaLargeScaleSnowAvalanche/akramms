@@ -188,8 +188,11 @@ def run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last_
     ramms_sav = os.path.join(ramms_distro, 'ramms_lshm.sav')
     scenario_txt = os.path.join(ramms_dir, 'scenario.txt')
     batfile = os.path.join(ramms_dir, f'run_ramms_{first_ramms_phase}_{last_ramms_phase}.bat')
+    print('Writing {}'.format(batfile))
     with open(batfile, 'w') as out:
-        out.write(f'"{idlrt_exe}" "{ramms_sav}" -args "{scenario_txt}" {first_ramms_phase} {last_ramms_phase}\n')
+        bat_contents = f'"{idlrt_exe}" "{ramms_sav}" -args "{scenario_txt}" {first_ramms_phase} {last_ramms_phase}\n'
+        print(bat_contents)
+        out.write(bat_contents)
 
     # Run RAMMS
     try:
@@ -260,6 +263,7 @@ def run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last_
                 ifname = os.path.join(path, f)
                 ofname = os.path.join(path, f+'.gz')
                 print(f'Gzipping {ifname}')
+                sys.stdout.flush()
                 with open(ifname, 'rb') as fin:
                     with gzip.open(ofname, 'wb') as out:
                         shutil.copyfileobj(fin, out)
