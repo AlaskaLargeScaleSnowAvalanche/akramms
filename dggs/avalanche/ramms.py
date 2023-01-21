@@ -1,4 +1,4 @@
-import os,subprocess,re,sys,itertools,gzip,collections,io
+import os,subprocess,re,sys,itertools,gzip,collections,io,typing
 import numpy as np
 import datetime,time,zipfile
 import contextlib
@@ -125,7 +125,7 @@ def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, 
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
 # sh ~/av/akramms/sh/run_ramms.sh 'c:\Users\efischer\av\prj\juneau1\RAMMS\juneau130yFor'
-def run_ramms(hostname, ramms_dir, first_phase, last_phase, HARNESS_REMOTE, dry_run=False):
+def run_ramms(hostname, ramms_dir, phase, HARNESS_REMOTE, dry_run=False):
     # Run RAMMS
     remote_run_ramms_sh = harnutil.remote_windows_name(
             os.path.join(harnutil.HARNESS, 'akramms', 'sh', 'run_ramms.sh'),
@@ -134,7 +134,7 @@ def run_ramms(hostname, ramms_dir, first_phase, last_phase, HARNESS_REMOTE, dry_
 
     cmd = ['ssh', hostname, 'sh', remote_run_ramms_sh,
         harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True),
-        str(first_phase), str(last_phase)]    # Stage 1 to 1
+        str(phase)]    # Stage 1 to 1
     print(' '.join(cmd))
     if not dry_run:
         subprocess.run(cmd, check=True)
@@ -160,7 +160,7 @@ def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_R
         harnutil.rsync_files(input_files, hostname, HARNESS_REMOTE, tdir)
 
         # Run RAMMS
-        run_ramms(hostname, ramms_dir, 1, 1, HARNESS_REMOTE, dry_run=dry_run)
+        run_ramms(hostname, ramms_dir, 1, HARNESS_REMOTE, dry_run=dry_run)
 
         # Get results back
         err = None
@@ -201,7 +201,24 @@ def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_R
 # ===== RAMMS Stage 2: Manage avalanche jobs
 
 # ---------------------------------------------------------------
-ParsedJobBase = collections.namedtuple('JobSpec', ('run_dir', 'base', 'prefix', 'suffix'))
+class ParsedJobBase(typing.NamedTuple):
+    run_dir: str
+    base: str
+    prefix: str
+    suffix: str
+
+    def log_zip(self, id):
+        return os.path.join(self.run_dir, '{}_{}.log.zip'.format(self.base, id))
+
+    def arcname(self, id, ext):
+        """Name of the logfile in the Zip archive
+        extname:
+            .log or .overrun
+        """
+        return '{}_{}{}'.format(self.base, id, ext)
+
+
+# -------------------------------------------------------
 _job_baseRE = re.compile(r'^(.+_.+)_(.+_.+)$')
 @functools.lru_cache()
 def parse_job_base(ramms_dir, job_base):
@@ -232,11 +249,12 @@ def get_job_ids(release_file):
     release_df = shputil.read_df(release_file, read_shapes=False)
     return sorted(list(release_df['Id']))
 # ---------------------------------------------------------------
-DOCKER_IMAGE = 'localhost:5000/ramms'
+#DOCKER_IMAGE = 'localhost:5000/ramms'
+DOCKER_IMAGE = 'git.akdggs.com/efischer/ramms'
 
 submit_tpl = \
 """universe                = docker
-docker_image            = localhost:5000/ramms
+docker_image            = {DOCKER_IMAGE}
 executable              = /usr/bin/python
 arguments               = /opt/runaval.py {job_name}
 
@@ -278,7 +296,7 @@ def submit_job(run_dir, job_name):#, local=False):
 
 
     print('Submitting job: {}'.format(job_name))
-    submit_txt = submit_tpl.format(job_name=job_name, run_dir=run_dir)
+    submit_txt = submit_tpl.format(job_name=job_name, run_dir=run_dir, DOCKER_IMAGE=DOCKER_IMAGE)
 
     cmd = ['condor_submit', '-batch-name', job_name]
     proc = subprocess.Popen(cmd, cwd=run_dir, stdin=subprocess.PIPE)
@@ -682,7 +700,50 @@ def parse_aval_log(log_in):
         return _parse_aval_log(fin)
 
 # -------------------------------------------------------
+
+def ramms_iter(ramms_spec, ids=list()):
+    """Iterates through a set of avalanches by spec
+    spec:
+        Spec indicating the release file(s) to include in the iteration
+    ids: [int, ...]
+        Avalanche IDs to include.
+        If empty list, that means include all of them.
+    """
+
+    release_files = get_release_files(ramms_spec)
+    ids = set(ids)
+
+    for release_file in release_files:
+        jb = parse_release_file(release_file)
+        exist_ids = get_job_ids(release_file)
+
+        # Get list of ids to inspect
+        if len(ids) == 0:
+            process_ids = exist_ids
+        else:
+            process_ids = {x for x in exist_ids if x in ids}
+
+
+        for id in process_ids:
+            yield jb,id
+
+
+def cat(ramms_spec, ids=list()):
+    for jb,id in ramms_iter(ramms_spec, ids=ids):
+        log_zip = jb.log_zip(id)
+        with zipfile.ZipFile(log_zip, 'r') as izip:
+            print('======== {}'.format(log_zip))
+            sys.stdout.flush()
+            bytes = izip.read(jb.arcname(id, '.out.log'))
+            os.write(1, bytes)    # 1 = STDOUT
+            #with os.fdopen(sys.stdout.fileno(), "wb", closefd=False) as stdout:
+            #    stdout.write(bytes)
+            #    stdout.flush()
+
+
+
 def infos(release_files, ids=None):
+    """Provide summary info on one or more completed avalanches"""
     if ids is None:
         ids = set([])
     else:
@@ -742,13 +803,52 @@ def infos(release_files, ids=None):
 
 # =============================================================================
 # ===== RAMMS Stage 3
-def ramms_stage3_rule(hostname, ramms_dir, release_files, HARNESS_REMOTE):
+def stage3(hostname, ramms_dir, HARNESS_REMOTE, tdir):
 
-    # Unpack / gzip individual avalanche .zip files
 
-    # rsync to 
+    # Determine input files to transfer to Windows.
+    # These are the files needed to run RAMMS Stage 3
+    xferRE = re.compile('|'.join(r'^[^.]*{}$'.format(ext)
+        for ext in (r'\.dom', r'\.log\.zip', r'\.out\.gz', r'\.xy-coord\.gz')))
 
-    pass
+    inputs = list()
+    for path,dirs,files in os.walk(os.path.join(ramms_dir, 'RESULTS')):
+        for f in files:
+            if xferRE.match(f) is not None:
+                inputs.append(os.path.join(path, f))
+
+    # Sync RAMMS files to remote dir
+    harnutil.rsync_files(inputs, hostname, HARNESS_REMOTE, tdir)
+    
+    # Run RAMMS
+    run_ramms(hostname, ramms_dir, 3, HARNESS_REMOTE)
+
+
+
+#    # Unpack / gzip individual avalanche .zip files
+#
+#    # rsync to 
+#
+#Send: .dom, .log.zip, .out.gz, .xy-coord.gz
+#
+#
+#-rw-r--r-- 1 efischer Domain Users     104 Jan 17 18:58 juneau1_For_5m_30L_3743.dom
+#-rw-r--r-- 1 efischer Domain Users   57858 Jan 18 08:17 juneau1_For_5m_30L_3743.out.gz
+#-rw-r--r-- 1 efischer Domain Users    6180 Jan 18  2023 juneau1_For_5m_30L_3743.out.log
+#-rw-r--r-- 1 efischer Domain Users 5392660 Jan 17 19:02 juneau1_For_5m_30L_3743.xy-coord
+#
+#
+## Gunzip files; leave original .gz in scratch dir
+#for ext in ('var', 'xy-coord', 'xyz'):
+#    ifname = os.path.join(RAMMS_DIR, f'{base}.{ext}.gz')
+#    ofname = os.path.join(RAMMS_DIR, f'{base}.{ext}')
+#    with gzip.open(ifname, 'rb') as fin:
+#        with open(ofname, 'wb') as out:
+#            shutil.copyfileobj(fin, out)
+#
+#
+#
+#    pass
 
 
 

@@ -1,4 +1,4 @@
-import time,gzip
+import time
 import os,subprocess,re,sys,itertools,collections,shutil,zipfile
 from uafgi.util import ioutil
 from dggs.util import harnutil
@@ -118,6 +118,8 @@ def install_ramms_on_windows(version):
 #main()
 # ==============================================================
 # -----------------------------------------------------
+# taskkill.exe /F /IM idlrt.exe
+# taskkill.exe /F /IM idl_opserver.exe
 def kill_idl():
     sys.stdout.flush()
     sys.stderr.flush()
@@ -147,12 +149,14 @@ def kill_idl():
 # RAMMS IDL prints this when it is done with Phase 1
 _doneREs = {
     1 : re.compile(r'\s*(Starting LSHM SIMULATIONS|LSHM Analysis finished successfully|- VAR-Files: All files created \(IDLBridge\)!)'),
-    3 : re.compile(r'Hello World'),
+    3 : re.compile(r'LSHM Analysis finished successfully'),
 }
 
 #_doneRE = re.compile(r"\s*Finsihed writing GEOTIFF files!")    # Prod
 
-def run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last_ramms_phase):
+
+# -----------------------------------------------------------------------
+def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last_ramms_phase):
     """Call this to run top-level RAMMS locally on Windows.
     idlrt_exe:
         Windows path to idlrt.exe IDL runtime
@@ -170,10 +174,11 @@ def run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last_
     """
     print(f'***** Running Top-Level RAMMS on {ramms_dir}')
 
+    # ----------------------------------------------------------------
     # Make sure we've added our stub properly
     ramms_distro = install_ramms_on_windows(ramms_version)
 
-    # Avoid extra IDL's lying around that would eat our license
+    # Avoid extra IDL processese lying around that would eat our license
     kill_idl()
 
     # Remove logfile (if it exists)
@@ -254,23 +259,125 @@ def run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last_
             sys.stdout.flush()
             sys.stderr.flush()
 
-    # gzip all .var, .xy-coord and .xyz files
-    gzipRE = re.compile(r'[^.]*\.var$|[^.]*\.xy-coord$|[^.]*\.xyz$')
+# -----------------------------------------------------------------------
+def _print_outputs(outputs):
+    sys.stdout.flush()
+    print()
+    print('BEGIN OUTPUTS')
+    for output in outputs:
+        print(f'OUTPUT: {output}')
+    print('END OUTPUTS')
+    sys.stdout.flush()
+# -----------------------------------------------------------------------
+def run_on_windows_phase1(idlrt_exe, ramms_version, ramms_dir):
+    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 1, 1)
+
+    # gzip all .var, .xy-coord and .xyz files, ready to rsync back
+    outputs = list()
+    if last_ramms_phase == 1:
+        gzipRE = re.compile(r'[^.]*\.var$|[^.]*\.xy-coord$|[^.]*\.xyz$')
+        for path,dirs,files in os.walk(os.path.join(ramms_dir, 'RESULTS')):
+            for f in files:
+                if gzipRE.match(f) is not None:
+                    # Gzip the file
+                    ifname = os.path.join(path, f)
+                    ofname = os.path.join(path, f+'.gz')
+                    outputs.append(ofname)
+                    print(f'Gzipping {ifname}')
+                    with open(ifname, 'rb') as fin:
+                        with gzip.open(ofname, 'wb') as out:
+                            shutil.copyfileobj(fin, out)
+
+                    # Delete the original (except for .xy-coord file)
+                    if not ifname.endswith('.xy-coord'):
+                        try:
+                            os.remove(ifname)
+                        except FileNotFoundError:
+                            pass
+
+    # Tell calling process on Linux what the output files are
+    _print_outputs(outputs)
+
+# -----------------------------------------------------------------------
+def run_on_windows_phase3(idlrt_exe, ramms_version, ramms_dir):
+
+    # Un-gzip .xy-coord.gz files (leave .out.gz gzipped)
+    gzipRE = re.compile(r'[^.]*\.xy-coord\.gz$|[^.]*\.log.zip$')
     for path,dirs,files in os.walk(os.path.join(ramms_dir, 'RESULTS')):
         for f in files:
             if gzipRE.match(f) is not None:
-                # Gzip the file
-                ifname = os.path.join(path, f)
-                ofname = os.path.join(path, f+'.gz')
-                print(f'Gzipping {ifname}')
-                sys.stdout.flush()
-                with open(ifname, 'rb') as fin:
-                    with gzip.open(ofname, 'wb') as out:
-                        shutil.copyfileobj(fin, out)
+                if f.endswith('.gz'):
+                    # Gunzip the .xy-coord file
+                    ifname = os.path.join(path, f)
+                    ofname = os.path.join(path, f[:-3])    # Remove .gz
+                    if True or not os.path.exists(ofname):  # TODO: compare timestamps
+                        print(f'Un-gzipping {ifname}')
+                        with gzip.open(ifname, 'rb') as fin:
+                            with open(ofname, 'wb') as out:
+                                shutil.copyfileobj(fin, out)
 
-                # Delete the original
-                try:
-                    os.remove(ifname)
-                except FileNotFoundError:
-                    pass
-                    
+                elif f.endswith('.zip'):
+                    # Unzip the log
+                    ifname = os.path.join(path, f)
+                    print(f'Extracting log from {ifname}')
+                    with zipfile.ZipFile(ifname, 'r') as in_zip:
+                        arcnames = [os.path.split(x)[1] for x in in_zip.namelist()
+                            if x.endswith('.out.log')]
+                        for arcname in arcnames:
+                            ofname = os.path.join(path, arcname)
+                            if True or not os.path.exists(ofname):  # TODO: compare timestamps
+                                bytes = izip.read(arcname)
+                                with open(ofname, 'wb') as out:
+                                    out.write(bytes)
+
+    print('** TODO: Uncomment so we actually run RAMMS **')
+#    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 3, 3)
+
+
+    # Figure out which output files exist, and print to STDOUT
+
+#    # Determine the directory where RAMMS outputs are, by reading the
+#    # scenario.txt file
+#    scenario_file = os.path.join(ramms_dir, 'scenario.txt')
+#    dirRE = re.compile('^DIR\s+(.*)$')
+#    with open(scenario_file) as fin:
+#        line = next(fin)
+#        match = dirRE.match(line)
+#        if match is not None:
+#            data_dir = match.group(1)    # Top-level dir where the individaul avalanche files are; (same as ramms_dir, so no point in reading it out)
+#            break
+            
+    # Look for top-level directories under RESULTS.
+    # Each one of them will hold one or more sets of final outputs
+    outputs = list()
+    results_dir = os.path.join(ramms_dir, 'RESULTS')
+    for x in os.listdir(results_dir):
+        dir = os.path.join(results_dir, x)
+        if os.isdir(dir):
+            outputs.extent(os.path.join(dir, x) for x in os.listdir(dir))
+            logfiles_dir = os.path.join(dir, 'logfiles')
+            outputs.extend(os.path.join(logfiles_dir, x) for x in os.listdir(logfiles_dir))
+
+    # Tell calling process on Linux what the output files are
+    _print_outputs(outputs)
+
+
+# -----------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+>>>>>>> Changed run_ramms on Windows

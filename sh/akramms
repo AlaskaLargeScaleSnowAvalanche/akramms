@@ -85,6 +85,14 @@ def info(args):
 
     print(df)
 
+@subcommand([
+    argument('ramms', help='RAMMS directory or release file to inspect'),
+    argument('ids', type=int, nargs='*', help='ID of avalanche in run_dir to inspect')])
+def cat(args):
+    ramms.cat(args.ramms, args.ids)
+
+
+
 def main():
     args = cli.parse_args()
     if args.subcommand is None:
