@@ -12,6 +12,7 @@ import dggs.data
 from uafgi.util import make,ioutil,shputil
 import pandas as pd
 
+# TODO: scenario_name is juneau130yFor, and yet everything else is named juneau1_For_5m_30L
 @functools.lru_cache()
 def scenario_name(scene_dir, return_period, forest):
     scene_args = avalanche.params.load(scene_dir)
@@ -137,8 +138,28 @@ def run_ramms(hostname, ramms_dir, phase, HARNESS_REMOTE, dry_run=False):
         str(phase)]    # Stage 1 to 1
     print(' '.join(cmd))
     if not dry_run:
-        subprocess.run(cmd, check=True)
+        outputs = list()
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        outputRE = re.compile(r'OUTPUT:\s([^\s]*)\s*$')
+        while True:
+            line = proc.stdout.readline().decode('UTF-8')
+            if not line:
+                break
+            print(line, end='')
+            match = outputRE.match(line)
+            if match is not None:
+                outputs.append(match.group(1))
 
+        proc.wait()
+        if proc.returncode != 0:
+            raise subprocess.CalledProcessError(proc.returncode, cmd)
+
+        remote_harness_b = harnutil.bash_name(HARNESS_REMOTE)
+        outputs_b = [harnutil.bash_name(x) for x in outputs]
+        return outputs_b
+
+#        outputs_b = [harnutil.local_linux_name(output, remote_harness_b) for output in outputs]
+#        print('OUTPUTS: {}'.format(outputs))
 
 def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_REMOTE, dry_run=False, submit=True):
     """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)
@@ -202,7 +223,7 @@ def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_R
 
 # ---------------------------------------------------------------
 class ParsedJobBase(typing.NamedTuple):
-    run_dir: str
+    run_dir: str    # Full pathname, eg. .../juneau1_For/5m_30L  <ramms_dir>/RESULTS/<prefix>/<suffix>
     base: str
     prefix: str
     suffix: str
@@ -803,28 +824,60 @@ def infos(release_files, ids=None):
 
 # =============================================================================
 # ===== RAMMS Stage 3
-def stage3(hostname, ramms_dir, HARNESS_REMOTE, tdir):
 
+def ramms_stage3_rule(hostname, ramms_dir, release_files, HARNESS_REMOTE, dry_run=False, submit=True):
+    """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)
+    For now, do no inputs to stage3.  It's hard to predict exactly
+    what the input files should be.
 
-    # Determine input files to transfer to Windows.
-    # These are the files needed to run RAMMS Stage 3
-    xferRE = re.compile('|'.join(r'^[^.]*{}$'.format(ext)
-        for ext in (r'\.dom', r'\.log\.zip', r'\.out\.gz', r'\.xy-coord\.gz')))
+    release_files:
+        Must be ALL the (active) release files for ramms_dir.
+    """
 
+    # Leave these out for now:
+    #     juneau130yFor\RESULTS\juneau1_For\juneau1_For_L300_mu.tif
+    #     juneau130yFor\RESULTS\juneau1_For\juneau1_For_L300_xi.tif
+
+#    inputs = [os.path.join(ramms_dir, 'stage2_complete.txt')]
     inputs = list()
-    for path,dirs,files in os.walk(os.path.join(ramms_dir, 'RESULTS')):
-        for f in files:
-            if xferRE.match(f) is not None:
-                inputs.append(os.path.join(path, f))
 
-    # Sync RAMMS files to remote dir
-    harnutil.rsync_files(inputs, hostname, HARNESS_REMOTE, tdir)
-    
-    # Run RAMMS
-    run_ramms(hostname, ramms_dir, 3, HARNESS_REMOTE)
+    outputs = list()
+    for release_file in release_files:
+        jb = parse_release_file(release_file)
+        dir = os.path.join(ramms_dir, 'RESULTS', jb.prefix)
+        for leaf in ('curvidl.tif', 'slope.tif', 'logfiles/muxi_altlimits.log', 'logfiles/muxi_class.tif'):
+            outputs.append(os.path.join(dir, leaf))
+
+        base = os.path.join(dir, '{}_{}'.format(jb.prefix, jb.suffix))    # Eg: juneau1_For_5m_30L
+        for ext in ('.dbf', '.shp', '.shx', '_AblagerungStef.tif', '_COUNT.tif', '_ID.tif', '_Xi.tif', '_maxHeight.tif', '_maxPRESSURE.tif', '_maxVelocity.tif'):
+            outputs.append(f'{base}{ext}')
 
 
+    def action(tdir):
+        # Determine input files to transfer to Windows.
+        # These are the files needed to run RAMMS Stage 3
+        xferRE = re.compile('|'.join(r'^[^.]*{}$'.format(ext)
+            for ext in (r'\.dom', r'\.log\.zip', r'\.out\.gz', r'\.xy-coord\.gz')))
 
+        inputs = list()
+        for path,dirs,files in os.walk(os.path.join(ramms_dir, 'RESULTS')):
+            for f in files:
+                if xferRE.match(f) is not None:
+                    inputs.append(os.path.join(path, f))
+
+        # Sync RAMMS files to remote dir
+        harnutil.rsync_files(inputs, hostname, HARNESS_REMOTE, tdir, direction='up')
+        
+        # Run RAMMS
+        outputs_b = run_ramms(hostname, ramms_dir, 3, HARNESS_REMOTE)    # Bash-style names on remote Windows
+
+        outputs_rel = harnutil.rsync_files(outputs_b, hostname, HARNESS_REMOTE, tdir, direction='down')
+        outputs = [os.path.join(harnutil.HARNESS, x) for x in outputs_rel]
+        print('RAMMS_DIR ', ramms_dir)
+        return outputs
+
+    return make.Rule(action, inputs, outputs)
+# --------------------------------------------------------------------
 #    # Unpack / gzip individual avalanche .zip files
 #
 #    # rsync to 

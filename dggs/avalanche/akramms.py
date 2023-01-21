@@ -19,6 +19,7 @@ def add_stage1_rules(makefile, scene_dir, debug=False, windows_host='davos'):
         dem_file, scene_dir, fill_sinks=True)).outputs
 
     # Loop over combos
+    ramms_dirs_release_files = list()    # [(ramms_dir, [release_file, ...]), ...]
     all_ramms_dirs = list()
     all_release_files = list()    # Release files we will run RAMMS on
     for return_period in scene_args['return_periods']:
@@ -40,6 +41,7 @@ def add_stage1_rules(makefile, scene_dir, debug=False, windows_host='davos'):
             # TESTING: Do only L
             release_files = release_files[3:]
             print('release_files ',release_files)
+            ramms_dirs_release_files.append((ramms_dir, release_files))
 
             # Domain finder for post-process output
             domain_files = list()
@@ -64,19 +66,38 @@ def add_stage1_rules(makefile, scene_dir, debug=False, windows_host='davos'):
 
             # RAMMS Stage 1: IDL Prep
             ramms_files = shputil.expand_list(release_files + domain_files) + rammsdir_files
-            makefile.add(ramms.ramms_stage1_rule(
-                windows_host, ramms_dir, release_files, ramms_files, dggs.data.HARNESS_WINDOWS, dry_run=False))
+            stage1_outputs = makefile.add(ramms.ramms_stage1_rule(
+                windows_host, ramms_dir, release_files, ramms_files, dggs.data.HARNESS_WINDOWS, dry_run=False)).outputs
 
 
             all_release_files += release_files
+            ramms_dirs_release_files.append((ramms_dir, release_files))
+#            ramms_dirs_release_files.append((ramms_dir, release_files, stage1_outputs))
+
 
             break    # DEBUG
 
-    return all_ramms_dirs,all_release_files
+    return ramms_dirs_release_files
+#    return all_ramms_dirs,all_release_files
 
+
+def add_stage3_rules(makefile, ramms_dirs_release_files, debug=False, windows_host='davos'):
+    """ramms_dirs_release_files:
+        Output from add_stage1_rules()
+    """
+
+    stage3_outputs = list()
+    for ramms_dir, release_files in ramms_dirs_release_files:
+        out = makefile.add(ramms.ramms_stage3_rule(
+            windows_host, ramms_dir, release_files,
+            dggs.data.HARNESS_WINDOWS, dry_run=False)).outputs
+        stage3_outputs.extend(out)
+
+    return stage3_outputs
+# -------------------------------------------------------------------
 def run_stage1(scene_dir):
     makefile = make.Makefile()
-    ramms_dirs,release_files = add_stage1_rules(makefile, scene_dir)
+    ramms_dirs_release_files = add_stage1_rules(makefile, scene_dir)
 
     # We do this to make sure the domain finder C++ code is compiled.
     setup_py = os.path.join(harnutil.HARNESS, 'akramms', 'setup.py')
@@ -86,13 +107,25 @@ def run_stage1(scene_dir):
     setuptools.sandbox.run_setup(setup_py, cmd)
 
     makefile.generate('juneau1_mk', run=True, ncpu=1)
-    return ramms_dirs, release_files
+    return ramms_dirs_release_files
 # =====================================================================
 def run_stage2(release_files):
     """Get the simulations run to completion"""
     pass
 # =====================================================================
-def run_stage3(ramms_dir):
-    """Runs RAMMS stage 3"""
+def run_stage3(scene_dir):
+    dummy = make.Makefile()
+    ramms_dirs_release_files = add_stage1_rules(dummy, scene_dir)
 
-    pass
+    makefile = make.Makefile()
+    stage3_outputs = add_stage3_rules(makefile, ramms_dirs_release_files)
+
+    # We do this to make sure the domain finder C++ code is compiled.
+    setup_py = os.path.join(harnutil.HARNESS, 'akramms', 'setup.py')
+    prefix = os.path.join(harnutil.HARNESS, 'akramms', 'inst')
+    cmd = ['install', '--prefix', prefix]
+    print('setup.py ', cmd)
+    setuptools.sandbox.run_setup(setup_py, cmd)
+
+    makefile.generate('juneau1_mk', run=True, ncpu=1)
+    return stage3_outputs

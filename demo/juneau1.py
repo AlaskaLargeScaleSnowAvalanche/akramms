@@ -24,17 +24,27 @@ def main():
         snowdepth_geo=dggs.data.join('data', 'lader', 'sx3', 'geo_southeast.nc'),
         snowdepth_file=dggs.data.join('data', 'lader', 'sx3', 'gfdl_sx3_1986.nc'))
 
-#    release_files = akramms.run_stage1(scene_dir)
 
-    release_files = ramms.get_release_files(os.path.join(scene_dir, 'RAMMS/juneau130yFor/RESULTS/juneau1_For/5m_30L'))
-    print(release_files)
 
-#    akramms.run_stage2(release_files)    # Enlarge domains, get it done
+    outputs = akramms.run_stage3(scene_dir)
+    print('xxx1 ', outputs)
 
-    ramms_dir = os.path.join(scene_dir, 'RAMMS/juneau130yFor')#/RESULTS/juneau1_For/5m_30L')
-#    ramms.run_ramms('davos', ramms_dir, 3, 3, dggs.data.HARNESS_WINDOWS)
 
-    with ioutil.TmpDir() as tdir:
-        ramms.stage3('davos', ramms_dir, dggs.data.HARNESS_WINDOWS, tdir)
+##    release_files = akramms.run_stage1(scene_dir)
+#
+#    release_files = ramms.get_release_files(os.path.join(scene_dir, 'RAMMS/juneau130yFor/RESULTS/juneau1_For/5m_30L'))
+#    print(release_files)
+#
+##    akramms.run_stage2(release_files)    # Enlarge domains, get it done
+#
+#    ramms_dir = os.path.join(scene_dir, 'RAMMS/juneau130yFor')#/RESULTS/juneau1_For/5m_30L')
+##    ramms.run_ramms('davos', ramms_dir, 3, 3, dggs.data.HARNESS_WINDOWS)
+
+
+#    with ioutil.TmpDir() as tdir:
+#        ramms_dirs_release_files = akramms.add_stage1_rules(make.Makefile(), scene_dir)
+#        for ramms_dir,release_files in ramms_dirs_release_files:
+#            print('xxx ', ramms_dir, release_files)
+##        ramms.stage3('davos', ramms_dir, dggs.data.HARNESS_WINDOWS, tdir)
 
 main()

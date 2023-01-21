@@ -330,8 +330,9 @@ def run_on_windows_phase3(idlrt_exe, ramms_version, ramms_dir):
                                 with open(ofname, 'wb') as out:
                                     out.write(bytes)
 
-    print('** TODO: Uncomment so we actually run RAMMS **')
-#    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 3, 3)
+#    print('** TODO: Uncomment so we actually run RAMMS **')
+    print('Running RAMMS Stage 3 on Windows (launching IDL now)')
+    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 3, 3)
 
 
     # Figure out which output files exist, and print to STDOUT
