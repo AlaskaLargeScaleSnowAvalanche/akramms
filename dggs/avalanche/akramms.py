@@ -38,8 +38,8 @@ def add_stage1_rules(makefile, scene_dir, debug=False, windows_host='davos'):
             release_files = makefile.add(
                 pra_post.release_rule(scene_dir, return_period, forest, ramms_dir, require_all=False)).outputs
 
-            # TESTING: Do only L
-            release_files = release_files[3:]
+            # TESTING: Do only L (and M)
+            release_files = release_files[2:]
             print('release_files ',release_files)
             ramms_dirs_release_files.append((ramms_dir, release_files))
 
@@ -109,8 +109,16 @@ def run_stage1(scene_dir):
     makefile.generate('juneau1_mk', run=True, ncpu=1)
     return ramms_dirs_release_files
 # =====================================================================
-def run_stage2(release_files):
+def run_stage2(scene_dir):
     """Get the simulations run to completion"""
+    dummy = make.Makefile()
+    ramms_dirs_release_files = add_stage1_rules(dummy, scene_dir)
+    release_files = list()
+    for _,rfs in ramms_dirs_release_files:
+        release_files.extend(rfs)
+
+
+
     pass
 # =====================================================================
 def run_stage3(scene_dir):

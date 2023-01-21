@@ -26,7 +26,7 @@ def main():
 
 
 
-    outputs = akramms.run_stage3(scene_dir)
+    outputs = akramms.run_stage1(scene_dir)
     print('xxx1 ', outputs)
 
 

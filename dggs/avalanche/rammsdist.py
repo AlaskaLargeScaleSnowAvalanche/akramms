@@ -121,6 +121,7 @@ def install_ramms_on_windows(version):
 # taskkill.exe /F /IM idlrt.exe
 # taskkill.exe /F /IM idl_opserver.exe
 def kill_idl():
+    print('Killing IDL Tasks... (do not be alarmed by two "not found" errors)')
     sys.stdout.flush()
     sys.stderr.flush()
 
@@ -274,26 +275,25 @@ def run_on_windows_phase1(idlrt_exe, ramms_version, ramms_dir):
 
     # gzip all .var, .xy-coord and .xyz files, ready to rsync back
     outputs = list()
-    if last_ramms_phase == 1:
-        gzipRE = re.compile(r'[^.]*\.var$|[^.]*\.xy-coord$|[^.]*\.xyz$')
-        for path,dirs,files in os.walk(os.path.join(ramms_dir, 'RESULTS')):
-            for f in files:
-                if gzipRE.match(f) is not None:
-                    # Gzip the file
-                    ifname = os.path.join(path, f)
-                    ofname = os.path.join(path, f+'.gz')
-                    outputs.append(ofname)
-                    print(f'Gzipping {ifname}')
-                    with open(ifname, 'rb') as fin:
-                        with gzip.open(ofname, 'wb') as out:
-                            shutil.copyfileobj(fin, out)
+    gzipRE = re.compile(r'[^.]*\.var$|[^.]*\.xy-coord$|[^.]*\.xyz$')
+    for path,dirs,files in os.walk(os.path.join(ramms_dir, 'RESULTS')):
+        for f in files:
+            if gzipRE.match(f) is not None:
+                # Gzip the file
+                ifname = os.path.join(path, f)
+                ofname = os.path.join(path, f+'.gz')
+                outputs.append(ofname)
+                print(f'Gzipping {ifname}')
+                with open(ifname, 'rb') as fin:
+                    with gzip.open(ofname, 'wb') as out:
+                        shutil.copyfileobj(fin, out)
 
-                    # Delete the original (except for .xy-coord file)
-                    if not ifname.endswith('.xy-coord'):
-                        try:
-                            os.remove(ifname)
-                        except FileNotFoundError:
-                            pass
+                # Delete the original (except for .xy-coord file)
+                if not ifname.endswith('.xy-coord'):
+                    try:
+                        os.remove(ifname)
+                    except FileNotFoundError:
+                        pass
 
     # Tell calling process on Linux what the output files are
     _print_outputs(outputs)

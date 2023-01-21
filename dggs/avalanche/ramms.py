@@ -170,6 +170,13 @@ def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_R
 
     logfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock.log')
 
+    # Write extra output files to show we finished stage1 for a particular release file
+    outputs = list()
+    for release_file in release_files:
+        jb = parse_release_file(release_file)
+        output = os.path.join(ramms_dir, 'RESULTS', '{}_{}_stage1.txt'.format(jb.prefix, jb.suffix))
+        outputs.append(output)
+
     def action(tdir):
         print('Running RAMMS ', ramms_dir)
 
@@ -208,14 +215,22 @@ def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_R
         print(' '.join(cmd))
         subprocess.run(cmd, check=True)
 
+        # Write output files
+        for output in outputs:
+            with open(output, 'w') as out:
+                out.write('Finished RAMMS Stage 1\n')
+
         # Submit the individual avalanche runs immediately so we can
         # get going while preparing more RAMMS directories.
         if submit:
             submit_jobs(release_files)
 
+
+
+
     return make.Rule(action,
         input_files,
-        [logfile])    # We don't really know the output files yet
+        outputs)
 
 
 # =========================================================================================
