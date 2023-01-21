@@ -1,4 +1,4 @@
-import time
+import gzip,time
 import os,subprocess,re,sys,itertools,collections,shutil,zipfile
 from uafgi.util import ioutil
 from dggs.util import harnutil
@@ -320,8 +320,8 @@ def run_on_windows_phase3(idlrt_exe, ramms_version, ramms_dir):
                     # Unzip the log
                     ifname = os.path.join(path, f)
                     print(f'Extracting log from {ifname}')
-                    with zipfile.ZipFile(ifname, 'r') as in_zip:
-                        arcnames = [os.path.split(x)[1] for x in in_zip.namelist()
+                    with zipfile.ZipFile(ifname, 'r') as izip:
+                        arcnames = [os.path.split(x)[1] for x in izip.namelist()
                             if x.endswith('.out.log')]
                         for arcname in arcnames:
                             ofname = os.path.join(path, arcname)
@@ -352,33 +352,19 @@ def run_on_windows_phase3(idlrt_exe, ramms_version, ramms_dir):
     # Each one of them will hold one or more sets of final outputs
     outputs = list()
     results_dir = os.path.join(ramms_dir, 'RESULTS')
-    for x in os.listdir(results_dir):
-        dir = os.path.join(results_dir, x)
-        if os.isdir(dir):
-            outputs.extent(os.path.join(dir, x) for x in os.listdir(dir))
-            logfiles_dir = os.path.join(dir, 'logfiles')
-            outputs.extend(os.path.join(logfiles_dir, x) for x in os.listdir(logfiles_dir))
+    for x0 in os.listdir(results_dir):
+        dir0 = os.path.join(results_dir, x0)
+        if not os.path.isdir(dir0):
+            continue
+
+        for dir in [dir0, os.path.join(dir0, 'logfiles')]:
+            for x1 in os.listdir(dir):
+                fname1 = os.path.join(dir, x1)
+                if os.path.isfile(fname1):
+                    outputs.append(fname1)
+
+    outputs.sort()
 
     # Tell calling process on Linux what the output files are
     _print_outputs(outputs)
-
-
 # -----------------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
->>>>>>> Changed run_ramms on Windows
