@@ -145,7 +145,7 @@ def run_ramms(hostname, ramms_dir, phase, inputs, HARNESS_REMOTE, tdir, dry_run=
     print(' '.join(cmd))
     if not dry_run:
         # Start the remote process
-        proc = subprocess.Popen(cmd, stdin=stdout.subprocess.PIPE, stdout=subprocess.PIPE)
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
         # Write to processes stdin
         inputs_w = [
@@ -339,6 +339,10 @@ def query_condor(job_base):
         projection=['ClusterId', 'ProcId', 'JobBatchName', 'JobPartition'])
     condor_statuses = {ad['JobBatchName']: ad['JobPartition'] for ad in ads}
 
+def get_job_ids(release_file):
+    """Reads a release file, and returns a (sorted) list of PRA IDs in that file."""
+    release_df = shputil.read_df(release_file, read_shapes=False)
+    return sorted(list(release_df['Id']))
 
 # Categorize each job int one of four sets
 job_status_labels = ('noinput', 'incomplete', 'todo', 'inprocess', 'finished', 'overrun', 'failed')

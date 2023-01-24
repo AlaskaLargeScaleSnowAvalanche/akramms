@@ -1,6 +1,4 @@
 import os,re,typing,functools
-from uafgi.util import shputil
-
 
 # TODO: scenario_name is juneau130yFor, and yet everything else is named juneau1_For_5m_30L
 def scenario_name(scene_name, return_period, forest):
@@ -63,7 +61,3 @@ def parse_release_file(release_file):
     base = shapefile[:-8]    # remove _rel.shp
     return parse_job_base(ramms_dir, base)
 
-def get_job_ids(release_file):
-    """Reads a release file, and returns a (sorted) list of PRA IDs in that file."""
-    release_df = shputil.read_df(release_file, read_shapes=False)
-    return sorted(list(release_df['Id']))
