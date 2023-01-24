@@ -318,7 +318,7 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
     print('release_files ', release_files)
 
     # Collect output files, to be be transferred back to Linux
-    outputs = [ologfile]
+    outputs = list()
 
     # Run RAMMS locally, managing the IDL process
     _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 1)
