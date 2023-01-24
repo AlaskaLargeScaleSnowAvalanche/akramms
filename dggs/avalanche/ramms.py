@@ -182,10 +182,10 @@ def run_ramms(hostname, ramms_dir, phase, inputs, HARNESS_REMOTE, tdir, dry_run=
         outputs = [os.path.join(harnutil.HARNESS, x) for x in outputs_rel]
         return outputs
 # ----------------------------------------------------------------------
-def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_REMOTE, dry_run=False, submit=True):
+def ramms_stage1_rule(hostname, ramms_dir, release_files, inputs, HARNESS_REMOTE, dry_run=False, submit=True):
     """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)
 
-    input_files:
+    inputs:
         All input files for the RAMMS run (superset of release_files)
     """
 
@@ -201,7 +201,7 @@ def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_R
     def action(tdir):
 
         # Sync RAMMS files to remote dir
-        harnutil.rsync_files(input_files, hostname, HARNESS_REMOTE, tdir)
+        harnutil.rsync_files(inputs, hostname, HARNESS_REMOTE, tdir)
 
         # Run RAMMS
         outputs = run_ramms(hostname, ramms_dir, 1, inputs, HARNESS_REMOTE, tdir, dry_run=dry_run)
@@ -224,7 +224,7 @@ def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_R
             submit_jobs(release_files)
 
     return make.Rule(action,
-        input_files,
+        inputs,
         done_outputs)
 
 # =========================================================================================
