@@ -12,22 +12,6 @@ import dggs.data
 from uafgi.util import make,ioutil
 import pandas as pd
 
-# TODO: scenario_name is juneau130yFor, and yet everything else is named juneau1_For_5m_30L
-@functools.lru_cache()
-def scenario_name(scene_dir, return_period, forest):
-    scene_args = avalanche.params.load(scene_dir)
-    name = scene_args['name']
-    For = 'For' if forest else 'NoFor'
-    return f"{name}{return_period}y{For}"
-
-
-def ramms_dir(scene_dir, *args):
-    if len(args) == 1:
-        sn = args[0]
-    else:
-        sn = scenario_name(scene_dir, *args)
-
-    return os.path.join(scene_dir, 'RAMMS', sn)
 
 # --------------------------------------------------------------------
 scenario_tpl = \
@@ -63,8 +47,8 @@ def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, 
     name = scene_args['name']
     For = 'For' if forest else 'NoFor'
 
-#    xscenario_name = scenario_name(scene_dir, return_period, forest)
-#    xramms_dir = ramms_dir(scene_dir, xscenario_name)
+#    xscenario_name = rammsutil.scenario_name(scene_dir, return_period, forest)
+#    xramms_dir = rammsutil.ramms_dir(scene_dir, xscenario_name)
     scenario_file = os.path.join(xramms_dir, 'scenario.txt')
 #    assert os.path.exists(xramms_dir)
 
@@ -73,8 +57,8 @@ def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, 
     idem_dir,idem_tif = os.path.split(scene_args['dem_file'])
     idem_stub = idem_tif[:-4]
     links = [
-        (os.path.join(idem_dir, f'{idem_stub}.tif'), os.path.join(xramms_dir, 'DEM', f'{name}_{For}_{resolution}m_DEM.tif')),
-        (os.path.join(idem_dir, f'{idem_stub}.tfw'), os.path.join(xramms_dir, 'DEM', f'{name}_{For}_{resolution}m_DEM.tfw')),
+        (os.path.join(idem_dir, f'{idem_stub}.tif'), os.path.join(xramms_dir, 'DEM', f'{name}{For}_{resolution}m_DEM.tif')),
+        (os.path.join(idem_dir, f'{idem_stub}.tfw'), os.path.join(xramms_dir, 'DEM', f'{name}{For}_{resolution}m_DEM.tfw')),
     ]
 
 
@@ -83,8 +67,8 @@ def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, 
         iforest_dir,iforest_tif = os.path.split(scene_args['forest_file'])
         iforest_stub = iforest_tif[:-4]
         links += [
-            (os.path.join(iforest_dir, f'{iforest_stub}.tif'), os.path.join(xramms_dir, 'FOREST', f'{name}_{For}_{resolution}m_forest.tif')),
-            (os.path.join(iforest_dir, f'{iforest_stub}.tfw'), os.path.join(xramms_dir, 'FOREST', f'{name}_{For}_{resolution}m_forest.tfw')),
+            (os.path.join(iforest_dir, f'{iforest_stub}.tif'), os.path.join(xramms_dir, 'FOREST', f'{name}{For}_{resolution}m_forest.tif')),
+            (os.path.join(iforest_dir, f'{iforest_stub}.tfw'), os.path.join(xramms_dir, 'FOREST', f'{name}{For}_{resolution}m_forest.tfw')),
         ]
 
     def action(tdir):

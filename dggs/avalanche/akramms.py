@@ -1,6 +1,6 @@
 from uafgi.util import make,shputil
 import dggs.data
-from dggs.avalanche import avalanche, pra_post, domain_builder, ramms
+from dggs.avalanche import avalanche, pra_post, domain_builder, ramms,rammsutil
 from dggs.util import paramutil,harnutil
 import os,sys
 import setuptools.sandbox
@@ -26,8 +26,8 @@ def add_stage1_rules(makefile, scene_dir, debug=False, windows_host='davos'):
         for forest in scene_args['forests']:
 
             # One RAMMS directory per loop iteration...
-            scenario_name = ramms.scenario_name(scene_dir, return_period, forest)
-            ramms_dir = ramms.ramms_dir(scene_dir, scenario_name)
+            scenario_name = rammsutil.scenario_name(scene_dir, return_period, forest)
+            ramms_dir = rammsutil.ramms_dir(scene_dir, scenario_name)
             all_ramms_dirs.append(ramms_dir)
 
             # Run eCognition
@@ -45,13 +45,15 @@ def add_stage1_rules(makefile, scene_dir, debug=False, windows_host='davos'):
 
             # Domain finder for post-process output
             domain_files = list()
-            for pra_file in release_files:
-                pra_burn_file = '{}_burn.pik.gz'.format(pra_file[:-4])    # Same dir, .pik.gz does not pollute directory of .shp
+            for release_file in release_files:
+                jb = rammsutil.parse_release_file(release_file)
+
+                pra_burn_file = '{}_burn.pik.gz'.format(release_file[:-4])    # Same dir, .pik.gz does not pollute directory of .shp
                 makefile.add(
-                    domain_builder.burn_pra_rule(dem_file, pra_file, pra_burn_file))
+                    domain_builder.burn_pra_rule(dem_file, release_file, pra_burn_file))
 
                 # Different directory for chull and domain
-                pra_name = os.path.split(pra_file)[1][:-8]
+                pra_name = os.path.split(release_file)[1][:-8]
                 chull_file = os.path.join(ramms_dir, 'CHULL', '{}_chull.shp'.format(pra_name))
                 domain_file = os.path.join(ramms_dir, 'DOMAIN', '{}_dom.shp'.format(pra_name))
                 makefile.add(domain_builder.domain_rule(

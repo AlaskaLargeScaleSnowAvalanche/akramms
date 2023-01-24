@@ -1,6 +1,24 @@
 import os,re,typing,functools
 from uafgi.util import shputil
 
+
+# TODO: scenario_name is juneau130yFor, and yet everything else is named juneau1_For_5m_30L
+@functools.lru_cache()
+def scenario_name(scene_dir, return_period, forest):
+    scene_args = avalanche.params.load(scene_dir)
+    name = scene_args['name']
+    For = 'For' if forest else 'NoFor'
+    return f"{name}{return_period}y{For}"
+
+
+def ramms_dir(scene_dir, *args):
+    if len(args) == 1:
+        _scenario_name = args[0]
+    else:
+        _scenario_name = scenario_name(scene_dir, *args)
+
+    return os.path.join(scene_dir, 'RAMMS', sn)
+
 # ---------------------------------------------------------------
 class ParsedJobBase(typing.NamedTuple):
     run_dir: str    # Full pathname, eg. .../juneau1_For/5m_30L  <ramms_dir>/RESULTS/<prefix>/<suffix>
@@ -20,13 +38,17 @@ class ParsedJobBase(typing.NamedTuple):
 
 
 # -------------------------------------------------------
-_job_baseRE = re.compile(r'^(.+_.+)_(.+_.+)$')
+def release_file_name(scene_name, forest, resolution, return_period, 
+# -------------------------------------------------------
+_job_baseRE = re.compile(r'^(.+)_(.+_.+)$')
 @functools.lru_cache()
 def parse_job_base(ramms_dir, job_base):
     """
     base:
         String of base of job names, with an avalanche ID.
-        Eg: juneau1_For_5m_30L
+        Eg: juneau1For_5m_30L
+            prefix = juneau1For
+            suffix = 5m_30L
     """
     print('job_base ',job_base)
     match = _job_baseRE.match(job_base)

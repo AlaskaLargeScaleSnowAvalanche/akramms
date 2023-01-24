@@ -1,6 +1,6 @@
 import scipy.spatial
 from osgeo import gdal
-from dggs.avalanche import params,process_tree
+from dggs.avalanche import params,process_tree,rammsutil
 from uafgi.util import shputil,gdalutil,wrfutil,make,cfutil
 import os,sys
 import subprocess
@@ -98,11 +98,6 @@ class WrfLookup:
 # ---------------------------------------------------------------------------------
 _post_cat_bounds = (0.,5000.,25000.,60000.,1e10)    # Dummy value at end
 
-def _pra_post_iter1():
-    return iter(('tiny', 'small', 'medium', 'large'))
-
-
-
 def release_rule(scene_dir, return_period, forest, ramms_dir, require_all=True):
     """
     scene_dir:
@@ -133,16 +128,17 @@ def release_rule(scene_dir, return_period, forest, ramms_dir, require_all=True):
     name = scene_args['name']
     For = 'For' if forest else 'NoFor'
 
+    # eCognition filename conventions
     inputs.append(os.path.join(
         scene_dir,
         f'PRA_{process_tree.return_period_category(return_period)}',
         f'PRA_{return_period}y_{For}.shp'))
 
-#    ramms_dir = ramms.ramms_dir(scene_dir, scene_args['name'], return_period, forest)
-    for catname in _pra_post_iter1():
+    # RAMMS filename conventions
+    for catname in rammsutil.PRA_SIZES:    # ('tiny', 'small', 'medium', 'large')
         cat_letter = catname[0].upper()
         outputs.append(os.path.join(ramms_dir, 'RELEASE',
-            f'{name}_{For}_{resolution}m_{return_period}{cat_letter}_rel.shp'))
+            f'{name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp'))
 
     # Add one-off input files
 #    inputs += [os.path.join(scene_dir, 'scene.nc'), scene_args['snowdepth_file'], scene_args['snowdepth_geo']]
@@ -228,7 +224,7 @@ def release_rule(scene_dir, return_period, forest, ramms_dir, require_all=True):
 
         # Split into segments and save
         outputsi = iter(outputs)
-        for catname,low,high in zip(_pra_post_iter1(), _post_cat_bounds[:-1], _post_cat_bounds[1:]):
+        for catname,low,high in zip(rammsutil.PRA_SIZES, _post_cat_bounds[:-1], _post_cat_bounds[1:]):
             print('Category: {}, [{}, {})'.format(catname, low, high))
             output = next(outputsi)
 
