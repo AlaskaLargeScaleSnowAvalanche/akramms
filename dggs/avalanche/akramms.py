@@ -39,7 +39,7 @@ def add_stage1_rules(makefile, scene_dir, debug=False, windows_host='davos'):
                 pra_post.release_rule(scene_dir, return_period, forest, ramms_dir, require_all=False)).outputs
 
             # TESTING: Do only L (and M)
-            release_files = release_files[2:]
+            release_files = release_files[2:]    # DEBUG
             print('release_files ',release_files)
             ramms_dirs_release_files.append((ramms_dir, release_files))
 

@@ -1,3 +1,4 @@
+from dggs.avalanche import rammsutil
 import gzip,time
 import os,subprocess,re,sys,itertools,collections,shutil,zipfile
 from uafgi.util import ioutil
@@ -147,7 +148,7 @@ def kill_idl():
 # -----------------------------------------------------
 
 #_doneRE = re.compile(r"\s*Creating MUXI-Files...")    # Demo
-# RAMMS IDL prints this when it is done with Phase 1
+# RAMMS IDL prints this when it is done with Stage 1
 _doneREs = {
     1 : re.compile(r'\s*(Starting LSHM SIMULATIONS|LSHM Analysis finished successfully|- VAR-Files: All files created \(IDLBridge\)!)'),
     3 : re.compile(r'LSHM Analysis finished successfully'),
@@ -157,7 +158,22 @@ _doneREs = {
 
 
 # -----------------------------------------------------------------------
-def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last_ramms_phase):
+def read_inputs():
+    """Read list of input files from stdin"""
+
+    inputRE = re.compile(r'INPUT:\s([^\s]*)\s*$')
+    inputs = list()
+    while True:
+        line = sys.stdin.readline().strip()
+        if line == 'END INPUTS':
+            break
+        match = inputRE.match(line)
+        if match is not None:
+            inputs.append(match.group(1))
+    return inputs
+
+# -----------------------------------------------------------------------
+def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_stage, last_ramms_stage):
     """Call this to run top-level RAMMS locally on Windows.
     idlrt_exe:
         Windows path to idlrt.exe IDL runtime
@@ -165,16 +181,19 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last
         Version of RAMMS to run (eg: '221101')
     ramms_dir:
         RAMMS directory to run
-    first_ramms_phase: 1|2|3
-        First phase of RAMMS to execute on this run (eg: 1)
-    last_ramms_phase: 1|2|3
-        Last phase of RAMMS to execute on this run (eg: 1)
+    first_ramms_stage: 1|2|3
+        First stage of RAMMS to execute on this run (eg: 1)
+    last_ramms_stage: 1|2|3
+        Last stage of RAMMS to execute on this run (eg: 1)
     Returns:
         Nothing if OK.
         Raises Exception if it did not complete.
     """
     print(f'***** Running Top-Level RAMMS on {ramms_dir}')
 
+    # ----------------------------------------------------------------
+        
+    
     # ----------------------------------------------------------------
     # Make sure we've added our stub properly
     ramms_distro = install_ramms_on_windows(ramms_version)
@@ -193,10 +212,10 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last
     # Create batch file to run
     ramms_sav = os.path.join(ramms_distro, 'ramms_lshm.sav')
     scenario_txt = os.path.join(ramms_dir, 'scenario.txt')
-    batfile = os.path.join(ramms_dir, f'run_ramms_{first_ramms_phase}_{last_ramms_phase}.bat')
+    batfile = os.path.join(ramms_dir, f'run_ramms_{first_ramms_stage}_{last_ramms_stage}.bat')
     print('Writing {}'.format(batfile))
     with open(batfile, 'w') as out:
-        bat_contents = f'"{idlrt_exe}" "{ramms_sav}" -args "{scenario_txt}" {first_ramms_phase} {last_ramms_phase}\n'
+        bat_contents = f'"{idlrt_exe}" "{ramms_sav}" -args "{scenario_txt}" {first_ramms_stage} {last_ramms_stage}\n'
         print(bat_contents)
         out.write(bat_contents)
 
@@ -236,7 +255,7 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_phase, last
 
                 # Process the line we read
                 print(line+'*', end='')
-                if _doneREs[last_ramms_phase].match(line) is not None:
+                if _doneREs[last_ramms_stage].match(line) is not None:
                     sys.stdout.flush()
                     raise EOFError()   # Break out of double loop
 
@@ -270,20 +289,48 @@ def _print_outputs(outputs):
     print('END OUTPUTS')
     sys.stdout.flush()
 # -----------------------------------------------------------------------
-def run_on_windows_phase1(idlrt_exe, ramms_version, ramms_dir):
+def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
+
+    # Obtain list of input files (includes the release files)
+    inputs = read_inputs()
+
+    release_files = [x for x in read_inputs() if x.endswith('_rel.shp')]
+    print('release_files ', release_files)
+
+    # Collect output files, to be be transferred back to Linux
+    outputs = [ologfile]
+
+    # Run RAMMS locally, managing the IDL process
     _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 1, 1)
 
-    # gzip all .var, .xy-coord and .xyz files, ready to rsync back
-    outputs = list()
+    # Rename the log file to reflect stage1
+    ilogfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock_stage1.log')
+    ologfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock_stage1.log')
+    os.rename(ilogfile, ologfile)
+    outputs.append(ologfile)
+
+    # gzip all .var, .xy-coord and .xyz files in the avalanche
+    # directories, and declare as output files
     gzipRE = re.compile(r'[^.]*\.var$|[^.]*\.xy-coord$|[^.]*\.xyz$')
-    for path,dirs,files in os.walk(os.path.join(ramms_dir, 'RESULTS')):
-        for f in files:
+    for input in read_inputs():
+        # Only look at release files to parse out avalanche directories
+        if not input.endswith('_rel.shp'):
+            continue
+
+        # Identify our list of avalanche directories based release files listed as inputs
+        # Turn release file name into directory of avalanche simulations
+        jb = rammsutil.parse_release_file(release_file)
+        aval_dir = os.path.join(ramms_dir, jb.prefix, jb.suffix)
+
+        # Look at files inside avalanche directory
+        for f in os.listdir(aval_dir):
             if gzipRE.match(f) is not None:
                 # Gzip the file
-                ifname = os.path.join(path, f)
-                ofname = os.path.join(path, f+'.gz')
+                ifname = os.path.join(aval_dir, f)
+                ofname = os.path.join(aval_dir, f+'.gz')
                 outputs.append(ofname)
                 print(f'Gzipping {ifname}')
+                sys.stdout.flush()
                 with open(ifname, 'rb') as fin:
                     with gzip.open(ofname, 'wb') as out:
                         shutil.copyfileobj(fin, out)
@@ -299,7 +346,9 @@ def run_on_windows_phase1(idlrt_exe, ramms_version, ramms_dir):
     _print_outputs(outputs)
 
 # -----------------------------------------------------------------------
-def run_on_windows_phase3(idlrt_exe, ramms_version, ramms_dir):
+def run_on_windows_stage3(idlrt_exe, ramms_version, ramms_dir):
+
+    # We have been provided a number of input files implicitly.
 
     # Un-gzip .xy-coord.gz files (leave .out.gz gzipped)
     gzipRE = re.compile(r'[^.]*\.xy-coord\.gz$|[^.]*\.log.zip$')
