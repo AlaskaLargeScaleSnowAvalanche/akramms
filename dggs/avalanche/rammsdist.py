@@ -173,7 +173,7 @@ def read_inputs():
     return inputs
 
 # -----------------------------------------------------------------------
-def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_stage, last_ramms_stage):
+def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
     """Call this to run top-level RAMMS locally on Windows.
     idlrt_exe:
         Windows path to idlrt.exe IDL runtime
@@ -181,10 +181,8 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_stage, last
         Version of RAMMS to run (eg: '221101')
     ramms_dir:
         RAMMS directory to run
-    first_ramms_stage: 1|2|3
-        First stage of RAMMS to execute on this run (eg: 1)
-    last_ramms_stage: 1|2|3
-        Last stage of RAMMS to execute on this run (eg: 1)
+    ramms_stage: 1|2|3
+        Stage of RAMMS to execute on this run (eg: 1)
     Returns:
         Nothing if OK.
         Raises Exception if it did not complete.
@@ -192,7 +190,17 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_stage, last
     print(f'***** Running Top-Level RAMMS on {ramms_dir}')
 
     # ----------------------------------------------------------------
-        
+    # Stuff we will discern from the IDL stdout
+    # RELEASE 1/2 
+    #   - Release shapefile: C:\Users\efischer\av\prj\juneau1\RAMMS\juneau130yFor\RELEASE\juneau1_For_5m_30L_rel.shp 
+    #   - Scenario: 5m_30L 
+    #   - Creating SCENARIO directory: C:\Users\efischer\av\prj\juneau1\RAMMS\juneau130yFor\RESULTS\juneau1_For\5m_30L\ 
+    release_file_ix = None      # Eg: 1
+    num_release_files = None    # Eg: 2
+
+    # This flag means we are ready to exit as soon as we identify the
+    # "done message" (see _doneREs)
+    ready_to_exit = (ramms_stage != 1)        
     
     # ----------------------------------------------------------------
     # Make sure we've added our stub properly
@@ -212,10 +220,10 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_stage, last
     # Create batch file to run
     ramms_sav = os.path.join(ramms_distro, 'ramms_lshm.sav')
     scenario_txt = os.path.join(ramms_dir, 'scenario.txt')
-    batfile = os.path.join(ramms_dir, f'run_ramms_{first_ramms_stage}_{last_ramms_stage}.bat')
+    batfile = os.path.join(ramms_dir, f'run_ramms_{ramms_stage}.bat')
     print('Writing {}'.format(batfile))
     with open(batfile, 'w') as out:
-        bat_contents = f'"{idlrt_exe}" "{ramms_sav}" -args "{scenario_txt}" {first_ramms_stage} {last_ramms_stage}\n'
+        bat_contents = f'"{idlrt_exe}" "{ramms_sav}" -args "{scenario_txt}" {ramms_stage} {ramms_stage}\n'
         print(bat_contents)
         out.write(bat_contents)
 
@@ -253,9 +261,21 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, first_ramms_stage, last
                 if not line:
                     break    # Nothing more to read for now
 
-                # Process the line we read
                 print(line+'*', end='')
-                if _doneREs[last_ramms_stage].match(line) is not None:
+
+                # ---- Process the line we have read
+                # Seek info on progress through release files
+                # Eg: RELEASE 1/3
+                match = _releaseRE.match(line)
+                if match is not None:
+                    release_file_ix = int(match.group(1))
+                    num_release_files = int(match.group(2))
+                    if release_file_ix == num_release_files:
+                        ready_to_exit = True
+
+                # If we've seen enough release files, look out for our
+                # "done message."
+                if ready_to_exit and _doneREs[last_ramms_stage].match(line) is not None:
                     sys.stdout.flush()
                     raise EOFError()   # Break out of double loop
 
@@ -301,7 +321,7 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
     outputs = [ologfile]
 
     # Run RAMMS locally, managing the IDL process
-    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 1, 1)
+    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 1)
 
     # Rename the log file to reflect stage1
     ilogfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock_stage1.log')
@@ -381,7 +401,7 @@ def run_on_windows_stage3(idlrt_exe, ramms_version, ramms_dir):
 
 #    print('** TODO: Uncomment so we actually run RAMMS **')
     print('Running RAMMS Stage 3 on Windows (launching IDL now)')
-    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 3, 3)
+    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 3)
 
 
     # Figure out which output files exist, and print to STDOUT
