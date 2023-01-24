@@ -77,6 +77,10 @@ def rsync_files(fnames, remote_host, REMOTE_HARNESS, tdir, flags=['--copy-links'
 
     # Run rsync
     if direction == 'up':
+        # Create output directory
+        cmd = ['ssh', remote_host, 'mkdir', '-p', remote_harness_b]
+        subprocess.run(cmd)
+
         cmd = ['rsync'] + flags + ['--files-from={}'.format(list_file),
             HARNESS+'/',
             f'{remote_host}:{remote_harness_b}']

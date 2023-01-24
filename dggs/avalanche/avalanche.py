@@ -232,35 +232,23 @@ def prepare_data_rule(hostname, scene_dir, HARNESS_REMOTE):
     outputs = _prepare_data_outputs(scene_dir, scene_args)
 
     def action(tdir):
-#      if False:
         remote_scene_dir = harnutil.remote_windows_name(scene_dir, HARNESS_REMOTE, bash=True)
         remote_scene_host_dir = '{}:{}'.format(hostname, remote_scene_dir)
 
-        # Copy scene.nc to remote host
-        cmd = ['ssh', hostname, 'mkdir', '-p', remote_scene_dir]
-        print(cmd)
-        subprocess.run(cmd, check=True)
+        # Assemble list of files to copy to remote Windows host
+        inputs = [os.path.join(scene_dir, 'scene.nc')]
 
-        cmd = ['rsync', os.path.join(scene_dir, 'scene.nc'), remote_scene_host_dir+'/']
-        print(cmd)
-        subprocess.run(cmd, check=True)
-
-        # Copy input files: dem and forest
+        # Input files: dem and forest
         for param in params.ALL.values():
             if param.type != 'input_file':
                 continue
             if param.name not in scene_args:
                 continue
 
-            cmd = ['ssh', hostname, 'mkdir', '-p',
-                harnutil.bash_name(harnutil.remote_windows_name(os.path.split(scene_args[param.name])[0], HARNESS_REMOTE))]
-            print(cmd)
-            subprocess.run(cmd, check=True)
+            inputs.append(scene_args[param.name])
 
-            cmd = ['rsync', scene_args[param.name],
-                '{}:{}'.format(hostname, harnutil.remote_windows_name(scene_args[param.name], HARNESS_REMOTE, bash=True))]
-            print(cmd)
-            subprocess.run(cmd, check=True)
+        # Transfer over input files
+        harnutil.rsync_files(inputs, hostname, HARNESS_REMOTE, tdir)
 
         # Run script on remote host
         cmd = ['ssh', hostname, 'sh', harnutil.bash_name(f'{HARNESS_REMOTE}\\akramms\\sh\\prepare_scene.sh'), remote_scene_dir]

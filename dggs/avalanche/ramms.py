@@ -66,7 +66,7 @@ def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, 
 #    xscenario_name = scenario_name(scene_dir, return_period, forest)
 #    xramms_dir = ramms_dir(scene_dir, xscenario_name)
     scenario_file = os.path.join(xramms_dir, 'scenario.txt')
-    assert os.path.exists(scenario_file)
+#    assert os.path.exists(xramms_dir)
 
 
     # ---- DEM File
@@ -215,7 +215,7 @@ def ramms_stage1_rule(hostname, ramms_dir, release_files, input_files, HARNESS_R
     # Write extra output files to show we finished stage1 for a particular release file
     done_outputs = list()
     for release_file in release_files:
-        jb = parse_release_file(release_file)
+        jb = rammsutil.parse_release_file(release_file)
         output = os.path.join(ramms_dir, 'RESULTS', '{}_{}_stage1.txt'.format(jb.prefix, jb.suffix))
         done_outputs.append(output)
 
