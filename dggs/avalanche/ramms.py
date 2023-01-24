@@ -105,16 +105,16 @@ def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, 
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
 # sh ~/av/akramms/sh/run_ramms.sh 'c:\Users\efischer\av\prj\juneau1\RAMMS\juneau130yFor'
-def run_ramms(hostname, ramms_dir, phase, inputs, HARNESS_REMOTE, tdir, dry_run=False):
+def run_ramms(hostname, ramms_dir, stage, inputs, HARNESS_REMOTE, tdir, dry_run=False):
     """
     hostname:
         Remote windows host to run on
     ramms_dir:
         Local directory containing RAMMS setup
-    phase: 1 or 3
-        phase=1:
+    stage: 1 or 3
+        stage=1:
             Prepare avlanche simulations for RAMMS Core
-        phase=3:
+        stage=3:
             Merge avalanche outputs from RAMMS Core
     inputs:
         Input files in local harness; to be copied to remote host before running RAMMS.
@@ -141,7 +141,7 @@ def run_ramms(hostname, ramms_dir, phase, inputs, HARNESS_REMOTE, tdir, dry_run=
 
     cmd = ['ssh', hostname, 'sh', remote_run_ramms_sh,
         harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True),
-        str(phase)]    # Stage 1 to 1
+        str(stage)]    # Stage 1 to 1
     print(' '.join(cmd))
     if not dry_run:
         # Start the remote process

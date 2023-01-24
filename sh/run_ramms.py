@@ -19,13 +19,13 @@ parser.add_argument('--ramms-version', metavar='<RAMMS distro version>',
 parser.add_argument('ramms_dir', metavar='<RAMMS run directory>',
     help='Directory prepared to run RAMMS')
 
-parser.add_argument('phase', type=int,
-    help='Phase of RAMMS to run (1|3)')
+parser.add_argument('stage', type=int,
+    help='Stage of RAMMS to run (1|3)')
 
 args = parser.parse_args()
-if args.phase == 1:
-    rammsdist.run_on_windows_phase1(args.idlrt, args.ramms_version, args.ramms_dir)
-elif args.phase == 3:
-    rammsdist.run_on_windows_phase3(args.idlrt, args.ramms_version, args.ramms_dir)
+if args.stage == 1:
+    rammsdist.run_on_windows_stage1(args.idlrt, args.ramms_version, args.ramms_dir)
+elif args.stage == 3:
+    rammsdist.run_on_windows_stage3(args.idlrt, args.ramms_version, args.ramms_dir)
 else:
-    raise ValueError(f'Illegal RAMMS phase: {phase}')
+    raise ValueError(f'Illegal RAMMS stage: {stage}')
