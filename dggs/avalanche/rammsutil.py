@@ -1,5 +1,5 @@
+import os,re,typing,functools
 from uafgi.util import shputil
-import os,re,typing
 
 # ---------------------------------------------------------------
 class ParsedJobBase(typing.NamedTuple):
