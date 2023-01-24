@@ -1,5 +1,5 @@
 from dggs.avalanche import rammsutil
-import gzip,time
+import gzip,time,traceback
 import os,subprocess,re,sys,itertools,collections,shutil,zipfile
 from uafgi.util import ioutil
 from dggs.util import harnutil
@@ -276,7 +276,8 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
 
                 # If we've seen enough release files, look out for our
                 # "done message."
-                if ready_to_exit and _doneREs[last_ramms_stage].match(line) is not None:
+                if ready_to_exit and (_doneREs[ramms_stage].match(line) is not None):
+                    print('_run_on_windows() exiting')
                     sys.stdout.flush()
                     raise EOFError()   # Break out of double loop
 
@@ -285,7 +286,11 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
     except EOFError:
         # Proper signal of end of IDL output; exit gracefully
         pass
-
+    exception Exception as e:
+        # Inform user of errors in this program
+        traceback.print_exc()
+        sys.stdout.flush()
+        sys.stderr.flush()
     finally:
         if fin is not None:
             fin.close()
