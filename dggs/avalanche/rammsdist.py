@@ -173,6 +173,7 @@ def read_inputs():
     return inputs
 
 # -----------------------------------------------------------------------
+_releaseRE = re.compile(r'\s*RELEASE\s+(\d+)/(\d+)')
 def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
     """Call this to run top-level RAMMS locally on Windows.
     idlrt_exe:
