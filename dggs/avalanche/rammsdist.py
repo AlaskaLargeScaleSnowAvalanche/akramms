@@ -286,7 +286,7 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
     except EOFError:
         # Proper signal of end of IDL output; exit gracefully
         pass
-    exception Exception as e:
+    except Exception as e:
         # Inform user of errors in this program
         traceback.print_exc()
         sys.stdout.flush()
