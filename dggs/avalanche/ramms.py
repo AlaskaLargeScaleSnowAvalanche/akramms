@@ -46,12 +46,7 @@ def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, 
     resolution = scene_args['resolution']
     name = scene_args['name']
     For = 'For' if forest else 'NoFor'
-
-#    xscenario_name = rammsutil.scenario_name(scene_dir, return_period, forest)
-#    xramms_dir = rammsutil.ramms_dir(scene_dir, xscenario_name)
     scenario_file = os.path.join(xramms_dir, 'scenario.txt')
-#    assert os.path.exists(xramms_dir)
-
 
     # ---- DEM File
     idem_dir,idem_tif = os.path.split(scene_args['dem_file'])

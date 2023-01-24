@@ -3,12 +3,9 @@ from uafgi.util import shputil
 
 
 # TODO: scenario_name is juneau130yFor, and yet everything else is named juneau1_For_5m_30L
-@functools.lru_cache()
-def scenario_name(scene_dir, return_period, forest):
-    scene_args = avalanche.params.load(scene_dir)
-    name = scene_args['name']
+def scenario_name(scene_name, return_period, forest):
     For = 'For' if forest else 'NoFor'
-    return f"{name}{return_period}y{For}"
+    return f"{scene_name}{return_period}y{For}"
 
 
 def ramms_dir(scene_dir, *args):
@@ -17,8 +14,9 @@ def ramms_dir(scene_dir, *args):
     else:
         _scenario_name = scenario_name(scene_dir, *args)
 
-    return os.path.join(scene_dir, 'RAMMS', sn)
+    return os.path.join(scene_dir, 'RAMMS', _scenario_name)
 
+PRA_SIZES = ('tiny', 'small', 'medium', 'large')
 # ---------------------------------------------------------------
 class ParsedJobBase(typing.NamedTuple):
     run_dir: str    # Full pathname, eg. .../juneau1_For/5m_30L  <ramms_dir>/RESULTS/<prefix>/<suffix>
@@ -38,9 +36,8 @@ class ParsedJobBase(typing.NamedTuple):
 
 
 # -------------------------------------------------------
-def release_file_name(scene_name, forest, resolution, return_period, 
-# -------------------------------------------------------
 _job_baseRE = re.compile(r'^(.+)_(.+_.+)$')
+
 @functools.lru_cache()
 def parse_job_base(ramms_dir, job_base):
     """

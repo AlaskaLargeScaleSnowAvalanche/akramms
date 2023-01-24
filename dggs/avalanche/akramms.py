@@ -26,7 +26,8 @@ def add_stage1_rules(makefile, scene_dir, debug=False, windows_host='davos'):
         for forest in scene_args['forests']:
 
             # One RAMMS directory per loop iteration...
-            scenario_name = rammsutil.scenario_name(scene_dir, return_period, forest)
+            scenario_name = rammsutil.scenario_name(
+                scene_args['name'], return_period, forest)
             ramms_dir = rammsutil.ramms_dir(scene_dir, scenario_name)
             all_ramms_dirs.append(ramms_dir)
 
