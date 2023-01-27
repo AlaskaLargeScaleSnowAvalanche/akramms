@@ -34,36 +34,37 @@ ALT_LIM_LOW  {alt_lim_low}
 END
 """
 
-def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, HARNESS_REMOTE,
+def rammsdir_rule(scene_dir, release_file, HARNESS_REMOTE,
     debug=False, alt_lim_top=1500, alt_lim_low=1000, ncpu=8, ncpu_preprocess=4, cohesion=50):
 
     """Generates the scenario file, which becomes key to running RAMMS.
     HARNESS_REMOTE:
         Location of ~/git on remote Windows machine (parent of akramms/ repo)
     """
+    jb = rammsutil.parse_release_file(release_file)
 
     scene_args = avalanche.params.load(scene_dir)
     resolution = scene_args['resolution']
     name = scene_args['name']
-    For = 'For' if forest else 'NoFor'
-    scenario_file = os.path.join(xramms_dir, 'scenario.txt')
+    For = 'For' if jb.forest else 'NoFor'
+    scenario_file = os.path.join(jb.ramms_dir, 'scenario.txt')
 
     # ---- DEM File
     idem_dir,idem_tif = os.path.split(scene_args['dem_file'])
     idem_stub = idem_tif[:-4]
     links = [
-        (os.path.join(idem_dir, f'{idem_stub}.tif'), os.path.join(xramms_dir, 'DEM', f'{name}{For}_{resolution}m_DEM.tif')),
-        (os.path.join(idem_dir, f'{idem_stub}.tfw'), os.path.join(xramms_dir, 'DEM', f'{name}{For}_{resolution}m_DEM.tfw')),
+        (os.path.join(idem_dir, f'{idem_stub}.tif'), os.path.join(jb.ramms_dir, 'DEM', f'{name}{For}_{resolution}m_DEM.tif')),
+        (os.path.join(idem_dir, f'{idem_stub}.tfw'), os.path.join(jb.ramms_dir, 'DEM', f'{name}{For}_{resolution}m_DEM.tfw')),
     ]
 
 
     # ---- Forest File
-    if forest:
+    if jb.forest:
         iforest_dir,iforest_tif = os.path.split(scene_args['forest_file'])
         iforest_stub = iforest_tif[:-4]
         links += [
-            (os.path.join(iforest_dir, f'{iforest_stub}.tif'), os.path.join(xramms_dir, 'FOREST', f'{name}{For}_{resolution}m_forest.tif')),
-            (os.path.join(iforest_dir, f'{iforest_stub}.tfw'), os.path.join(xramms_dir, 'FOREST', f'{name}{For}_{resolution}m_forest.tfw')),
+            (os.path.join(iforest_dir, f'{iforest_stub}.tif'), os.path.join(jb.ramms_dir, 'FOREST', f'{name}{For}_{resolution}m_forest.tif')),
+            (os.path.join(iforest_dir, f'{iforest_stub}.tfw'), os.path.join(jb.ramms_dir, 'FOREST', f'{name}{For}_{resolution}m_forest.tfw')),
         ]
 
     def action(tdir):
@@ -79,8 +80,8 @@ def rammsdir_rule(xramms_dir, xscenario_name, scene_dir, return_period, forest, 
 
         # Create the scenario file
         kwargs = dict()
-        kwargs['scenario_name'] = xscenario_name
-        kwargs['remote_ramms_dir'] = harnutil.remote_windows_name(xramms_dir, HARNESS_REMOTE)
+        kwargs['scenario_name'] = jb.scenario_name
+        kwargs['remote_ramms_dir'] = harnutil.remote_windows_name(jb.ramms_dir, HARNESS_REMOTE)
         kwargs['ncpu'] = str(ncpu)
         kwargs['ncpu_preprocess'] = str(ncpu_preprocess)
         kwargs['cohesion'] = str(cohesion)

@@ -1,7 +1,7 @@
 import scipy.spatial
 from osgeo import gdal
 from dggs.avalanche import params,process_tree,rammsutil
-from uafgi.util import shputil,gdalutil,wrfutil,make,cfutil
+from uafgi.util import shputil,gdalutil,wrfutil,make,cfutil,ioutil
 import os,sys
 import subprocess
 import json
@@ -98,7 +98,7 @@ class WrfLookup:
 # ---------------------------------------------------------------------------------
 _post_cat_bounds = (0.,5000.,25000.,60000.,1e10)    # Dummy value at end
 
-def release_rule(scene_dir, return_period, forest, ramms_dir, require_all=True):
+def release_rule(scene_dir, return_period, forest, require_all=True):
     """
     scene_dir:
         Uses params: name ("site"), resample_cell_size ("res")
@@ -106,10 +106,6 @@ def release_rule(scene_dir, return_period, forest, ramms_dir, require_all=True):
     return_period:
         Return period we are calculating for.
         Must be included in scene_args['return_periods']
-    ramms_dir:
-        Top-level directory for RAMMS run that's being created.
-        Typically equal to:
-           ramms.ramms_dir(scene_dir, scene_args['name'], return_period, forest)
 
     forest: bool  (formerly "Naming")
         Whether we are doing with / without forest
@@ -125,7 +121,7 @@ def release_rule(scene_dir, return_period, forest, ramms_dir, require_all=True):
     inputs = list()
     outputs = list()
     resolution = scene_args['resolution']
-    name = scene_args['name']
+    scene_name = scene_args['name']
     For = 'For' if forest else 'NoFor'
 
     # eCognition filename conventions
@@ -134,14 +130,13 @@ def release_rule(scene_dir, return_period, forest, ramms_dir, require_all=True):
         f'PRA_{process_tree.return_period_category(return_period)}',
         f'PRA_{return_period}y_{For}.shp'))
 
-    # RAMMS filename conventions
-    for catname in rammsutil.PRA_SIZES:    # ('tiny', 'small', 'medium', 'large')
-        cat_letter = catname[0].upper()
-        outputs.append(os.path.join(ramms_dir, 'RELEASE',
-            f'{name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp'))
+    # Full pathnames of release files generated from this (scene_name, return_period, forest) combo
+    for pra_size in rammsutil.PRA_SIZES:    # T,S,M,L
+        ramms_name = rammsutil.ramms_name(scene_name, forest, resolution, return_period, pra_size)
+        release_file = os.path.join(scene_dir, 'RAMMS', ramms_name, 'RELEASE', f'{ramms_name}_rel.shp')
+        outputs.append(release_file)
 
     # Add one-off input files
-#    inputs += [os.path.join(scene_dir, 'scene.nc'), scene_args['snowdepth_file'], scene_args['snowdepth_geo']]
     inputs += [scene_args['snowdepth_file'], scene_args['snowdepth_geo']]
 
     def action(tdir):
@@ -216,20 +211,13 @@ def release_rule(scene_dir, return_period, forest, ramms_dir, require_all=True):
         # df[VOL_vname] = df['area_m2'] / np.cos(df['Mean_Slope']*degree) * df[d0_vname]
         df[VOL_vname] = (df['area_m2'] * df[d0_vname]) / np.cos(df['Mean_Slope']*degree)
 
-        # Create directories needed for output files
-        dirs = set(os.path.split(x)[0] for x in outputs)
-        for dir in dirs:
-            print(f'Creating directory: {dir}')
-            os.makedirs(dir, exist_ok=True)
-
         # Split into segments and save
-        outputsi = iter(outputs)
-        for catname,low,high in zip(rammsutil.PRA_SIZES, _post_cat_bounds[:-1], _post_cat_bounds[1:]):
-            print('Category: {}, [{}, {})'.format(catname, low, high))
-            output = next(outputsi)
+        ioutil.mkdirs_for_files(outputs)
+        for output, pra_size_name, low, high in zip(
+            outputs, rammsutil.PRA_SIZE_NAMES, _post_cat_bounds[:-1], _post_cat_bounds[1:]):
 
+            print(f'Category: {pra_size_name}, [{low}, {high})')
             df_cat = df[df['area_m2'].between(low, high, inclusive='both')]  # SHOULD be inclusive='left'
-
             shputil.write_df(df_cat, 'pra', 'Polygon', output, wkt=scene_args['coordinate_system'])
                 
     return make.Rule(action, inputs, outputs)

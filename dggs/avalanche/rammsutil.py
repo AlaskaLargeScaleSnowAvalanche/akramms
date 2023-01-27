@@ -1,26 +1,37 @@
 import os,re,typing,functools
 
-# TODO: scenario_name is juneau130yFor, and yet everything else is named juneau1_For_5m_30L
-def scenario_name(scene_name, return_period, forest):
-    For = 'For' if forest else 'NoFor'
-    return f"{scene_name}{return_period}y{For}"
-
-
-def ramms_dir(scene_dir, *args):
-    if len(args) == 1:
-        _scenario_name = args[0]
-    else:
-        _scenario_name = scenario_name(scene_dir, *args)
-
-    return os.path.join(scene_dir, 'RAMMS', _scenario_name)
-
-PRA_SIZES = ('tiny', 'small', 'medium', 'large')
+PRA_SIZE_NAMES = ('tiny', 'small', 'medium', 'large')
+PRA_SIZES = ('T', 'S', 'M', 'L')
 # ---------------------------------------------------------------
-class ParsedJobBase(typing.NamedTuple):
-    run_dir: str    # Full pathname, eg. .../juneau1_For/5m_30L  <ramms_dir>/RESULTS/<prefix>/<suffix>
-    base: str
-    prefix: str
-    suffix: str
+class RammsRun(typing.NamedTuple):
+    ramms_dir: str    # Directory just under RAMMS/
+    scene_name: str
+    forest: bool
+    resolution: int
+    return_period: int
+    pra_size: str
+
+    @property
+    def scenario_name(self):
+        For = 'For' if self.forest else 'NoFor'
+        return f"{self.scene_name}{For}_{self.resolution}m_{self.return_period}{self.pra_size}"
+
+    @property
+    def prefix(self):
+        For = 'For' if self.forest else 'NoFor'
+        return f'{self.scene_name}{For}'
+
+    @property
+    def suffix(self):
+        return f'{self.resolution}m_{self.return_period}{self.pra_size}'
+
+    @property
+    def run_dir(self):
+        """Directory RAMMS Core runs use for input and output"""
+        For = 'For' if self.forest else 'NoFor'
+        return os.path.join(ramms_dir, 'RESULTS',
+            f'{self.scene_name}{For}',
+            f'{self.resolution}m_{self.return_period}{self.pra_size}')
 
     def log_zip(self, id):
         return os.path.join(self.run_dir, '{}_{}.log.zip'.format(self.base, id))
@@ -32,32 +43,30 @@ class ParsedJobBase(typing.NamedTuple):
         """
         return '{}_{}{}'.format(self.base, id, ext)
 
+def ramms_name(*args, **kwargs):
+    return RammsRun(None, *args, **kwargs).scenario_name
 
 # -------------------------------------------------------
-_job_baseRE = re.compile(r'^(.+)_(.+_.+)$')
-
-@functools.lru_cache()
-def parse_job_base(ramms_dir, job_base):
-    """
-    base:
-        String of base of job names, with an avalanche ID.
-        Eg: juneau1For_5m_30L
-            prefix = juneau1For
-            suffix = 5m_30L
-    """
-    print('job_base ',job_base)
-    match = _job_baseRE.match(job_base)
-    prefix = match.group(1)
-    suffix = match.group(2)
-    run_dir = os.path.join(ramms_dir, 'RESULTS', prefix, suffix)
-    return ParsedJobBase(run_dir, job_base, prefix, suffix)
+release_fileRE = re.compile(r'^(.+)(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(.*)\.(.*)')
 
 @functools.lru_cache()
 def parse_release_file(release_file):
-    """Parses the full name of a release file into a ParsedJobBase named tuple."""
+    """Parses the full name of a release file into a RammsRun named tuple."""
 
-    RELEASE_dir,shapefile = os.path.split(release_file)
+    RELEASE_dir,leaf = os.path.split(release_file)
     ramms_dir = os.path.split(RELEASE_dir)[0]
-    base = shapefile[:-8]    # remove _rel.shp
-    return parse_job_base(ramms_dir, base)
+    match = release_fileRE.match(leaf)
+
+    scene_name = match.group(1)
+    For = match.group(2)
+    forest = True if For == 'For' else False
+    resolution = int(match.group(3))
+    return_period = int(match.group(4))
+    pra_size = match.group(5)
+    file_type = match.group(6)    # eg: _rel
+    ext = match.group(7)          # eg: shp
+
+    return RammsRun(
+        ramms_dir,
+        scene_name, forest, resolution, return_period, pra_size)
 
