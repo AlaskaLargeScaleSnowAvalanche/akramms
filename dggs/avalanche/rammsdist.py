@@ -314,7 +314,7 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
     # Obtain list of input files (includes the release files)
     inputs = read_inputs()
 
-    release_files = [x for x in read_inputs() if x.endswith('_rel.shp')]
+    release_files = [x for x in inputs if x.endswith('_rel.shp')]
     print('release_files ', release_files)
 
     # Collect output files, to be be transferred back to Linux
@@ -329,13 +329,10 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
     os.rename(ilogfile, ologfile)
     outputs.append(ologfile)
 
-    # gzip all .var, .xy-coord and .xyz files in the avalanche
+    # Find all .var.gz, .xy-coord.gz and .xyz.gz files in the avalanche
     # directories, and declare as output files
-    gzipRE = re.compile(r'[^.]*\.var$|[^.]*\.xy-coord$|[^.]*\.xyz$')
-    for input in read_inputs():
-        # Only look at release files to parse out avalanche directories
-        if not input.endswith('_rel.shp'):
-            continue
+    outRE = re.compile(r'[^.]*\.var$|[^.]*\.xy-coord$|[^.]*\.xyz$')
+    for release_file in release_files:
 
         # Identify our list of avalanche directories based release files listed as inputs
         # Turn release file name into directory of avalanche simulations
@@ -344,23 +341,9 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
 
         # Look at files inside avalanche directory
         for f in os.listdir(aval_dir):
-            if gzipRE.match(f) is not None:
-                # Gzip the file
-                ifname = os.path.join(aval_dir, f)
-                ofname = os.path.join(aval_dir, f+'.gz')
+            if outRE.match(f) is not None:
+                ofname = os.path.join(aval_dir, f)
                 outputs.append(ofname)
-                print(f'Gzipping {ifname}')
-                sys.stdout.flush()
-                with open(ifname, 'rb') as fin:
-                    with gzip.open(ofname, 'wb') as out:
-                        shutil.copyfileobj(fin, out)
-
-                # Delete the original (except for .xy-coord file)
-                if not ifname.endswith('.xy-coord'):
-                    try:
-                        os.remove(ifname)
-                    except FileNotFoundError:
-                        pass
 
     # Tell calling process on Linux what the output files are
     _print_outputs(outputs)
