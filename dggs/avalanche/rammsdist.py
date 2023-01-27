@@ -4,10 +4,6 @@ import os,subprocess,re,sys,itertools,collections,shutil,zipfile
 from uafgi.util import ioutil
 from dggs.util import harnutil
 
-_dest_paths = {    # Relative path where files from Marc belong
-    'ramms_lshm.sav': [],
-}
-
 _renames = {
     'ramms_aval_LHM.exe' : 'ramms_aval_LHM_orig.exe'
 }
@@ -17,6 +13,7 @@ _base_upgrade_for_version = {
     '220922' : (RAMMS_220922, None),
     '220928' : (RAMMS_220922, '220928'),
     '221101' : (RAMMS_220922, '221101'),
+    '230126' : (RAMMS_220922, '230126'),
 }
 def install_ramms_on_windows(version):
     """Installs RAMMS into the appropriate distro file inside the harness."""
@@ -36,22 +33,18 @@ def install_ramms_on_windows(version):
     upgrade_dir = os.path.join(harnutil.HARNESS, 'data', 'christen', 'RAMMS', version)
     print('upgrade_dir ',upgrade_dir)
 
-    # Copy the upgrade files
+    # Copy the upgrade file(s)
     upgrade_paths = set()
-    for leaf in sorted(list(os.listdir(upgrade_dir))):
-        src_file = os.path.join(upgrade_dir, leaf)
+    for path,dirs,files in os.walk(upgrade_dir):
+        for f in files:
+            src_dir = path
+            src_file = os.path.join(src_dir, f)
+            dir_rel = os.relpath(src_dir, upgrade_dir)
+            dest_dir = os.path.join(ramms_installed, dir_rel)
 
-        # Ignore files we don't know what to do with
-        try:
-            dest_path = _dest_paths[leaf]
-            upgrade_paths.add(tuple(list(dest_path) + [leaf]))
-        except KeyError:
-            # Ignore files we don't know what to do with
-            continue
-        dest_dir = os.path.join(ramms_installed, *dest_path)
-        os.makedirs(dest_dir, exist_ok=True)
-        print(src_file, dest_dir)
-        shutil.copy(src_file, dest_dir)
+            os.makedirs(dest_dir, exist_ok=True)
+            print(src_file, dest_dir)
+            shutil.copy(src_file, dest_dir)
 
     #print('** upgrade_paths ',upgrade_paths)
 
