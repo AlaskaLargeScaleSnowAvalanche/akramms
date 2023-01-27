@@ -9,6 +9,7 @@
 
 int main(int argc, char **argv)
 {
+    int status;
     std::vector<std::string> args;
     for (int i=0; i<argc; ++i) args.push_back(std::string(argv[i]));
 
@@ -20,6 +21,7 @@ int main(int argc, char **argv)
 
     if (argc == 4) {
         // ramms_aval_LHM.exe juneau1_For_5m_30L_11392.av2 C write_xy
+
         // Pass through
         std::string cmd = exe_dir + "\\ramms_aval_LHM_orig.exe";
         for (int i=1; ;) {
@@ -29,7 +31,16 @@ int main(int argc, char **argv)
             if (i >= args.size()) break;
         }
         printf("%s\n", cmd.c_str());
-        return system(cmd.c_str());
+        status = system(cmd.c_str());
+        if (status != 0) return status;
+
+        // Compress resulting files
+        std::string base(args[1]);
+        base.resize(base.length() - 4);
+        std::string cmd = "gzip " + base + ".xyz " + base + ".xy-coord";
+        status = system(cmd.c_str());
+        return status;
+
     } else if (argc == 3) {
         // ramms_aval_LHM.exe juneau1_For_5m_30L_11392.av2 juneau1_For_5m_30L_11392.out
         // Capture this call, do not run
