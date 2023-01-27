@@ -39,8 +39,9 @@ def install_ramms_on_windows(version):
         for f in files:
             src_dir = path
             src_file = os.path.join(src_dir, f)
-            dir_rel = os.relpath(src_dir, upgrade_dir)
+            dir_rel = os.path.relpath(src_dir, upgrade_dir)    # Tuple
             dest_dir = os.path.join(ramms_installed, dir_rel)
+            upgrade_paths.add(tuple(dir_rel.split(os.sep) + [f]))
 
             os.makedirs(dest_dir, exist_ok=True)
             print(src_file, dest_dir)
