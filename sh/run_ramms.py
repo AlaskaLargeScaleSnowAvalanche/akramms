@@ -12,8 +12,7 @@ parser.add_argument('--idlrt', metavar='<IDL .exe file>',
     help='Main IDL executable idlrt.exe')
 
 parser.add_argument('--ramms-version', metavar='<RAMMS distro version>',
-    default=r'221101',
-#    default=r'220928',
+    default=r'230126',
     help='Version of RAMMS to use')
 
 parser.add_argument('ramms_dir', metavar='<RAMMS run directory>',
