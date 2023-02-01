@@ -127,8 +127,9 @@ def run_ramms(hostname, ramms_dir, stage, inputs, HARNESS_REMOTE, tdir, dry_run=
         Windows machine and then copied to Linux.
     """
 
-    # Create remote dir
-    cmd = ['ssh', hostname, 'mkdir', '-p', harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True)]
+# Not needed, harnutil does this
+#    # Create remote dir
+#    cmd = ['ssh', hostname, 'mkdir', '-p', harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True)]
     subprocess.run(cmd, check=True)
 
     # Sync RAMMS input files to remote dir

@@ -25,8 +25,11 @@ def main():
         snowdepth_file=dggs.data.join('data', 'lader', 'sx3', 'gfdl_sx3_1986.nc'))
 
 
+    scene_args = avalanche.params.load(scene_dir)
+    print(scene_args)
 
-    outputs = akramms.run_stage1(scene_dir)
+#    ramms_dirs_release_files = akramms.run_stage1(scene_dir)
+#    outputs = akramms.run_stage1(scene_dir)
     print('xxx1 ', outputs)
 
 

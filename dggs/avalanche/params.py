@@ -6,6 +6,7 @@ from dggs.util import paramutil
 # List of all parameters involved in an overall run.
 # Param = collections.namedtuple('Param', ('name', 'units', 'type', 'required', 'description'))
 ALL = paramutil.parse([
+    # Basic parameters of the scene
     ('name', None, 'str', False,
         """Root name of scene; to use for filenames, plotting, etc"""),
     ('dem_file', None, 'input_file', True,
@@ -66,10 +67,10 @@ ALL = paramutil.parse([
 
     ])
 
-# Not included in main parameters because it doesn't affect the value
-# of the computation.
-SCENE_DIR = paramutil.Param('scene_dir', None, 'path', False,
-    'Top-level directory of this scene / project')
+## Not included in main parameters because it doesn't affect the value
+## of the computation.
+#SCENE_DIR = paramutil.Param('scene_dir', None, 'path', False,
+#    'Top-level directory of this scene / project')
 
 DEFAULTS = {
     'schweitz': dict(
