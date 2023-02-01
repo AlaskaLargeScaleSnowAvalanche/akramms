@@ -43,12 +43,6 @@ def remote_windows_name(fname, REMOTE_HARNESS, bash=False):
     return ret
 
 
-def remote_linux_name(fname):
-    """Converts local Linux name to remote Linux name.
-    Assumes same home directory structure on remote Linux host"""
-    ret = os.path.join('~', os.path.relpath(fname, os.environ['HOME']))
-    return ret
-
 def rsync_files(fnames, remote_host, REMOTE_HARNESS, tdir, flags=['--copy-links', '-avz'], direction='up'):
     """Syncs a list of files into the same location in the remote harness.
 
@@ -95,3 +89,74 @@ def rsync_files(fnames, remote_host, REMOTE_HARNESS, tdir, flags=['--copy-links'
 
     # Return relative names
     return fnames_rel
+
+
+def run_remote(inputs, cmd, write_inputs=False):
+    """Runs a command on the remote Windows machine.
+    inputs:
+        Input files to copy to Windows before running.
+    cmd: [str, ...]
+        The command to run on the remote host
+    Returns outputs:
+        Output files on remote machine (Relative pathnames)
+    """
+
+    # Sync RAMMS input files to remote dir
+    if not config.shared_filesystem:
+        rsync_files(inputs, hostname, HARNESS_REMOTE, tdir, direction='up')
+
+    # Run RAMMS
+
+    # Start the remote process
+    cmd = ['ssh', config.windows_host] + cmd
+    kw = dict()
+    if write_inputs:
+        kw['stdin'] = stdin=subprocess.PIPE
+    print(' '.join(cmd))
+    proc = subprocess.Popen(cmd, stdout=stdout=subprocess.PIPE, **kw)
+
+    # Write to processes stdin (relative path of input files)
+    if write_inputs:
+        inputs_w = [
+            config.roots.relpath(input),
+            for input in inputs]
+        inputs_txt = ''.join(f'INPUT: {input_w}\r\n' for input_w in inputs_w) + 'END INPUTS\r\n'
+        for input in inputs:
+            proc.stdin.write(inputs_txt.encode('UTF-8'))
+        proc.stdin.flush()
+
+    # Read outputs
+    outputs_rel = list()
+    outputRE = re.compile(r'OUTPUT:\s([^\s]*)\s*$')
+    while True:
+        line = proc.stdout.readline().decode('UTF-8')
+        if not line:
+            break
+        print(line, end='')
+
+        # Collect list of output files as declared by Windows-side program
+        match = outputRE.match(line)
+        if match is not None:
+            outputs_rel.append(match.group(1))
+
+    proc.wait()
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, cmd)
+
+    # outputs contains relative names of files.
+    if not config.shared_filesystem:
+        harnutil.rsync_files(outputs_b, hostname, HARNESS_REMOTE, tdir, direction='down')
+
+    # Outputs as local filenames
+    outputs = [config.roots.abspath(x) for x in outputs_rel]
+    return outputs
+
+def print_outputs(outputs):
+    sys.stdout.flush()
+    print()
+    print('BEGIN OUTPUTS')
+    for output in outputs:
+        print(f'OUTPUT: {output}')
+    print('END OUTPUTS')
+    sys.stdout.flush()
+# -----------------------------------------------------------------------

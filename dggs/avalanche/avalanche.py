@@ -2,6 +2,7 @@ import subprocess
 import os,pathlib,shutil
 import netCDF4
 import numpy as np
+from dggs import config
 from dggs.util import paramutil,harnutil,arcgisutil
 from uafgi.util import make
 from dggs.avalanche import process_tree,params
@@ -120,7 +121,7 @@ def _prepare_data_outputs(scene_dir, scene_args):
 
 def prepare_data(scene_dir):
     """Called from prepare_scene.py; RUNS ON WINDOWS HOST WITH ArcGIS"""
-
+    outputs = list()
     scene_args = params.load(scene_dir)
 
     temporaries = [
@@ -130,8 +131,8 @@ def prepare_data(scene_dir):
 
     # Delete all output files/folders
     # (otherwise ArcGIS complains)
-    outputs = _prepare_data_outputs(scene_dir, scene_args)
-    for dir in (temporaries + outputs):
+    _outputs = _prepare_data_outputs(scene_dir, scene_args)
+    for dir in (temporaries + _outputs):
         shutil.rmtree(dir, ignore_errors=True)
 
     # Assemble script args
@@ -188,13 +189,17 @@ def prepare_data(scene_dir):
     # Copy DEM to eCog folder
     ecog_dir = os.path.join(scene_dir, 'eCog')
     os.makedirs(ecog_dir, exist_ok=True)
+    dem_tif = os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name']))
+    outputs.append(dem_tif)
     shutil.copy(scene_args['dem_file'], os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name'])))
 
     # Write import...xml files 
     for freq in ('frequent', 'extreme'):
         for forest in ((True,False) if scene_args['forest_file'] else (False,)):
             _Forest = '_Forest' if forest else '_NoForest'
-            with open(os.path.join(ecog_dir, f'PRA_import_{freq}{_Forest}.xml'), 'w') as out:
+            import_xml = os.path.join(ecog_dir, f'PRA_import_{freq}{_Forest}.xml')
+            outputs.append(import_xml)
+            with open(import_xml, 'w') as out:
                 out.write(import_xml_str(scene_args, freq, forest))
 
     # Generate the required process trees
@@ -209,10 +214,14 @@ def prepare_data(scene_dir):
             _For = '_For' if forest else '_NoFor'
             ofname = os.path.join(scene_dir, 'eCog',
                 f'GHK_{return_period:d}y{_For}.dcp')
+            outputs.append(ofname)
             with open(ofname, 'w') as out:
                 # scene_dir=/mnt because this runs in a docker container
                 out.write(process_tree.get(scene_args, '/mnt', return_period, forest))
 #                out.write(process_tree.get(scene_dir, return_period, forest))
+
+    # Declare our output files so they may be copied back to Linux
+    harnutil.print_outputs(outputs)
 
 # ---------------------------------------------------------------------------
 
@@ -232,8 +241,7 @@ def prepare_data_rule(hostname, scene_dir, HARNESS_REMOTE):
     outputs = _prepare_data_outputs(scene_dir, scene_args)
 
     def action(tdir):
-        remote_scene_dir = harnutil.remote_windows_name(scene_dir, HARNESS_REMOTE, bash=True)
-        remote_scene_host_dir = '{}:{}'.format(hostname, remote_scene_dir)
+        scene_dir_rel = config.roots.relpath(scene_dir)
 
         # Assemble list of files to copy to remote Windows host
         inputs = [os.path.join(scene_dir, 'scene.nc')]
@@ -248,19 +256,8 @@ def prepare_data_rule(hostname, scene_dir, HARNESS_REMOTE):
             inputs.append(scene_args[param.name])
 
         # Transfer over input files
-        harnutil.rsync_files(inputs, hostname, HARNESS_REMOTE, tdir)
-
-        # Run script on remote host
-        cmd = ['ssh', hostname, 'sh', harnutil.bash_name(f'{HARNESS_REMOTE}\\akramms\\sh\\prepare_scene.sh'), remote_scene_dir]
-        print(cmd)
-        subprocess.run(cmd, check=True)
-
-#      if True:
-        # TODO: Copy outputs back to local host
-        cmd = ['rsync', '-avz', remote_scene_host_dir+'/', scene_dir]
-        print(' '.join(cmd))
-        subprocess.run(cmd, check=True)
-
+        cmd = ['sh', config.roots_w.bashpath('{HARNESS}/akramms/sh/prepare_scene.sh'), scene_dir_rel]
+        harnutil.run_remote(inputs, cmd)
 
     return make.Rule(action, inputs, outputs)
 
