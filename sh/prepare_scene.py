@@ -1,6 +1,6 @@
 import sys
-from dggs import config
-from dggs.avalanche import avalanche
+from akramms import config
+from akramms import avalanche
 import os
 
 """Script used to prepare scene remotely on Windows host."""

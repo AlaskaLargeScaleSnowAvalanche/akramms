@@ -1,5 +1,5 @@
-from dggs.util import harnutil
-from dggs import config
+from akramms.util import harnutil
+from akramms import config
 import collections
 import pathlib
 import textwrap

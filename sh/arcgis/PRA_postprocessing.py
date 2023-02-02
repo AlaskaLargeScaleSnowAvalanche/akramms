@@ -5,7 +5,7 @@
 # Add akramms to PYTHONPATH, and import utilities therein
 import sys,os
 sys.path.append(os.path.abspath(os.path.join(os.path.abspath(__file__), '..', '..', '..')))
-import dggs.util.arcgisutil
+import akramms.util.arcgisutil
 
 # Import system modules
 import sys, string, os
@@ -26,7 +26,7 @@ env.overwriteOutput = True
 
 #Script varibles...
 
-dggs.util.arcgisutil.get_script_vars(globals(), (
+akramms.util.arcgisutil.get_script_vars(globals(), (
     ('workspace', 'GetParameterAsText'),
     ('site' 'GetParameterAsText'),
     ('inShp', 'GetParameterAsText'),

@@ -2,7 +2,7 @@ import gzip,pickle
 import numpy as np
 import shapely
 import d8graph
-from dggs.avalanche import domain
+from akramms import domain
 from uafgi.util import shputil,shapelyutil,gdalutil,make
 
 pra_file = '/Users/eafischer2/av/prj/juneau1/juneau1_For_5m_30T_rel.shp'

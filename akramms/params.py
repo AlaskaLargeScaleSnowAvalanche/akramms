@@ -1,7 +1,7 @@
 import functools
 import os
 import numpy as np
-from dggs.util import paramutil
+from akramms.util import paramutil
 
 # List of all parameters involved in an overall run.
 # Param = collections.namedtuple('Param', ('name', 'units', 'type', 'required', 'description'))

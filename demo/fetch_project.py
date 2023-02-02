@@ -1,6 +1,6 @@
-import dggs.data
+from akramms import config
 from dggs import avalanche
-from dggs.util import paramutil,harnutil
+from akramms.util import paramutil,harnutil
 import os,subprocess
 
 scene_dir = dggs.data.join('prj', 'juneau1')

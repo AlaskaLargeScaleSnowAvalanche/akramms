@@ -6,9 +6,9 @@ import itertools, functools,shutil
 import numpy as np
 import shapely
 import htcondor
-from dggs.avalanche import avalanche,akramms,rammsutil
-from dggs.util import harnutil
-import dggs.data
+from akramms import avalanche,akramms,rammsutil
+from akramms.util import harnutil
+from akramms import config
 from uafgi.util import make,ioutil
 import pandas as pd
 

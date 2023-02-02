@@ -1,6 +1,6 @@
 import functools
 import os
-from dggs.avalanche import params
+from akramms import params
 
 thisdir = os.path.split(os.path.abspath(__file__))[0]
 

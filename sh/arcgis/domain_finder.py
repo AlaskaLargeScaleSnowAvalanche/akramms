@@ -13,7 +13,7 @@
 # Add akramms to PYTHONPATH, and import utilities therein
 import sys,os
 sys.path.append(os.path.abspath(os.path.join(os.path.abspath(__file__), '..', '..', '..')))
-import dggs.util.arcgisutil
+import akramms.util.arcgisutil
 
 
 import os, sys
@@ -274,7 +274,7 @@ def findDomain(workspace, fileShp, fileDEM, fileFlowdir, buffdis, name):
 
 
 def main():
-    dggs.util.arcgisutil.get_script_vars(locals(), (
+    akramms.util.arcgisutil.get_script_vars(locals(), (
         ('scene_dir', 'GetParameterAsText'),
         ('fileDEM', 'GetParameterAsText'),
     ))

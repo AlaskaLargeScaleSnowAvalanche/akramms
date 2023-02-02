@@ -1,7 +1,7 @@
 from uafgi.util import make,shputil
-import dggs.data
-from dggs.avalanche import avalanche, pra_post, domain_builder, ramms,rammsutil
-from dggs.util import paramutil,harnutil
+from akramms import config
+from akramms import avalanche, pra_post, domain_builder, ramms,rammsutil
+from akramms.util import paramutil,harnutil
 import os,sys
 import setuptools.sandbox
 

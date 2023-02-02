@@ -1,7 +1,7 @@
 import sys,re,subprocess,os
 import htcondor
 import shapely
-from dggs.avalanche import ramms
+from akramms import ramms
 
 
 ramms_dir = '/home/efischer/av/prj/juneau1/RAMMS/juneau130yFor'

@@ -8,7 +8,7 @@
 # Add akramms to PYTHONPATH, and import utilities therein
 import sys,os
 sys.path.append(os.path.abspath(os.path.join(os.path.abspath(__file__), '..', '..', '..')))
-import dggs.util.arcgisutil
+import akramms.util.arcgisutil
 
 # Import system modules
 import string
@@ -24,7 +24,7 @@ arcpy.CheckOutExtension("3d")
 #-------------------------------------------------------------------------------
 # Obtain script variables
 
-dggs.util.arcgisutil.get_script_vars(globals(), (
+akramms.util.arcgisutil.get_script_vars(globals(), (
     ('Workspace', 'GetParameterAsText'),
     ('inDEM', 'GetParameterAsText'),
     ('inForest', 'GetParameterAsText'),

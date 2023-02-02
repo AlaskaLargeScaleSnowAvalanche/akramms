@@ -2,7 +2,7 @@ import gzip
 import pickle
 import numpy as np
 import d8graph
-from dggs.avalanche import domain
+from akramms import domain
 from uafgi.util import shputil,shapelyutil,gdalutil
 import sys
 import os

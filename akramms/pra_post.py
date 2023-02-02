@@ -1,11 +1,11 @@
 import scipy.spatial
 from osgeo import gdal
-from dggs.avalanche import params,process_tree,rammsutil
+from akramms import params,process_tree,rammsutil
 from uafgi.util import shputil,gdalutil,wrfutil,make,cfutil,ioutil
 import os,sys
 import subprocess
 import json
-import dggs.data
+from akramms import config
 import pyproj
 import netCDF4
 import numpy as np

@@ -1,7 +1,7 @@
 import time,sys
 import subprocess,os,signal
 import argparse
-from dggs.avalanche import rammsdist
+from akramms import rammsdist
 
 parser = argparse.ArgumentParser(prog='run_ramms',
     description='Executes and manages RAMMS top-level IDL code')

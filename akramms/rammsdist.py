@@ -1,8 +1,8 @@
-from dggs.avalanche import rammsutil
+from akramms import rammsutil
 import gzip,time,traceback
 import os,subprocess,re,sys,itertools,collections,shutil,zipfile
 from uafgi.util import ioutil
-from dggs.util import harnutil
+from akramms.util import harnutil
 
 _renames = {
     'ramms_aval_LHM.exe' : 'ramms_aval_LHM_orig.exe'

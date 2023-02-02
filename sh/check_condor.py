@@ -1,7 +1,7 @@
 import sys,re,subprocess,os
 import htcondor
 import shapely
-from dggs.avalanche import ramms
+from akramms import ramms
 
 p = ramms.read_polygon('juneau1_For_5m_30L_1456.dom')
 #p = shapely.geometry.Polygon([(0,0),(2,0),(2,2),(0,2)])
