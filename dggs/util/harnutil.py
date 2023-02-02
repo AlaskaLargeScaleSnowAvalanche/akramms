@@ -43,14 +43,11 @@ def remote_windows_name(fname, REMOTE_HARNESS, bash=False):
     return ret
 
 
-def rsync_files(fnames, remote_host, REMOTE_HARNESS, tdir, flags=['--copy-links', '-avz'], direction='up'):
+def rsync_files(fnames, tdir, flags=['--copy-links', '-avz'], direction='up'):
     """Syncs a list of files into the same location in the remote harness.
 
     fnames: [filename, ...]
-        Files to transfer to remote harness (bash-style filename)
-        (These files must be within the implied local harness)
-    REMOTE_HARNESS:
-        Root of remote harness
+        Relative filenames to transfer to the remote Windows machine.
     Returns:
         Bash-style pathname of files, relative to the harness root
     """
@@ -97,13 +94,15 @@ def run_remote(inputs, cmd, write_inputs=False):
         Input files to copy to Windows before running.
     cmd: [str, ...]
         The command to run on the remote host
+    write_inputs: bool
+        If set, write the input file list to STDIN, one file at a time.
     Returns outputs:
         Output files on remote machine (Relative pathnames)
     """
 
     # Sync RAMMS input files to remote dir
     if not config.shared_filesystem:
-        rsync_files(inputs, hostname, HARNESS_REMOTE, tdir, direction='up')
+        rsync_files(inputs, tdir, direction='up')
 
     # Run RAMMS
 
@@ -113,13 +112,11 @@ def run_remote(inputs, cmd, write_inputs=False):
     if write_inputs:
         kw['stdin'] = stdin=subprocess.PIPE
     print(' '.join(cmd))
-    proc = subprocess.Popen(cmd, stdout=stdout=subprocess.PIPE, **kw)
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, **kw)
 
     # Write to processes stdin (relative path of input files)
     if write_inputs:
-        inputs_w = [
-            config.roots.relpath(input),
-            for input in inputs]
+        inputs_w = [config.roots.relpath(input) for input in inputs]
         inputs_txt = ''.join(f'INPUT: {input_w}\r\n' for input_w in inputs_w) + 'END INPUTS\r\n'
         for input in inputs:
             proc.stdin.write(inputs_txt.encode('UTF-8'))
@@ -145,7 +142,7 @@ def run_remote(inputs, cmd, write_inputs=False):
 
     # outputs contains relative names of files.
     if not config.shared_filesystem:
-        harnutil.rsync_files(outputs_b, hostname, HARNESS_REMOTE, tdir, direction='down')
+        harnutil.rsync_files(outputs_b, tdir, direction='down')
 
     # Outputs as local filenames
     outputs = [config.roots.abspath(x) for x in outputs_rel]

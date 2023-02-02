@@ -4,11 +4,16 @@ from dggs.avalanche import avalanche, pra_post, domain_builder, ramms,akramms
 from dggs.util import paramutil,harnutil
 import os,sys
 import setuptools.sandbox
-
+from dggs import config
 
 
 
 def main():
+
+    scene_dir = config.roots.abspath('{PRJ}/juneau1')
+    print(scene_dir)
+    print(config.roots.relpath(scene_dir))
+    return
 
 
     # Set up a new workspace directory, and set ALL parameters for our computation

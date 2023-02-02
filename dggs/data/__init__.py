@@ -1,14 +1,14 @@
 import os
 
-HARNESS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
+#HARNESS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 
 #HARNESS_WINDOWS = r'C:\Users\{}\av'.format(os.environ['USER'])
-HARNESS_WINDOWS = r'\\nona.dnr.state.ak.us\enggeo_projects\avalanche_sim\av'
+#HARNESS_WINDOWS = r'\\nona.dnr.state.ak.us\enggeo_projects\avalanche_sim\av'
 
 
 # Convenience function
-def join(*path):
-    return os.path.join(HARNESS, *path)
+#def join(*path):
+#    return os.path.join(HARNESS, *path)
 
 
 # Standard Projections
