@@ -1,6 +1,6 @@
 import sys
 from akramms import config
-from akramms import avalanche
+from akramms import r_prepare
 import os
 
 """Script used to prepare scene remotely on Windows host."""
@@ -9,5 +9,5 @@ import os
 scene_dir_rel = sys.argv[1]
 scene_dir = config.roots.abspath(scene_dir_rel)
 
-avalanche.prepare_data(scene_dir)
+r_prepare.prepare_data(scene_dir)
 
