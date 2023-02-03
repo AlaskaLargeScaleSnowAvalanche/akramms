@@ -99,7 +99,7 @@ class WrfLookup:
 # ---------------------------------------------------------------------------------
 _post_cat_bounds = (0.,5000.,25000.,60000.,1e10)    # Dummy value at end
 
-def release_rule(scene_dir, return_period, forest, require_all=True):
+def rule(scene_dir, return_period, forest, require_all=True):
     """
     scene_dir:
         Uses params: name ("site"), resample_cell_size ("res")

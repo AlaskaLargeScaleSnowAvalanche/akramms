@@ -10,12 +10,11 @@ def add_stage1_rules(makefile, scene_dir):
     scene_args = params.load(scene_dir)
 
     # Run ArcGIS script to prepare files for eCognition
-    makefile.add(
-        avalanche.prepare_data_rule(windows_host, scene_dir, dggs.data.HARNESS_WINDOWS))
+    makefile.add(r_prepare.rule(scene_dir))
 
     # Get neighbor1 graph for DEM routing network
     dem_file = scene_args['dem_file']
-    dem_filled_file,sinks_file,neighbor1_file = makefile.add(domain_builder.neighbor1_rule(
+    dem_filled_file,sinks_file,neighbor1_file = makefile.add(r_domain_builder.neighbor1_rule(
         dem_file, scene_dir, fill_sinks=True)).outputs
 
     # Loop over combos
@@ -26,12 +25,12 @@ def add_stage1_rules(makefile, scene_dir):
         for forest in scene_args['forests']:
 
             # Run eCognition
-            makefile.add(avalanche.run_ecog_rule(scene_dir, return_period, forest))
+            makefile.add(r_ecog.rule(scene_dir, return_period, forest))
 
             # Post-Process eCognition Output
             # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
             release_files = makefile.add(
-                pra_post.release_rule(scene_dir, return_period, forest, require_all=False)).outputs
+                r_pra_post.rule(scene_dir, return_period, forest, require_all=False)).outputs
 
             # TESTING: Do only L (and M)
 #            release_files = release_files[2:]    # DEBUG
@@ -47,25 +46,25 @@ def add_stage1_rules(makefile, scene_dir):
 
                 pra_burn_file = '{}_burn.pik.gz'.format(release_file[:-4])    # Same dir, .pik.gz does not pollute directory of .shp
                 makefile.add(
-                    domain_builder.burn_pra_rule(dem_file, release_file, pra_burn_file))
+                    r_domain_builder.burn_pra_rule(dem_file, release_file, pra_burn_file))
 
                 # Different directory for chull and domain
                 pra_name = os.path.split(release_file)[1][:-8]
                 chull_file = os.path.join(jb.ramms_dir, 'CHULL', '{}_chull.shp'.format(pra_name))
                 domain_file = os.path.join(jb.ramms_dir, 'DOMAIN', '{}_dom.shp'.format(pra_name))
-                makefile.add(domain_builder.domain_rule(
+                makefile.add(r_domain_builder.domain_rule(
                     dem_filled_file, pra_burn_file, chull_file, domain_file, min_alpha=18., margin=1000.))
                 domain_files.append(domain_file)
 
                 # Now we have the input files for a RAMMS run:
                 #    rammsdir_files, release_files, domain_files
-                rammsdir_files = makefile.add(ramms.rammsdir_rule(
+                rammsdir_files = makefile.add(r_ramms.rammsdir_rule(
                     scene_dir, release_file)).outputs
 
                 # RAMMS Stage 1: IDL Prep
                 ramms_files = shputil.expand_list(release_files + domain_files) + rammsdir_files
-                stage1_outputs = makefile.add(ramms.ramms_stage1_rule(
-                    windows_host, jb.ramms_dir, release_files, ramms_files, dry_run=False)).outputs
+                stage1_outputs = makefile.add(r_ramms.ramms_stage1_rule(
+                    jb.ramms_dir, release_files, ramms_files, dry_run=False)).outputs
 
 
             all_release_files.extend(release_files)

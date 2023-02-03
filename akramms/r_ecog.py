@@ -112,7 +112,7 @@ def rule(scene_dir, return_period, forest):
         # unfortunately not much.
         cmd += [f'--log-file=/mnt/eCog/GHK_{return_period:d}y{_For}.log']
 
-        # Run eCognition!
+        # Run eCognition (in Docker container)!
         print(' '.join(cmd))
         subprocess.run(cmd, check=True)
 
