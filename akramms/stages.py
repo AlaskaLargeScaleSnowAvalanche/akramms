@@ -1,13 +1,13 @@
 from uafgi.util import make,shputil
-from akramms import config
-from akramms import avalanche, pra_post, domain_builder, ramms,rammsutil
-from akramms.util import paramutil,harnutil
+from akramms import config,params
+from akramms import avalanche, pra_post, domain_builder, ramms
+from akramms.util import paramutil,harnutil,rammsutil
 import os,sys
 import setuptools.sandbox
 
-def add_stage1_rules(makefile, scene_dir, debug=False, windows_host='davos'):
+def add_stage1_rules(makefile, scene_dir):
 
-    scene_args = avalanche.params.load(scene_dir)
+    scene_args = params.load(scene_dir)
 
     # Run ArcGIS script to prepare files for eCognition
     makefile.add(
@@ -60,12 +60,12 @@ def add_stage1_rules(makefile, scene_dir, debug=False, windows_host='davos'):
                 # Now we have the input files for a RAMMS run:
                 #    rammsdir_files, release_files, domain_files
                 rammsdir_files = makefile.add(ramms.rammsdir_rule(
-                    scene_dir, release_file, dggs.data.HARNESS_WINDOWS, debug=debug)).outputs
+                    scene_dir, release_file)).outputs
 
                 # RAMMS Stage 1: IDL Prep
                 ramms_files = shputil.expand_list(release_files + domain_files) + rammsdir_files
                 stage1_outputs = makefile.add(ramms.ramms_stage1_rule(
-                    windows_host, jb.ramms_dir, release_files, ramms_files, dggs.data.HARNESS_WINDOWS, dry_run=False)).outputs
+                    windows_host, jb.ramms_dir, release_files, ramms_files, dry_run=False)).outputs
 
 
             all_release_files.extend(release_files)

@@ -1,6 +1,7 @@
 import scipy.spatial
 from osgeo import gdal
-from akramms import params,process_tree,rammsutil
+from akramms import params,process_tree
+from akramms.util import rammsutil
 from uafgi.util import shputil,gdalutil,wrfutil,make,cfutil,ioutil
 import os,sys
 import subprocess

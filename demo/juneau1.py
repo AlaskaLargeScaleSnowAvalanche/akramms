@@ -1,20 +1,13 @@
 from uafgi.util import make,shputil,ioutil
 from akramms import config
-from akramms import avalanche, pra_post, domain_builder, ramms,akramms
+from akramms import avalanche, pra_post, domain_builder, ramms, stages
 from akramms.util import paramutil,harnutil
 import os,sys
-import setuptools.sandbox
 from akramms import config
-
-
 
 def main():
 
-    scene_dir = config.roots.abspath('{PRJ}/juneau1')
-    print(scene_dir)
-    print(config.roots.relpath(scene_dir))
-    return
-
+    scene_dir = config.roots.join('prj', 'juneau1')
 
     # Set up a new workspace directory, and set ALL parameters for our computation
     # (across ArcGIS, eCognition, RAMMS, etc)
@@ -33,24 +26,24 @@ def main():
     scene_args = avalanche.params.load(scene_dir)
     print(scene_args)
 
-#    ramms_dirs_release_files = akramms.run_stage1(scene_dir)
-#    outputs = akramms.run_stage1(scene_dir)
-    print('xxx1 ', outputs)
+    ramms_dirs_release_files = stages.run_stage1(scene_dir)
+#    outputs = stages.run_stage1(scene_dir)
+#    print('xxx1 ', outputs)
 
 
-##    release_files = akramms.run_stage1(scene_dir)
+##    release_files = stages.run_stage1(scene_dir)
 #
 #    release_files = ramms.get_release_files(os.path.join(scene_dir, 'RAMMS/juneau130yFor/RESULTS/juneau1_For/5m_30L'))
 #    print(release_files)
 #
-##    akramms.run_stage2(release_files)    # Enlarge domains, get it done
+##    stages.run_stage2(release_files)    # Enlarge domains, get it done
 #
 #    ramms_dir = os.path.join(scene_dir, 'RAMMS/juneau130yFor')#/RESULTS/juneau1_For/5m_30L')
 ##    ramms.run_ramms('davos', ramms_dir, 3, 3, dggs.data.HARNESS_WINDOWS)
 
 
 #    with ioutil.TmpDir() as tdir:
-#        ramms_dirs_release_files = akramms.add_stage1_rules(make.Makefile(), scene_dir)
+#        ramms_dirs_release_files = stages.add_stage1_rules(make.Makefile(), scene_dir)
 #        for ramms_dir,release_files in ramms_dirs_release_files:
 #            print('xxx ', ramms_dir, release_files)
 ##        ramms.stage3('davos', ramms_dir, dggs.data.HARNESS_WINDOWS, tdir)
