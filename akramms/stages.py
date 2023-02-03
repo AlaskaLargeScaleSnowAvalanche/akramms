@@ -10,7 +10,7 @@ def add_stage1_rules(makefile, scene_dir):
     scene_args = params.load(scene_dir)
 
     # Run ArcGIS script to prepare files for eCognition
-    makefile.add(r_prepare.rule(scene_dir))
+    prepare_outputs = makefile.add(r_prepare.rule(scene_dir)).outputs
 
     # Get neighbor1 graph for DEM routing network
     dem_file = scene_args['dem_file']
@@ -25,7 +25,7 @@ def add_stage1_rules(makefile, scene_dir):
         for forest in scene_args['forests']:
 
             # Run eCognition
-            makefile.add(r_ecog.rule(scene_dir, return_period, forest))
+            makefile.add(r_ecog.rule(scene_dir, prepare_outputs, return_period, forest))
 
             # Post-Process eCognition Output
             # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]

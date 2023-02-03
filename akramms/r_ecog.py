@@ -46,10 +46,13 @@ Usage:
     --pause                - pause application after done
 """
 
-def rule(scene_dir, return_period, forest):
+def rule(scene_dir, inputs, return_period, forest):
+    """inputs:
+        Outputs of r_prepare.rule()
+    """
 
     scene_args = params.load(scene_dir)
-    inputs = _prepare_data_outputs(scene_dir, scene_args)
+#    inputs = _prepare_data_outputs(scene_dir, scene_args)
 
     # Systematically generate list of output files
     rp = return_period

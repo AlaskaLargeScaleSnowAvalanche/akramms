@@ -5,7 +5,7 @@
 #include <vector>
 #include <array>
 
-namespace dggs {
+namespace akramms {
 
 /** Find the smallest bounding rectangle for a set of points.
 Returns a set of points representing the corners of the bounding box.

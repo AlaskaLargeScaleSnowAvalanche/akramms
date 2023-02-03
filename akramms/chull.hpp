@@ -12,7 +12,7 @@
 #include <cstdio>
 #include <algorithm>
 
-namespace dggs {
+namespace akramms {
 
 namespace chull {
 
@@ -70,7 +70,7 @@ struct compare_vs {
         return ret;
     }
 };
-}    // namespace dggs::chull
+}    // namespace akramms::chull
 
 /** Returns convex hull of a set of n points.
 
@@ -154,5 +154,5 @@ std::vector<std::array<T,2>> convex_hull(
     }
     return stack;
 }
-}    // namespace dggs
+}    // namespace akramms
 

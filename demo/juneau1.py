@@ -1,6 +1,6 @@
 from uafgi.util import make,shputil,ioutil
-from akramms import config
-from akramms import avalanche, pra_post, domain_builder, ramms, stages
+from akramms import config,params
+from akramms import r_prepare,stages
 from akramms.util import paramutil,harnutil
 import os,sys
 from akramms import config
@@ -11,7 +11,7 @@ def main():
 
     # Set up a new workspace directory, and set ALL parameters for our computation
     # (across ArcGIS, eCognition, RAMMS, etc)
-    scene_dir = avalanche.prepare_scene(
+    scene_dir = r_prepare.prepare_scene(
         config.roots.join('prj', 'juneau1'), defaults='alaska',
 #        return_periods=[10,30,100,300],
 #        forests=[1,0],    # True,False],
@@ -23,7 +23,7 @@ def main():
         snowdepth_file=config.roots.join('data', 'lader', 'sx3', 'gfdl_sx3_1986.nc'))
 
 
-    scene_args = avalanche.params.load(scene_dir)
+    scene_args = params.load(scene_dir)
     print(scene_args)
 
     ramms_dirs_release_files = stages.run_stage1(scene_dir)

@@ -23,11 +23,11 @@
 #include <csignal>
 #include <cstdlib>
 //#include <cunistd>
-#include <dggs/chull.hpp>
-#include <dggs/mbr.hpp>
+#include <akramms/chull.hpp>
+#include <akramms/mbr.hpp>
 
 
-using namespace dggs;
+using namespace akramms;
 
 // #define OPTIMIZE_D8        // Adds complication, only speeds things up a little bit.
 
@@ -1287,7 +1287,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
         // Add it in (notice we are standardizing on i-j coordinate order here on out)
         ij_points.push_back(std::array{i,j});
     }
-    std::vector<std::array<int,2>> chull_ij(dggs::convex_hull(ij_points));
+    std::vector<std::array<int,2>> chull_ij(akramms::convex_hull(ij_points));
     ij_points.clear();    // Free memory
 
     // Convert convex hull to geographic coordinates by applying the geotransform
@@ -1309,7 +1309,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     // Compute minimum bounding rectangle (MBR) on the convex hull
     PyObject *ret_mbr = nullptr;
     if (chull_xy.size() >= 3) {
-        std::vector<std::array<double,2>> mbr(dggs::mbr_chull(chull_xy, margin));
+        std::vector<std::array<double,2>> mbr(akramms::mbr_chull(chull_xy, margin));
         ret_mbr = polygon_to_python(mbr);
     } else {
         ret_mbr = PyList_New(0);

@@ -300,6 +300,16 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
             sys.stderr.flush()
 
 # -----------------------------------------------------------------------
+def write_outputs(outputs):
+    """Helper function"""
+    sys.stdout.flush()
+    print()
+    print('BEGIN OUTPUTS')
+    for output in outputs:
+        print(f'OUTPUT: {}'.format(config.roots.relpath(output)))
+    print('END OUTPUTS')
+    sys.stdout.flush()
+# -----------------------------------------------------------------------
 def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
 
     # Obtain list of input files (includes the release files)
@@ -309,7 +319,8 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
     print('release_files ', release_files)
 
     # Collect output files, to be be transferred back to Linux
-    outputs = list()
+    logfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock.log')
+    outputs = [logfile]
 
     # Run RAMMS locally, managing the IDL process
     _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 1)
@@ -337,7 +348,7 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
                 outputs.append(ofname)
 
     # Tell calling process on Linux what the output files are
-    harnutil.print_outputs(outputs)
+    write_outputs(outputs)
 
 # -----------------------------------------------------------------------
 def run_on_windows_stage3(idlrt_exe, ramms_version, ramms_dir):
@@ -409,5 +420,5 @@ def run_on_windows_stage3(idlrt_exe, ramms_version, ramms_dir):
     outputs.sort()
 
     # Tell calling process on Linux what the output files are
-    harnutil.print_outputs(outputs)
+    write_outputs(outputs)
 # -----------------------------------------------------------------------

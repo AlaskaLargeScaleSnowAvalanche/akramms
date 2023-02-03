@@ -256,7 +256,8 @@ def rule(scene_dir):
             inputs.append(scene_args[param.name])
 
         # Transfer over input files
-        cmd = ['sh', config.roots_w.bashpath('{HARNESS}/akramms/sh/prepare_scene.sh'), scene_dir_rel]
-        harnutil.run_remote(inputs, cmd)
+        cmd = ['sh', config.roots_w.syspath('{HARNESS}/akramms/sh/prepare_scene.sh', bash=True),
+            config.roots_w.syspath(scene_dir_rel, bash=True)]
+        harnutil.run_remote(inputs, cmd, tdir)
 
     return make.Rule(action, inputs, outputs)

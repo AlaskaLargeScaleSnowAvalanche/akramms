@@ -1,7 +1,7 @@
 #include <algorithm>
-#include <dggs/mbr.hpp>
+#include <akramms/mbr.hpp>
 
-namespace dggs {
+namespace akramms {
 
 /** Find the smallest bounding rectangle for a set of points.
 Returns a set of points representing the corners of the bounding box.
@@ -115,7 +115,7 @@ std::vector<std::array<double,2>> mbr_chull(
     return rval;
 }
 
-}    // namespace dggs
+}    // namespace akramms
 
 /*
 // Original Python code from:

@@ -13,7 +13,7 @@ def default_roots(sep, harness):
     ))
 
 roots_l = default_roots(os.sep, os.path.abspath(os.path.realpath(os.path.join(os.path.dirname(__file__), '..', '..'))))
-roots_w = default_roots('\\', r'\\nona.dnr.state.ak.us\enggeo_projects\avalanche_sim\av')
+roots_w = default_roots('\\', r'C:\Users\efischer\av') # r'\\nona.dnr.state.ak.us\enggeo_projects\avalanche_sim\av'
 
 # Differences from defaults
 roots_l['PRJ'] = '/mnt/avalanche_sim/prj'
@@ -27,3 +27,5 @@ windows_host = 'davos'
 
 # True if the Linux and Windows harnesses access the same location on a network drive.
 shared_filesystem = True
+
+DEBUG = False

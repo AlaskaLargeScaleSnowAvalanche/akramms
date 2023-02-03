@@ -1,5 +1,6 @@
-import os,subprocess
+import os,subprocess,re
 import functools
+from akramms import config
 
 def _harness_dir():
     path = os.path.abspath(__file__)
@@ -88,7 +89,7 @@ def rsync_files(fnames, tdir, flags=['--copy-links', '-avz'], direction='up'):
     return fnames_rel
 
 
-def run_remote(inputs, cmd, write_inputs=False):
+def run_remote(inputs, cmd, tdir, write_inputs=False):
     """Runs a command on the remote Windows machine.
     inputs:
         Input files to copy to Windows before running.
@@ -116,8 +117,7 @@ def run_remote(inputs, cmd, write_inputs=False):
 
     # Write to processes stdin (relative path of input files)
     if write_inputs:
-        inputs_w = [config.roots.relpath(input) for input in inputs]
-        inputs_txt = ''.join(f'INPUT: {input_w}\r\n' for input_w in inputs_w) + 'END INPUTS\r\n'
+        inputs_txt = ''.join('INPUT: {}\r\n'.format(config.roots.relpath(input)) for input in inputs) + 'END INPUTS\r\n'
         for input in inputs:
             proc.stdin.write(inputs_txt.encode('UTF-8'))
         proc.stdin.flush()
@@ -148,12 +148,3 @@ def run_remote(inputs, cmd, write_inputs=False):
     outputs = [config.roots.abspath(x) for x in outputs_rel]
     return outputs
 
-def print_outputs(outputs):
-    sys.stdout.flush()
-    print()
-    print('BEGIN OUTPUTS')
-    for output in outputs:
-        print(f'OUTPUT: {output}')
-    print('END OUTPUTS')
-    sys.stdout.flush()
-# -----------------------------------------------------------------------

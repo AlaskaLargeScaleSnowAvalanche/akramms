@@ -6,7 +6,7 @@ import itertools, functools,shutil
 import numpy as np
 import shapely
 import htcondor
-from akramms import avalanche,config
+from akramms import config,params
 from akramms.util import harnutil,rammsutil
 from uafgi.util import make,ioutil
 import pandas as pd
@@ -33,16 +33,14 @@ ALT_LIM_LOW  {alt_lim_low}
 END
 """
 
-def rammsdir_rule(scene_dir, release_file, HARNESS_REMOTE,
-    debug=False, alt_lim_top=1500, alt_lim_low=1000, ncpu=8, ncpu_preprocess=4, cohesion=50):
+def rammsdir_rule(scene_dir, release_file,
+    alt_lim_top=1500, alt_lim_low=1000, ncpu=8, ncpu_preprocess=4, cohesion=50):
 
     """Generates the scenario file, which becomes key to running RAMMS.
-    HARNESS_REMOTE:
-        Location of ~/git on remote Windows machine (parent of akramms/ repo)
     """
     jb = rammsutil.parse_release_file(release_file)
 
-    scene_args = avalanche.params.load(scene_dir)
+    scene_args = params.load(scene_dir)
     resolution = scene_args['resolution']
     name = scene_args['name']
     For = 'For' if jb.forest else 'NoFor'
@@ -80,7 +78,7 @@ def rammsdir_rule(scene_dir, release_file, HARNESS_REMOTE,
         # Create the scenario file
         kwargs = dict()
         kwargs['scenario_name'] = jb.scenario_name
-        kwargs['remote_ramms_dir'] = harnutil.remote_windows_name(jb.ramms_dir, HARNESS_REMOTE)
+        kwargs['remote_ramms_dir'] = config.roots.conver_to(jb.ramms_dir, config.roots_w)
         kwargs['ncpu'] = str(ncpu)
         kwargs['ncpu_preprocess'] = str(ncpu_preprocess)
         kwargs['cohesion'] = str(cohesion)
@@ -105,10 +103,8 @@ def rammsdir_rule(scene_dir, release_file, HARNESS_REMOTE,
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
 # sh ~/av/akramms/sh/run_ramms.sh 'c:\Users\efischer\av\prj\juneau1\RAMMS\juneau130yFor'
-def run_ramms(hostname, ramms_dir, stage, inputs, HARNESS_REMOTE, tdir, dry_run=False):
+def run_ramms(ramms_dir, stage, inputs, tdir, dry_run=False):
     """
-    hostname:
-        Remote windows host to run on
     ramms_dir:
         Local directory containing RAMMS setup
     stage: 1 or 3
@@ -132,7 +128,7 @@ def run_ramms(hostname, ramms_dir, stage, inputs, HARNESS_REMOTE, tdir, dry_run=
     subprocess.run(cmd, check=True)
 
     # Sync RAMMS input files to remote dir
-    harnutil.rsync_files(inputs, hostname, HARNESS_REMOTE, tdir, direction='up')
+    harnutil.rsync_files(inputs, hostname, tdir, direction='up')
 
     # Run RAMMS
     remote_run_ramms_sh = harnutil.remote_windows_name(
@@ -183,7 +179,7 @@ def run_ramms(hostname, ramms_dir, stage, inputs, HARNESS_REMOTE, tdir, dry_run=
         outputs = [os.path.join(harnutil.HARNESS, x) for x in outputs_rel]
         return outputs
 # ----------------------------------------------------------------------
-def ramms_stage1_rule(hostname, ramms_dir, release_files, inputs, HARNESS_REMOTE, dry_run=False, submit=True):
+def ramms_stage1_rule(ramms_dir, release_files, inputs, dry_run=False, submit=True):
     """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)
 
     inputs:
@@ -201,18 +197,13 @@ def ramms_stage1_rule(hostname, ramms_dir, release_files, inputs, HARNESS_REMOTE
 
     def action(tdir):
 
-        # Sync RAMMS files to remote dir
-        harnutil.rsync_files(inputs, hostname, HARNESS_REMOTE, tdir)
+        cmd = ['sh', 
+            config.roots_w.join('HARNESS', 'akramms', 'sh', 'run_ramms.sh', bash=True),
+            harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True),
+            str(stage)]    # Stage 1 to 1
 
-        # Run RAMMS
-        outputs = run_ramms(hostname, ramms_dir, 1, inputs, HARNESS_REMOTE, tdir, dry_run=dry_run)
-
-        # Get logfile back
-        cmd = ['rsync',
-            '{}:{}'.format(hostname, harnutil.remote_windows_name(logfile, HARNESS_REMOTE, bash=True)),
-            logfile]
-        print(' '.join(cmd))
-        subprocess.run(cmd, check=True)
+        # RAMMS Stage 1 accepts inputs on stdin
+        outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=True)
 
         # Write output files
         for output in done_outputs:
@@ -791,7 +782,7 @@ def infos(release_files, ids=None):
 # =============================================================================
 # ===== RAMMS Stage 3
 
-def ramms_stage3_rule(hostname, ramms_dir, release_files, HARNESS_REMOTE, dry_run=False, submit=True):
+def ramms_stage3_rule(ramms_dir, release_files, dry_run=False, submit=True):
     """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)
     For now, do no inputs to stage3.  It's hard to predict exactly
     what the input files should be.
@@ -853,7 +844,7 @@ def ramms_stage3_rule(hostname, ramms_dir, release_files, HARNESS_REMOTE, dry_ru
 
         
         # Run RAMMS and sync files back
-        dynamic_outputs = run_ramms(hostname, ramms_dir, 3, inputs, HARNESS_REMOTE)    # Bash-style names on remote Windows
+        dynamic_outputs = run_ramms(ramms_dir, 3, inputs)
         return dynamic_outputs
 
     return make.Rule(action, inputs, outputs)
