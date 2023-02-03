@@ -1,6 +1,6 @@
 from uafgi.util import make,shputil
 from akramms import config,params
-from akramms import avalanche, pra_post, domain_builder, ramms
+from akramms import r_prepare, r_ecog, r_pra_post, r_domain_builder, r_ramms
 from akramms.util import paramutil,harnutil,rammsutil
 import os,sys
 import setuptools.sandbox
