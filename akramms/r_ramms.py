@@ -124,7 +124,7 @@ def run_ramms(ramms_dir, stage, inputs, tdir, dry_run=False):
 
 # Not needed, harnutil does this
 #    # Create remote dir
-#    cmd = ['ssh', hostname, 'mkdir', '-p', harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True)]
+#    cmd = config.ssh_w + ['mkdir', '-p', harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True)]
     subprocess.run(cmd, check=True)
 
     # Sync RAMMS input files to remote dir
@@ -136,7 +136,7 @@ def run_ramms(ramms_dir, stage, inputs, tdir, dry_run=False):
             # --ramms-version 221101
             HARNESS_REMOTE, bash=True)
 
-    cmd = ['ssh', hostname, 'sh', remote_run_ramms_sh,
+    cmd = config.ssh_w + ['sh', remote_run_ramms_sh,
         harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True),
         str(stage)]    # Stage 1 to 1
     print(' '.join(cmd))

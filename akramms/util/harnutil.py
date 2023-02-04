@@ -70,7 +70,7 @@ def rsync_files(fnames, tdir, flags=['--copy-links', '-avz'], direction='up'):
     # Run rsync
     if direction == 'up':
         # Create output directory
-        cmd = ['ssh', remote_host, 'mkdir', '-p', remote_harness_b]
+        cmd = config.ssh_w + ['mkdir', '-p', remote_harness_b]
         subprocess.run(cmd)
 
         cmd = ['rsync'] + flags + ['--files-from={}'.format(list_file),
@@ -108,7 +108,7 @@ def run_remote(inputs, cmd, tdir, write_inputs=False):
     # Run RAMMS
 
     # Start the remote process
-    cmd = ['ssh', config.windows_host] + cmd
+    cmd = config.ssh_w
     kw = dict()
     if write_inputs:
         kw['stdin'] = stdin=subprocess.PIPE
