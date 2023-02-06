@@ -145,7 +145,7 @@ def run_remote(inputs, cmd, tdir, write_inputs=False):
         harnutil.rsync_files(outputs_b, tdir, direction='down')
 
     # Outputs as local filenames
-    outputs = [config.roots.abspath(x) for x in outputs_rel]
+    outputs = [config.roots.syspath(x) for x in outputs_rel]
     return outputs
 
 
@@ -155,6 +155,6 @@ def print_outputs(outputs):
     print()
     print('BEGIN OUTPUTS')
     for output in outputs:
-        print(f'OUTPUT: {}'.format(config.roots.relpath(output)))
+        print('OUTPUT: {}'.format(config.roots.relpath(output)))
     print('END OUTPUTS')
     sys.stdout.flush()

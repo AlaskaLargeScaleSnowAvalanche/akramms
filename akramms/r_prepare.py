@@ -113,10 +113,30 @@ def import_xml_str(scene_args, freq, forest):
     return import_xml_tpl.format(**args)
 # ---------------------------------------------------------------------------
 def _prepare_data_outputs(scene_dir, scene_args):
+
+
+    # Basic stuff
     outputs = [
-        os.path.join(scene_dir, 'eCog'),
         os.path.join(scene_dir, 'stats_kernel.txt'),
-        os.path.join(scene_dir, '{}_DataPrep_InputParameters.csv'.format(scene_args['name']))]
+        os.path.join(scene_dir, '{}_DataPrep_InputParameters.csv'.format(scene_args['name'])),
+    ]
+
+    # xml import files
+    for freq in ('frequent', 'extreme'):
+        for forest in ((True,False) if scene_args['forest_file'] else (False,)):
+            _Forest = '_Forest' if forest else '_NoForest'
+            import_xml = os.path.join(scene_dir, 'eCog', f'PRA_import_{freq}{_Forest}.xml')
+            outputs.append(import_xml)
+
+    # GHK Files
+    for return_period in scene_args['return_periods']:
+        for forest in (False, True):
+            _For = '_For' if forest else '_NoFor'
+            ofname = os.path.join(scene_dir, 'eCog',
+                f'GHK_{return_period:d}y{_For}.dcp')
+            outputs.append(ofname)
+
+
     return outputs
 
 def prepare_data(scene_dir):
