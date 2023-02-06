@@ -108,7 +108,7 @@ def run_remote(inputs, cmd, tdir, write_inputs=False):
     # Run RAMMS
 
     # Start the remote process
-    cmd = config.ssh_w
+    cmd = config.ssh_w + cmd
     kw = dict()
     if write_inputs:
         kw['stdin'] = stdin=subprocess.PIPE
