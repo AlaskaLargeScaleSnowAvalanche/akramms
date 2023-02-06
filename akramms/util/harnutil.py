@@ -148,3 +148,13 @@ def run_remote(inputs, cmd, tdir, write_inputs=False):
     outputs = [config.roots.abspath(x) for x in outputs_rel]
     return outputs
 
+
+def print_outputs(outputs):
+    """Helper function"""
+    sys.stdout.flush()
+    print()
+    print('BEGIN OUTPUTS')
+    for output in outputs:
+        print(f'OUTPUT: {}'.format(config.roots.relpath(output)))
+    print('END OUTPUTS')
+    sys.stdout.flush()

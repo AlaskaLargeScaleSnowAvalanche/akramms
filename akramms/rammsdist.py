@@ -300,15 +300,6 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
             sys.stderr.flush()
 
 # -----------------------------------------------------------------------
-def write_outputs(outputs):
-    """Helper function"""
-    sys.stdout.flush()
-    print()
-    print('BEGIN OUTPUTS')
-    for output in outputs:
-        print(f'OUTPUT: {}'.format(config.roots.relpath(output)))
-    print('END OUTPUTS')
-    sys.stdout.flush()
 # -----------------------------------------------------------------------
 def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
 
@@ -348,7 +339,7 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
                 outputs.append(ofname)
 
     # Tell calling process on Linux what the output files are
-    write_outputs(outputs)
+    harnutil.print_outputs(outputs)
 
 # -----------------------------------------------------------------------
 def run_on_windows_stage3(idlrt_exe, ramms_version, ramms_dir):
@@ -420,5 +411,5 @@ def run_on_windows_stage3(idlrt_exe, ramms_version, ramms_dir):
     outputs.sort()
 
     # Tell calling process on Linux what the output files are
-    write_outputs(outputs)
+    harnutil.print_outputs(outputs)
 # -----------------------------------------------------------------------
