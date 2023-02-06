@@ -7,7 +7,7 @@ import os
 
 # Scene directory given as path relative to roots
 scene_dir_rel = sys.argv[1]
-scene_dir = config.roots.abspath(scene_dir_rel)
+scene_dir = config.roots.syspath(scene_dir_rel)
 
 r_prepare.prepare_data(scene_dir)
 
