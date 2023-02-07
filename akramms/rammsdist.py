@@ -1,57 +1,17 @@
-from akramms import rammsutil
+from akramms import config
+from akramms.util import rammsutil
 import gzip,time,traceback
 import os,subprocess,re,sys,itertools,collections,shutil,zipfile
 from uafgi.util import ioutil
 from akramms.util import harnutil
 
-_renames = {
-    'ramms_aval_LHM.exe' : 'ramms_aval_LHM_orig.exe'
-}
-
-RAMMS_220922 = ('220922', 'RAMMS_LSHM_NEW2022.zip')
-_base_upgrade_for_version = {
-    '220922' : (RAMMS_220922, None),
-    '220928' : (RAMMS_220922, '220928'),
-    '221101' : (RAMMS_220922, '221101'),
-    '230126' : (RAMMS_220922, '230126'),
-}
-def install_ramms_on_windows(version):
-    """Installs RAMMS into the appropriate distro file inside the harness."""
-
-    # See if this version of RAMMS is already installed.
-    ramms_installed = os.path.join(harnutil.HARNESS, 'opt', 'RAMMS', version)
-    INSTALLED_txt = os.path.join(ramms_installed, 'INSTALLED.txt')
-    if os.path.exists(INSTALLED_txt):
-        return ramms_installed
-
-    # Create destination directory
-    shutil.rmtree(ramms_installed, ignore_errors=True)
-    os.makedirs(ramms_installed, exist_ok=True)
-
-    # Figure out where raw distro files are for our version.
-    base_args, upgrade_leaf = _base_upgrade_for_version[version]
-    upgrade_dir = os.path.join(harnutil.HARNESS, 'data', 'christen', 'RAMMS', version)
-    print('upgrade_dir ',upgrade_dir)
-
-    # Copy the upgrade file(s)
-    upgrade_paths = set()
-    for path,dirs,files in os.walk(upgrade_dir):
-        for f in files:
-            src_dir = path
-            src_file = os.path.join(src_dir, f)
-            dir_rel = os.path.relpath(src_dir, upgrade_dir)    # Tuple
-            dest_dir = os.path.join(ramms_installed, dir_rel)
-            upgrade_paths.add(tuple(dir_rel.split(os.sep) + [f]))
-
-            os.makedirs(dest_dir, exist_ok=True)
-            print(src_file, dest_dir)
-            shutil.copy(src_file, dest_dir)
-
-    #print('** upgrade_paths ',upgrade_paths)
+def unpack_zipfile(ifname, odir, toplevel=True):
+    """toplevel:
+        Is everything in a top level directory that needs to be removed?
+    """
 
     # Unpack the Zipfile
-    base_zip = os.path.join(harnutil.HARNESS, 'data', 'christen', 'RAMMS', *base_args)
-    with zipfile.ZipFile(base_zip, 'r') as zipf:
+    with zipfile.ZipFile(ifname, 'r') as zipf:
         # Deal with zipfiles with a single top-level folder
         truncate = 0
         root = zipfile.Path(zipf)
@@ -67,49 +27,56 @@ def install_ramms_on_windows(version):
             if info.is_dir():
                 continue
 
-            # Don't copy things we've already upgraded
-            if tuple(name_path) in upgrade_paths:
-                continue
-
-            # Change output filename when unzipping
-            try:
-                new_leaf = _renames[name_path[-1]]
-                new_path = name_path[:-1] + [new_leaf]
-                ofname = os.path.join(ramms_installed, *new_path)
-            except KeyError:
-                # Not renaming this
-                ofname = os.path.join(ramms_installed, *name_path)
+            ofname = os.path.join(odir, *name_path)
             ofname_dir = os.path.split(ofname)[0]
-            print('makedirs ', ofname_dir)
+#            print('makedirs ', ofname_dir)
             os.makedirs(ofname_dir, exist_ok=True)
-            print(info.filename, ofname)
+            print(ofname)
             with open(ofname, 'wb') as out:
                 out.write(zipf.open(info.filename).read())
-            #zipf.extract(name, ofname)
 
-    # Build the stub wrapper
-    bin = os.path.join(ramms_installed, 'bin')
-    with ioutil.pushd(bin):
-#        if not os.path.exists('ramms_aval_LHM_orig.exe'):
-#            # Need to move
-#            print('Moving to ramms_aval_LHM_orig.exe')
-#            os.rename('ramms_aval_LHM.exe', 'ramms_aval_LHM_orig.exe')
 
-        if not os.path.exists('ramms_aval_LHM.exe'):
-            # Need to build
-            src = os.path.join(harnutil.HARNESS, 'akramms', 'ramms_aval_LHM_stub.cpp')
-            cmd = ['g++', src, '-o', 'ramms_aval_LHM.exe']
-            print(' '.join(cmd))
-            subprocess.run(cmd, check=True)
+
+_renames = {
+    'ramms_aval_LHM.exe' : 'ramms_aval_LHM_orig.exe'
+}
+
+RAMMS_220922 = ('220922', 'RAMMS_LSHM_NEW2022.zip')
+_base_upgrade_for_version = {
+    '220922' : (RAMMS_220922, None),
+    '220928' : (RAMMS_220922, '220928'),
+    '221101' : (RAMMS_220922, '221101'),
+    '230126' : (RAMMS_220922, '230126'),
+}
+def install_ramms_on_windows(version):
+    """Installs RAMMS into the appropriate distro file inside the harness.
+    Returns:
+        Directory of installed RAMMS"""
+
+    # See if this version of RAMMS is already installed.
+    odir = os.path.join(harnutil.HARNESS, 'opt', 'RAMMS', version)
+    INSTALLED_txt = os.path.join(odir, 'INSTALLED.txt')
+    if os.path.exists(INSTALLED_txt):
+        return odir
+
+    # Unzip base
+    shutil.rmtree(odir, ignore_errors=True)
+    base_zip = config.roots.syspath('{DATA}/christen/RAMMS/220922/RAMMS_LSHM_NEW2022.zip')
+    unpack_zipfile(base_zip, odir)
+
+    # Unpack changes
+    if version != '220922':
+        delta_dir = config.roots.syspath('{DATA}/christen/RAMMS/'+version)
+        shutil.copytree(delta_dir, odir, dirs_exist_ok=True)
 
     # Mark we are complete
     with open(INSTALLED_txt, 'w') as out:
         out.write('Completed RAMMS installation\n')
 
-    return ramms_installed
+    return odir
 
 #def main():
-#    install_ramms_on_windows('221101')
+#    install_ramms_on_windows('230126')
 #main()
 # ==============================================================
 # -----------------------------------------------------
@@ -310,27 +277,31 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
     print('release_files ', release_files)
 
     # Collect output files, to be be transferred back to Linux
-    logfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock.log')
-    outputs = [logfile]
+    outputs = list()
 
     # Run RAMMS locally, managing the IDL process
-    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 1)
-
-    # Rename the log file to reflect stage1
-    ilogfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock_stage1.log')
-    ologfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock_stage1.log')
-    os.rename(ilogfile, ologfile)
-    outputs.append(ologfile)
+#    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 1)
+#
+#    # Rename the log file to reflect stage1
+#    ilogfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock.log')
+#    ologfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock_stage1.log')
+#    os.rename(ilogfile, ologfile)
+#    outputs.append(ologfile)
 
     # Find all .var.gz, .xy-coord.gz and .xyz.gz files in the avalanche
     # directories, and declare as output files
-    outRE = re.compile(r'[^.]*\.var$|[^.]*\.xy-coord$|[^.]*\.xyz$')
+
+    outRE = re.compile('|'.join(
+        r'[^.]*{}$'.format(ext.replace('.', r'\.')) \
+            for ext in
+            ('.av2', '.dom', '.rel', '.var.gz', '.xy-coord.gz', '.xyz.gz')))
+
     for release_file in release_files:
 
         # Identify our list of avalanche directories based release files listed as inputs
         # Turn release file name into directory of avalanche simulations
         jb = rammsutil.parse_release_file(release_file)
-        aval_dir = os.path.join(ramms_dir, jb.prefix, jb.suffix)
+        aval_dir = os.path.join(ramms_dir, 'RESULTS', f'{jb.prefix}_{jb.resolution}m', f'{jb.return_period}{jb.pra_size}')
 
         # Look at files inside avalanche directory
         for f in os.listdir(aval_dir):
