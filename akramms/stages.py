@@ -33,8 +33,8 @@ def add_stage1_rules(makefile, scene_dir):
                 r_pra_post.rule(scene_dir, return_period, forest, require_all=False)).outputs
 
             # TESTING: Do only L (and M)
-#            release_files = release_files[2:]    # DEBUG
-            release_files = release_files[2:3]    # DEBUG
+            release_files = release_files[3:]    # DEBUG; just the L PRAs
+#            release_files = release_files[2:3]    # DEBUG; just the M PRAs
             print('release_files ',release_files)
             all_release_files.extend(release_files)
 

@@ -8,9 +8,17 @@ import shapely
 import htcondor
 from akramms import config,params
 from akramms.util import harnutil,rammsutil
-from uafgi.util import make,ioutil
+from uafgi.util import make,ioutil,shputil
 import pandas as pd
 
+
+def setlink_or_copy(ifile, ofile):
+    if config.shared_filesystem:    # No symlinks for Windows
+        if os.path.islink(ofile) or not os.path.exists(ofile):
+            os.makedirs(os.path.dirname(ofile), exist_ok=True)
+            shutil.copy(ifile, ofile)
+    else:
+        ioutil.setlink(ifile, ofile)
 
 # --------------------------------------------------------------------
 scenario_tpl = \
@@ -67,22 +75,16 @@ def rammsdir_rule(scene_dir, release_file,
     def action(tdir):
         # Make symlinks for DEM file, etc.
         for ifile,ofile in links:
-            ioutil.setlink(ifile, ofile)
-#            if not os.path.exists(ofile):
-#                odir = os.path.split(ofile)[0]
-#                os.makedirs(odir, exist_ok=True)
-#                print('***symlink ifile: {}'.format(ifile))
-#                print('***symlink ofile: {}'.format(ofile))
-#                os.symlink(ifile, ofile)
+            setlink_or_copy(ifile, ofile)
 
         # Create the scenario file
         kwargs = dict()
         kwargs['scenario_name'] = jb.scenario_name
-        kwargs['remote_ramms_dir'] = config.roots.conver_to(jb.ramms_dir, config.roots_w)
+        kwargs['remote_ramms_dir'] = config.roots.convert_to(jb.ramms_dir, config.roots_w)
         kwargs['ncpu'] = str(ncpu)
         kwargs['ncpu_preprocess'] = str(ncpu_preprocess)
         kwargs['cohesion'] = str(cohesion)
-        if debug:
+        if config.debug:
             kwargs['debug'] = '1'
             kwargs['keep_data'] = '1'
             kwargs['test_nr_tpl'] = "TEST_NR    20\n"
@@ -102,83 +104,6 @@ def rammsdir_rule(scene_dir, release_file,
     print('rammsdir ',outputs)
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
-# sh ~/av/akramms/sh/run_ramms.sh 'c:\Users\efischer\av\prj\juneau1\RAMMS\juneau130yFor'
-def run_ramms(ramms_dir, stage, inputs, tdir, dry_run=False):
-    """
-    ramms_dir:
-        Local directory containing RAMMS setup
-    stage: 1 or 3
-        stage=1:
-            Prepare avlanche simulations for RAMMS Core
-        stage=3:
-            Merge avalanche outputs from RAMMS Core
-    inputs:
-        Input files in local harness; to be copied to remote host before running RAMMS.
-        This list is also provided to the remote RAMMS via stdin
-    tdir: ioutil.TmpDir
-        Location for temporary directories
-    Returns: [filename, ...]
-        Local filenames of output files, which were generated on the remote
-        Windows machine and then copied to Linux.
-    """
-
-# Not needed, harnutil does this
-#    # Create remote dir
-#    cmd = config.ssh_w + ['mkdir', '-p', harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True)]
-    subprocess.run(cmd, check=True)
-
-    # Sync RAMMS input files to remote dir
-    harnutil.rsync_files(inputs, hostname, tdir, direction='up')
-
-    # Run RAMMS
-    remote_run_ramms_sh = harnutil.remote_windows_name(
-            os.path.join(harnutil.HARNESS, 'akramms', 'sh', 'run_ramms.sh'),
-            # --ramms-version 221101
-            HARNESS_REMOTE, bash=True)
-
-    cmd = config.ssh_w + ['sh', remote_run_ramms_sh,
-        harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True),
-        str(stage)]    # Stage 1 to 1
-    print(' '.join(cmd))
-    if not dry_run:
-        # Start the remote process
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-
-        # Write to processes stdin
-        inputs_w = [
-            harnutil.remote_windows_name(input, HARNESS_REMOTE, bash=False)
-            for input in inputs]
-        inputs_txt = ''.join(f'INPUT: {input_w}\r\n' for input_w in inputs_w) + 'END INPUTS\r\n'
-        for input in inputs:
-            proc.stdin.write(inputs_txt.encode('UTF-8'))
-        proc.stdin.flush()
-
-        outputs = list()
-        outputRE = re.compile(r'OUTPUT:\s([^\s]*)\s*$')
-        while True:
-            line = proc.stdout.readline().decode('UTF-8')
-            if not line:
-                break
-            print(line, end='')
-
-            # Collect list of output files as declared by Windows-side RAMMS
-            match = outputRE.match(line)
-            if match is not None:
-                outputs.append(match.group(1))
-
-        proc.wait()
-        if proc.returncode != 0:
-            raise subprocess.CalledProcessError(proc.returncode, cmd)
-
-        # outputs contains Windows names of output files.
-        # Transfer over to local Linux, and conver to Linux filenames.
-        outputs_b = [harnutil.bash_name(x) for x in outputs]
-        # _rel = Bash-style filenames relative to the harness
-        outputs_rel = harnutil.rsync_files(outputs_b, hostname, HARNESS_REMOTE, tdir, direction='down')
-        # Outputs as local filenames
-        outputs = [os.path.join(harnutil.HARNESS, x) for x in outputs_rel]
-        return outputs
-# ----------------------------------------------------------------------
 def ramms_stage1_rule(ramms_dir, release_files, inputs, dry_run=False, submit=True):
     """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)
 
@@ -195,15 +120,18 @@ def ramms_stage1_rule(ramms_dir, release_files, inputs, dry_run=False, submit=Tr
         output = os.path.join(ramms_dir, 'RESULTS', '{}_{}_stage1.txt'.format(jb.prefix, jb.suffix))
         done_outputs.append(output)
 
+    ramms_dir_rel = config.roots.relpath(ramms_dir)
+
     def action(tdir):
 
         cmd = ['sh', 
             config.roots_w.join('HARNESS', 'akramms', 'sh', 'run_ramms.sh', bash=True),
-            harnutil.remote_windows_name(ramms_dir, HARNESS_REMOTE, bash=True),
-            str(stage)]    # Stage 1 to 1
+            '--ramms-version', config.ramms_version,
+            config.roots_w.syspath(ramms_dir_rel, bash=True), '1']    # '1'=stage 1
 
         # RAMMS Stage 1 accepts inputs on stdin
-        outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=True)
+        # rammsdist.run_on_windows_stage() calls read_inputs()
+        dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=True)
 
         # Write output files
         for output in done_outputs:
@@ -214,6 +142,8 @@ def ramms_stage1_rule(ramms_dir, release_files, inputs, dry_run=False, submit=Tr
         # get going while preparing more RAMMS directories.
         if submit:
             submit_jobs(release_files)
+
+        return dynamic_outputs
 
     return make.Rule(action,
         inputs,
@@ -844,7 +774,15 @@ def ramms_stage3_rule(ramms_dir, release_files, dry_run=False, submit=True):
 
         
         # Run RAMMS and sync files back
-        dynamic_outputs = run_ramms(ramms_dir, 3, inputs)
+        #dynamic_outputs = run_ramms(ramms_dir, 3, inputs)
+
+        cmd = ['sh', 
+            config.roots_w.join('HARNESS', 'akramms', 'sh', 'run_ramms.sh', bash=True),
+            '--ramms-version', config.ramms_version,
+            config.roots_w.syspath(ramms_dir_rel, bash=True), '3']    # '3'=stage 3
+        # rammsdist.run_on_windows_stage() does not call read_inputs()
+        dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=False)
+
         return dynamic_outputs
 
     return make.Rule(action, inputs, outputs)

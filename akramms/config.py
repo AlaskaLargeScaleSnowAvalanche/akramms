@@ -17,7 +17,8 @@ roots_w = default_roots('\\', r'C:\Users\efischer\av') # r'\\nona.dnr.state.ak.u
 
 # Differences from defaults
 roots_l['PRJ'] = '/mnt/avalanche_sim/prj'
-roots_w['PRJ'] = r'\\nona.dnr.state.ak.us\enggeo_projects\avalanche_sim\prj'
+#roots_w['PRJ'] = r'\\nona.dnr.state.ak.us\enggeo_projects\avalanche_sim\prj'
+roots_w['PRJ'] = r'M:\prj'
 
 # Roots for the system we're running on
 roots = roots_w if os.name=='nt' else roots_l
@@ -32,4 +33,6 @@ ssh_w = ['sshpass',
 # True if the Linux and Windows harnesses access the same location on a network drive.
 shared_filesystem = True
 
-DEBUG = False
+debug = False
+
+ramms_version = '230126'
