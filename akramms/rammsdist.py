@@ -280,13 +280,13 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
     outputs = list()
 
     # Run RAMMS locally, managing the IDL process
-#    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 1)
-#
-#    # Rename the log file to reflect stage1
-#    ilogfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock.log')
-#    ologfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock_stage1.log')
-#    os.rename(ilogfile, ologfile)
-#    outputs.append(ologfile)
+    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 1)
+
+    # Rename the log file to reflect stage1
+    ilogfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock.log')
+    ologfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock_stage1.log')
+    os.rename(ilogfile, ologfile)
+    outputs.append(ologfile)
 
     # Find all .var.gz, .xy-coord.gz and .xyz.gz files in the avalanche
     # directories, and declare as output files
@@ -301,7 +301,7 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
         # Identify our list of avalanche directories based release files listed as inputs
         # Turn release file name into directory of avalanche simulations
         jb = rammsutil.parse_release_file(release_file)
-        aval_dir = os.path.join(ramms_dir, 'RESULTS', f'{jb.prefix}_{jb.resolution}m', f'{jb.return_period}{jb.pra_size}')
+        aval_dir = os.path.join(ramms_dir, 'RESULTS', f'{jb.prefix}_{jb.resolution}m', f'{jb.return_period}{jb.pra_size}_{jb.segment:03d}')
 
         # Look at files inside avalanche directory
         for f in os.listdir(aval_dir):
