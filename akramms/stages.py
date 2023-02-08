@@ -5,7 +5,8 @@ from akramms.util import paramutil,harnutil,rammsutil
 import os,sys
 import setuptools.sandbox
 
-def add_stage1_rules(makefile, scene_dir):
+
+def add_stage0_rules(makefile, scene_dir):
 
     scene_args = params.load(scene_dir)
 
@@ -29,50 +30,72 @@ def add_stage1_rules(makefile, scene_dir):
 
             # Post-Process eCognition Output
             # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
-            release_files = makefile.add(
+            release_shplists = makefile.add(
                 r_pra_post.rule(scene_dir, return_period, forest, require_all=False)).outputs
 
-            # TESTING: Do only L (and M)
-            release_files = release_files[3:]    # DEBUG; just the L PRAs
-#            release_files = release_files[2:3]    # DEBUG; just the M PRAs
-            print('release_files ',release_files)
-            all_release_files.extend(release_files)
-
-            # Domain finder for post-process output
-            domain_files = list()
-            rammsdir_files = list()
-            for release_file in release_files:
-                jb = rammsutil.parse_release_file(release_file)
-
-                pra_burn_file = '{}_burn.pik.gz'.format(release_file[:-4])    # Same dir, .pik.gz does not pollute directory of .shp
-                makefile.add(
-                    r_domain_builder.burn_pra_rule(dem_file, release_file, pra_burn_file))
-
-                # Different directory for chull and domain
-                pra_name = os.path.split(release_file)[1][:-8]
-                chull_file = os.path.join(jb.ramms_dir, 'CHULL', '{}_chull.shp'.format(pra_name))
-                domain_file = os.path.join(jb.ramms_dir, 'DOMAIN', '{}_dom.shp'.format(pra_name))
-                makefile.add(r_domain_builder.domain_rule(
-                    dem_filled_file, pra_burn_file, chull_file, domain_file, min_alpha=18., margin=1000.))
-                domain_files.append(domain_file)
-
-                # Now we have the input files for a RAMMS run:
-                #    rammsdir_files, release_files, domain_files
-                rammsdir_files = makefile.add(r_ramms.rammsdir_rule(
-                    scene_dir, release_file)).outputs
-
-                # RAMMS Stage 1: IDL Prep
-                ramms_files = shputil.expand_list(release_files + domain_files) + rammsdir_files
-                stage1_outputs = makefile.add(r_ramms.ramms_stage1_rule(
-                    jb.ramms_dir, release_files, ramms_files, dry_run=False)).outputs
 
 
-            all_release_files.extend(release_files)
+def add_stage1_rules(makefile, scene_dir):
+
+    scene_args = params.load(scene_dir)
+
+    dem_file = scene_args['dem_file']
+    dem_root = os.path.split(dem_file)[1][:-4]
+    dem_filled_file = os.path.join(scene_dir, f'{dem_root}_filled.tif')
+
+    # Read release files from *_rel.shplist
+    release_files = list()    # Release files we will run RAMMS on
+    for return_period in scene_args['return_periods']:
+        for forest in scene_args['forests']:
+            for pra_size in rammsutil.PRA_SIZES.keys():    # T,S,M,L
+                # DEBUG: Only do 'L' for now
+                if pra_size not in config.allowed_pra_sizes:
+                    continue
+
+                # Figure out which release files we have for this (return_period, forest, pra_size)
+                resolution = scene_args['resolution']
+                scene_name = scene_args['name']
+
+                ramms_name = rammsutil.ramms_name(scene_name, forest, resolution, return_period, pra_size)
+                release_shplist = os.path.join(scene_dir, 'RAMMS', f'{ramms_name}_rel.shplist')
+
+                with open(release_shplist, 'r') as fin:
+                    release_files.extend(x.strip() for x in fin)
 
 
-            break    # TODO: DEBUG
 
-    return all_release_files
+
+    # Domain finder for post-process output
+#    domain_files = list()
+#    rammsdir_files = list()
+    for release_file in release_files:
+        jb = rammsutil.parse_release_file(release_file)
+        if jb.segment == 0:
+            continue    # DEBUG
+
+        pra_burn_file = '{}_burn.pik.gz'.format(release_file[:-4])    # Same dir, .pik.gz does not pollute directory of .shpX
+        makefile.add(
+            r_domain_builder.burn_pra_rule(dem_file, release_file, pra_burn_file))
+
+        # Different directory for chull and domain
+        pra_name = os.path.split(release_file)[1][:-8]
+        chull_file = os.path.join(jb.ramms_dir, 'CHULL', '{}_chull.shp'.format(pra_name))
+        domain_file = os.path.join(jb.ramms_dir, 'DOMAIN', '{}_dom.shp'.format(pra_name))
+        makefile.add(r_domain_builder.domain_rule(
+            dem_filled_file, pra_burn_file, chull_file, domain_file, min_alpha=18., margin=1000.))
+
+
+        # Now we have the input files for a RAMMS run:
+        #    rammsdir_files, release_files, domain_files
+        rammsdir_files = makefile.add(r_ramms.rammsdir_rule(
+            scene_dir, release_file)).outputs
+
+        # RAMMS Stage 1: IDL Prep
+        ramms_files = shputil.expand_list([release_file, domain_file]) + rammsdir_files
+        stage1_outputs = makefile.add(r_ramms.ramms_stage1_rule(
+            jb.ramms_dir, [release_file], ramms_files, dry_run=False)).outputs
+
+    return release_files
 
 
 
@@ -90,6 +113,13 @@ def add_stage3_rules(makefile, ramms_dirs_release_files, debug=False, windows_ho
 
     return stage3_outputs
 # -------------------------------------------------------------------
+def run_stage0(scene_dir):
+    makefile = make.Makefile()
+    ramms_dirs_release_files = add_stage0_rules(makefile, scene_dir)
+
+    makefile.generate('juneau1_mk', run=True, ncpu=1)
+    return ramms_dirs_release_files
+# =====================================================================
 def run_stage1(scene_dir):
     makefile = make.Makefile()
     ramms_dirs_release_files = add_stage1_rules(makefile, scene_dir)
@@ -122,13 +152,6 @@ def run_stage3(scene_dir):
 
     makefile = make.Makefile()
     stage3_outputs = add_stage3_rules(makefile, ramms_dirs_release_files)
-
-    # We do this to make sure the domain finder C++ code is compiled.
-    setup_py = os.path.join(harnutil.HARNESS, 'akramms', 'setup.py')
-    prefix = os.path.join(harnutil.HARNESS, 'akramms', 'inst')
-    cmd = ['install', '--prefix', prefix]
-    print('setup.py ', cmd)
-    setuptools.sandbox.run_setup(setup_py, cmd)
 
     makefile.generate('juneau1_mk', run=True, ncpu=1)
     return stage3_outputs

@@ -26,6 +26,7 @@ def main():
     scene_args = params.load(scene_dir)
     print(scene_args)
 
+#    ramms_dirs_release_files = stages.run_stage0(scene_dir)
     ramms_dirs_release_files = stages.run_stage1(scene_dir)
 #    outputs = stages.run_stage1(scene_dir)
 #    print('xxx1 ', outputs)

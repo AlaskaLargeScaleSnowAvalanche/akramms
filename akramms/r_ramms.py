@@ -100,7 +100,6 @@ def rammsdir_rule(scene_dir, release_file,
     inputs = [d[0] for d in links]
     linked_files = [d[1] for d in links]
     outputs = [scenario_file] + linked_files
-    print('rammsdir ',outputs)
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
 def ramms_stage1_rule(ramms_dir, release_files, inputs, dry_run=False, submit=True):
@@ -115,6 +114,7 @@ def ramms_stage1_rule(ramms_dir, release_files, inputs, dry_run=False, submit=Tr
     # Write extra output files to show we finished stage1 for a particular release file
     done_outputs = list()
     for release_file in release_files:
+        print('parsing ', release_file)
         jb = rammsutil.parse_release_file(release_file)
         output = os.path.join(ramms_dir, 'RESULTS', '{}_{}_stage1.txt'.format(jb.prefix, jb.suffix))
         done_outputs.append(output)
@@ -202,7 +202,7 @@ def submit_job(run_dir, job_name):#, local=False):
     submit_txt = submit_tpl.format(job_name=job_name, run_dir=run_dir, DOCKER_IMAGE=DOCKER_IMAGE)
 
     cmd = ['condor_submit', '-batch-name', job_name]
-    print(' '.join(cmd)) + <<EOF
+    print(' '.join(cmd) + '<<EOF')
     print(submit_txt)
     print('EOF')
     proc = subprocess.Popen(cmd, cwd=run_dir, stdin=subprocess.PIPE)

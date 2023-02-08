@@ -2,9 +2,16 @@ import os,re,typing,functools
 import numpy as np
 import shapely
 
-PRA_SIZE_NAMES = ('tiny', 'small', 'medium', 'large')
-PRA_SIZES = ('T', 'S', 'M', 'L')
+PRA_SIZES = {
+    'T' : 'tiny',
+    'S' : 'small',
+    'M' : 'medium',
+    'L' : 'large'}
 # ---------------------------------------------------------------
+def ramms_name(scene_name, forest, resolution, return_period, pra_size):
+    For = 'For' if forest else 'NoFor'
+    return f"{scene_name}{For}_{resolution}m_{return_period}{pra_size}"
+
 class RammsRun(typing.NamedTuple):
     ramms_dir: str    # Directory just under RAMMS/
     scene_name: str
@@ -12,11 +19,11 @@ class RammsRun(typing.NamedTuple):
     resolution: int
     return_period: int
     pra_size: str
+    segment: int
 
     @property
-    def scenario_name(self):
-        For = 'For' if self.forest else 'NoFor'
-        return f"{self.scene_name}{For}_{self.resolution}m_{self.return_period}{self.pra_size}"
+    def scenario_name(self):    # Does NOT include segment number
+        return '{}_{:03d}'.format(ramms_name(self.scene_name, self.forest, self.resolution, self.return_period, self.pra_size), self.segment)
 
     base = scenario_name
 
@@ -47,11 +54,8 @@ class RammsRun(typing.NamedTuple):
         """
         return '{}_{}{}'.format(self.base, id, ext)
 
-def ramms_name(*args, **kwargs):
-    return RammsRun(None, *args, **kwargs).scenario_name
-
 # -------------------------------------------------------
-release_fileRE = re.compile(r'^(.+)(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(.*)\.(.*)')
+release_fileRE = re.compile(r'^(.+)(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(\d+)_(.*)\.(.*)')
 
 @functools.lru_cache()
 def parse_release_file(release_file):
@@ -59,6 +63,7 @@ def parse_release_file(release_file):
 
     RELEASE_dir,leaf = os.path.split(release_file)
     ramms_dir = os.path.split(RELEASE_dir)[0]
+    print('leaf ', leaf)
     match = release_fileRE.match(leaf)
 
     scene_name = match.group(1)
@@ -67,12 +72,13 @@ def parse_release_file(release_file):
     resolution = int(match.group(3))
     return_period = int(match.group(4))
     pra_size = match.group(5)
-    file_type = match.group(6)    # eg: _rel
-    ext = match.group(7)          # eg: shp
+    segment = int(match.group(6))
+    file_type = match.group(7)    # eg: _rel
+    ext = match.group(8)          # eg: shp
 
     return RammsRun(
         ramms_dir,
-        scene_name, forest, resolution, return_period, pra_size)
+        scene_name, forest, resolution, return_period, pra_size, segment)
 
 # --------------------------------------------------------
 def _ramms_to_release(ramms_dirs):
