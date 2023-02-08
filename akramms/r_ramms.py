@@ -4,7 +4,6 @@ import datetime,time,zipfile
 import contextlib
 import itertools, functools,shutil
 import numpy as np
-import shapely
 import htcondor
 from akramms import config,params
 from akramms.util import harnutil,rammsutil
@@ -203,6 +202,9 @@ def submit_job(run_dir, job_name):#, local=False):
     submit_txt = submit_tpl.format(job_name=job_name, run_dir=run_dir, DOCKER_IMAGE=DOCKER_IMAGE)
 
     cmd = ['condor_submit', '-batch-name', job_name]
+    print(' '.join(cmd)) + <<EOF
+    print(submit_txt)
+    print('EOF')
     proc = subprocess.Popen(cmd, cwd=run_dir, stdin=subprocess.PIPE)
     proc.communicate(input=submit_txt.encode('utf-8'))
     proc.wait()
@@ -404,49 +406,6 @@ def print_job_statuses(df):
         print('=========== {} {}:'.format(job_status_labels[job_status], run_dir))
         print(sorted(group['id'].tolist()))
 
-def _ramms_to_release(ramms_dirs):
-    """Given a bunch of RAMMS directories, returns the release files in them."""
-    release_files = list()
-    for ramms_dir in ramms_dirs:
-        RELEASE_dir = os.path.join(ramms_dir, 'RELEASE')
-        for file in os.listdir(RELEASE_dir):
-            if file.endswith('_rel.shp'):
-                release_files.append(os.path.join(RELEASE_dir, file))
-
-    return release_files
-
-def get_release_files(spec):
-    """Given a directory above or below the RAMMS directory, finds a
-    "ramms dir," which is one level below RAMMS/."""
-
-    # *** The spec is a directory corresponding to a SINGLE shapefile
-    # ** The spec is a SINGLE shapefile
-    if spec.endswith('.shp'):
-        return [spec]
-
-    dir = os.path.abspath(spec)
-    parts = dir.split(os.sep)
-
-    # See if we're in, eg:
-    #   RAMMS/juneau130yFor/RESULTS/juneau1_For/5m_30L$ 
-    # Return just the shapefile
-    if len(parts) >=3 and parts[-3] == 'RESULTS':
-        parts2 = parts[:-3] + ['RELEASE', '{}_{}_rel.shp'.format(parts[-2], parts[-1])]
-        return [os.sep.join(parts2)]
-
-
-    # See if we're in a subdirectory
-    for i in range(len(parts)):
-        if parts[i] == 'RAMMS':
-            # RAMMS/ is the last part of the path, we have multiple dirs.
-            if len(parts) == i:
-                ramms_dirs = [os.path.join(x) for x in os.listdir(dir)]
-                return _ramms_to_release(ramms_dirs)
-            else:
-                # We have a path one lower than RAMMS, use it.
-                return _ramms_to_release([os.sep.join(parts[:i+2])])
-
-    raise ValueError('Could not interpret spec {} as one or more RAMMS dirs'.format(spec))
 
 # --------------------------------------------------------------------
 def submit_jobs(release_files, ids=None):
@@ -459,8 +418,10 @@ def submit_jobs(release_files, ids=None):
             Job statuses BEFORE submissions were made
     """
 
+    print('release_files = ',release_files)
     df = job_statuses(release_files)
     df = df[df.job_status == JobStatus.TODO]
+    print('df = ',df)
     for _,row in df.iterrows():
         if ids is None or row['id'] in ids:
             parts = row['run_dir'].split(os.sep)
@@ -474,64 +435,16 @@ def submit_jobs(release_files, ids=None):
 # ======================================================================
 # ============= RAMMS Stage 2: Enlarge and re-submit domains that overran
 
-def read_polygon(poly_file):
-    """Reads a RAMMS polygon file (eg: .dom) into a Shapely Polygon."""
-    with open(poly_file) as fin:
-        line = next(fin).split(' ')
-        # Get just the x,y coordinates, no count at beginning, no repeat at end
-        coords = [float(x) for x in line[1:-2]]
-
-    return shapely.geometry.Polygon(list(zip(coords[::2], coords[1::2])))
-
-def write_polygon(p, poly_file):
-    with open(poly_file, 'w') as out:
-        coords = list(p.boundary.coords)
-        out.write('{}'.format(len(coords)))
-        for x,y in coords:
-            out.write(f' {x} {y}')
-        out.write('\n')
-# --------------------------------------------------------
-def _scale_vec(vec,margin):
-    """Adds a certain length to a vector.  Helper function."""
-    veclen = np.linalg.norm(vec)
-    if (veclen+margin) < 0:
-        raise ValueError('Margin is larger than side')
-    factor = margin / veclen
-    return factor*vec
-
-def edge_lengths(p):
-    pts = np.array(p.boundary.coords)
-    edges = np.diff(pts, axis=0)
-    return np.linalg.norm(edges,axis=1)
-
-def add_margin(p,margin):
-    """Adds a margin to a (rotated) rectangle, i.e. a domain rectangle.
-    p: shapely.geometry.Polygon
-        The rectangle
-    margin:
-        Absolute amount to add to length and width.
-        If negative, subtract this amount; cannot subtract more than original length
-    """
-    pts = np.array(p.boundary.coords)
-    edges = np.diff(pts, axis=0)
-    margin2 = .5*margin
-    pts[0,:] += (_scale_vec(edges[3,:],margin2) - _scale_vec(edges[0,:],margin2))
-    pts[1,:] += (_scale_vec(edges[0,:],margin2) - _scale_vec(edges[1,:],margin2))
-    pts[2,:] += (_scale_vec(edges[1,:],margin2) - _scale_vec(edges[2,:],margin2))
-    pts[3,:] += (_scale_vec(edges[2,:],margin2) - _scale_vec(edges[3,:],margin2))
-
-    p = shapely.geometry.Polygon(list(zip(pts[:-1,0], pts[:-1,1])))
-    return p
 # -----------------------------------------------------------
 def enlarge_domain(run_dir, job_name, enlarge_increment=5000.):
 
     # Read the .dom file and make it bigger by 1000m
     dom_file = os.path.join(run_dir, f'{job_name}.dom')
     log_zip_file = os.path.join(run_dir, f'{job_name}.log.zip')
-    dom0 = read_polygon(dom_file)
-    dom1 = add_margin(dom0, enlarge_increment)
+    dom0 = rammsutil.read_polygon(dom_file)
+    dom1 = rammsutil.add_margin(dom0, enlarge_increment)
     with np.printoptions(precision=0, suppress=True):
-        print('{}:\n  {} -> {}'.format(job_name, edge_lengths(dom0), edge_lengths(dom1)))
+        print('{}:\n  {} -> {}'.format(job_name, rammsutil.edge_lengths(dom0), rammsutil.edge_lengths(dom1)))
 
     # ----Rename old .dom file and write new one
     if True:
@@ -548,7 +461,7 @@ def enlarge_domain(run_dir, job_name, enlarge_increment=5000.):
         # Copy to one bigger, then overwrite
         shutil.copy2(dom_file, dom_file + '.v{}'.format(max_version+1))
         shutil.copy2(log_zip_file, log_zip_file + '.v{}'.format(max_version+1))
-        write_polygon(dom1, dom_file)    # New timestamp
+        rammsutil.write_polygon(dom1, dom_file)    # New timestamp
 
 
 def enlarge_domains(release_files, ids=None):
@@ -618,7 +531,7 @@ def ramms_iter(ramms_spec, ids=list()):
         If empty list, that means include all of them.
     """
 
-    release_files = get_release_files(ramms_spec)
+    release_files = rammsutil.get_release_files(ramms_spec)
     ids = set(ids)
 
     for release_file in release_files:

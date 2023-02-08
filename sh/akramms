@@ -2,7 +2,8 @@
 #
 
 import argparse,itertools,os,subprocess
-from dggs.avalanche import ramms
+from akramms import r_ramms
+from akramms.util import rammsutil
 
 # ------------------------------------------------------------------------
 # https://mike.depalatis.net/blog/simplifying-argparse.html
@@ -29,10 +30,10 @@ def subcommand(args=[], parent=subparsers):
 @subcommand([argument('ramms', help='RAMMS directory or release file to inspect')])
 def ps(args):
     """Provides status of RAMMS avalanches"""
-    release_files = ramms.get_release_files(args.ramms)
+    release_files = rammsutil.get_release_files(args.ramms)
 
-    df = ramms.job_statuses(release_files)
-    ramms.print_job_statuses(df)
+    df = r_ramms.job_statuses(release_files)
+    r_ramms.print_job_statuses(df)
 
 @subcommand([
     argument('run_dir', help='Run directory to use'),
@@ -44,7 +45,7 @@ def run(args):
     parts = run_dir.split(os.sep)
     job_name = '{}_{}_{}'.format(parts[-2], parts[-1], args.id)
 
-    ramms.submit_job(run_dir, job_name)
+    r_ramms.submit_job(run_dir, job_name)
 
 @subcommand([
     argument('ramms', help='RAMMS directory or release file to inspect'),
@@ -55,8 +56,8 @@ def submit(args):
     ids = None if len(args.ids) == 0 else args.ids
 
     # Separate into numeric-only and non-numerica args in the spec
-    release_files = ramms.get_release_files(args.ramms)
-    ramms.submit_jobs(release_files, ids=ids)
+    release_files = rammsutil.get_release_files(args.ramms)
+    r_ramms.submit_jobs(release_files, ids=ids)
 
 @subcommand([
     argument('ramms', help='RAMMS directory or release file to inspect'),
@@ -67,16 +68,16 @@ def enlarge(args):
     ids = None if len(args.ids) == 0 else args.ids
 
     # Separate into numeric-only and non-numerica args in the spec
-    release_files = ramms.get_release_files(args.ramms)
-    ramms.enlarge_domains(release_files, ids=ids)
+    release_files = rammsutil.get_release_files(args.ramms)
+    r_ramms.enlarge_domains(release_files, ids=ids)
 
 @subcommand([
     argument('ramms', help='RAMMS directory or release file to inspect'),
     argument('ids', type=int, nargs='*', help='ID of avalanche in run_dir to inspect')])
 def info(args):
     ids = None if len(args.ids) == 0 else args.ids
-    release_files = ramms.get_release_files(args.ramms)
-    infos_df = ramms.infos(release_files, ids=ids)
+    release_files = rammsutil.get_release_files(args.ramms)
+    infos_df = r_ramms.infos(release_files, ids=ids)
 
 
 #    df = infos_df[infos_df['final_outflow_volume'] == 0.00]
@@ -89,7 +90,7 @@ def info(args):
     argument('ramms', help='RAMMS directory or release file to inspect'),
     argument('ids', type=int, nargs='*', help='ID of avalanche in run_dir to inspect')])
 def cat(args):
-    ramms.cat(args.ramms, args.ids)
+    r_ramms.cat(args.ramms, args.ids)
 
 
 
