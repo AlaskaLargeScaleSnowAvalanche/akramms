@@ -93,7 +93,7 @@ def add_stage1_rules(makefile, scene_dir):
         # RAMMS Stage 1: IDL Prep
         ramms_files = shputil.expand_list([release_file, domain_file]) + rammsdir_files
         stage1_outputs = makefile.add(r_ramms.ramms_stage1_rule(
-            jb.ramms_dir, [release_file], ramms_files, dry_run=False)).outputs
+            jb.ramms_dir, [release_file], ramms_files, dry_run=False, submit=False)).outputs
 
     return release_files
 

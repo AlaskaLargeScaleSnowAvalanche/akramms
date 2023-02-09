@@ -3,6 +3,7 @@ import gzip,pickle,os
 import numpy as np
 import shapely
 import d8graph
+import sys
 from uafgi.util import shputil,shapelyutil,gdalutil,make
 
 # --------------------------------------------------------------------
@@ -98,6 +99,7 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):
             pra_burn = np.where(pra_ras1d)[0].astype('i')
 
             print('PRA {} ({} of {}) burned with {} cells'.format(row['Id'], ipra, npra, len(pra_burn)))
+            sys.stdout.flush()
             pra_burns.append(pra_burn)
 
         # Add to the dataframe and save

@@ -38,12 +38,12 @@ debug = False
 ramms_version = '230126'
 
 # Maximum number of PRAs in a RAMMS run
-#max_ramms_pras = 500
-max_ramms_pras = 20
+max_ramms_pras = 100
+#max_ramms_pras = 20
 
 # ------------------------------
 # DEBUG parameters
-#allowed_pra_sizes = {'T', 'S', 'M', 'L'}
-allowed_pra_sizes = {'L'}
+allowed_pra_sizes = {'T', 'S', 'M', 'L'}
+#allowed_pra_sizes = {'M'}
 #allowed_forests = {True}
 #allowed_return_periods = {30}

@@ -130,6 +130,7 @@ def run_remote(inputs, cmd, tdir, write_inputs=False):
         if not line:
             break
         print(line, end='')
+        sys.stdout.flush()
 
         # Collect list of output files as declared by Windows-side program
         match = outputRE.match(line)

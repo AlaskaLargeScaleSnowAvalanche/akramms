@@ -102,7 +102,7 @@ def rammsdir_rule(scene_dir, release_file,
     outputs = [scenario_file] + linked_files
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
-def ramms_stage1_rule(ramms_dir, release_files, inputs, dry_run=False, submit=True):
+def ramms_stage1_rule(ramms_dir, release_files, inputs, dry_run=False, submit=False):
     """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)
 
     inputs:
