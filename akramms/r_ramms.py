@@ -420,14 +420,15 @@ def submit_jobs(release_files, ids=None):
 
     print('release_files = ',release_files)
     df = job_statuses(release_files)
+    print('df = ',df)
     df = df[df.job_status == JobStatus.TODO]
     print('df = ',df)
     for _,row in df.iterrows():
         if ids is None or row['id'] in ids:
             parts = row['run_dir'].split(os.sep)
             job_name = '{}_{}_{}'.format(parts[-2], parts[-1], row['id'])
-#            print('submit ', row['run_dir'], job_name)
-            submit_job(row['run_dir'], job_name)
+            print('submit ', row['run_dir'], job_name)
+#            submit_job(row['run_dir'], job_name)
 
     return df
 

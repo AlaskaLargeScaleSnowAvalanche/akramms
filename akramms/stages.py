@@ -62,12 +62,7 @@ def add_stage1_rules(makefile, scene_dir):
                 with open(release_shplist, 'r') as fin:
                     release_files.extend(x.strip() for x in fin)
 
-
-
-
     # Domain finder for post-process output
-#    domain_files = list()
-#    rammsdir_files = list()
     for release_file in release_files:
         jb = rammsutil.parse_release_file(release_file)
         if jb.segment == 0:

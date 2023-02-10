@@ -8,77 +8,86 @@ PRA_SIZES = {
     'M' : 'medium',
     'L' : 'large'}
 # ---------------------------------------------------------------
-def ramms_name(scene_name, forest, resolution, return_period, pra_size):
-    For = 'For' if forest else 'NoFor'
-    return f"{scene_name}{For}_{resolution}m_{return_period}{pra_size}"
+class RammsName:
 
-class RammsRun(typing.NamedTuple):
-    ramms_dir: str    # Directory just under RAMMS/
-    scene_name: str
-    forest: bool
-    resolution: int
-    return_period: int
-    pra_size: str
-    segment: int
+    def __init__(self, ramms_harness, scene_name, segment, forest, resolution, return_period, pra_size):
+        """
+        ramms_harness:
+            Directory containing RAMMS directories
+            Eg: ~/prj/juneau1/RAMMS
+        """
+        self.__dict__.update(locals())
+        self.update()
 
-    @property
-    def scenario_name(self):    # Does NOT include segment number
-        return '{}_{:03d}'.format(ramms_name(self.scene_name, self.forest, self.resolution, self.return_period, self.pra_size), self.segment)
 
-    base = scenario_name
+    def update(self):
+        """Update computed values"""
+        self.For = 'For' if self.forest else 'NoFor'
+        self.ssegment = '' if self.segment is None else '{:03d}'.format(self.segment)
+        self.ramms_name = f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m_{self.return_period}{self.pra_size}'
 
-    @property
-    def prefix(self):
-        For = 'For' if self.forest else 'NoFor'
-        return f'{self.scene_name}{For}'
+        # Root of the RAMMS run (from RAMM's perspective)
+        self.ramms_dir = os.path.join(self.ramms_harness, self.ramms_name)
 
-    @property
-    def suffix(self):
-        return f'{self.resolution}m_{self.return_period}{self.pra_size}'
-
-    @property
-    def run_dir(self):
-        """Directory RAMMS Core runs use for input and output"""
-        For = 'For' if self.forest else 'NoFor'
-        return os.path.join(self.ramms_dir, 'RESULTS',
-            f'{self.scene_name}{For}_{self.resolution}m',
+        # Place where individual avalanche computations take place
+        self.avalanche_dir =  os.path.join(self.ramms_dir, 'RESULTS',
+            f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m',
             f'{self.return_period}{self.pra_size}')
+
+        # ------------------ Name of individual avla
+        # Base pathname for avalanche files; just append _{id}.{ext}
+        self.avalanche_base = os.path.join(self.avalanche_dir, self.ramms_name)
+
+    def set(self, **kwargs):
+        """Change the value of one or more fields"""
+        # Check we're not making any new fields
+        assert all(key in self.__dict__ for key in kwargs)
+        self.__dict__.update(kwargs)
+        self.update()
+
+    # ---------- Per-avalanche naming...
+    def avalanche_file(self, id, ext):
+        """Name of an individual file read or written by RAMMS Core
+        id: int
+            ID of the avalanche
+        ext: str
+            Eg: '.av2', '.rel', etc.
+        """
+        return f'{self.avalanche_base}_{id}{ext}'
+
 
     def log_zip(self, id):
         return os.path.join(self.run_dir, '{}_{}.log.zip'.format(self.base, id))
 
     def arcname(self, id, ext):
-        """Name of the logfile in the Zip archive
-        extname:
-            .log or .overrun
+        """Name of the a file within the Zip archive of an avalanche
+
         """
         return '{}_{}{}'.format(self.base, id, ext)
 
 # -------------------------------------------------------
-release_fileRE = re.compile(r'^(.+)(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(\d+)_(.*)\.(.*)')
+release_fileRE = re.compile(r'^(.+)(\d\d\d)(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(.*)(\..*)')
 
 @functools.lru_cache()
 def parse_release_file(release_file):
-    """Parses the full name of a release file into a RammsRun named tuple."""
+    """Parses the full name of a release file into a RammsName."""
 
     RELEASE_dir,leaf = os.path.split(release_file)
     ramms_dir = os.path.split(RELEASE_dir)[0]
-    print('leaf ', leaf)
+    ramms_harness = os.path.split(ramms_dir)[0]
     match = release_fileRE.match(leaf)
 
-    scene_name = match.group(1)
-    For = match.group(2)
-    forest = True if For == 'For' else False
+    sn = match.group(1)
+    scene_name = sn[:-3]
+    segment = int(sn[-3:])
+    forest = True if match.group(2) == 'For' else False
     resolution = int(match.group(3))
     return_period = int(match.group(4))
     pra_size = match.group(5)
-    segment = int(match.group(6))
-    file_type = match.group(7)    # eg: _rel
-    ext = match.group(8)          # eg: shp
+    file_type = match.group(6)    # eg: _rel
+    ext = match.group(7)          # eg: shp
 
-    return RammsRun(
-        ramms_dir,
-        scene_name, forest, resolution, return_period, pra_size, segment)
+    return RammsName(ramms_harness, scene_name, segment, forest, resolution, return_period, pra_size)
 
 # --------------------------------------------------------
 def _ramms_to_release(ramms_dirs):
@@ -105,7 +114,7 @@ def get_release_files(spec):
     parts = dir.split(os.sep)
 
     # See if we're in, eg:
-    #   RAMMS/juneau130yFor/RESULTS/juneau1_For/5m_30L$ 
+    #   RAMMS/juneau1017For_5m_30L/RESULTS/juneau1017For_5m/30L
     # Return just the shapefile
     if len(parts) >=3 and parts[-3] == 'RESULTS':
         parts2 = parts[:-3] + ['RELEASE', '{}_{}_rel.shp'.format(parts[-2], parts[-1])]

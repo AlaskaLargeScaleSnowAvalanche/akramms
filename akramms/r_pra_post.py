@@ -141,9 +141,10 @@ def rule(scene_dir, return_period, forest, require_all=True):
         # DEBUG: Only do 'L' for now
         if pra_size not in config.allowed_pra_sizes:
             continue
-        ramms_name = rammsutil.ramms_name(scene_name, forest, resolution, return_period, pra_size)
-        ramms_names.append((ramms_name,pra_size))
-        outputs.append(os.path.join(scene_dir, 'RAMMS', f'{ramms_name}_rel.shplist'))
+        jb = rammsutil.RammsName(os.path.join(scene_dir, 'RAMMS'), scene_name, None, forest, resolution, return_period, pra_size)
+        ramms_names.append((jb,pra_size))
+        # This filename does NOT have any segment numbers.
+        outputs.append(os.path.join(scene_dir, 'RAMMS', f'{jb.ramms_name}_rel.shplist'))
 
     # Add one-off input files
     inputs += [scene_args['snowdepth_file'], scene_args['snowdepth_geo']]
@@ -198,8 +199,6 @@ def rule(scene_dir, return_period, forest, require_all=True):
             df['d0star'] = sx3_corrected
 
 
-        # DEBUG: 
-
         # --- Slope angle correction (slopecorr)
         # TODO: Discuss with Gabe.  Do we want to apply slope angle correction?
         # If yes, we can make it much simpler than what we have here.
@@ -222,7 +221,7 @@ def rule(scene_dir, return_period, forest, require_all=True):
 
         # Split into segments and save
         ioutil.mkdirs_for_files(outputs)
-        for ((ramms_name,pra_size),output) in zip(ramms_names,outputs):
+        for ((jb,pra_size),output) in zip(ramms_names,outputs):
             low,high = post_cat_bounds[pra_size]
 
             print(f'Category: {pra_size}, [{low}, {high})')
@@ -232,16 +231,17 @@ def rule(scene_dir, return_period, forest, require_all=True):
             # Split df for this category (size) PRAs into bite-size chunks
             df_chunks = [df_cat[i:i+config.max_ramms_pras] for i in range(0,df_cat.shape[0],config.max_ramms_pras)]
             ofnames = list()
-            for ix,df in enumerate(df_chunks):
-                ofname = os.path.join(scene_dir, 'RAMMS', f'{ramms_name}_{ix:03d}', 'RELEASE', f'{ramms_name}_{ix:03d}_rel.shp')
+            for segment,dfc in enumerate(df_chunks):
+                jb.set(segment=segment)
+                ofname = os.path.join(jb.ramms_dir, 'RELEASE', f'{jb.ramms_name}_rel.shp')
                 ofnames.append(ofname)
                 os.makedirs(os.path.split(ofname)[0], exist_ok=True)
-                shputil.write_df(df, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
+                shputil.write_df(dfc, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
 
-            # Write names ofb our PRA files into the final output file.
+            # Write names of our PRA files into the final output file.
             with open(output, 'w') as out:
                 for ofname in ofnames:
-                    out.write(f'{ofname}\n')
+                    out.write('{}\n'.format(config.roots.relpath(ofname)))
 
                 
     return make.Rule(action, inputs, outputs)
