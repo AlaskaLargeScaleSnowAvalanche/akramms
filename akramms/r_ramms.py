@@ -46,19 +46,19 @@ def rammsdir_rule(scene_dir, release_file,
     """Generates the scenario file, which becomes key to running RAMMS.
     """
     jb = rammsutil.parse_release_file(release_file)
+    jb_dem = jb.copy(return_period=-1)    # Get name without return period
 
     scene_args = params.load(scene_dir)
     resolution = scene_args['resolution']
     name = scene_args['name']
-    For = 'For' if jb.forest else 'NoFor'
-    scenario_file = os.path.join(jb.ramms_dir, 'scenario.txt')
+    scenario_txt = os.path.join(jb.ramms_dir, 'scenario.txt')
 
     # ---- DEM File
     idem_dir,idem_tif = os.path.split(scene_args['dem_file'])
     idem_stub = idem_tif[:-4]
     links = [
-        (os.path.join(idem_dir, f'{idem_stub}.tif'), os.path.join(jb.ramms_dir, 'DEM', f'{name}{For}_{resolution}m_DEM.tif')),
-        (os.path.join(idem_dir, f'{idem_stub}.tfw'), os.path.join(jb.ramms_dir, 'DEM', f'{name}{For}_{resolution}m_DEM.tfw')),
+        (os.path.join(idem_dir, f'{idem_stub}.tif'), os.path.join(jb_dem.ramms_dir, 'DEM', f'{jb_dem.ramms_name}_DEM.tif')),
+        (os.path.join(idem_dir, f'{idem_stub}.tfw'), os.path.join(jb_dem.ramms_dir, 'DEM', f'{jb_dem.ramms_name}_DEM.tfw')),
     ]
 
 
@@ -67,8 +67,8 @@ def rammsdir_rule(scene_dir, release_file,
         iforest_dir,iforest_tif = os.path.split(scene_args['forest_file'])
         iforest_stub = iforest_tif[:-4]
         links += [
-            (os.path.join(iforest_dir, f'{iforest_stub}.tif'), os.path.join(jb.ramms_dir, 'FOREST', f'{name}{For}_{resolution}m_forest.tif')),
-            (os.path.join(iforest_dir, f'{iforest_stub}.tfw'), os.path.join(jb.ramms_dir, 'FOREST', f'{name}{For}_{resolution}m_forest.tfw')),
+            (os.path.join(iforest_dir, f'{iforest_stub}.tif'), os.path.join(jb_dem.ramms_dir, 'FOREST', f'{jb_dem.ramms_name}_forest.tif')),
+            (os.path.join(iforest_dir, f'{iforest_stub}.tfw'), os.path.join(jb_dem.ramms_dir, 'FOREST', f'{jb_dem.ramms_name}_forest.tfw')),
         ]
 
     def action(tdir):
@@ -78,7 +78,7 @@ def rammsdir_rule(scene_dir, release_file,
 
         # Create the scenario file
         kwargs = dict()
-        kwargs['scenario_name'] = jb.scenario_name
+        kwargs['scenario_name'] = jb.ramms_name
         kwargs['remote_ramms_dir'] = config.roots.convert_to(jb.ramms_dir, config.roots_w)
         kwargs['ncpu'] = str(ncpu)
         kwargs['ncpu_preprocess'] = str(ncpu_preprocess)
@@ -94,15 +94,15 @@ def rammsdir_rule(scene_dir, release_file,
         kwargs['alt_lim_top'] = str(alt_lim_top)
         kwargs['alt_lim_low'] = str(alt_lim_low)
 
-        with open(scenario_file, 'w') as out:
+        with open(scenario_txt, 'w') as out:
             out.write(scenario_tpl.format(**kwargs))
 
     inputs = [d[0] for d in links]
     linked_files = [d[1] for d in links]
-    outputs = [scenario_file] + linked_files
+    outputs = [scenario_txt] + linked_files
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
-def ramms_stage1_rule(ramms_dir, release_files, inputs, dry_run=False, submit=False):
+def ramms_stage1_rule(release_files, inputs, dry_run=False, submit=False):
     """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)
 
     inputs:
@@ -116,7 +116,7 @@ def ramms_stage1_rule(ramms_dir, release_files, inputs, dry_run=False, submit=Fa
     for release_file in release_files:
         print('parsing ', release_file)
         jb = rammsutil.parse_release_file(release_file)
-        output = os.path.join(ramms_dir, 'RESULTS', '{}_{}_stage1.txt'.format(jb.prefix, jb.suffix))
+        output = os.path.join(jb.ramms_dir, 'RESULTS', f'{jb.ramms_name}_stage1.txt')
         done_outputs.append(output)
 
     ramms_dir_rel = config.roots.relpath(ramms_dir)
@@ -256,7 +256,7 @@ def query_condor(job_base):
     """
     # Query Condor
     schedd = htcondor.Schedd()   # get the Python representation of the scheduler
-    jobRE_str = r'^{}_([0-9]+)$'.format(jb.base)
+    jobRE_str = r'^{}_([0-9]+)$'.format(jb.ramms_name)
     jobRE = re.compile(jobRE_str)
     ads = schedd.query(    # One Ad per job
         constraint=f'regexp("{jobRE_str}", JobBatchName)',
@@ -296,7 +296,7 @@ def job_statuses(release_files):
 
         # Query Condor
         schedd = htcondor.Schedd()   # get the Python representation of the scheduler
-        jobRE_str = r'^{}_([0-9]+)$'.format(jb.base)
+        jobRE_str = r'^{}_([0-9]+)$'.format(jb.ramms_name)
         jobRE = re.compile(jobRE_str)
         ads = schedd.query(    # One Ad per job
             constraint=f'regexp("{jobRE_str}", JobBatchName)',
@@ -325,23 +325,20 @@ def job_statuses(release_files):
         # Identify avalanches that have been submitted / are still running
 
         # List files on disk
-#        ard = analyze_rundir(jb.run_dir, jb.base)
-#        print('run_dir ',jb.run_dir)
-#        print('ard ',ard)
-        job_suffixes = dict(analyze_rundir(jb.run_dir, jb.base))
+        job_suffixes = dict(analyze_rundir(jb.avalanche_dir, jb.ramms_name))
 
         # --------------------------------------------------
 
         # Consider each job in turn from our master list
         for id in ids:
-            key = (jb.run_dir, id)
+            key = (jb.avalanche_dir, id)
 
-            job_name = f'{jb.base}_{id}'
+            job_name = f'{jb.ramms_name}_{id}'
 
             # If nothing for this key exists, then probably top-level
             # RAMMS has not been run yet for this run_dir
             if id not in job_suffixes:
-                statuses.append((jb.run_dir, id, JobStatus.NOINPUT))
+                statuses.append((jb.avalanche_dir, id, JobStatus.NOINPUT))
                 continue
             suffixes = job_suffixes[id]
 
@@ -350,17 +347,17 @@ def job_statuses(release_files):
             ninputs = sum(x in suffixes for x in input_suffixes)
 
             if ninputs == 0:
-                statuses.append((jb.run_dir, id, JobStatus.NOINPUT))
+                statuses.append((jb.avalanche_dir, id, JobStatus.NOINPUT))
                 continue
 
             if ninputs < len(input_suffixes):
-                statuses.append((jb.run_dir, id, JobStatus.INCOMPLETE))
+                statuses.append((jb.avalanche_dir, id, JobStatus.INCOMPLETE))
                 continue
 
 
             # See if Condor tells is what's going on with the job
             if job_name in condor_statuses:
-                statuses.append((jb.run_dir, id, condor_statuses[job_name]))
+                statuses.append((jb.avalanche_dir, id, condor_statuses[job_name]))
                 continue
 
             # Not in Condor?  Either it hasn't launched, or it's finished / failed
@@ -369,7 +366,7 @@ def job_statuses(release_files):
             # Identify avalanches that have finished: .out.gz exists and has non-zero size
             # (User can reset jobs by removing *.job.log)
             if ('log.zip' in suffixes) and ('out.gz' in suffixes):
-                log_zip = os.path.join(jb.run_dir, '{}_{}.log.zip'.format(jb.base, id))
+                log_zip = os.path.join(jb.avalanche_dir, '{}_{}.log.zip'.format(jb.ramms_name, id))
 
                 # Check for abandoned job
                 statinfo = os.stat(log_zip)
@@ -378,7 +375,7 @@ def job_statuses(release_files):
                     # no sign of the HTCondor job to write it at the
                     # end.  Sounds like things were killed, send
                     # status back to TODO.
-                    statuses.append((jb.run_dir, id, JobStatus.TODO))
+                    statuses.append((jb.avalanche_dir, id, JobStatus.TODO))
                     continue
 
                 # We tentatively think the job is finished.  But let's
@@ -387,13 +384,13 @@ def job_statuses(release_files):
                 with zipfile.ZipFile(log_zip, 'r') as in_zip:
                     arcnames = [os.path.split(x)[1] for x in in_zip.namelist()]
                 if any(x.endswith('.out.overrun') for x in arcnames):
-                    statuses.append((jb.run_dir, id, JobStatus.OVERRUN))
+                    statuses.append((jb.avalanche_dir, id, JobStatus.OVERRUN))
                 else:
-                    statuses.append((jb.run_dir, id, JobStatus.FINISHED))
+                    statuses.append((jb.avalanche_dir, id, JobStatus.FINISHED))
                 continue
 
             # Default to TODO
-            statuses.append((jb.run_dir, id, JobStatus.TODO))
+            statuses.append((jb.avalanche_dir, id, JobStatus.TODO))
 
 
     df = pd.DataFrame(statuses, columns=('run_dir', 'id', 'job_status'))
@@ -420,7 +417,6 @@ def submit_jobs(release_files, ids=None):
 
     print('release_files = ',release_files)
     df = job_statuses(release_files)
-    print('df = ',df)
     df = df[df.job_status == JobStatus.TODO]
     print('df = ',df)
     for _,row in df.iterrows():
@@ -585,7 +581,7 @@ def infos(release_files, ids=None):
 
         # Inspect them
         for id in process_ids:
-            job_name = f'{jb.base}_{id}'
+            job_name = f'{jb.ramms_name}_{id}'
             info = {'job_name': job_name, 'id': id}
 
             # Add info from the logfile (if it exists)
@@ -650,16 +646,15 @@ def ramms_stage3_rule(ramms_dir, release_files, dry_run=False, submit=True):
         # avalanches from each release file have been completed.
         # (Sometimes not all individual avalanches can complete, for
         # various reasons).
-        input = os.path.join(ramms_dir, 'RESULTS', '{}_{}_stage2.txt'.format(jb.prefix, jb.suffix))
+        input = os.path.join(ramms_dir, 'RESULTS', f'{jb.ramms_name}_stage2.txt')
         inputs.append(input)
 
         # -----------------------------------------------------------
         # Outputs are the end-user GeoTIFF files that RAMMS Stage 3 writes.
 
         # Misc. Files
-        dir = os.path.join(ramms_dir, 'RESULTS', jb.prefix)
         for leaf in ('curvidl.tif', 'slope.tif', 'logfiles/muxi_altlimits.log', 'logfiles/muxi_class.tif'):
-            outputs.append(os.path.join(dir, leaf))
+            outputs.append(os.path.join(jb.slope_dir, leaf))
 
         # The main GeoTIFF Files
         base = os.path.join(dir, '{}_{}'.format(jb.prefix, jb.suffix))    # Eg: juneau1_For_5m_30L
@@ -667,7 +662,7 @@ def ramms_stage3_rule(ramms_dir, release_files, dry_run=False, submit=True):
             '.dbf', '.shp', '.shx',
             '_AblagerungStef.tif', '_COUNT.tif', '_ID.tif', '_Xi.tif',
             '_maxHeight.tif', '_maxPRESSURE.tif', '_maxVelocity.tif'):
-            outputs.append(f'{base}{ext}')
+            outputs.append(os.path.join(jb.ramms_dir, f'{jb.ramms_name}{ext}'))
 
     # ----------------------------------------------------
     def action(tdir):

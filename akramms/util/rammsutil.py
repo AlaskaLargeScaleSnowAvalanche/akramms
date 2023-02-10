@@ -1,4 +1,4 @@
-import os,re,typing,functools
+import os,re,typing,functools,copy
 import numpy as np
 import shapely
 
@@ -10,11 +10,13 @@ PRA_SIZES = {
 # ---------------------------------------------------------------
 class RammsName:
 
-    def __init__(self, ramms_harness, scene_name, segment, forest, resolution, return_period, pra_size):
+    def __init__(self, ramms_harness, scene_name, segment, forest, resolution, return_period, pra_size, id):
         """
         ramms_harness:
             Directory containing RAMMS directories
             Eg: ~/prj/juneau1/RAMMS
+        id: int
+            ID number of a PRA (can be None)
         """
         self.__dict__.update(locals())
         self.update()
@@ -24,15 +26,20 @@ class RammsName:
         """Update computed values"""
         self.For = 'For' if self.forest else 'NoFor'
         self.ssegment = '' if self.segment is None else '{:03d}'.format(self.segment)
-        self.ramms_name = f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m_{self.return_period}{self.pra_size}'
+        self.sid = '' if self.id is None else f'_{self.id}'
+        suffix = '' if self.return_period<0 else f'_{self.return_period}{self.pra_size}'
+        self.ramms_name = f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m{suffix}{self.sid}'
 
         # Root of the RAMMS run (from RAMM's perspective)
         self.ramms_dir = os.path.join(self.ramms_harness, self.ramms_name)
 
+        # Place where slope files are placed.
+        # (These are common for all return periods and T/S/M/L
+        self.slope_dir = os.path.join(self.ramms_dir, 'RESULTS',
+            f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m')
+
         # Place where individual avalanche computations take place
-        self.avalanche_dir =  os.path.join(self.ramms_dir, 'RESULTS',
-            f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m',
-            f'{self.return_period}{self.pra_size}')
+        self.avalanche_dir = os.path.join(self.slop_dir, f'{self.return_period}{self.pra_size}')
 
         # ------------------ Name of individual avla
         # Base pathname for avalanche files; just append _{id}.{ext}
@@ -44,6 +51,11 @@ class RammsName:
         assert all(key in self.__dict__ for key in kwargs)
         self.__dict__.update(kwargs)
         self.update()
+
+    def copy(self, **kwargs):
+        ret = copy.copy(self)
+        ret.set(**kwargs)
+        return ret
 
     # ---------- Per-avalanche naming...
     def avalanche_file(self, id, ext):
@@ -87,7 +99,7 @@ def parse_release_file(release_file):
     file_type = match.group(6)    # eg: _rel
     ext = match.group(7)          # eg: shp
 
-    return RammsName(ramms_harness, scene_name, segment, forest, resolution, return_period, pra_size)
+    return RammsName(ramms_harness, scene_name, segment, forest, resolution, return_period, pra_size, None)
 
 # --------------------------------------------------------
 def _ramms_to_release(ramms_dirs):

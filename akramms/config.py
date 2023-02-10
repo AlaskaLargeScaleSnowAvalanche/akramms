@@ -43,7 +43,7 @@ max_ramms_pras = 100
 
 # ------------------------------
 # DEBUG parameters
-allowed_pra_sizes = {'T', 'S', 'M', 'L'}
-#allowed_pra_sizes = {'M'}
+#allowed_pra_sizes = {'T', 'S', 'M', 'L'}
+allowed_pra_sizes = {'L'}
 #allowed_forests = {True}
 #allowed_return_periods = {30}
