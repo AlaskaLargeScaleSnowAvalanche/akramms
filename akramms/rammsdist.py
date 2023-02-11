@@ -274,7 +274,7 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
     # Obtain list of input files (includes the release files)
     inputs_rel = read_inputs()
 
-    release_files_rel = [x for x in inputs if x.endswith('_rel.shp')]
+    release_files_rel = [x for x in inputs_rel if x.endswith('_rel.shp')]
     print('release_files_rel ', release_files_rel)
 
     # Collect output files, to be be transferred back to Linux
