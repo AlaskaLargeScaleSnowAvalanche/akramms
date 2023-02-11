@@ -286,7 +286,13 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
     # Rename the log file to reflect stage1
     ilogfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock.log')
     ologfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock_stage1.log')
-    os.rename(ilogfile, ologfile)
+    if os.path.exists(ologfile):
+        try:
+            os.remove(ologfile)
+            os.rename(ilogfile, ologfile)
+        except:
+            print('WARNING: Cannot create logfile in final location, is it locked?: ', ologfile)
+
     outputs.append(ologfile)
 
     # Find all .var.gz, .xy-coord.gz and .xyz.gz files in the avalanche
