@@ -272,10 +272,10 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
 def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
 
     # Obtain list of input files (includes the release files)
-    inputs = read_inputs()
+    inputs_rel = read_inputs()
 
-    release_files = [x for x in inputs if x.endswith('_rel.shp')]
-    print('release_files ', release_files)
+    release_files_rel = [x for x in inputs if x.endswith('_rel.shp')]
+    print('release_files_rel ', release_files_rel)
 
     # Collect output files, to be be transferred back to Linux
     outputs = list()
@@ -303,7 +303,8 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
             for ext in
             ('.av2', '.dom', '.rel', '.var.gz', '.xy-coord.gz', '.xyz.gz')))
 
-    for release_file in release_files:
+    for release_file_rel in release_files_rel:
+        release_file = config.roots.syspath(release_file_rel)
 
         # Identify our list of avalanche directories based release files listed as inputs
         # Turn release file name into directory of avalanche simulations
