@@ -308,12 +308,11 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
         # Identify our list of avalanche directories based release files listed as inputs
         # Turn release file name into directory of avalanche simulations
         jb = rammsutil.parse_release_file(release_file)
-        aval_dir = os.path.join(ramms_dir, 'RESULTS', f'{jb.prefix}_{jb.resolution}m', f'{jb.return_period}{jb.pra_size}_{jb.segment:03d}')
 
         # Look at files inside avalanche directory
-        for f in os.listdir(aval_dir):
+        for f in os.listdir(jb.avalanche_dir):
             if outRE.match(f) is not None:
-                ofname = os.path.join(aval_dir, f)
+                ofname = os.path.join(jb.avalanche_dir, f)
                 outputs.append(ofname)
 
     # Tell calling process on Linux what the output files are
