@@ -102,27 +102,22 @@ def rammsdir_rule(scene_dir, release_file,
     outputs = [scenario_txt] + linked_files
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
-def ramms_stage1_rule(release_files, inputs, dry_run=False, submit=False):
+def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):
     """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)
 
     inputs:
         All input files for the RAMMS run (superset of release_files)
     """
 
-    logfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock.log')
+    jb = rammsutil.parse_release_file(release_file)
+    #logfile = os.path.join(jb.ramms_dir, 'RESULTS', 'lshm_rock.log')
 
     # Write extra output files to show we finished stage1 for a particular release file
-    done_outputs = list()
-    for release_file in release_files:
-        print('parsing ', release_file)
-        jb = rammsutil.parse_release_file(release_file)
-        output = os.path.join(jb.ramms_dir, 'RESULTS', f'{jb.ramms_name}_stage1.txt')
-        done_outputs.append(output)
-
-    ramms_dir_rel = config.roots.relpath(ramms_dir)
+    done_output = os.path.join(jb.ramms_dir, 'RESULTS', f'{jb.ramms_name}_stage1.txt')
 
     def action(tdir):
 
+        ramms_dir_rel = config.roots.relpath(jb.ramms_dir)
         cmd = ['sh', 
             config.roots_w.join('HARNESS', 'akramms', 'sh', 'run_ramms.sh', bash=True),
             '--ramms-version', config.ramms_version,
@@ -133,20 +128,17 @@ def ramms_stage1_rule(release_files, inputs, dry_run=False, submit=False):
         dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=True)
 
         # Write output files
-        for output in done_outputs:
-            with open(output, 'w') as out:
-                out.write('Finished RAMMS Stage 1\n')
+        with open(done_output, 'w') as out:
+            out.write('Finished RAMMS Stage 1\n')
 
         # Submit the individual avalanche runs immediately so we can
         # get going while preparing more RAMMS directories.
         if submit:
-            submit_jobs(release_files)
+            submit_jobs([release_file])
 
         return dynamic_outputs
 
-    return make.Rule(action,
-        inputs,
-        done_outputs)
+    return make.Rule(action, inputs, [done_output])
 
 # =========================================================================================
 # ===== RAMMS Stage 2: Manage avalanche jobs

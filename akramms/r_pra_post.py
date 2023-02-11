@@ -141,7 +141,7 @@ def rule(scene_dir, return_period, forest, require_all=True):
         # DEBUG: Only do 'L' for now
         if pra_size not in config.allowed_pra_sizes:
             continue
-        jb = rammsutil.RammsName(os.path.join(scene_dir, 'RAMMS'), scene_name, None, forest, resolution, return_period, pra_size)
+        jb = rammsutil.RammsName(os.path.join(scene_dir, 'RAMMS'), scene_name, None, forest, resolution, return_period, pra_size, None)
         ramms_names.append((jb,pra_size))
         # This filename does NOT have any segment numbers.
         outputs.append(os.path.join(scene_dir, 'RAMMS', f'{jb.ramms_name}_rel.shplist'))

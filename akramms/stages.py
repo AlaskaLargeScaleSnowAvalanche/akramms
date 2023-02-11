@@ -56,11 +56,15 @@ def add_stage1_rules(makefile, scene_dir):
                 resolution = scene_args['resolution']
                 scene_name = scene_args['name']
 
-                ramms_name = rammsutil.ramms_name(scene_name, forest, resolution, return_period, pra_size)
-                release_shplist = os.path.join(scene_dir, 'RAMMS', f'{ramms_name}_rel.shplist')
+                jb = rammsutil.RammsName(
+                    os.path.join(scene_dir, 'RAMMS'),
+                    scene_args['name'], None, forest, resolution,
+                    return_period, pra_size, None)
+
+                release_shplist = os.path.join(scene_dir, 'RAMMS', f'{jb.ramms_name}_rel.shplist')
 
                 with open(release_shplist, 'r') as fin:
-                    release_files.extend(x.strip() for x in fin)
+                    release_files.extend(config.roots.syspath(x.strip()) for x in fin)
 
     # Domain finder for post-process output
     for release_file in release_files:
@@ -85,7 +89,7 @@ def add_stage1_rules(makefile, scene_dir):
         # RAMMS Stage 1: IDL Prep
         ramms_files = shputil.expand_list([release_file, domain_file]) + rammsdir_files
         stage1_outputs = makefile.add(r_ramms.ramms_stage1_rule(
-            [release_file], ramms_files, dry_run=False, submit=False)).outputs
+            release_file, ramms_files, dry_run=False, submit=False)).outputs
 
     return release_files
 

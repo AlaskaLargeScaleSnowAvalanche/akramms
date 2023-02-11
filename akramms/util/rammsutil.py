@@ -31,7 +31,10 @@ class RammsName:
         self.ramms_name = f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m{suffix}{self.sid}'
 
         # Root of the RAMMS run (from RAMM's perspective)
-        self.ramms_dir = os.path.join(self.ramms_harness, self.ramms_name)
+        if self.return_period >= 0:
+            self.rammsdir_name = f'{self.scene_name}{self.ssegment}{self.return_period}{self.pra_size}{self.For}_{self.resolution}m{self.sid}' 
+
+            self.ramms_dir = os.path.join(self.ramms_harness, self.rammsdir_name)
 
         # Place where slope files are placed.
         # (These are common for all return periods and T/S/M/L
@@ -39,7 +42,7 @@ class RammsName:
             f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m')
 
         # Place where individual avalanche computations take place
-        self.avalanche_dir = os.path.join(self.slop_dir, f'{self.return_period}{self.pra_size}')
+        self.avalanche_dir = os.path.join(self.slope_dir, f'{self.return_period}{self.pra_size}')
 
         # ------------------ Name of individual avla
         # Base pathname for avalanche files; just append _{id}.{ext}
@@ -89,15 +92,14 @@ def parse_release_file(release_file):
     ramms_harness = os.path.split(ramms_dir)[0]
     match = release_fileRE.match(leaf)
 
-    sn = match.group(1)
-    scene_name = sn[:-3]
-    segment = int(sn[-3:])
-    forest = True if match.group(2) == 'For' else False
-    resolution = int(match.group(3))
-    return_period = int(match.group(4))
-    pra_size = match.group(5)
-    file_type = match.group(6)    # eg: _rel
-    ext = match.group(7)          # eg: shp
+    scene_name = match.group(1)
+    segment = int(match.group(2))
+    forest = True if match.group(3) == 'For' else False
+    resolution = int(match.group(4))
+    return_period = int(match.group(5))
+    pra_size = match.group(6)
+    file_type = match.group(7)    # eg: _rel
+    ext = match.group(8)          # eg: shp
 
     return RammsName(ramms_harness, scene_name, segment, forest, resolution, return_period, pra_size, None)
 

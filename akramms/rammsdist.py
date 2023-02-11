@@ -47,6 +47,7 @@ _base_upgrade_for_version = {
     '220928' : (RAMMS_220922, '220928'),
     '221101' : (RAMMS_220922, '221101'),
     '230126' : (RAMMS_220922, '230126'),
+    '230210' : (RAMMS_220922, '230210'),
 }
 def install_ramms_on_windows(version):
     """Installs RAMMS into the appropriate distro file inside the harness.
