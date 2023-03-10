@@ -129,7 +129,7 @@ DEFAULTS = {
 
     # These are WILD GUESSES
     reference_elevation=100.,
-    gradient_snowdepth=0.1,    # [m/100m]
+    gradient_snowdepth=0.1,    # [m/100m] (in Switzerland this is .05)
 
 )}
 

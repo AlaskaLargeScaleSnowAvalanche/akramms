@@ -166,7 +166,8 @@ def rule(scene_dir, return_period, forest, require_all=True):
         df = shputil.read_df(inputs[0], shape='pra')
         df = df.rename(columns={'fid': 'Id'})    # RAMMS etc. want it named "Id"
         sx3_mm_swe = df['pra'].map(snow_lookup.value_at_centroid)    # Raw snow amount [kg m-2]
-        by_SNOW_DENSITY = 1. / 100.    # [m^3 kg-1]
+        by_SNOW_DENSITY = 1. / 200.    # [m^3 kg-1]   (Wolken; based on data we have on field work in these areas).
+        # Typical values: 1m
         df['sx3'] = sx3_mm_swe * by_SNOW_DENSITY    # Depth of SNOW [m]
 
 
@@ -181,8 +182,16 @@ def rule(scene_dir, return_period, forest, require_all=True):
 
         # GW: In SE Alaska, steep terrain can hold several meters of
         # snow in something almost 70 degrees from time to time.
+# gradient_snowdepth needs to be based on precip. lapse rates around Juneau; Gabe will get back on that.
+# Yves: reference_elevation should be elveation value from Rick's raster.
+# If PRA is above DEM gridcell then must inflate reanalysis snow volume.  If PRA is below DEM, then defalte it.
+        # def['Mean_DEM'] is mean elevation of the PRA
 
-        snowdepth_correction = (df['Mean_DEM'] - scene_args['reference_elevation']) *.01 * scene_args['gradient_snowdepth']
+        gradient_snowdepth_si_units = .01 * scene_args['gradient_snowdepth'] # gradient_snowdepth parameter is in m/100m, translate to unitless
+
+        snowdepth_correction = \
+            (df['Mean_DEM'] - scene_args['reference_elevation']) \
+            * gradient_snowdepth_si_units
         sx3_corrected = (df['sx3'] + snowdepth_correction)
         # TODO: Why are we multiplying by cos(28) = .883?
 
@@ -202,8 +211,9 @@ def rule(scene_dir, return_period, forest, require_all=True):
         # --- Slope angle correction (slopecorr)
         # TODO: Discuss with Gabe.  Do we want to apply slope angle correction?
         # If yes, we can make it much simpler than what we have here.
-        df['slopecorr'] =  0.291 / np.sin(df['Mean_Slope']*degree) \
-                         - 0.202 * np.cos(df['Mean_Slope']*degree)
+        mean_slope_rad = df['Mean_Slope'] * degree
+        df['slopecorr'] =  0.291 / \
+            (np.sin(mean_slope_rad) - 0.202 * np.cos(mean_slope_rad))
 
         # Wind load interpolation between 100 (0) and 200 (full wind load) elevation
         # Change max wind load dependent on scenario!!
