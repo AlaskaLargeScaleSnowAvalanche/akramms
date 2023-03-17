@@ -145,7 +145,7 @@ def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):
 
 # ---------------------------------------------------------------
 #DOCKER_IMAGE = 'localhost:5000/ramms'
-DOCKER_IMAGE = 'git.akdggs.com/efischer/ramms'
+DOCKER_IMAGE = 'git.akdggs.com/efischer/ramms:230210.2'
 
 submit_tpl = \
 """universe                = docker
@@ -409,14 +409,14 @@ def submit_jobs(release_files, ids=None):
 
     print('release_files = ',release_files)
     df = job_statuses(release_files)
-    df = df[df.job_status == JobStatus.TODO]
-    print('df = ',df)
+    df = df[df.job_status.isin({JobStatus.TODO, JobStatus.OVERRUN})]
+#    print('df = ',df)
     for _,row in df.iterrows():
         if ids is None or row['id'] in ids:
             parts = row['run_dir'].split(os.sep)
             job_name = '{}_{}_{}'.format(parts[-2], parts[-1], row['id'])
             print('submit ', row['run_dir'], job_name)
-#            submit_job(row['run_dir'], job_name)
+            submit_job(row['run_dir'], job_name)
 
     return df
 
@@ -473,7 +473,7 @@ def enlarge_domains(release_files, ids=None):
                 dom_tm = -1
             if log_tm > dom_tm:
                 enlarge_domain(run_dir, job_name)
-            submit_job(run_dir, job_name)
+#            submit_job(run_dir, job_name)
 
     return df
 
@@ -513,7 +513,7 @@ def parse_aval_log(log_in):
 
 def ramms_iter(ramms_spec, ids=list()):
     """Iterates through a set of avalanches by spec
-    spec:
+    ramms_spec:
         Spec indicating the release file(s) to include in the iteration
     ids: [int, ...]
         Avalanche IDs to include.
@@ -521,27 +521,21 @@ def ramms_iter(ramms_spec, ids=list()):
     """
 
     release_files = rammsutil.get_release_files(ramms_spec)
-    ids = set(ids)
 
+    rf_by_id = dict()
     for release_file in release_files:
         jb = rammsutil.parse_release_file(release_file)
-        exist_ids = get_job_ids(release_file)
+        for id in get_job_ids(release_file):
+            rf_by_id[id] = jb
 
-        # Get list of ids to inspect
-        if len(ids) == 0:
-            process_ids = exist_ids
-        else:
-            process_ids = {x for x in exist_ids if x in ids}
-
-
-        for id in process_ids:
-            yield jb,id
+    for id in ids:
+        yield rf_by_id[id],id
 
 
 def cat(ramms_spec, ids=list()):
     for jb,id in ramms_iter(ramms_spec, ids=ids):
         log_zip = jb.log_zip(id)
-        with zipfile.ZipFile(log_zip, 'r') as izip:
+        with zipfile.ZipFile( log_zip, 'r') as izip:
             print('======== {}'.format(log_zip))
             sys.stdout.flush()
             bytes = izip.read(jb.arcname(id, '.out.log'))
@@ -613,6 +607,83 @@ def infos(release_files, ids=None):
 
 # =============================================================================
 # ===== RAMMS Stage 3
+
+def assemble_stage3(release_files):
+    """Iterates through a set of avalanches by spec
+    ramms_spec:
+        Spec indicating the release file(s) to include in the iteration
+    """
+
+    oramms_dirs = set()
+
+    # Find all available individual runs
+    for release_file in release_files:
+        jb = rammsutil.parse_release_file(release_file)
+        ids = get_job_ids(release_file)
+
+        # Construct a fresh output directory...
+        oramms_dir = os.path.join(
+            os.path.dirname(jb.ramms_harness), 'ORAMMS',
+            f'{jb.scene_name}{jb.For}_{jb.resolution}m')
+        try:
+            shutil.rmtree(oramms_dir)
+        except FileNotFoundError:
+            pass
+        oramms_dirs.add(oramms_dir)
+
+        oslope_dir = os.path.join(oramms_dir, 'RESULTS',
+            f'{jb.scene_name}{jb.For}_{jb.resolution}m')
+        oavalanche_dir = os.path.join(oslope_dir,
+            f'{jb.return_period}{jb.pra_size}')
+            
+        ireleasefile_dir = os.path.split(release_file)[0]
+
+        ibase = f'{jb.scene_name}{jb.ssegment}{jb.For}_{jb.resolution}m_{jb.return_period}{jb.pra_size}'
+        obase = f'{jb.scene_name}{jb.For}_{jb.resolution}m_{jb.return_period}{jb.pra_size}'
+
+        # Figure out which avalanches have been run
+        required_exts = {'.dom', '.rel', '.out.gz', '.xy-coord.gz'}
+        id_exts = dict()
+        ifileRE = re.compile(r'{}_(\d+)(\..+)'.format(ibase))
+        for leaf in os.listdir(jb.avalanche_dir):
+            # Make sure file exists in non-zero length
+            ifile = os.path.join(jb.avalanche_dir, leaf)
+            if os.path.getsize(ifile) == 0:
+                continue
+
+            match = ifileRE.match(leaf)
+            if match is not None:
+                id = int(match.group(1))
+                ext = match.group(2)
+                if ext in required_exts:
+                    if id in id_exts:
+                        id_exts[id].add(ext)
+                    else:
+                        id_exts[id] = {ext}
+
+        # Copy files that have complete outputs
+        os.makedirs(oavalanche_dir, exist_ok=True)
+        for id,exts in id_exts.items():
+            print(id,exts)
+            if len(exts) < len(required_exts):
+                continue
+            for ext in exts:
+                ifname = os.path.join(jb.avalanche_dir, f'{ibase}_{id}{ext}')
+                ofname = os.path.join(oavalanche_dir, f'{obase}_{id}{ext}')
+                shutil.copy(ifname, ofname)
+    return oramms_dirs
+
+def run_ramms_stage3(oramms_dir):
+    oramms_dir_rel = config.roots.relpath(oramms_dir)
+    cmd = ['sh', 
+        config.roots_w.join('HARNESS', 'akramms', 'sh', 'run_ramms.sh', bash=True),
+        '--ramms-version', config.ramms_version,
+        config.roots_w.syspath(ramms_dir_rel, bash=True), '3']    # '3'=stage 3
+    dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=False)
+
+    return dynamic_outputs
+
+
 
 def ramms_stage3_rule(ramms_dir, release_files, dry_run=False, submit=True):
     """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)

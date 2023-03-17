@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+#
+
+import sys,re,subprocess,os,gzip,shutil,zipfile,traceback
+
+base = sys.argv[1]
+RAMMS_DIR = os.getcwd()    # HTCondor sets this
+
+av2_file = os.path.join(RAMMS_DIR, f'{base}.av2')
+av3_file = os.path.join(RAMMS_DIR, f'{base}.av3')
+log_base = os.path.join(RAMMS_DIR, base)
+#out_file = f'{log_base}.out'
+
+# ----------------------------------------
+pathRE = re.compile(r'Domain\s+[^\s]*\s+([^\s]*)\s*', re.MULTILINE)
+def write_av3(av2_file, av3_file):
+    """Rewrite .av2 file to avoid absolute paths (on a Windows machine)"""
+
+    with open(av2_file) as fin:
+        av2_str = fin.read()
+
+    # Figure out directory to blank out (as a string)
+    match = pathRE.search(av2_str)
+    dom_file = match.group(1)
+    dir = dom_file[:dom_file.rindex('\\')+1]
+
+    # Blank out all occurrences of that dir
+    av3_str = av2_str.replace(dir, '')
+
+
+    # Go one dir up
+    dir = dir[:-1]    # Remove trailing backslash
+    dir = dir[:dir.rindex('\\')]
+    print(f'dir "{dir}"')
+    av3_str = av3_str.replace(dir, '..')
+
+    with open(av3_file, 'w') as out:
+        out.write(av3_str)
+# ----------------------------------------
+
+# Write the .av3 file
+write_av3(av2_file, av3_file)
+
+# Gunzip files; leave original .gz in scratch dir
+for ext in ('var', 'xy-coord', 'xyz'):
+    ifname = os.path.join(RAMMS_DIR, f'{base}.{ext}.gz')
+    ofname = os.path.join(RAMMS_DIR, f'{base}.{ext}')
+    with gzip.open(ifname, 'rb') as fin:
+        with open(ofname, 'wb') as out:
+            shutil.copyfileobj(fin, out)
+
+# ----------------------
+# Launch RAMMS exe to run one avalanche
+#os.chdir(RAMMS_DIR)
+if True:
+    ramms_exe = '/home/efischer/av/opt/RAMMS/230210/bin/ramms_aval_LHM.exe'
+    cmd = ['wine', ramms_exe, av3_file, f'{log_base}.out']
+    print(' '.join(cmd))
+    subprocess.run(cmd, check=True)

@@ -1,9 +1,6 @@
 import sys,re,subprocess,os,gzip,shutil,zipfile,traceback
 
 base = sys.argv[1]
-#base = os.environ['avalanche']
-
-
 RAMMS_DIR = os.getcwd()    # HTCondor sets this
 HOME = '/tmp/home'
 
@@ -14,22 +11,35 @@ log_base = os.path.join(RAMMS_DIR, base)
 #out_file = f'{log_base}.out'
 
 # ----------------------------------------
-pathRE = re.compile(r'((Domain|Altitude)\s+[^\s]*\s+)([^\s]*)\s*')
+pathRE = re.compile(r'Domain\s+[^\s]*\s+([^\s]*)\s*', re.MULTILINE)
 def write_av3(av2_file, av3_file):
-    # Rewrite .av2 file to avoid absolute paths (on a Windows machine)
+    """Rewrite .av2 file to avoid absolute paths (on a Windows machine)"""
+
     with open(av2_file) as fin:
-        with open(av3_file, 'w') as out:
-            for line in fin:
-                # Transform
-                match = pathRE.match(line)
-                if match is None:
-                    out.write(line)
-                else:
-                    fname = match.group(3)
-                    leaf = fname.split('\\')[-1]
-                    out.write(f'{match.group(1)}{leaf}\n')
+        av2_str = fin.read()
+
+    # Figure out directory to blank out (as a string)
+    match = pathRE.search(av2_str)
+    dom_file = match.group(1)
+    dir = dom_file[:dom_file.rindex('\\')+1]
+
+    # Blank out all occurrences of that dir
+    av3_str = av2_str.replace(dir, '')
+
+
+    # Go one dir up
+    dir = dir[:-1]    # Remove trailing backslash
+    dir = dir[:dir.rindex('\\')]
+    print(f'dir "{dir}"')
+    av3_str = av3_str.replace(dir, '..')
+
+    with open(av3_file, 'w') as out:
+        out.write(av3_str)
 # ----------------------------------------
-print('Starting runaval.py')
+with open('/opt/build_date.txt') as fin:
+    build_sdate = fin.read().strip()
+
+print(f'Starting runaval.py (Docker Container Build Date: {build_sdate}')
 files_for_zip = set()
 
 # Set up environment
@@ -40,6 +50,7 @@ os.makedirs(os.path.join(HOME, 'Desktop'), exist_ok=True)
 # Set up wine
 os.chdir(HOME)
 cmd = ['tar', 'xfz', '/opt/dotwine.tar.gz']
+print(' '.join(cmd))
 subprocess.run(cmd, check=True, env=env)
 
 # Write the .av3 file
@@ -57,7 +68,7 @@ for ext in ('var', 'xy-coord', 'xyz'):
 # Launch RAMMS exe to run one avalanche
 os.chdir(RAMMS_DIR)
 if True:
-    cmd = ['wine', '/opt/ramms/bin/ramms_aval_LHM_orig.exe', av3_file, f'{log_base}.out']
+    cmd = ['wine', '/opt/ramms/bin/ramms_aval_LHM.exe', av3_file, f'{log_base}.out']
     print(' '.join(cmd))
     subprocess.run(cmd, check=True, env=env)
 else:

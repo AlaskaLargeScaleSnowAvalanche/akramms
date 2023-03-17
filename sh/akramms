@@ -31,6 +31,7 @@ def subcommand(args=[], parent=subparsers):
 def ps(args):
     """Provides status of RAMMS avalanches"""
     release_files = rammsutil.get_release_files(args.ramms)
+    print(release_files)
 
     df = r_ramms.job_statuses(release_files)
     r_ramms.print_job_statuses(df)
@@ -93,6 +94,23 @@ def cat(args):
     r_ramms.cat(args.ramms, args.ids)
 
 
+@subcommand([
+    argument('ramms', help='RAMMS directory or release file to inspect'),
+])
+def spec(args):
+    release_files = rammsutil.get_release_files(args.ramms)
+    for fname in release_files:
+        print(fname)
+
+@subcommand([
+    argument('ramms', help='RAMMS directory or release file to inspect'),
+])
+def mosaic(args):
+    release_files = rammsutil.get_release_files(args.ramms)
+    oramms_dirs = r_ramms.assemble_stage3(release_files)
+    for oramms_dir in oramms_dirs:
+        print(f'=========== Assembling {oramms_dir}')
+        r_ramms.run_ramms_stage3(oramms_dir)
 
 def main():
     args = cli.parse_args()

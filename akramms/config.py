@@ -45,6 +45,14 @@ max_ramms_pras = 100
 # ------------------------------
 # DEBUG parameters
 #allowed_pra_sizes = {'T', 'S', 'M', 'L'}
-allowed_pra_sizes = {'L'}
+allowed_pra_sizes = {'L', 'M'}
 #allowed_forests = {True}
 #allowed_return_periods = {30}
+
+# Amount of margin to provide avalanche for first run
+initial_margins = {
+    'T' : 1000.,
+    'S' : 1000.,
+    'M' : 1000.,
+    'L' : 1000.
+}

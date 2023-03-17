@@ -1,4 +1,4 @@
-import os,re,typing,functools,copy
+import os,re,typing,functools,copy,glob
 import numpy as np
 import shapely
 
@@ -33,7 +33,6 @@ class RammsName:
         # Root of the RAMMS run (from RAMM's perspective)
         if self.return_period >= 0:
             self.rammsdir_name = f'{self.scene_name}{self.ssegment}{self.return_period}{self.pra_size}{self.For}_{self.resolution}m{self.sid}' 
-
             self.ramms_dir = os.path.join(self.ramms_harness, self.rammsdir_name)
 
         # Place where slope files are placed.
@@ -72,13 +71,13 @@ class RammsName:
 
 
     def log_zip(self, id):
-        return os.path.join(self.run_dir, '{}_{}.log.zip'.format(self.base, id))
+        return os.path.join(self.avalanche_dir, self.arcname(id, '.log.zip'))
 
     def arcname(self, id, ext):
         """Name of the a file within the Zip archive of an avalanche
 
         """
-        return '{}_{}{}'.format(self.base, id, ext)
+        return f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m_{self.return_period}{self.pra_size}_{id}{ext}'
 
 # -------------------------------------------------------
 release_fileRE = re.compile(r'^(.+)(\d\d\d)(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(.*)(\..*)')
@@ -115,7 +114,7 @@ def _ramms_to_release(ramms_dirs):
 
     return release_files
 
-def get_release_files(spec):
+def _get_release_files(spec):
     """Given a directory above or below the RAMMS directory, finds a
     "ramms dir," which is one level below RAMMS/."""
 
@@ -147,6 +146,18 @@ def get_release_files(spec):
                 return _ramms_to_release([os.sep.join(parts[:i+2])])
 
     raise ValueError('Could not interpret spec {} as one or more RAMMS dirs'.format(spec))
+
+def get_release_files(spec):
+    # Expand wildcards
+    specs = glob.glob(spec)
+    if len(specs) == 0:
+        return _get_release_files(spec)
+
+    ret = list()
+    for spec1 in specs:
+        ret += _get_release_files(spec1)
+    return ret
+
 # ---------------------------------------------------------
 def read_polygon(poly_file):
     """Reads a RAMMS polygon file (eg: .dom) into a Shapely Polygon."""

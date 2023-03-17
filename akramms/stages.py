@@ -78,7 +78,7 @@ def add_stage1_rules(makefile, scene_dir):
         chull_file = os.path.join(jb.ramms_dir, 'CHULL', '{}_chull.shp'.format(jb.ramms_name))
         domain_file = os.path.join(jb.ramms_dir, 'DOMAIN', '{}_dom.shp'.format(jb.ramms_name))
         makefile.add(r_domain_builder.domain_rule(
-            dem_filled_file, pra_burn_file, chull_file, domain_file, min_alpha=18., margin=1000.))
+            dem_filled_file, pra_burn_file, chull_file, domain_file, min_alpha=18., margin=config.initial_margins[jb.pra_size]))
 
 
         # Now we have the input files for a RAMMS run:
