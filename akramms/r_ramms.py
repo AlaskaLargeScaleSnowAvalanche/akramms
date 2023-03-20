@@ -608,6 +608,51 @@ def infos(release_files, ids=None):
 # =============================================================================
 # ===== RAMMS Stage 3
 
+def oramms_mapping(release_files):
+    """Collects tuple of source info from a RammsName.
+    Returns: {oramms_names: [release_file, ...], ...}
+        Grouping of release files by output RAMMS name (tuple of args to RammsName())
+    """
+
+    # Assemble dataframe of original release files
+    rows = list()
+    for release_file in release_files:
+        jb = rammsutil.parse_release_file(release_file)
+        rows.append(jb.args)
+    df = pd.DataFrame(rows)
+
+    # Boil down input RAMMS Names into output...
+    # Foreach optional col:
+    #   If all rows have same value:
+    #      leave at that value
+    #   Else:
+    #      set all rows to None
+
+    for colname in rammsutil.RammsName.optional_cols:
+        col = df[colname]
+        val0 = col.iloc[0]
+        if (not (col == val0).all()):
+            df[colname] = None
+
+    # Determine output RAMMS name for each item
+    oramms_names = dict()
+    for ix,row in df.iterrows():
+        oramms_name = tuple((row[x] for x in rammsutil.RammsName.all_cols))
+        if oramms_name not in oramms_names:
+            oramms_names[oramms_name] = list()
+        oramms_names[oramms_name].append(release_files[ix])
+
+    return oramms_names
+            
+
+
+
+
+
+    for ix,df0 in df.groupby(rammsutil.RammsName.required_cols):
+        df0.index.tolist()
+
+
 def assemble_stage3(release_files):
     """Iterates through a set of avalanches by spec
     ramms_spec:
@@ -673,13 +718,15 @@ def assemble_stage3(release_files):
                 shutil.copy(ifname, ofname)
     return oramms_dirs
 
+
 def run_ramms_stage3(oramms_dir):
     oramms_dir_rel = config.roots.relpath(oramms_dir)
     cmd = ['sh', 
         config.roots_w.join('HARNESS', 'akramms', 'sh', 'run_ramms.sh', bash=True),
         '--ramms-version', config.ramms_version,
-        config.roots_w.syspath(ramms_dir_rel, bash=True), '3']    # '3'=stage 3
-    dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=False)
+        config.roots_w.syspath(oramms_dir_rel, bash=True), '3']    # '3'=stage 3
+    with ioutil.TmpDir() as tdir:
+        dynamic_outputs = harnutil.run_remote([], cmd, tdir, write_inputs=False)
 
     return dynamic_outputs
 

@@ -9,29 +9,47 @@ PRA_SIZES = {
     'L' : 'large'}
 # ---------------------------------------------------------------
 class RammsName:
+    all_cols = ['ramms_harness', 'scene_name', 'segment', 'forest', 'resolution', 'return_period', 'pra_size', 'id']
+    required_cols = ['ramms_harness', 'scene_name', 'forest', 'resolution']
+    optional_cols = ['segment', 'return_period', 'pra_size', 'id']
 
     def __init__(self, ramms_harness, scene_name, segment, forest, resolution, return_period, pra_size, id):
         """
-        ramms_harness:
+        ramms_harness: REQUIRED
             Directory containing RAMMS directories
             Eg: ~/prj/juneau1/RAMMS
-        id: int
-            ID number of a PRA (can be None)
+        scene_name: REQUIRED
+            Overall name of scene in top-level project (eg: juneau1)
+        segment: int OPTIONAL (None = not set)
+            Segment numberwithin a run
+        forest: bool REQUIRED
+            Is this a forested or non-forested run?
+        resolution: int REQUIRED
+            Spatial resolution of the DEM used
+        return_period: int OPTIONAL (None = not set)
+            10y, 30y, 100y, 300y
+        pra_size: str OPTIONAL
+            Which segment of PRAs is being processed
+            'T', 'S', 'M', 'L'
+        id: int OPTIONAL (None = not set)
+            ID number of a PRA
         """
-        self.__dict__.update(locals())
+        if return_period == -1:
+            return_period = None
+        self.args = dict(locals())    # Store original args to function
+        self.__dict__.update(self.args)
         self.update()
-
 
     def update(self):
         """Update computed values"""
         self.For = 'For' if self.forest else 'NoFor'
         self.ssegment = '' if self.segment is None else '{:03d}'.format(self.segment)
         self.sid = '' if self.id is None else f'_{self.id}'
-        suffix = '' if self.return_period<0 else f'_{self.return_period}{self.pra_size}'
+        suffix = '' if self.return_period is None else f'_{self.return_period}{self.pra_size}'
         self.ramms_name = f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m{suffix}{self.sid}'
 
         # Root of the RAMMS run (from RAMM's perspective)
-        if self.return_period >= 0:
+        if self.return_period is not None:
             self.rammsdir_name = f'{self.scene_name}{self.ssegment}{self.return_period}{self.pra_size}{self.For}_{self.resolution}m{self.sid}' 
             self.ramms_dir = os.path.join(self.ramms_harness, self.rammsdir_name)
 

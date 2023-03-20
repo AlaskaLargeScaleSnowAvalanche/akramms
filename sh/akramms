@@ -107,6 +107,11 @@ def spec(args):
 ])
 def mosaic(args):
     release_files = rammsutil.get_release_files(args.ramms)
+
+    ormap = r_ramms.oramms_mapping(release_files)
+    print(ormap)
+    return
+
     oramms_dirs = r_ramms.assemble_stage3(release_files)
     for oramms_dir in oramms_dirs:
         print(f'=========== Assembling {oramms_dir}')
