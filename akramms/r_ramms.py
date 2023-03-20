@@ -608,7 +608,7 @@ def infos(release_files, ids=None):
 # =============================================================================
 # ===== RAMMS Stage 3
 
-def oramms_mapping(release_files):
+def oramms_mapping(oramms_harness, release_files):
     """Collects tuple of source info from a RammsName.
     Returns: {oramms_names: [release_file, ...], ...}
         Grouping of release files by output RAMMS name (tuple of args to RammsName())
@@ -637,44 +637,32 @@ def oramms_mapping(release_files):
     # Determine output RAMMS name for each item
     oramms_names = dict()
     for ix,row in df.iterrows():
-        oramms_name = tuple((row[x] for x in rammsutil.RammsName.all_cols))
+        oramms_name = tuple((oramms_harness, *(row[x] for x in rammsutil.RammsName.all_cols[1:])))
         if oramms_name not in oramms_names:
             oramms_names[oramms_name] = list()
         oramms_names[oramms_name].append(release_files[ix])
 
     return oramms_names
-            
 
 
-
-
-
-    for ix,df0 in df.groupby(rammsutil.RammsName.required_cols):
-        df0.index.tolist()
-
-
-def assemble_stage3(release_files):
+def assemble_stage3(oramms_dir, release_files):
     """Iterates through a set of avalanches by spec
     ramms_spec:
         Spec indicating the release file(s) to include in the iteration
     """
 
-    oramms_dirs = set()
+    print('oramms_dir ', oramms_dir)
+
+#    # Construct a fresh output directory...
+#    try:
+#        shutil.rmtree(oramms_dir)
+#    except FileNotFoundError:
+#        pass
 
     # Find all available individual runs
     for release_file in release_files:
         jb = rammsutil.parse_release_file(release_file)
         ids = get_job_ids(release_file)
-
-        # Construct a fresh output directory...
-        oramms_dir = os.path.join(
-            os.path.dirname(jb.ramms_harness), 'ORAMMS',
-            f'{jb.scene_name}{jb.For}_{jb.resolution}m')
-        try:
-            shutil.rmtree(oramms_dir)
-        except FileNotFoundError:
-            pass
-        oramms_dirs.add(oramms_dir)
 
         oslope_dir = os.path.join(oramms_dir, 'RESULTS',
             f'{jb.scene_name}{jb.For}_{jb.resolution}m')
@@ -716,7 +704,6 @@ def assemble_stage3(release_files):
                 ifname = os.path.join(jb.avalanche_dir, f'{ibase}_{id}{ext}')
                 ofname = os.path.join(oavalanche_dir, f'{obase}_{id}{ext}')
                 shutil.copy(ifname, ofname)
-    return oramms_dirs
 
 
 def run_ramms_stage3(oramms_dir):

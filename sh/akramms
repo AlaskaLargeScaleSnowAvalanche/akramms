@@ -108,13 +108,14 @@ def spec(args):
 def mosaic(args):
     release_files = rammsutil.get_release_files(args.ramms)
 
-    ormap = r_ramms.oramms_mapping(release_files)
-    print(ormap)
-    return
-
-    oramms_dirs = r_ramms.assemble_stage3(release_files)
-    for oramms_dir in oramms_dirs:
+    jb = rammsutil.parse_release_file(release_files[0])
+    oramms_harness = os.path.join(os.path.dirname(jb.ramms_harness), 'ORAMMS')
+    ormap = r_ramms.oramms_mapping(oramms_harness, release_files)
+    for args,release_files in ormap.items():
+        ojb = rammsutil.RammsName(*args)
+        oramms_dir = ojb.ramms_dir
         print(f'=========== Assembling {oramms_dir}')
+        r_ramms.assemble_stage3(ojb.ramms_dir, release_files)
         r_ramms.run_ramms_stage3(oramms_dir)
 
 def main():
