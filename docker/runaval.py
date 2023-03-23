@@ -36,10 +36,10 @@ def write_av3(av2_file, av3_file):
     with open(av3_file, 'w') as out:
         out.write(av3_str)
 # ----------------------------------------
-with open('/opt/build_date.txt') as fin:
-    build_sdate = fin.read().strip()
+with open('/opt/build_version.txt') as fin:
+    build_version = fin.read().strip()
 
-print(f'Starting runaval.py (Docker Container Build Date: {build_sdate}')
+print(f'Starting runaval.py (Docker Container Build: {build_version}')
 files_for_zip = set()
 
 # Set up environment

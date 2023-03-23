@@ -2,13 +2,7 @@ import os,subprocess,re,sys
 import functools
 from akramms import config
 
-def _harness_dir():
-    path = os.path.abspath(__file__)
-    for i in range(4):
-        path = os.path.split(path)[0]
-    return path
-HARNESS = _harness_dir()
-
+HARNESS = config.HARNESS    # Alias
 
 def bash_name(wfname):
     """Gets the bash name of a Windows filename.
