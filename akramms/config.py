@@ -68,7 +68,7 @@ initial_margins = {
     'L' : 1000.
 }
 
-ramms_distro_dir = os.path.join(roots['DATA'], 'data', 'christen', 'RAMMS', ramms_version)
+ramms_distro_dir = roots.join('data', 'christen', 'RAMMS', ramms_version)
 
 # Host we use for Docker registry
 docker_host = 'git.akdggs.com'
