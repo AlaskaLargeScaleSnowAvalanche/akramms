@@ -55,7 +55,8 @@ max_ramms_pras = 100
 # ------------------------------
 # DEBUG parameters
 #allowed_pra_sizes = {'T', 'S', 'M', 'L'}
-allowed_pra_sizes = {'L', 'M'}
+#allowed_pra_sizes = {'L', 'M'}
+allowed_pra_sizes = {'L'}
 #allowed_forests = {True}
 #allowed_return_periods = {30}
 
@@ -71,6 +72,19 @@ ramms_distro_dir = os.path.join(HARNESS, 'data', 'christen', 'RAMMS', ramms_vers
 
 # Host we use for Docker registry
 docker_host = 'git.akdggs.com'
+
+# Determine the Docker image to use to run RAMMS
+def _docker_tag():
+    ini = configparser.ConfigParser()
+    ini.read(builds_ini)
+    section = self.ini['builds']
+    build = int(section[ramms_version])
+
+    vers = f'{ramms_version}.{build}'
+    return f'{docker_host}/efischer/ramms:{vers}'
+
+docker_tag = _docker_tag()
+
 
 # ------------------------------------------------------------
 builds_ini = os.path.join(HARNESS, 'akramms', 'docker', 'builds.ini')

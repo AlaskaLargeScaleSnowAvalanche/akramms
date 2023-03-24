@@ -25,7 +25,7 @@ COPY dotwine.tar.gz /opt
 
 # Install RAMMS .exe file (and any supporting DLLs)
 ADD RAMMS/230321 /opt/ramms
-RUN echo '230321.13' >/opt/build_version.txt
+RUN echo '230321.1' >/opt/build_version.txt
 
 ADD RAMMS/230321 /opt/ramms
 

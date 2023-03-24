@@ -26,7 +26,6 @@ MODULE  AVAL
 MUXI    VARIABLE
 DIR     {remote_ramms_dir}\
 DEM     DEM\
-SLOPE   SLOPE\
 RELEASE RELEASE\
 DOMAIN  DOMAIN\
 FOREST  FOREST\
@@ -145,11 +144,11 @@ def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):
 
 # ---------------------------------------------------------------
 #DOCKER_IMAGE = 'localhost:5000/ramms'
-DOCKER_IMAGE = 'git.akdggs.com/efischer/ramms:230210.2'
+#DOCKER_IMAGE = 'git.akdggs.com/efischer/ramms:230210.2'
 
 submit_tpl = \
 """universe                = docker
-docker_image            = {DOCKER_IMAGE}
+docker_image            = {config.docker_tag}
 executable              = /usr/bin/python
 arguments               = /opt/runaval.py {job_name}
 
@@ -188,6 +187,7 @@ def submit_job(run_dir, job_name):#, local=False):
 #        cmd = ['docker', 'run', DOCKER_IMAGE, '/usr/bin/python', '/opt/runaval.py', job_name]
 #        subprocess.run(cmd, cwd=run_dir, check=True)
 #        return
+
 
 
     print('Submitting job: {}'.format(job_name))
