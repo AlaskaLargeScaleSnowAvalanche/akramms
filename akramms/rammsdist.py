@@ -113,7 +113,8 @@ def kill_idl():
 # RAMMS IDL prints this when it is done with Stage 1
 _doneREs = {
     1 : re.compile(r'\s*(Starting LSHM SIMULATIONS|LSHM Analysis finished successfully|- VAR-Files: All files created \(IDLBridge\)!)'),
-    3 : re.compile(r'LSHM Analysis finished successfully'),
+    3 : re.compile(r'\s*Finished writing GEOTIFF files!'),
+#    3 : re.compile(r'LSHM Analysis finished successfully'),
 }
 
 #_doneRE = re.compile(r"\s*Finsihed writing GEOTIFF files!")    # Prod

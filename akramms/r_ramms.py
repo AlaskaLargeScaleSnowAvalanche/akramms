@@ -39,50 +39,37 @@ ALT_LIM_LOW  {alt_lim_low}
 END
 """
 
-def rammsdir_rule(scene_dir, release_file, oramms_name,
-    alt_lim_top=1500, alt_lim_low=1000, ncpu=8, ncpu_preprocess=4, cohesion=50):
-
-    """Generates the scenario file, which becomes key to running RAMMS.
-    release:
-        Release file to process
-    oramms_name:
-        Output RAMMS directory to create
+def dem_forest_links(scene_args, ramms_dir, oslope_name, forest=False):
     """
-    jb = rammsutil.parse_release_file(release_file)
-    oslope_dir = oramms_name.slope_dir
-
-    scene_args = params.load(scene_dir)
-    resolution = scene_args['resolution']
-    name = scene_args['name']
-    scenario_txt = os.path.join(jb.ramms_dir, 'scenario.txt')
+    ramms_dir:
+        RAMMS directory where FOREST and DEM files are being created
+    """
 
     # ---- DEM File
     idem_dir,idem_tif = os.path.split(scene_args['dem_file'])
     idem_stub = idem_tif[:-4]
     links = [
         (os.path.join(idem_dir, f'{idem_stub}.tif'),
-            os.path.join(jb.ramms_dir, 'DEM', f'{oslope_dir}_DEM.tif')),
+            os.path.join(ramms_dir, 'DEM', f'{oslope_name}_DEM.tif')),
         (os.path.join(idem_dir, f'{idem_stub}.tfw'),
-            os.path.join(jb.ramms_dir, 'DEM', f'{oslope_dir}_DEM.tfw')),
+            os.path.join(ramms_dir, 'DEM', f'{oslope_name}_DEM.tfw')),
     ]
 
 
     # ---- Forest File
-    if jb.forest:
+    if forest:
         iforest_dir,iforest_tif = os.path.split(scene_args['forest_file'])
         iforest_stub = iforest_tif[:-4]
         links += [
             (os.path.join(iforest_dir, f'{iforest_stub}.tif'),
-                os.path.join(jb.ramms_dir, 'FOREST', f'{oslope_dir}_forest.tif')),
+                os.path.join(ramms_dir, 'FOREST', f'{oslope_name}_forest.tif')),
             (os.path.join(iforest_dir, f'{iforest_stub}.tfw'),
-                os.path.join(jb.ramms_dir, 'FOREST', f'{oslope_dir}_forest.tfw')),
+                os.path.join(ramms_dir, 'FOREST', f'{oslope_name}_forest.tfw')),
         ]
 
-    def action(tdir):
-        # Make symlinks for DEM file, etc.
-        for ifile,ofile in links:
-            setlink_or_copy(ifile, ofile)
+    return links
 
+def write_scenario_txt(jb, alt_lim_top=1500, alt_lim_low=1000, ncpu=8, ncpu_preprocess=4, cohesion=50):
         # Create the scenario file
         kwargs = dict()
         kwargs['scenario_name'] = jb.ramms_name
@@ -101,8 +88,35 @@ def rammsdir_rule(scene_dir, release_file, oramms_name,
         kwargs['alt_lim_top'] = str(alt_lim_top)
         kwargs['alt_lim_low'] = str(alt_lim_low)
 
+        scenario_txt = os.path.join(jb.ramms_dir, 'scenario.txt')
+        os.makedirs(jb.ramms_dir, exist_ok=True)
         with open(scenario_txt, 'w') as out:
             out.write(scenario_tpl.format(**kwargs))
+
+
+def rammsdir_rule(scene_dir, release_file, oramms_name, **scenario_kwargs):
+
+    """Generates the scenario file, which becomes key to running RAMMS.
+    release:
+        Release file to process
+    oramms_name:
+        Output RAMMS directory to create
+    """
+    jb = rammsutil.parse_release_file(release_file)
+
+    scene_args = params.load(scene_dir)
+    resolution = scene_args['resolution']
+    name = scene_args['name']
+    scenario_txt = os.path.join(jb.ramms_dir, 'scenario.txt')
+
+    links = dem_forest_links(scene_args, jb.ramms_dir, oramms_name.slope_dir, forest=jb.forest)
+
+    def action(tdir):
+        # Make symlinks for DEM file, etc.
+        for ifile,ofile in links:
+            setlink_or_copy(ifile, ofile)
+
+        write_scenario_txt(jb, **scenario_kwargs)
 
     inputs = [d[0] for d in links]
     linked_files = [d[1] for d in links]
@@ -630,8 +644,8 @@ def assemble_stage3(oramms_name, release_files):
         Spec indicating the release file(s) to include in the iteration
     """
 
-    oramms_dir = oramms_name.ramms_dir
-    print('oramms_dir ', oramms_dir)
+#    oramms_dir = oramms_name.ramms_dir
+#    print('oramms_dir ', oramms_dir)
 
 
 # ADDITIONAL STUFF NEEDED IN ORAMMS DIRECTORY
@@ -660,10 +674,48 @@ def assemble_stage3(oramms_name, release_files):
 #    except FileNotFoundError:
 #        pass
 
+    # Write scenario.txt
+    write_scenario_txt(oramms_name)
+
+    # Copy / Symlink DEM and FOREST files
+    jb = rammsutil.parse_release_file(release_files[0])
+    scene_args = params.load(oramms_name.scene_dir)
+    links = dem_forest_links(scene_args, oramms_name.ramms_dir, oramms_name.slope_name, forest=jb.forest)
+    links.append((
+        os.path.join(jb.scene_dir, 'scene.nc'),
+        os.path.join(oramms_name.scene_dir, 'scene.nc')))
+
+    # Do the copies!
+    for ifile,ofile in links:
+        setlink_or_copy(ifile, ofile)
+
+    # Decide on what the _rel.shp and _dom.shp files should be called
+    orel_base = os.path.join(oramms_name.ramms_dir, 'RELEASE', oramms_name.reldom_name+'_rel')
+    odom_base = os.path.join(oramms_name.ramms_dir, 'DOMAIN', oramms_name.reldom_name+'_dom')
+
     # Find all available individual runs
     for release_file in release_files:
         jb = rammsutil.parse_release_file(release_file)
         ids = get_job_ids(release_file)
+
+        # Copy _rel.shp and _dom.shp files
+        irel_base = os.path.join(jb.ramms_dir, 'RELEASE', jb.reldom_name+'_rel')
+        idom_base = os.path.join(jb.ramms_dir, 'DOMAIN', jb.reldom_name+'_dom')
+
+#        irel_base = os.path.splitext(release_file)[0]
+#        irel_baseleaf = os.path.split(irel_base)[1]
+#        idom_base = (irel_base[:-4] + '_dom').replace('RELEASE', 'DOMAIN')
+#
+#        orel_base = os.path.join(oramms_name.ramms_dir, 'RELEASE', irel_baseleaf)
+#        odom_base = os.path.join(oramms_name.ramms_dir, 'DOMAIN', irel_baseleaf)
+
+        links = list()
+        for ext in ('.dbf', '.prj', '.shp', '.shx'):
+            links.append((f'{irel_base}{ext}', f'{orel_base}{ext}'))
+            links.append((f'{idom_base}{ext}', f'{odom_base}{ext}'))
+        for ifile,ofile in links:
+            print('COPY: {} -> {}'.format(ifile, ofile))
+            setlink_or_copy(ifile, ofile)
 
 #        oslope_dir = os.path.join(oramms_dir, 'RESULTS',
 #            f'{jb.scene_name}{jb.For}_{jb.resolution}m')
@@ -709,7 +761,8 @@ def assemble_stage3(oramms_name, release_files):
                 shutil.copy(ifname, ofname)
 
 
-def run_ramms_stage3(oramms_dir):
+def run_ramms_stage3(oramms_name):
+    oramms_dir = oramms_name.ramms_dir
     oramms_dir_rel = config.roots.relpath(oramms_dir)
     cmd = ['sh', 
         config.roots_w.join('HARNESS', 'akramms', 'sh', 'run_ramms.sh', bash=True),

@@ -43,11 +43,13 @@ class RammsName:
 
     def update(self):
         """Update computed values"""
+        self.scene_dir = os.path.dirname(self.ramms_harness)   # Top-level AKRAMMS directory
         self.For = 'For' if self.forest else 'NoFor'
         self.ssegment = '' if self.segment is None else '{:03d}'.format(self.segment)
         self.sid = '' if self.id is None else f'_{self.id}'
         suffix = '' if self.return_period is None else f'_{self.return_period}{self.pra_size}'
-        self.ramms_name = f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m{suffix}{self.sid}'
+        self.reldom_name = f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m{suffix}'
+        self.ramms_name = self.reldom_name + str(self.sid)  #f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m{suffix}{self.sid}'
 
         # Root of the RAMMS run (from RAMM's perspective)
         if self.return_period is not None:
@@ -56,8 +58,8 @@ class RammsName:
 
         # Place where slope files are placed.
         # (These are common for all return periods and T/S/M/L
-        self.slope_dir = os.path.join(self.ramms_dir, 'RESULTS',
-            f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m')
+        self.slope_name = f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m'
+        self.slope_dir = os.path.join(self.ramms_dir, 'RESULTS', self.slope_name)
 
         # Place where individual avalanche computations take place
         self.avalanche_dir = os.path.join(self.slope_dir, f'{self.return_period}{self.pra_size}')
@@ -256,6 +258,9 @@ def oramms_mapping(oramms_harness, release_files):
         val0 = col.iloc[0]
         if (not (col == val0).all()):
             df[colname] = None
+
+    # Don't include segment in ORAMMS name in any case!
+    df['segment'] = None
 
     # Determine output RAMMS name for each item
     oramms_names = dict()
