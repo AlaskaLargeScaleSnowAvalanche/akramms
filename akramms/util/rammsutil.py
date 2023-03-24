@@ -1,6 +1,7 @@
 import os,re,typing,functools,copy,glob
 import numpy as np
 import shapely
+import pandas as pd
 
 PRA_SIZES = {
     'T' : 'tiny',
@@ -226,3 +227,63 @@ def add_margin(p,margin):
     p = shapely.geometry.Polygon(list(zip(pts[:-1,0], pts[:-1,1])))
     return p
 # -----------------------------------------------------------
+def oramms_mapping(oramms_harness, release_files):
+
+    """Collects tuple of source info from a RammsName.  In preparation
+    for determing ORAMMS project names for Stage 3 assembly.
+
+    Returns: {oramms_names: [release_file, ...], ...}
+        Grouping of release files by output RAMMS name (tuple of args to RammsName())
+
+    """
+
+    # Assemble dataframe of original release files
+    rows = list()
+    for release_file in release_files:
+        jb = parse_release_file(release_file)
+        rows.append(jb.args)
+    df = pd.DataFrame(rows)
+
+    # Boil down input RAMMS Names into output...
+    # Foreach optional col:
+    #   If all rows have same value:
+    #      leave at that value
+    #   Else:
+    #      set all rows to None
+
+    for colname in RammsName.optional_cols:
+        col = df[colname]
+        val0 = col.iloc[0]
+        if (not (col == val0).all()):
+            df[colname] = None
+
+    # Determine output RAMMS name for each item
+    oramms_names = dict()
+    for ix,row in df.iterrows():
+        oramms_name = tuple((oramms_harness, *(row[x] for x in RammsName.all_cols[1:])))
+        if oramms_name not in oramms_names:
+            oramms_names[oramms_name] = list()
+        oramms_names[oramms_name].append(release_files[ix])
+
+    return oramms_names
+
+def groupby_oramms(release_files):
+    """Groups a bunch of piecewise release files into output RAMMS
+    runs.
+
+    Yields: (oramms_name, [release_file, ...])
+        oramms_name: RammsName:
+            Name of an ORAMMS run to assemble and use.
+        [release_file, ...]
+            Constituent RAMMS runs to assemble into oramms_name
+    """
+    # Assume all in same harness
+    jb = parse_release_file(release_files[0])
+    oramms_harness = os.path.join(os.path.dirname(jb.ramms_harness), 'ORAMMS')
+
+    for args,release_files in oramms_mapping(oramms_harness, release_files).items():
+        ojb = RammsName(*args)
+        yield ojb, release_files
+
+
+# ------------------------------------------------

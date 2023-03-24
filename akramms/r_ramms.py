@@ -1,4 +1,4 @@
-import os,subprocess,re,sys,itertools,gzip,collections,io,typing
+import os,subprocess,re,sys,itertools,gzip,collections,io,typing,codecs
 import numpy as np
 import datetime,time,zipfile
 import contextlib
@@ -39,13 +39,17 @@ ALT_LIM_LOW  {alt_lim_low}
 END
 """
 
-def rammsdir_rule(scene_dir, release_file,
+def rammsdir_rule(scene_dir, release_file, oramms_name,
     alt_lim_top=1500, alt_lim_low=1000, ncpu=8, ncpu_preprocess=4, cohesion=50):
 
     """Generates the scenario file, which becomes key to running RAMMS.
+    release:
+        Release file to process
+    oramms_name:
+        Output RAMMS directory to create
     """
     jb = rammsutil.parse_release_file(release_file)
-    jb_dem = jb.copy(return_period=None)    # Get name without return period
+    oslope_dir = oramms_name.slope_dir
 
     scene_args = params.load(scene_dir)
     resolution = scene_args['resolution']
@@ -56,8 +60,10 @@ def rammsdir_rule(scene_dir, release_file,
     idem_dir,idem_tif = os.path.split(scene_args['dem_file'])
     idem_stub = idem_tif[:-4]
     links = [
-        (os.path.join(idem_dir, f'{idem_stub}.tif'), os.path.join(jb.ramms_dir, 'DEM', f'{jb_dem.ramms_name}_DEM.tif')),
-        (os.path.join(idem_dir, f'{idem_stub}.tfw'), os.path.join(jb.ramms_dir, 'DEM', f'{jb_dem.ramms_name}_DEM.tfw')),
+        (os.path.join(idem_dir, f'{idem_stub}.tif'),
+            os.path.join(jb.ramms_dir, 'DEM', f'{oslope_dir}_DEM.tif')),
+        (os.path.join(idem_dir, f'{idem_stub}.tfw'),
+            os.path.join(jb.ramms_dir, 'DEM', f'{oslope_dir}_DEM.tfw')),
     ]
 
 
@@ -66,8 +72,10 @@ def rammsdir_rule(scene_dir, release_file,
         iforest_dir,iforest_tif = os.path.split(scene_args['forest_file'])
         iforest_stub = iforest_tif[:-4]
         links += [
-            (os.path.join(iforest_dir, f'{iforest_stub}.tif'), os.path.join(jb.ramms_dir, 'FOREST', f'{jb_dem.ramms_name}_forest.tif')),
-            (os.path.join(iforest_dir, f'{iforest_stub}.tfw'), os.path.join(jb.ramms_dir, 'FOREST', f'{jb_dem.ramms_name}_forest.tfw')),
+            (os.path.join(iforest_dir, f'{iforest_stub}.tif'),
+                os.path.join(jb.ramms_dir, 'FOREST', f'{oslope_dir}_forest.tif')),
+            (os.path.join(iforest_dir, f'{iforest_stub}.tfw'),
+                os.path.join(jb.ramms_dir, 'FOREST', f'{oslope_dir}_forest.tfw')),
         ]
 
     def action(tdir):
@@ -186,14 +194,14 @@ def submit_job(run_dir, job_name):#, local=False):
 
 #    if local:
 #        print('Running: {}'.format(job_name))
-#        cmd = ['docker', 'run', DOCKER_IMAGE, '/usr/bin/python', '/opt/runaval.py', job_name]
+#        cmd = ['docker', 'run', DOCKER_TAG, '/usr/bin/python', '/opt/runaval.py', job_name]
 #        subprocess.run(cmd, cwd=run_dir, check=True)
 #        return
 
 
 
     print('Submitting job: {}'.format(job_name))
-    submit_txt = submit_tpl.format(job_name=job_name, run_dir=run_dir, DOCKER_IMAGE=DOCKER_IMAGE)
+    submit_txt = submit_tpl.format(job_name=job_name, run_dir=run_dir, DOCKER_TAG=DOCKER_TAG)
 
     cmd = ['condor_submit', '-batch-name', job_name]
     print(' '.join(cmd) + '<<EOF')
@@ -534,14 +542,18 @@ def ramms_iter(ramms_spec, ids=list()):
         yield rf_by_id[id],id
 
 
-def cat(ramms_spec, ids=list()):
+# https://stackoverflow.com/questions/34447623/wrap-an-open-stream-with-io-textiowrapper
+def cat(ramms_spec, ids=list(), out_bytes=sys.stdout.buffer):
+    out_text = codecs.getwriter('utf-8')(out_bytes)
     for jb,id in ramms_iter(ramms_spec, ids=ids):
         log_zip = jb.log_zip(id)
         with zipfile.ZipFile( log_zip, 'r') as izip:
-            print('======== {}'.format(log_zip))
+            print('======== {}'.format(log_zip), file=out_text)
             sys.stdout.flush()
             bytes = izip.read(jb.arcname(id, '.out.log'))
-            os.write(1, bytes)    # 1 = STDOUT
+            out_bytes.write(bytes)
+
+            #os.write(1, bytes)    # 1 = STDOUT
             #with os.fdopen(sys.stdout.fileno(), "wb", closefd=False) as stdout:
             #    stdout.write(bytes)
             #    stdout.flush()
@@ -610,50 +622,37 @@ def infos(release_files, ids=None):
 # =============================================================================
 # ===== RAMMS Stage 3
 
-def oramms_mapping(oramms_harness, release_files):
-    """Collects tuple of source info from a RammsName.
-    Returns: {oramms_names: [release_file, ...], ...}
-        Grouping of release files by output RAMMS name (tuple of args to RammsName())
-    """
-
-    # Assemble dataframe of original release files
-    rows = list()
-    for release_file in release_files:
-        jb = rammsutil.parse_release_file(release_file)
-        rows.append(jb.args)
-    df = pd.DataFrame(rows)
-
-    # Boil down input RAMMS Names into output...
-    # Foreach optional col:
-    #   If all rows have same value:
-    #      leave at that value
-    #   Else:
-    #      set all rows to None
-
-    for colname in rammsutil.RammsName.optional_cols:
-        col = df[colname]
-        val0 = col.iloc[0]
-        if (not (col == val0).all()):
-            df[colname] = None
-
-    # Determine output RAMMS name for each item
-    oramms_names = dict()
-    for ix,row in df.iterrows():
-        oramms_name = tuple((oramms_harness, *(row[x] for x in rammsutil.RammsName.all_cols[1:])))
-        if oramms_name not in oramms_names:
-            oramms_names[oramms_name] = list()
-        oramms_names[oramms_name].append(release_files[ix])
-
-    return oramms_names
 
 
-def assemble_stage3(oramms_dir, release_files):
+def assemble_stage3(oramms_name, release_files):
     """Iterates through a set of avalanches by spec
     ramms_spec:
         Spec indicating the release file(s) to include in the iteration
     """
 
+    oramms_dir = oramms_name.ramms_dir
     print('oramms_dir ', oramms_dir)
+
+
+# ADDITIONAL STUFF NEEDED IN ORAMMS DIRECTORY
+# 
+# * ORAMMS/juneau100030LFor_5m does not match ORAMMS/juneau100030LFor_5m/RESULTS/juneau1For_5m
+#  (both should be called juneau130LFor_5m???)
+# 
+# * scenario.txt file (and must edit its name as well)
+# 
+# * DEM and FOREST files
+#  2021  cp -r ../../RAMMS/juneau100030LFor_5m/FOREST .
+#  2022  cp -r ../../RAMMS/juneau100030LFor_5m/DEM .
+# 
+# * DOMAIN and RELEASE files
+#  2029  cp ../../RAMMS/juneau100030LFor_5m/RELEASE/*_rel.??? RELEASE/
+#  2030  mkdir DOMAIN
+#  2031  cp ../../RAMMS/juneau100030LFor_5m/DOMAIN/*_dom.??? DOMAIN/
+#  2032  history
+# (base) efischer@antevorta:~/prj/juneau1/ORAMMS/juneau100030LFor_5m$ 
+
+
 
 #    # Construct a fresh output directory...
 #    try:
@@ -666,20 +665,22 @@ def assemble_stage3(oramms_dir, release_files):
         jb = rammsutil.parse_release_file(release_file)
         ids = get_job_ids(release_file)
 
-        oslope_dir = os.path.join(oramms_dir, 'RESULTS',
-            f'{jb.scene_name}{jb.For}_{jb.resolution}m')
-        oavalanche_dir = os.path.join(oslope_dir,
-            f'{jb.return_period}{jb.pra_size}')
+#        oslope_dir = os.path.join(oramms_dir, 'RESULTS',
+#            f'{jb.scene_name}{jb.For}_{jb.resolution}m')
+#        oavalanche_dir = os.path.join(oslope_dir,
+#            f'{jb.return_period}{jb.pra_size}')
+        oslope_dir = oramms_name.slope_dir
+        oavalanche_dir = oramms_name.avalanche_dir
             
         ireleasefile_dir = os.path.split(release_file)[0]
 
-        ibase = f'{jb.scene_name}{jb.ssegment}{jb.For}_{jb.resolution}m_{jb.return_period}{jb.pra_size}'
-        obase = f'{jb.scene_name}{jb.For}_{jb.resolution}m_{jb.return_period}{jb.pra_size}'
+#        ibase = f'{jb.scene_name}{jb.ssegment}{jb.For}_{jb.resolution}m_{jb.return_period}{jb.pra_size}'
+#        obase = f'{jb.scene_name}{jb.For}_{jb.resolution}m_{jb.return_period}{jb.pra_size}'
 
         # Figure out which avalanches have been run
         required_exts = {'.dom', '.rel', '.out.gz', '.xy-coord.gz'}
         id_exts = dict()
-        ifileRE = re.compile(r'{}_(\d+)(\..+)'.format(ibase))
+        ifileRE = re.compile(r'{}_(\d+)(\..+)'.format(jb.ramms_name))
         for leaf in os.listdir(jb.avalanche_dir):
             # Make sure file exists in non-zero length
             ifile = os.path.join(jb.avalanche_dir, leaf)
@@ -703,8 +704,8 @@ def assemble_stage3(oramms_dir, release_files):
             if len(exts) < len(required_exts):
                 continue
             for ext in exts:
-                ifname = os.path.join(jb.avalanche_dir, f'{ibase}_{id}{ext}')
-                ofname = os.path.join(oavalanche_dir, f'{obase}_{id}{ext}')
+                ifname = os.path.join(jb.avalanche_dir, f'{jb.ramms_name}_{id}{ext}')
+                ofname = os.path.join(oavalanche_dir, f'{oramms_name.ramms_name}_{id}{ext}')
                 shutil.copy(ifname, ofname)
 
 

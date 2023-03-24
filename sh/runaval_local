@@ -2,6 +2,7 @@
 #
 
 import sys,re,subprocess,os,gzip,shutil,zipfile,traceback
+from akramms import config
 
 base = sys.argv[1]
 RAMMS_DIR = os.getcwd()    # HTCondor sets this
@@ -53,7 +54,7 @@ for ext in ('var', 'xy-coord', 'xyz'):
 # Launch RAMMS exe to run one avalanche
 #os.chdir(RAMMS_DIR)
 if True:
-    ramms_exe = '/home/efischer/av/opt/RAMMS/230210/bin/ramms_aval_LHM.exe'
+    ramms_exe = os.path.join(config.ramms_distro_dir, 'bin', 'ramms_aval_LHM.exe')
     cmd = ['wine', ramms_exe, av3_file, f'{log_base}.out']
     print(' '.join(cmd))
     subprocess.run(cmd, check=True)
