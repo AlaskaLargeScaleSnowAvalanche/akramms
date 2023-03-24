@@ -119,6 +119,19 @@ def spec(args):
         print(fname)
 
 @subcommand([
+    argument('scene', help='Top-Level scene directory to setup through stages 0 and 1.'),
+])
+def setup(args):
+    scene_dir = args.scene
+    scene_args = params.load(scene_dir)
+    print(scene_args)
+
+    stages.run_stage0(scene_dir)
+    stages.run_stage1(scene_dir)
+
+
+
+@subcommand([
     argument('ramms', help='RAMMS directory or release file to inspect'),
 ])
 def mosaic(args):

@@ -113,7 +113,9 @@ def run_stage0(scene_dir):
     makefile = make.Makefile()
     ramms_dirs_release_files = add_stage0_rules(makefile, scene_dir)
 
-    makefile.generate('juneau1_mk', run=True, ncpu=1)
+    makefile.generate(
+        os.path.join(scene_dir, 'stage0_mk'),
+        run=True, ncpu=1)
     return ramms_dirs_release_files
 # =====================================================================
 def run_stage1(scene_dir):
@@ -127,7 +129,9 @@ def run_stage1(scene_dir):
     print('setup.py ', cmd)
     setuptools.sandbox.run_setup(setup_py, cmd)
 
-    makefile.generate('juneau1_mk', run=True, ncpu=1)
+    makefile.generate(
+        os.path.join(scene_dir, 'stage1_mk'),
+        run=True, ncpu=1)
     return ramms_dirs_release_files
 # =====================================================================
 def run_stage2(scene_dir):

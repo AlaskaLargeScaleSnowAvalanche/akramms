@@ -94,7 +94,7 @@ def write_scenario_txt(jb, alt_lim_top=1500, alt_lim_low=1000, ncpu=8, ncpu_prep
             out.write(scenario_tpl.format(**kwargs))
 
 
-def rammsdir_rule(scene_dir, release_file, oramms_name, **scenario_kwargs):
+def rammsdir_rule(scene_dir, release_file, oramms_name=None, **scenario_kwargs):
 
     """Generates the scenario file, which becomes key to running RAMMS.
     release:
@@ -103,13 +103,15 @@ def rammsdir_rule(scene_dir, release_file, oramms_name, **scenario_kwargs):
         Output RAMMS directory to create
     """
     jb = rammsutil.parse_release_file(release_file)
+    if oramms_name is None:
+        oramms_name = jb
 
     scene_args = params.load(scene_dir)
     resolution = scene_args['resolution']
     name = scene_args['name']
     scenario_txt = os.path.join(jb.ramms_dir, 'scenario.txt')
 
-    links = dem_forest_links(scene_args, jb.ramms_dir, oramms_name.slope_dir, forest=jb.forest)
+    links = dem_forest_links(scene_args, jb.ramms_dir, oramms_name.slope_name, forest=jb.forest)
 
     def action(tdir):
         # Make symlinks for DEM file, etc.
@@ -720,11 +722,12 @@ def assemble_stage3(oramms_name, release_files):
         for ifile,ofile in links:
             print('MERGE: {} -> {}'.format(ifile, ofile))
 #            setlink_or_copy(ifile, ofile)
+            os.makedirs(os.path.dirname(ofile), exist_ok=True)
             if ix == 0:
                 # https://gis.stackexchange.com/questions/223183/ogr2ogr-merge-multiple-shapefiles-what-is-the-purpose-of-nln-tag
                 cmd = ['ogr2ogr', '-f', 'gpkg', ofile, ifile]
             else:
-                cmd = ['ogr2og4', '-f', 'gpkg', '-append', '-update', ofile, ifile]
+                cmd = ['ogr2ogr', '-f', 'gpkg', '-append', '-update', ofile, ifile]
             subprocess.run(cmd, check=True)
 
 #        oslope_dir = os.path.join(oramms_dir, 'RESULTS',
