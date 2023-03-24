@@ -1,4 +1,4 @@
-import os,configparser,functools
+import os,configparser,functools,sys
 from uafgi.util import pathutil,ioutil
 
 
@@ -79,7 +79,7 @@ builds_ini = os.path.join(HARNESS, 'akramms', 'docker', 'builds.ini')
 def docker_tag():
     ini = configparser.ConfigParser()
     ini.read(builds_ini)
-    section = self.ini['builds']
+    section = ini['builds']
     build = int(section[ramms_version])
 
     vers = f'{ramms_version}.{build}'
