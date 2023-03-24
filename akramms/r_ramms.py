@@ -45,7 +45,7 @@ def rammsdir_rule(scene_dir, release_file,
     """Generates the scenario file, which becomes key to running RAMMS.
     """
     jb = rammsutil.parse_release_file(release_file)
-    jb_dem = jb.copy(return_period=-1)    # Get name without return period
+    jb_dem = jb.copy(return_period=None)    # Get name without return period
 
     scene_args = params.load(scene_dir)
     resolution = scene_args['resolution']
@@ -56,8 +56,8 @@ def rammsdir_rule(scene_dir, release_file,
     idem_dir,idem_tif = os.path.split(scene_args['dem_file'])
     idem_stub = idem_tif[:-4]
     links = [
-        (os.path.join(idem_dir, f'{idem_stub}.tif'), os.path.join(jb_dem.ramms_dir, 'DEM', f'{jb_dem.ramms_name}_DEM.tif')),
-        (os.path.join(idem_dir, f'{idem_stub}.tfw'), os.path.join(jb_dem.ramms_dir, 'DEM', f'{jb_dem.ramms_name}_DEM.tfw')),
+        (os.path.join(idem_dir, f'{idem_stub}.tif'), os.path.join(jb.ramms_dir, 'DEM', f'{jb_dem.ramms_name}_DEM.tif')),
+        (os.path.join(idem_dir, f'{idem_stub}.tfw'), os.path.join(jb.ramms_dir, 'DEM', f'{jb_dem.ramms_name}_DEM.tfw')),
     ]
 
 
@@ -66,8 +66,8 @@ def rammsdir_rule(scene_dir, release_file,
         iforest_dir,iforest_tif = os.path.split(scene_args['forest_file'])
         iforest_stub = iforest_tif[:-4]
         links += [
-            (os.path.join(iforest_dir, f'{iforest_stub}.tif'), os.path.join(jb_dem.ramms_dir, 'FOREST', f'{jb_dem.ramms_name}_forest.tif')),
-            (os.path.join(iforest_dir, f'{iforest_stub}.tfw'), os.path.join(jb_dem.ramms_dir, 'FOREST', f'{jb_dem.ramms_name}_forest.tfw')),
+            (os.path.join(iforest_dir, f'{iforest_stub}.tif'), os.path.join(jb.ramms_dir, 'FOREST', f'{jb_dem.ramms_name}_forest.tif')),
+            (os.path.join(iforest_dir, f'{iforest_stub}.tfw'), os.path.join(jb.ramms_dir, 'FOREST', f'{jb_dem.ramms_name}_forest.tfw')),
         ]
 
     def action(tdir):
