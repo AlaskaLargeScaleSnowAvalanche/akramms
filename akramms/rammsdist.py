@@ -376,16 +376,16 @@ def run_on_windows_stage3(idlrt_exe, ramms_version, ramms_dir):
     # Each one of them will hold one or more sets of final outputs
     outputs = list()
     results_dir = os.path.join(ramms_dir, 'RESULTS')
+    outputs.append(os.path.join(results_dir, 'lshm_rock.log'))
     for x0 in os.listdir(results_dir):
-        dir0 = os.path.join(results_dir, x0)
-        if not os.path.isdir(dir0):
+        dir = os.path.join(results_dir, x0)
+        if not os.path.isdir(dir):
             continue
 
-        for dir in [dir0, os.path.join(dir0, 'logfiles')]:
-            for x1 in os.listdir(dir):
-                fname1 = os.path.join(dir, x1)
-                if os.path.isfile(fname1):
-                    outputs.append(fname1)
+        for x1 in os.listdir(dir):
+            fname1 = os.path.join(dir, x1)
+            if os.path.isfile(fname1):
+                outputs.append(fname1)
 
     outputs.sort()
 

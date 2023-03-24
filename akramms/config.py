@@ -49,8 +49,9 @@ ramms_version = '230321'
 #docker_container_version = f'${ramms_version}.0'
 
 # Maximum number of PRAs in a RAMMS run
-max_ramms_pras = 100
+#max_ramms_pras = 100
 #max_ramms_pras = 20
+max_ramms_pras = 30
 
 # ------------------------------
 # DEBUG parameters

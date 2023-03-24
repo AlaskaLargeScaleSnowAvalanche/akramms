@@ -694,7 +694,7 @@ def assemble_stage3(oramms_name, release_files):
     odom_base = os.path.join(oramms_name.ramms_dir, 'DOMAIN', oramms_name.reldom_name+'_dom')
 
     # Find all available individual runs
-    for release_file in release_files:
+    for ix,release_file in enumerate(release_files):
         jb = rammsutil.parse_release_file(release_file)
         ids = get_job_ids(release_file)
 
@@ -709,13 +709,23 @@ def assemble_stage3(oramms_name, release_files):
 #        orel_base = os.path.join(oramms_name.ramms_dir, 'RELEASE', irel_baseleaf)
 #        odom_base = os.path.join(oramms_name.ramms_dir, 'DOMAIN', irel_baseleaf)
 
+        # Merge shapefiles
         links = list()
-        for ext in ('.dbf', '.prj', '.shp', '.shx'):
-            links.append((f'{irel_base}{ext}', f'{orel_base}{ext}'))
-            links.append((f'{idom_base}{ext}', f'{odom_base}{ext}'))
+#        for ext in ('.dbf', '.prj', '.shp', '.shx'):
+#            links.append((f'{irel_base}{ext}', f'{orel_base}{ext}'))
+#            links.append((f'{idom_base}{ext}', f'{odom_base}{ext}'))
+        links.append((f'{irel_base}.shp', f'{orel_base}.shp'))
+        links.append((f'{idom_base}.shp', f'{odom_base}.shp'))
+
         for ifile,ofile in links:
-            print('COPY: {} -> {}'.format(ifile, ofile))
-            setlink_or_copy(ifile, ofile)
+            print('MERGE: {} -> {}'.format(ifile, ofile))
+#            setlink_or_copy(ifile, ofile)
+            if ix == 0:
+                # https://gis.stackexchange.com/questions/223183/ogr2ogr-merge-multiple-shapefiles-what-is-the-purpose-of-nln-tag
+                cmd = ['ogr2ogr', '-f', 'gpkg', ofile, ifile]
+            else:
+                cmd = ['ogr2og4', '-f', 'gpkg', '-append', '-update', ofile, ifile]
+            subprocess.run(cmd, check=True)
 
 #        oslope_dir = os.path.join(oramms_dir, 'RESULTS',
 #            f'{jb.scene_name}{jb.For}_{jb.resolution}m')
