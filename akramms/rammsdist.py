@@ -5,77 +5,77 @@ import os,subprocess,re,sys,itertools,collections,shutil,zipfile
 from uafgi.util import ioutil
 from akramms.util import harnutil
 
-def unpack_zipfile(ifname, odir, toplevel=True):
-    """toplevel:
-        Is everything in a top level directory that needs to be removed?
-    """
-
-    # Unpack the Zipfile
-    with zipfile.ZipFile(ifname, 'r') as zipf:
-        # Deal with zipfiles with a single top-level folder
-        truncate = 0
-        root = zipfile.Path(zipf)
-        print(root.name)
-        subdirs = list(root.iterdir())
-        if len(subdirs) == 1:
-            truncate = len(subdirs[0].name) + 1
-
-        for info in zipf.infolist():
-            name_path = info.filename[truncate:].split('/')
-
-            # Don't copy top-level dir
-            if info.is_dir():
-                continue
-
-            ofname = os.path.join(odir, *name_path)
-            ofname_dir = os.path.split(ofname)[0]
-#            print('makedirs ', ofname_dir)
-            os.makedirs(ofname_dir, exist_ok=True)
-            print(ofname)
-            with open(ofname, 'wb') as out:
-                out.write(zipf.open(info.filename).read())
-
-
-
-_renames = {
-    'ramms_aval_LHM.exe' : 'ramms_aval_LHM_orig.exe'
-}
-
-RAMMS_220922 = ('220922', 'RAMMS_LSHM_NEW2022.zip')
-_base_upgrade_for_version = {
-    '220922' : (RAMMS_220922, None),
-    '220928' : (RAMMS_220922, '220928'),
-    '221101' : (RAMMS_220922, '221101'),
-    '230126' : (RAMMS_220922, '230126'),
-    '230210' : (RAMMS_220922, '230210'),
-}
-def install_ramms_on_windows(version):
-    """Installs RAMMS into the appropriate distro file inside the harness.
-    Returns:
-        Directory of installed RAMMS"""
-
-    # See if this version of RAMMS is already installed.
-    odir = os.path.join(harnutil.HARNESS, 'opt', 'RAMMS', version)
-    INSTALLED_txt = os.path.join(odir, 'INSTALLED.txt')
-    if os.path.exists(INSTALLED_txt):
-        return odir
-
-    # Unzip base
-    shutil.rmtree(odir, ignore_errors=True)
-    base_zip = config.roots.syspath('{DATA}/christen/RAMMS/220922/RAMMS_LSHM_NEW2022.zip')
-    unpack_zipfile(base_zip, odir)
-
-    # Unpack changes
-    if version != '220922':
-        delta_dir = config.roots.syspath('{DATA}/christen/RAMMS/'+version)
-        shutil.copytree(delta_dir, odir, dirs_exist_ok=True)
-
-    # Mark we are complete
-    with open(INSTALLED_txt, 'w') as out:
-        out.write('Completed RAMMS installation\n')
-
-    return odir
-
+# def unpack_zipfile(ifname, odir, toplevel=True):
+#     """toplevel:
+#         Is everything in a top level directory that needs to be removed?
+#     """
+# 
+#     # Unpack the Zipfile
+#     with zipfile.ZipFile(ifname, 'r') as zipf:
+#         # Deal with zipfiles with a single top-level folder
+#         truncate = 0
+#         root = zipfile.Path(zipf)
+#         print(root.name)
+#         subdirs = list(root.iterdir())
+#         if len(subdirs) == 1:
+#             truncate = len(subdirs[0].name) + 1
+# 
+#         for info in zipf.infolist():
+#             name_path = info.filename[truncate:].split('/')
+# 
+#             # Don't copy top-level dir
+#             if info.is_dir():
+#                 continue
+# 
+#             ofname = os.path.join(odir, *name_path)
+#             ofname_dir = os.path.split(ofname)[0]
+# #            print('makedirs ', ofname_dir)
+#             os.makedirs(ofname_dir, exist_ok=True)
+#             print(ofname)
+#             with open(ofname, 'wb') as out:
+#                 out.write(zipf.open(info.filename).read())
+# 
+# 
+# 
+# _renames = {
+#     'ramms_aval_LHM.exe' : 'ramms_aval_LHM_orig.exe'
+# }
+# 
+# RAMMS_220922 = ('220922', 'RAMMS_LSHM_NEW2022.zip')
+# _base_upgrade_for_version = {
+#     '220922' : (RAMMS_220922, None),
+#     '220928' : (RAMMS_220922, '220928'),
+#     '221101' : (RAMMS_220922, '221101'),
+#     '230126' : (RAMMS_220922, '230126'),
+#     '230210' : (RAMMS_220922, '230210'),
+# }
+# def install_ramms_on_windows(version):
+#     """Installs RAMMS into the appropriate distro file inside the harness.
+#     Returns:
+#         Directory of installed RAMMS"""
+# 
+#     # See if this version of RAMMS is already installed.
+#     odir = os.path.join(harnutil.HARNESS, 'opt', 'RAMMS', version)
+#     INSTALLED_txt = os.path.join(odir, 'INSTALLED.txt')
+#     if os.path.exists(INSTALLED_txt):
+#         return odir
+# 
+#     # Unzip base
+#     shutil.rmtree(odir, ignore_errors=True)
+#     base_zip = config.roots.syspath('{DATA}/christen/RAMMS/220922/RAMMS_LSHM_NEW2022.zip')
+#     unpack_zipfile(base_zip, odir)
+# 
+#     # Unpack changes
+#     if version != '220922':
+#         delta_dir = config.roots.syspath('{DATA}/christen/RAMMS/'+version)
+#         shutil.copytree(delta_dir, odir, dirs_exist_ok=True)
+# 
+#     # Mark we are complete
+#     with open(INSTALLED_txt, 'w') as out:
+#         out.write('Completed RAMMS installation\n')
+# 
+#     return odir
+# 
 #def main():
 #    install_ramms_on_windows('230126')
 #main()
@@ -167,7 +167,7 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
     
     # ----------------------------------------------------------------
     # Make sure we've added our stub properly
-    ramms_distro = install_ramms_on_windows(ramms_version)
+    #ramms_distro = install_ramms_on_windows(ramms_version)
 
     # Avoid extra IDL processese lying around that would eat our license
     kill_idl()
@@ -181,7 +181,7 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
         pass
 
     # Create batch file to run
-    ramms_sav = os.path.join(ramms_distro, 'ramms_lshm.sav')
+    ramms_sav = os.path.join(config.ramms_distro_dir, 'ramms_lshm.sav')
     scenario_txt = os.path.join(ramms_dir, 'scenario.txt')
     batfile = os.path.join(ramms_dir, f'run_ramms_{ramms_stage}.bat')
     print('Writing {}'.format(batfile))
