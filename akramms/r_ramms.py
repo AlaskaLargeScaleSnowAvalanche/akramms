@@ -146,9 +146,11 @@ def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):
 #DOCKER_IMAGE = 'localhost:5000/ramms'
 #DOCKER_IMAGE = 'git.akdggs.com/efischer/ramms:230210.2'
 
+DOCKER_TAG = config.docker_tag()
+
 submit_tpl = \
 """universe                = docker
-docker_image            = {config.docker_tag}
+docker_image            = {DOCKER_TAG}
 executable              = /usr/bin/python
 arguments               = /opt/runaval.py {job_name}
 
