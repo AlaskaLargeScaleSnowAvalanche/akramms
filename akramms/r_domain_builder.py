@@ -76,7 +76,7 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
     """
 
     def action(tdir):
-        debug = True
+        debug = False   # Check domain-limited burn against full burn
 
         # Read the grid_info from the DEM
         grid_info = gdalutil.grid_info(dem_file)
@@ -136,8 +136,8 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
             gt1 = np.array(grid_info.geotransform)
             gt1[0] = origin_x
             gt1[3] = origin_y
-            print('gt-diff x: ', gt1[0] - grid_info.geotransform[0])
-            print('gt-diff y: ', gt1[3] - grid_info.geotransform[3])
+            #print('gt-diff x: ', gt1[0] - grid_info.geotransform[0])
+            #print('gt-diff y: ', gt1[3] - grid_info.geotransform[3])
             grid_info1 = gisutil.RasterInfo(
                 grid_info.wkt, nx1, ny1, gt1)
 
@@ -147,19 +147,19 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
             pra1_ds = shapelyutil.to_datasource(pra)
             pra1_ras = gdalutil.rasterize_polygons(pra1_ds, grid_info1)
             pra1_ds = None    # Free memory
-            print('pra1_ras ', pra1_ras)
 
+            #print('pra1_ras\n', pra1_ras)
             #print('yyyy ', grid_info.nx, grid_info.ny)
             #print('burn-size: {} vs {}'.format(np.sum(pra1_ras), np.sum(pra0_ras)))
             if debug:
-                asser np.sum(pra1_ras) == np.sum(pra0_ras)
+                assert np.sum(pra1_ras) == np.sum(pra0_ras)
 
             # Get x and y coordinates of burnt pixels (two numpy arrays of indices)
             jarr1, iarr1 = np.where(pra1_ras)
             jarr1 = jarr1.astype('i')
             iarr1 = iarr1.astype('i')
 
-            if debug:
+            #if debug:
                 #print('iarr0 ', iarr0)
                 #print('iarr1 ', iarr1 + origin_i)
                 #print('jarr0 ', jarr0)
@@ -168,26 +168,17 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
 
             pra1_burn = (jarr1+origin_j) * grid_info.nx + (iarr1 + origin_i)
             if debug:
-                #print(pra0_burn_a)
-                #print(pra1_burn)
-                assert np.all(pra_burn_a == pra1_burn)
-
-
-#            # ---------- Convert back to original coordinate system
-#            iarr0 = iarr1 + mini
-#            jarr0 = jarr1 + minj
-#            pra1_burn = jarr0 * grid_info1.nx + iarr0
-#
-#            print('pra0_burn ', pra0_burn)
-#            print('pra1_burn', pra1_burn)
-            sys.exit(0)
+                print('pra0_burn_a ', pra0_burn_a)
+                print('pra1_burn ', pra1_burn)
+                assert np.all(pra0_burn_a == pra1_burn)
 
             print('PRA {} of {} burned with {} cells'.format(ipra, npra, len(pra1_burn)))
             sys.stdout.flush()
-            pra_burns.append(pra_burn)
+            pra_burns.append(pra1_burn)
 
         # Add to the dataframe and save
 #        pras_df['pra_burn'] = pra_burns
+        print('Writing PRAs to file: {}'.format(pra_burn_file))
         with gzip.open(pra_burn_file, 'wb') as out:
             pickle.dump(grid_info, out)
             pickle.dump(pra_burns, out)
