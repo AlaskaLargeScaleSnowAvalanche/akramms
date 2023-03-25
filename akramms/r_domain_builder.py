@@ -4,7 +4,7 @@ import numpy as np
 import shapely
 import d8graph
 import sys
-from uafgi.util import shputil,shapelyutil,gdalutil,make
+from uafgi.util import shputil,shapelyutil,gdalutil,make,gisutil
 
 # --------------------------------------------------------------------
 def read_neighbor1(neighbor1_file):
@@ -63,7 +63,7 @@ def neighbor1_rule(dem_file, odir, fill_sinks=True):
 
     return make.Rule(action, [dem_file], [dem_filled_file, sinks_file, neighbor1_file])
 # --------------------------------------------------------------------
-def burn_pra_rule(dem_file, pra_file, pra_burn_file):
+def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
     """Reads a PRA _rel.shp file into a dataframe; adds a column for
     the gridcell indices of the burned polygon; and writes out to a
     Pickle.gz file.
@@ -89,14 +89,91 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):
         for ipra,(_,row) in enumerate(pras_df.iterrows()):
             pra = row['shape']
 
-            # Burn the PRA polygon into a raster
             pra_ds = shapelyutil.to_datasource(pra)
             pra_ras = gdalutil.rasterize_polygons(pra_ds, grid_info)
             pra_ds = None    # Free memory
 
-            # Convert to a list of initial gridcell IDs
-            pra_ras1d = pra_ras.reshape(-1)
-            pra_burn = np.where(pra_ras1d)[0].astype('i')
+            # ------------ Work in a smaller coord system
+            # Get oriented minimum bounding rectangle (MBR)
+            xx,yy = pra.exterior.coords.xy
+            minx = np.min(xx)
+            maxx = np.max(xx)
+            miny = np.min(yy)
+            maxy = np.max(yy)
+
+            # Extent of the polygon in pixels
+            margin = 2
+            mini,minj = grid_info.to_ij(minx,miny)
+            maxi,maxj = grid_info.to_ij(maxx,maxy)
+            origin_i = mini-margin if grid_info.dx > 0 else maxi-margin
+            origin_j = minj-margin if grid_info.dy > 0 else maxj-margin
+            origin_x,origin_y = grid_info.to_xy(origin_i, origin_j)
+
+            print('pra ', pra)
+            print('origin_xy ', origin_x, origin_y)
+
+            # Size to make new grid: put 2-pixel margen on all sides
+            nx1 = abs(maxi-mini) + margin*2
+            ny1 = abs(maxj-minj) + margin*2
+
+#            i0,j0 = grid_info.to_ij(np.min(xx), np.min(yy))
+#            i1,j1 = grid_info.to_ij(np.max(xx), np.max(yy))
+#            print('iijj0011 ', i0,j0,i1,j1)
+#            print('nx ny ', grid_info.nx, grid_info.ny)
+#
+#            # Range of pixels to select out
+#
+#            i0 = max(0, i0-1)
+#            j0 = max(0, j0-1)
+#            i1 = min(i1+2, grid_info.nx)
+#            j1 = min(j1+2, grid_info.ny)
+#            print('iijj0011 ', i0,j0,i1,j1)
+
+            # Define new grid_info for smaller coord system
+#            shiftx = i0 * grid_info.dx
+#            shifty = j0 * grid_info.dy
+#            print('shift ', shiftx, shifty)
+            gt1 = np.array(grid_info.geotransform)
+            gt1[0] = origin_x
+            gt1[3] = origin_y
+            print('gt-diff x: ', gt1[0] - grid_info.geotransform[0])
+            print('gt-diff y: ', gt1[3] - grid_info.geotransform[3])
+            grid_info1 = gisutil.RasterInfo(
+                grid_info.wkt, nx1, ny1, gt1)
+
+#            # Shift coordinates used to describe the PRA
+#            xx1 = xx - shiftx
+#            yy1 = yy - shifty
+#            pra1 = shapely.geometry.Polygon(zip(xx1,yy1))
+#            print('pra ', pra)
+#            print('pra1 ', pra1)
+
+            # ---------- Now working in sub-coord system (grid_info1 / pra1)
+            # Burn the PRA polygon into a raster
+            # pra1_ras is np.array(nj, ni)
+            pra1_ds = shapelyutil.to_datasource(pra)
+            pra1_ras = gdalutil.rasterize_polygons(pra1_ds, grid_info1)
+            pra1_ds = None    # Free memory
+            print('pra1_ras ', pra1_ras)
+
+            print('yyyy ', grid_info.nx, grid_info.ny)
+            print('xxxx ', type(pra_ras))
+            print('burn-size: {} vs {}'.format(np.sum(pra1_ras), np.sum(pra_ras)))
+            sys.exit(0)
+
+            # Get x and y coordinates of burnt pixels (two numpy arrays of indices)
+            jarr1, iarr1 = np.where(pra_ras1)
+            jarr1 = jarr1.astype('i')
+            iarr1 = iarr1.astype('i')
+
+            # ---------- Convert back to original coordinate system
+            iarr0 = iarr1 + i0
+            jarr0 = jarr1 + j0
+            pra_burn = jarr0 * grid_info.nx + iarr0
+
+#            # Convert to a list of initial gridcell IDs
+#            pra_ras1d = pra_ras.reshape(-1)
+#            pra_burn = np.where(pra_ras1d)[0].astype('i')
 
             print('PRA {} of {} burned with {} cells'.format(ipra, npra, len(pra_burn)))
             sys.stdout.flush()
