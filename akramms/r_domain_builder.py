@@ -76,6 +76,8 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
     """
 
     def action(tdir):
+        debug = True
+
         # Read the grid_info from the DEM
         grid_info = gdalutil.grid_info(dem_file)
 
@@ -89,21 +91,24 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
         for ipra,(_,row) in enumerate(pras_df.iterrows()):
             pra = row['shape']
 
-            pra_ds = shapelyutil.to_datasource(pra)
-            pra0_ras = gdalutil.rasterize_polygons(pra_ds, grid_info)
-            pra_ds = None    # Free memory
+            # ---------------------------------------------------
+            # Burn on entire raster ("Slow Burn")
+            if debug:
+                pra_ds = shapelyutil.to_datasource(pra)
+                pra0_ras = gdalutil.rasterize_polygons(pra_ds, grid_info)
+                pra_ds = None    # Free memory
 
-            # Convert to a list of initial gridcell IDs
-            jarr0, iarr0 = np.where(pra0_ras)
-            jarr0 = jarr0.astype('i')
-            iarr0 = iarr0.astype('i')
+                # Convert to a list of initial gridcell IDs
+                jarr0, iarr0 = np.where(pra0_ras)
+                jarr0 = jarr0.astype('i')
+                iarr0 = iarr0.astype('i')
 
-            pra0_ras1d = pra0_ras.reshape(-1)
-            pra0_burn_a = np.where(pra0_ras1d)[0].astype('i')
-            pra0_burn_b = jarr0 * grid_info.nx + iarr0
-            assert np.all(pra0_burn_a == pra0_burn_b)  # Get our indexing correct
+                pra0_ras1d = pra0_ras.reshape(-1)
+                pra0_burn_a = np.where(pra0_ras1d)[0].astype('i')
+                pra0_burn_b = jarr0 * grid_info.nx + iarr0
+                assert np.all(pra0_burn_a == pra0_burn_b)  # Get our indexing correct
 
-            # ------------ Work in a smaller coord system
+            # ------------ Work in a smaller coord system ("Fast Burn")
             # Get oriented minimum bounding rectangle (MBR)
             xx,yy = pra.exterior.coords.xy
             minx = np.min(xx)
@@ -119,8 +124,9 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
             origin_j = minj-margin if grid_info.dy > 0 else maxj-margin
             origin_x,origin_y = grid_info.to_xy(origin_i, origin_j)
 
-            print('pra ', pra)
-            print('origin_xy ', origin_x, origin_y)
+            #if debug:
+            #    print('pra ', pra)
+            #    print('origin_xy ', origin_x, origin_y)
 
             # Size to make new grid: put 2-pixel margen on all sides
             nx1 = abs(maxi-mini) + margin*2
@@ -143,24 +149,28 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
             pra1_ds = None    # Free memory
             print('pra1_ras ', pra1_ras)
 
-            print('yyyy ', grid_info.nx, grid_info.ny)
-            print('burn-size: {} vs {}'.format(np.sum(pra1_ras), np.sum(pra0_ras)))
+            #print('yyyy ', grid_info.nx, grid_info.ny)
+            #print('burn-size: {} vs {}'.format(np.sum(pra1_ras), np.sum(pra0_ras)))
+            if debug:
+                asser np.sum(pra1_ras) == np.sum(pra0_ras)
 
             # Get x and y coordinates of burnt pixels (two numpy arrays of indices)
             jarr1, iarr1 = np.where(pra1_ras)
             jarr1 = jarr1.astype('i')
             iarr1 = iarr1.astype('i')
 
-            print('iarr0 ', iarr0)
-            print('iarr1 ', iarr1 + origin_i)
-
-            print('jarr0 ', jarr0)
-            print('jarr1 ', jarr1 + origin_j)
+            if debug:
+                #print('iarr0 ', iarr0)
+                #print('iarr1 ', iarr1 + origin_i)
+                #print('jarr0 ', jarr0)
+                #print('jarr1 ', jarr1 + origin_j)
 
 
             pra1_burn = (jarr1+origin_j) * grid_info.nx + (iarr1 + origin_i)
-            print(pra0_burn_a)
-            print(pra1_burn)
+            if debug:
+                #print(pra0_burn_a)
+                #print(pra1_burn)
+                assert np.all(pra_burn_a == pra1_burn)
 
 
 #            # ---------- Convert back to original coordinate system
