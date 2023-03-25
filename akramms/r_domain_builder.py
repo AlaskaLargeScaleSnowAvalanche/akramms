@@ -90,8 +90,18 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
             pra = row['shape']
 
             pra_ds = shapelyutil.to_datasource(pra)
-            pra_ras = gdalutil.rasterize_polygons(pra_ds, grid_info)
+            pra0_ras = gdalutil.rasterize_polygons(pra_ds, grid_info)
             pra_ds = None    # Free memory
+
+            # Convert to a list of initial gridcell IDs
+            jarr0, iarr0 = np.where(pra0_ras)
+            jarr0 = jarr0.astype('i')
+            iarr0 = iarr0.astype('i')
+
+            pra0_ras1d = pra0_ras.reshape(-1)
+            pra0_burn_a = np.where(pra0_ras1d)[0].astype('i')
+            pra0_burn_b = jarr0 * grid_info.nx + iarr0
+            assert np.all(pra0_burn_a == pra0_burn_b)  # Get our indexing correct
 
             # ------------ Work in a smaller coord system
             # Get oriented minimum bounding rectangle (MBR)
@@ -116,23 +126,7 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
             nx1 = abs(maxi-mini) + margin*2
             ny1 = abs(maxj-minj) + margin*2
 
-#            i0,j0 = grid_info.to_ij(np.min(xx), np.min(yy))
-#            i1,j1 = grid_info.to_ij(np.max(xx), np.max(yy))
-#            print('iijj0011 ', i0,j0,i1,j1)
-#            print('nx ny ', grid_info.nx, grid_info.ny)
-#
-#            # Range of pixels to select out
-#
-#            i0 = max(0, i0-1)
-#            j0 = max(0, j0-1)
-#            i1 = min(i1+2, grid_info.nx)
-#            j1 = min(j1+2, grid_info.ny)
-#            print('iijj0011 ', i0,j0,i1,j1)
-
             # Define new grid_info for smaller coord system
-#            shiftx = i0 * grid_info.dx
-#            shifty = j0 * grid_info.dy
-#            print('shift ', shiftx, shifty)
             gt1 = np.array(grid_info.geotransform)
             gt1[0] = origin_x
             gt1[3] = origin_y
@@ -140,13 +134,6 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
             print('gt-diff y: ', gt1[3] - grid_info.geotransform[3])
             grid_info1 = gisutil.RasterInfo(
                 grid_info.wkt, nx1, ny1, gt1)
-
-#            # Shift coordinates used to describe the PRA
-#            xx1 = xx - shiftx
-#            yy1 = yy - shifty
-#            pra1 = shapely.geometry.Polygon(zip(xx1,yy1))
-#            print('pra ', pra)
-#            print('pra1 ', pra1)
 
             # ---------- Now working in sub-coord system (grid_info1 / pra1)
             # Burn the PRA polygon into a raster
@@ -157,25 +144,35 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
             print('pra1_ras ', pra1_ras)
 
             print('yyyy ', grid_info.nx, grid_info.ny)
-            print('xxxx ', type(pra_ras))
-            print('burn-size: {} vs {}'.format(np.sum(pra1_ras), np.sum(pra_ras)))
-            sys.exit(0)
+            print('burn-size: {} vs {}'.format(np.sum(pra1_ras), np.sum(pra0_ras)))
 
             # Get x and y coordinates of burnt pixels (two numpy arrays of indices)
-            jarr1, iarr1 = np.where(pra_ras1)
+            jarr1, iarr1 = np.where(pra1_ras)
             jarr1 = jarr1.astype('i')
             iarr1 = iarr1.astype('i')
 
-            # ---------- Convert back to original coordinate system
-            iarr0 = iarr1 + i0
-            jarr0 = jarr1 + j0
-            pra_burn = jarr0 * grid_info.nx + iarr0
+            print('iarr0 ', iarr0)
+            print('iarr1 ', iarr1 + origin_i)
 
-#            # Convert to a list of initial gridcell IDs
-#            pra_ras1d = pra_ras.reshape(-1)
-#            pra_burn = np.where(pra_ras1d)[0].astype('i')
+            print('jarr0 ', jarr0)
+            print('jarr1 ', jarr1 + origin_j)
 
-            print('PRA {} of {} burned with {} cells'.format(ipra, npra, len(pra_burn)))
+
+            pra1_burn = (jarr1+origin_j) * grid_info.nx + (iarr1 + origin_i)
+            print(pra0_burn_a)
+            print(pra1_burn)
+
+
+#            # ---------- Convert back to original coordinate system
+#            iarr0 = iarr1 + mini
+#            jarr0 = jarr1 + minj
+#            pra1_burn = jarr0 * grid_info1.nx + iarr0
+#
+#            print('pra0_burn ', pra0_burn)
+#            print('pra1_burn', pra1_burn)
+            sys.exit(0)
+
+            print('PRA {} of {} burned with {} cells'.format(ipra, npra, len(pra1_burn)))
             sys.stdout.flush()
             pra_burns.append(pra_burn)
 
