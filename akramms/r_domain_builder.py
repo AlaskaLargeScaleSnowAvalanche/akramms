@@ -98,20 +98,21 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):
             pra_ras1d = pra_ras.reshape(-1)
             pra_burn = np.where(pra_ras1d)[0].astype('i')
 
-            print('PRA {} ({} of {}) burned with {} cells'.format(row['Id'], ipra, npra, len(pra_burn)))
+            print('PRA {} of {} burned with {} cells'.format(ipra, npra, len(pra_burn)))
             sys.stdout.flush()
             pra_burns.append(pra_burn)
 
         # Add to the dataframe and save
-        pras_df['pra_burn'] = pra_burns
+#        pras_df['pra_burn'] = pra_burns
         with gzip.open(pra_burn_file, 'wb') as out:
             pickle.dump(grid_info, out)
-            pickle.dump(pras_df, out)
+            pickle.dump(pra_burns, out)
+#            pickle.dump(pras_df, out)
 
     return make.Rule(action, [dem_file, pra_file], [pra_burn_file])
 
 # --------------------------------------------------------------------
-def domain_rule(dem_filled_file, pra_burn_file, chull_file, domain_file, min_alpha=18., max_runout=10000., margin=0.):
+def domain_rule(dem_filled_file, release_file, pra_burn_file, chull_file, domain_file, min_alpha=18., max_runout=10000., margin=0.):
     """Compute domains for each PRA.
     neighbor1_file: filename
         Result of neighbor1_rule
@@ -135,17 +136,20 @@ def domain_rule(dem_filled_file, pra_burn_file, chull_file, domain_file, min_alp
 #        print('Sample dem_filled[18729844] = {}'.format(dem_filled.reshape(-1)[18729844]))
 
         # Read the PRAs
+        pras_df = shputil.read_df(release_file)
         with gzip.open(pra_burn_file, 'rb') as fin:
             _ = pickle.load(fin)    # grid_info
-            pras_df = pickle.load(fin)
+            pra_burns = pickle.load(fin)
+#            pras_df = pickle.load(fin)
 
         # Find domains based on the PRAs
         chulls = list()
         domains = list()
         for n,(_,row) in enumerate(pras_df.iterrows()):
+            id = row['Id']
             if n%1000 == 0:
                 print(f'Found {n} domains.')
-            pra_burn = row['pra_burn']
+            pra_burn = pra_burns[id]    # Look up pra_burn in auxilliary list (or maybe dict)
 
             # Get the domain from the list of starting cells of the PRA (pra_burn)
             args = (dem_filled, dem_nodata, grid_info.geotransform, pra_burn)
@@ -175,4 +179,4 @@ def domain_rule(dem_filled_file, pra_burn_file, chull_file, domain_file, min_alp
         domains_df['shape'] = domains
         shputil.write_df(domains_df, 'shape', 'Polygon', domain_file, wkt=grid_info.wkt)
 
-    return make.Rule(action, [dem_filled_file, pra_burn_file], outputs)
+    return make.Rule(action, [dem_filled_file, release_file, pra_burn_file], outputs)

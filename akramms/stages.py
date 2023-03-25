@@ -1,5 +1,5 @@
 from uafgi.util import make,shputil
-from akramms import config,params
+from akramms import config,params,process_tree
 from akramms import r_prepare, r_ecog, r_pra_post, r_domain_builder, r_ramms
 from akramms.util import paramutil,harnutil,rammsutil
 import os,sys
@@ -19,7 +19,7 @@ def add_stage0_rules(makefile, scene_dir):
         dem_file, scene_dir, fill_sinks=True)).outputs
 
     # Loop over combos
-    ramms_dirs_release_files = list()    # [(ramms_dir, [release_file, ...]), ...]
+#    ramms_dirs_release_files = list()    # [(ramms_dir, [release_file, ...]), ...]
 #    all_ramms_dirs = list()
     all_release_files = list()    # Release files we will run RAMMS on
     for return_period in scene_args['return_periods']:
@@ -28,22 +28,19 @@ def add_stage0_rules(makefile, scene_dir):
             # Run eCognition
             makefile.add(r_ecog.rule(scene_dir, prepare_outputs, return_period, forest))
 
-            # Post-Process eCognition Output
+            # Burn PRAs produced by eCognition into raster
+            pra_file, pra_burn_file = process_tree.pra_files(scene_args, return_period, forest)
+            makefile.add(
+                r_domain_builder.burn_pra_rule(dem_file, pra_file, pra_burn_file))
+
+            # Post-Process eCognition Output (the pra_file)
             # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
             release_shplists = makefile.add(
                 r_pra_post.rule(scene_dir, return_period, forest, require_all=False)).outputs
 
+def read_shplists(scene_args):
+    """Returns: release_files"""
 
-
-def add_stage1_rules(makefile, scene_dir):
-
-    scene_args = params.load(scene_dir)
-
-    dem_file = scene_args['dem_file']
-    dem_root = os.path.split(dem_file)[1][:-4]
-    dem_filled_file = os.path.join(scene_dir, f'{dem_root}_filled.tif')
-
-    # Read release files from *_rel.shplist
     release_files = list()    # Release files we will run RAMMS on
     for return_period in scene_args['return_periods']:
         for forest in scene_args['forests']:
@@ -65,20 +62,32 @@ def add_stage1_rules(makefile, scene_dir):
 
                 with open(release_shplist, 'r') as fin:
                     release_files.extend(config.roots.syspath(x.strip()) for x in fin)
+    return release_files
+
+def add_stage1_rules(makefile, scene_dir):
+
+    scene_args = params.load(scene_dir)
+
+    dem_file = scene_args['dem_file']
+    dem_root = os.path.split(dem_file)[1][:-4]
+    dem_filled_file = os.path.join(scene_dir, f'{dem_root}_filled.tif')
+
+    # Read release files from *_rel.shplist
+    release_files = read_shplists(scene_args)
 
     # Domain finder for post-process output
     for release_file in release_files:
         jb = rammsutil.parse_release_file(release_file)
 
-        pra_burn_file = os.path.join(jb.ramms_dir, 'RELEASE', f'{jb.ramms_name}_burn.pik.gz')
-        makefile.add(
-            r_domain_builder.burn_pra_rule(dem_file, release_file, pra_burn_file))
+#        pra_burn_file = os.path.join(jb.ramms_dir, 'RELEASE', f'{jb.ramms_name}_burn.pik.gz')
+#        makefile.add(
+#            r_domain_builder.burn_pra_rule(dem_file, release_file, pra_burn_file))
 
         # Different directory for chull and domain
         chull_file = os.path.join(jb.ramms_dir, 'CHULL', '{}_chull.shp'.format(jb.ramms_name))
         domain_file = os.path.join(jb.ramms_dir, 'DOMAIN', '{}_dom.shp'.format(jb.ramms_name))
         makefile.add(r_domain_builder.domain_rule(
-            dem_filled_file, pra_burn_file, chull_file, domain_file, min_alpha=18., margin=config.initial_margins[jb.pra_size]))
+            dem_filled_file, release_file, pra_burn_file, chull_file, domain_file, min_alpha=18., margin=config.initial_margins[jb.pra_size]))
 
 
         # Now we have the input files for a RAMMS run:
