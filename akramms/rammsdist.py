@@ -81,8 +81,14 @@ from akramms.util import harnutil
 #main()
 # ==============================================================
 # -----------------------------------------------------
-# taskkill.exe /F /IM idlrt.exe
-# taskkill.exe /F /IM idl_opserver.exe
+# taskkill.exe /T /F /IM idlrt.exe
+# taskkill.exe /T /F /IM idl_opserver.exe
+#
+# /T kills child processes.  I was getting the error:
+#    ERROR: The process "idl_opserver.exe" with PID 5468 could not be terminated.
+#    Reason: There is no running instance of the task.
+# See: https://stackoverflow.com/questions/12528963/taskkill-f-doesnt-kill-a-process
+
 def kill_idl():
     print('Killing IDL Tasks... (do not be alarmed by two "not found" errors)')
     sys.stdout.flush()
@@ -91,8 +97,8 @@ def kill_idl():
     sleep=False
 
     for cmd in (
-        ['taskkill.exe', '/F', '/IM', 'idlrt.exe'],
-        ['taskkill.exe', '/F', '/IM', 'idl_opserver.exe']):
+        ['taskkill.exe', '/T', '/F', '/IM', 'idlrt.exe'],
+        ['taskkill.exe', '/T', '/F', '/IM', 'idl_opserver.exe']):
 
         try:
             subprocess.run(cmd, check=True)

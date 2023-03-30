@@ -126,14 +126,25 @@ def run_remote(inputs, cmd, tdir, write_inputs=False):
         print(line, end='')
         sys.stdout.flush()
 
+        # Exit if remote program is exiting
+        if line == 'END OUTPUTS':
+            break
+
         # Collect list of output files as declared by Windows-side program
         match = outputRE.match(line)
         if match is not None:
             outputs_rel.append(match.group(1))
 
-    proc.wait()
-    if proc.returncode != 0:
-        raise subprocess.CalledProcessError(proc.returncode, cmd)
+    try:
+        proc.wait(timeout=10)    # The process should be exited anyway, wait for 10 seconds
+        if proc.returncode != 0:
+            raise subprocess.CalledProcessError(proc.returncode, cmd)
+    except TimeoutExpired as e:
+        # The IDL on the other side has not exited cleanly.  We should
+        # continue on Linux side; and next time Windows stuff is run,
+        # IDL will be killed before it begins.
+        print('***** WARNING:')
+        print(e)
 
     # outputs contains relative names of files.
     if not config.shared_filesystem:

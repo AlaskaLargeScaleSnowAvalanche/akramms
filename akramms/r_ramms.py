@@ -788,7 +788,7 @@ def run_ramms_stage3(oramms_name):
 
 
 
-def ramms_stage3_rule(ramms_dir, release_files, dry_run=False, submit=True):
+def ramms_stage3_rule(ramms_dir, release_files):
     """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)
     For now, do no inputs to stage3.  It's hard to predict exactly
     what the input files should be.

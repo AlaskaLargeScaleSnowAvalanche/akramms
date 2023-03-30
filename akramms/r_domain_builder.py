@@ -4,7 +4,7 @@ import numpy as np
 import shapely
 import d8graph
 import sys
-from uafgi.util import shputil,shapelyutil,gdalutil,make,gisutil
+from uafgi.util import shputil,shapelyutil,gdalutil,make,gisutil,rasterize
 
 # --------------------------------------------------------------------
 def read_neighbor1(neighbor1_file):
@@ -95,7 +95,7 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
             # Burn on entire raster ("Slow Burn")
             if debug:
                 pra_ds = shapelyutil.to_datasource(pra)
-                pra0_ras = gdalutil.rasterize_polygons(pra_ds, grid_info)
+                pra0_ras = rasterize.rasterize_polygons(pra_ds, grid_info)
                 pra_ds = None    # Free memory
 
                 # Convert to a list of initial gridcell IDs
@@ -145,7 +145,7 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
             # Burn the PRA polygon into a raster
             # pra1_ras is np.array(nj, ni)
             pra1_ds = shapelyutil.to_datasource(pra)
-            pra1_ras = gdalutil.rasterize_polygons(pra1_ds, grid_info1)
+            pra1_ras = rasterize.rasterize_polygons(pra1_ds, grid_info1)
             pra1_ds = None    # Free memory
 
             #print('pra1_ras\n', pra1_ras)
@@ -187,7 +187,7 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
     return make.Rule(action, [dem_file, pra_file], [pra_burn_file])
 
 # --------------------------------------------------------------------
-def domain_rule(dem_filled_file, release_file, pra_burn_file, chull_file, domain_file, min_alpha=18., max_runout=10000., margin=0.):
+def domain_rule(dem_filled_file, release_file, chull_file, domain_file, min_alpha=18., max_runout=10000., margin=0.):
     """Compute domains for each PRA.
     neighbor1_file: filename
         Result of neighbor1_rule
@@ -212,10 +212,10 @@ def domain_rule(dem_filled_file, release_file, pra_burn_file, chull_file, domain
 
         # Read the PRAs
         pras_df = shputil.read_df(release_file)
-        with gzip.open(pra_burn_file, 'rb') as fin:
-            _ = pickle.load(fin)    # grid_info
-            pra_burns = pickle.load(fin)
-#            pras_df = pickle.load(fin)
+#        with gzip.open(pra_burn_file, 'rb') as fin:
+#            _ = pickle.load(fin)    # grid_info
+#            pra_burns = pickle.load(fin)
+##            pras_df = pickle.load(fin)
 
         # Find domains based on the PRAs
         chulls = list()
@@ -224,9 +224,14 @@ def domain_rule(dem_filled_file, release_file, pra_burn_file, chull_file, domain
             id = row['Id']
             if n%1000 == 0:
                 print(f'Found {n} domains.')
-            pra_burn = pra_burns[id]    # Look up pra_burn in auxilliary list (or maybe dict)
 
-            # Get the domain from the list of starting cells of the PRA (pra_burn)
+
+#            pra_burn = pra_burns[id]    # Look up pra_burn in auxilliary list (or maybe dict)
+
+            # Get list of gridcells covered by the PRA polygon (the "PRA Burn")
+            pra_burn = rasterize.rasterize_polygon_compressed(row['shape'], grid_info)
+
+            # Get the domain from the PRA burn
             args = (dem_filled, dem_nodata, grid_info.geotransform, pra_burn)
             ret = d8graph.find_domain(*args, margin=margin, debug=1, min_alpha=min_alpha, max_runout=max_runout)
             if ret is not None:
@@ -254,4 +259,4 @@ def domain_rule(dem_filled_file, release_file, pra_burn_file, chull_file, domain
         domains_df['shape'] = domains
         shputil.write_df(domains_df, 'shape', 'Polygon', domain_file, wkt=grid_info.wkt)
 
-    return make.Rule(action, [dem_filled_file, release_file, pra_burn_file], outputs)
+    return make.Rule(action, [dem_filled_file, release_file], outputs)

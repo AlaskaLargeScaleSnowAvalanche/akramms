@@ -129,7 +129,7 @@ def rule(scene_dir, return_period, forest, require_all=True):
     For = 'For' if forest else 'NoFor'
 
     # eCognition filename conventions
-    pra_file,_ = process_tree.pra_files(scene_args, return_period, forest)
+    pra_file = process_tree.pra_file(scene_args, return_period, forest)
     inputs.append(pra_file)    # This rule does NOT use the burn files for domains...
 
     # Full pathnames of release files generated from this (scene_name, return_period, forest) combo

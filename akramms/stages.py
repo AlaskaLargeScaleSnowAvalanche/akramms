@@ -28,10 +28,10 @@ def add_stage0_rules(makefile, scene_dir):
             # Run eCognition
             makefile.add(r_ecog.rule(scene_dir, prepare_outputs, return_period, forest))
 
-            # Burn PRAs produced by eCognition into raster
-            pra_file, pra_burn_file = process_tree.pra_files(scene_args, return_period, forest)
-            makefile.add(
-                r_domain_builder.burn_pra_rule(dem_file, pra_file, pra_burn_file))
+#            # Burn PRAs produced by eCognition into raster
+#            pra_file, pra_burn_file = process_tree.pra_files(scene_args, return_period, forest)
+#            makefile.add(
+#                r_domain_builder.burn_pra_rule(dem_file, pra_file, pra_burn_file))
 
             # Post-Process eCognition Output (the pra_file)
             # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
@@ -54,11 +54,11 @@ def read_shplists(scene_args):
                 scene_name = scene_args['name']
 
                 jb = rammsutil.RammsName(
-                    os.path.join(scene_dir, 'RAMMS'),
+                    os.path.join(scene_args['scene_dir'], 'RAMMS'),
                     scene_args['name'], None, forest, resolution,
                     return_period, pra_size, None)
 
-                release_shplist = os.path.join(scene_dir, 'RAMMS', f'{jb.ramms_name}_rel.shplist')
+                release_shplist = os.path.join(scene_args['scene_dir'], 'RAMMS', f'{jb.ramms_name}_rel.shplist')
 
                 with open(release_shplist, 'r') as fin:
                     release_files.extend(config.roots.syspath(x.strip()) for x in fin)
@@ -87,7 +87,7 @@ def add_stage1_rules(makefile, scene_dir):
         chull_file = os.path.join(jb.ramms_dir, 'CHULL', '{}_chull.shp'.format(jb.ramms_name))
         domain_file = os.path.join(jb.ramms_dir, 'DOMAIN', '{}_dom.shp'.format(jb.ramms_name))
         makefile.add(r_domain_builder.domain_rule(
-            dem_filled_file, release_file, pra_burn_file, chull_file, domain_file, min_alpha=18., margin=config.initial_margins[jb.pra_size]))
+            dem_filled_file, release_file, chull_file, domain_file, min_alpha=18., margin=config.initial_margins[jb.pra_size]))
 
 
         # Now we have the input files for a RAMMS run:
@@ -98,7 +98,7 @@ def add_stage1_rules(makefile, scene_dir):
         # RAMMS Stage 1: IDL Prep
         ramms_files = shputil.expand_list([release_file, domain_file]) + rammsdir_files
         stage1_outputs = makefile.add(r_ramms.ramms_stage1_rule(
-            release_file, ramms_files, dry_run=False, submit=False)).outputs
+            release_file, ramms_files, dry_run=False, submit=True)).outputs
 
     return release_files
 
