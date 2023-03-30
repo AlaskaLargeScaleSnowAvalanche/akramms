@@ -53,11 +53,14 @@ ramms_version = '230321'
 #max_ramms_pras = 20
 max_ramms_pras = 500
 
+ramms_ncpu = 8    # Native RAMMS Stage 2; does not matter because we use HTCondor instead
+ramms_ncpu_preprocess = 8    # This matters for RAMMS Stage 1 (and maybe Stage 3)
+
 # ------------------------------
 # DEBUG parameters
 #allowed_pra_sizes = {'T', 'S', 'M', 'L'}
 #allowed_pra_sizes = {'L', 'M'}
-allowed_pra_sizes = {'M'}
+allowed_pra_sizes = {'M', 'S'}
 #allowed_forests = {True}
 #allowed_return_periods = {30}
 

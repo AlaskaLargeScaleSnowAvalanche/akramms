@@ -69,7 +69,7 @@ def dem_forest_links(scene_args, ramms_dir, oslope_name, forest=False):
 
     return links
 
-def write_scenario_txt(jb, alt_lim_top=1500, alt_lim_low=1000, ncpu=8, ncpu_preprocess=4, cohesion=50):
+def write_scenario_txt(jb, alt_lim_top=1500, alt_lim_low=1000, ncpu=config.ramms_ncpu, ncpu_preprocess=config.ramms_ncpu_preprocess, cohesion=50):
         # Create the scenario file
         kwargs = dict()
         kwargs['scenario_name'] = jb.ramms_name
