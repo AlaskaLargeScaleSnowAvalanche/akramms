@@ -1,8 +1,9 @@
 import scipy.spatial
+import shapely
 from osgeo import gdal
 from akramms import params,process_tree
 from akramms.util import rammsutil
-from uafgi.util import shputil,gdalutil,wrfutil,make,cfutil,ioutil
+from uafgi.util import shputil,gdalutil,wrfutil,make,cfutil,ioutil,rasterize
 import os,sys
 import subprocess
 import json
@@ -102,22 +103,44 @@ _post_cat_bounds = (0.,5000.,25000.,60000.,1e10)    # Dummy value at end
 post_cat_bounds = \
     dict((pra_size, (_post_cat_bounds[ix], _post_cat_bounds[ix+1])) for ix,pra_size in enumerate(rammsutil.PRA_SIZES.keys()))
 
+def master_ramms_names(scene_args, return_period, forest):
+    """Generates list of RAMMS names of RELEASE files before they've been chopped up.
+    Yields: jb (RammsName), pra_size
+    """
+    for pra_size in rammsutil.PRA_SIZES.keys():    # T,S,M,L
+        if pra_size not in config.allowed_pra_sizes:
+            continue
+        jb = rammsutil.RammsName(
+            os.path.join(scene_args['scene_dir'], 'RAMMS'),
+            scene_args['name'], None, forest, scene_args['resolution'],
+            return_period, pra_size, None)
+        yield jb, pra_size
 
-def rule(scene_dir, return_period, forest, require_all=True):
+
+
+def rule(scene_dir, dem_filled_file, return_period, forest,
+    min_alpha=18., max_runout=10000., margin=0.):
     """
     scene_dir:
         Uses params: name ("site"), resample_cell_size ("res")
+
+    dem_filled_file: filename
+        DEM that with sinks filled (while computing neighbor1)
 
     return_period:
         Return period we are calculating for.
         Must be included in scene_args['return_periods']
 
-    forest: bool  (formerly "Naming")
+    forest: bool
         Whether we are doing with / without forest
-    sx3_file:
-        Name of WRF file containing the sx3 snow depth variable
-    geo_file:
-        Name of WRF file containing eometry information for sx3_file
+
+
+    min_alpha: [deg]
+        Minimum slope that "avalanche" can continue in domain finder
+    max_runout:
+        Maximum distance avalanche can go
+   margin: [m]
+       Margin to add around convex hull to minimum bounding rectangle.
     """
 
     scene_args = params.load(scene_dir)
@@ -134,15 +157,10 @@ def rule(scene_dir, return_period, forest, require_all=True):
 
     # Full pathnames of release files generated from this (scene_name, return_period, forest) combo
     outputs = list()
-    ramms_names = list()
-    for pra_size in rammsutil.PRA_SIZES.keys():    # T,S,M,L
-        # DEBUG: Only do 'L' for now
-        if pra_size not in config.allowed_pra_sizes:
-            continue
-        jb = rammsutil.RammsName(os.path.join(scene_dir, 'RAMMS'), scene_name, None, forest, resolution, return_period, pra_size, None)
-        ramms_names.append((jb,pra_size))
-        # This filename does NOT have any segment numbers.
-        outputs.append(os.path.join(scene_dir, 'RAMMS', f'{jb.ramms_name}_rel.shplist'))
+    ramms_names = list(master_ramms_names(scene_args, return_period, forest))
+    for jb,_ in ramms_names:
+        for ext in ('_rel.shp', '_chull.shp', '_dom.shp'):
+            outputs.append(f'{jb.ramms_name}{ext}')
 
     # Add one-off input files
     inputs += [scene_args['snowdepth_file'], scene_args['snowdepth_geo']]
@@ -227,30 +245,105 @@ def rule(scene_dir, return_period, forest, require_all=True):
         # df[VOL_vname] = df['area_m2'] / np.cos(df['Mean_Slope']*degree) * df[d0_vname]
         df[VOL_vname] = (df['area_m2'] * df[d0_vname]) / np.cos(df['Mean_Slope']*degree)
 
-        # Split into segments and save
+        # Calculate domains
+        grid_info, dem_filled, dem_nodata = gdalutil.read_raster(dem_filled_file)
+        chulls = list()
+        doms = list()
+        for _,row in df.iterrows():
+
+            # Get list of gridcells covered by the PRA polygon (the "PRA Burn")
+            pra_burn = rasterize.rasterize_polygon_compressed(row['pra'], grid_info)
+
+            # Get the domain from the PRA burn
+            args = ()
+            ret = d8graph.find_domain(
+                dem_filled, dem_nodata, grid_info.geotransform, pra_burn
+                margin=margin, debug=1, min_alpha=min_alpha, max_runout=max_runout)
+
+            if ret is not None:
+                seen,chull_list,domain_list = ret
+                chulls.append(shapely.geometry.Polygon(chull_list))
+                doms.append(shapely.geometry.Polygon(domain_list))
+            else:
+                # Not able to make a domain for this PRA
+                chulls.append(shapely.geometry.Polygon([]))
+                domains.append(shapely.geometry.Polygon([]))
+
+        # ---------------------------------------------------------------
+        # Split into segments based on PRA size, and save
         ioutil.mkdirs_for_files(outputs)
-        for ((jb,pra_size),output) in zip(ramms_names,outputs):
+        for jb,pra_size in ramms_names:
+            # Select out rows for this category
             low,high = post_cat_bounds[pra_size]
-
             print(f'Category: {pra_size}, [{low}, {high})')
-            df_cat = df[df['area_m2'].between(low, high, inclusive='both')]  # SHOULD be inclusive='left'
+            cat_rows = df['area_m2'].between(low, high, inclusive='left')
+            cat_df = df[cat_rows]
+
+            # Store the _rel file
+            shputil.write_df(
+                cat_df, 'pra', 'Polygon',
+                os.path.join(scene_dir, 'RELEASE', f'{jb.ramms_name}_rel.shp'),
+                wkt=scene_args['coordinate_system'])
 
 
-            # Split df for this category (size) PRAs into bite-size chunks
-            df_chunks = [df_cat[i:i+config.max_ramms_pras] for i in range(0,df_cat.shape[0],config.max_ramms_pras)]
-            ofnames = list()
-            for segment,dfc in enumerate(df_chunks):
-                jb.set(segment=segment)
-                ofname = os.path.join(jb.ramms_dir, 'RELEASE', f'{jb.ramms_name}_rel.shp')
-                ofnames.append(ofname)
-                os.makedirs(os.path.split(ofname)[0], exist_ok=True)
-                shputil.write_df(dfc, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
+            # Store the _chull file
+            dom_df = pd.DataFrame(index=cat_df.index)
+            dom_df['chull'] = chulls
+            shputil.write_df(
+                df, 'chull', 'Polygon',
+                os.path.join(scene_dir, 'RELEASE', f'{jb.ramms_name}_chull.shp'),
+                wkt=scene_args['coordinate_system'])
 
-            # Write names of our PRA files into the final output file.
-            with open(output, 'w') as out:
-                for ofname in ofnames:
-                    out.write('{}\n'.format(config.roots.relpath(ofname)))
+            # Store the _dom file
+            df = pd.DataFrame(index=cat_df.index)
+            df['domain'] = doms
+            shputil.write_df(
+                df, 'domain', 'Polygon',
+                os.path.join(scene_dir, 'RELEASE', f'{jb.ramms_name}_dom.shp'),
+                wkt=scene_args['coordinate_system'])
 
-                
-    return make.Rule(action, inputs, outputs)
 
+        rule = make.Rule(action, inputs, outputs)
+        rule.ramms_names = ramms_names
+
+    return action
+
+def chunk_rule(
+
+
+
+# -------------------------------------------------------
+#            # Split df for this category (size) PRAs into bite-size chunks
+#            df_chunks = [df_cat[i:i+config.max_ramms_pras] for i in range(0,df_cat.shape[0],config.max_ramms_pras)]
+#            ofnames = list()
+#            for segment,dfc in enumerate(df_chunks):
+#                jb.set(segment=segment)
+#                ofname = os.path.join(jb.ramms_dir, 'RELEASE', f'{jb.ramms_name}_rel.shp')
+#                ofnames.append(ofname)
+#                os.makedirs(os.path.split(ofname)[0], exist_ok=True)
+#                shputil.write_df(dfc, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
+
+#            # Write names of our PRA files into the final output file.
+#            with open(output, 'w') as out:
+#                for ofname in ofnames:
+#                    out.write('{}\n'.format(config.roots.relpath(ofname)))
+#
+#                
+#    return make.Rule(action, inputs, outputs)
+# --------------------------------------------------------------------
+#
+#
+#
+#
+#    # Full pathnames of release files generated from this (scene_name, return_period, forest) combo
+#    outputs = list()
+#    ramms_names = list()
+#    for pra_size in rammsutil.PRA_SIZES.keys():    # T,S,M,L
+#        # DEBUG: Only do 'L' for now
+#        if pra_size not in config.allowed_pra_sizes:
+#            continue
+#        jb = rammsutil.RammsName(os.path.join(scene_dir, 'RAMMS'), scene_name, None, forest, resolution, return_period, pra_size, None)
+#        ramms_names.append((jb,pra_size))
+#        # This filename does NOT have any segment numbers.
+#        outputs.append(os.path.join(scene_dir, 'RAMMS', f'{jb.ramms_name}_rel.shplist'))
+#

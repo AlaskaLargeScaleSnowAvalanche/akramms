@@ -118,7 +118,10 @@ def rammsdir_rule(scene_dir, release_file, oramms_name=None, **scenario_kwargs):
         for ifile,ofile in links:
             setlink_or_copy(ifile, ofile)
 
+        # Write scenario.txt
         write_scenario_txt(jb, **scenario_kwargs)
+
+        # Generate .rel and .dom files
 
     inputs = [d[0] for d in links]
     linked_files = [d[1] for d in links]
