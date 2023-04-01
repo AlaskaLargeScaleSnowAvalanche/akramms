@@ -1,4 +1,4 @@
-import os,subprocess,re,sys,itertools,gzip,collections,io,typing,codecs
+import os,subprocess,re,sys,itertools,gzip,collections,io,typing,codecs,copy
 import numpy as np
 import datetime,time,zipfile
 import contextlib
@@ -94,7 +94,7 @@ def write_scenario_txt(jb, alt_lim_top=1500, alt_lim_low=1000, ncpu=config.ramms
             out.write(scenario_tpl.format(**kwargs))
 
 
-def rammsdir_rule(scene_dir, release_file, oramms_name=None, **scenario_kwargs):
+def orammsdir_rule(scene_dir, ramms_names, oramms_name=None, **scenario_kwargs):
 
     """Generates the scenario file, which becomes key to running RAMMS.
     release:
@@ -121,11 +121,93 @@ def rammsdir_rule(scene_dir, release_file, oramms_name=None, **scenario_kwargs):
         # Write scenario.txt
         write_scenario_txt(jb, **scenario_kwargs)
 
-        # Generate .rel and .dom files
-
     inputs = [d[0] for d in links]
     linked_files = [d[1] for d in links]
     outputs = [scenario_txt] + linked_files
+    return make.Rule(action, inputs, outputs)
+
+def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
+
+    """Generates the scenario file, which becomes key to running RAMMS.
+    release:
+        Release file to process
+    oramms_name:
+        Output RAMMS directory to create
+    """
+
+    scene_args = params.load(scene_dir)
+
+    outputs = list()
+    for jb,pra_size in ramms_names:
+        outputs.append(
+            os.path.join(scene_args['scene_dir'], 'RELEASE', f'{jb.ramms_name}_chunks.txt'))
+
+
+    def action(tdir):
+
+        for jb,pra_size in ramms_names:
+
+            # Make symlinks for DEM file, etc.
+            for ifile,ofile in dem_forest_links(scene_args, jb.ramms_dir, jb.slope_name, forest=jb.forest):
+                setlink_or_copy(ifile, ofile)
+
+            # Read _rel and _dom shapefiles
+            base = os.path.join(scene_args['scene_dir'], 'RELEASE', f'{jb.ramms_name}')
+            rel_df = shputil.read_df(f'{base}_rel.shp', shape='pra')
+            dom_df = shputil.read_df(f'{base}_dom.shp', shape='dom')
+            df = rel_df.merge(dom_df, on='Id')
+
+            # Drop rows with missing domain
+            df = df[df['dom'].notna()]
+
+            ofnames = list()
+            chunk_info = list()
+            for chunki in range(0,df.shape[0],config.max_ramms_pras):
+                # Select out chunk
+                dfc = df[i:i+config.max_ramms_pras]
+
+                # Add the chunk number to the name
+                jb1 = copy.copy(jb)
+                jb1.set(segment=segment)
+
+                # Write scenario.txt
+                scenario_txt = os.path.join(jb1.ramms_dir, 'scenario.txt')
+                write_scenario_txt(jb1, **scenario_kwargs)
+
+                # Write the _rel.shp file
+                ofname = os.path.join(jb1.ramms_dir, 'RELEASE', f'{jb1.ramms_name}_rel.shp')
+                os.makedirs(os.path.dirname(ofname), exist_ok=True)
+                shputil.write_df(dfc[list(rel_df)], 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_syste'])
+            
+                # Write the _dom.shp file
+                ofname = os.path.join(jb1.ramms_dir, 'DOMAIN', f'{jb1.ramms_name}_dom.shp')
+                os.makedirs(os.path.dirname(ofname), exist_ok=True)
+                shputil.write_df(dfc[list(dom_df)], 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_syste'])
+
+                # Write the .rel and .dom files for each avalanche
+                os.makedirs(jb1.avalanche_dir, exist_ok=True)
+                for _,row in chunk_df.iterrows():
+                    ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}.rel')
+                    rammsutil.write_polygon(row['pra'], ofname)
+                    ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}.dom')
+                    rammsutil.write_polygon(row['dom'], ofname)
+
+                # Store chunk info
+                chunk_info += [(chunki, id) for id in dfc['Id']]
+                #chunk_info.append(chunki, list(dfc['Id']))
+            
+            # Write names of our PRA files into the _chunks.txt output file
+            chunk_index_df = pd.DataFrame(chunk_info, columns=['chunk_index', 'Id'])
+            ofname = f'{base}_chunks.csv'
+            with open(output, 'w') as out:
+                chunk_index_df.to_csv(ofname)
+
+    inputs = list()
+    for jb,_ in ramms_names:
+        # Make symlinks for DEM file, etc.
+        links = dem_forest_links(scene_args, jb.ramms_dir, jb.slope_name, forest=jb.forest)
+        inputs += [d[0] for d in links]
+
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
 def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):

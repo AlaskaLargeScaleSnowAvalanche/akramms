@@ -45,7 +45,7 @@ class RammsName:
         """Update computed values"""
         self.scene_dir = os.path.dirname(self.ramms_harness)   # Top-level AKRAMMS directory
         self.For = 'For' if self.forest else 'NoFor'
-        self.ssegment = '' if self.segment is None else '{:03d}'.format(self.segment)
+        self.ssegment = '' if self.segment is None else '{:05d}'.format(self.segment)
         self.sid = '' if self.id is None else f'_{self.id}'
         suffix = '' if self.return_period is None else f'_{self.return_period}{self.pra_size}'
         self.reldom_name = f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m{suffix}'
@@ -101,7 +101,7 @@ class RammsName:
         return f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m_{self.return_period}{self.pra_size}_{id}{ext}'
 
 # -------------------------------------------------------
-release_fileRE = re.compile(r'^(.+)(\d\d\d)(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(.*)(\..*)')
+release_fileRE = re.compile(r'^(.+)(\d\d\d\d\d)(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(.*)(\..*)')
 
 @functools.lru_cache()
 def parse_release_file(release_file):

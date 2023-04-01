@@ -59,8 +59,8 @@ ramms_ncpu_preprocess = 8    # This matters for RAMMS Stage 1 (and maybe Stage 3
 # ------------------------------
 # DEBUG parameters
 #allowed_pra_sizes = {'T', 'S', 'M', 'L'}
-#allowed_pra_sizes = {'L', 'M'}
-allowed_pra_sizes = {'M', 'S'}
+allowed_pra_sizes = {'L', 'M'}
+#allowed_pra_sizes = {'M', 'S'}
 #allowed_forests = {True}
 #allowed_return_periods = {30}
 

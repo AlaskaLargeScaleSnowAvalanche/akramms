@@ -1,4 +1,5 @@
 import scipy.spatial
+import pandas as pd
 import shapely
 from osgeo import gdal
 from akramms import params,process_tree
@@ -12,7 +13,7 @@ import pyproj
 import netCDF4
 import numpy as np
 import gridfill
-
+import d8graph
 
 # From the gridfill docs...
 #def gridfill.fill(grids, xdim, ydim, eps, relax=.6, itermax=100, initzonal=False,
@@ -159,8 +160,9 @@ def rule(scene_dir, dem_filled_file, return_period, forest,
     outputs = list()
     ramms_names = list(master_ramms_names(scene_args, return_period, forest))
     for jb,_ in ramms_names:
-        for ext in ('_rel.shp', '_chull.shp', '_dom.shp'):
-            outputs.append(f'{jb.ramms_name}{ext}')
+        for dir,ext in (('RELEASE', '_rel.shp'), ('DOMAIN','_chull.shp'), ('DOMAIN','_dom.shp')):
+            outputs.append(
+                os.path.join(scene_dir, dir, f'{jb.ramms_name}{ext}'))
 
     # Add one-off input files
     inputs += [scene_args['snowdepth_file'], scene_args['snowdepth_geo']]
@@ -247,37 +249,47 @@ def rule(scene_dir, dem_filled_file, return_period, forest,
 
         # Calculate domains
         grid_info, dem_filled, dem_nodata = gdalutil.read_raster(dem_filled_file)
-        chulls = list()
-        doms = list()
-        for _,row in df.iterrows():
 
-            # Get list of gridcells covered by the PRA polygon (the "PRA Burn")
-            pra_burn = rasterize.rasterize_polygon_compressed(row['pra'], grid_info)
-
-            # Get the domain from the PRA burn
-            args = ()
-            ret = d8graph.find_domain(
-                dem_filled, dem_nodata, grid_info.geotransform, pra_burn
-                margin=margin, debug=1, min_alpha=min_alpha, max_runout=max_runout)
-
-            if ret is not None:
-                seen,chull_list,domain_list = ret
-                chulls.append(shapely.geometry.Polygon(chull_list))
-                doms.append(shapely.geometry.Polygon(domain_list))
-            else:
-                # Not able to make a domain for this PRA
-                chulls.append(shapely.geometry.Polygon([]))
-                domains.append(shapely.geometry.Polygon([]))
 
         # ---------------------------------------------------------------
         # Split into segments based on PRA size, and save
         ioutil.mkdirs_for_files(outputs)
         for jb,pra_size in ramms_names:
+            print('--- p_pra_post.rule() pra_size = ', pra_size)
+
             # Select out rows for this category
             low,high = post_cat_bounds[pra_size]
             print(f'Category: {pra_size}, [{low}, {high})')
             cat_rows = df['area_m2'].between(low, high, inclusive='left')
             cat_df = df[cat_rows]
+
+
+            # Calculate domains
+            chulls = list()
+            doms = list()
+            for ix,(_,row) in enumerate(cat_df.iterrows()):
+
+                if ix%1000 == 0:
+                    print('   Calculated {} of {} domains'.format(ix, len(cat_df)))
+
+                # Get list of gridcells covered by the PRA polygon (the "PRA Burn")
+                pra_burn = rasterize.rasterize_polygon_compressed(row['pra'], grid_info)
+
+                # Get the domain from the PRA burn
+                args = ()
+                ret = d8graph.find_domain(
+                    dem_filled, dem_nodata, grid_info.geotransform, pra_burn,
+                    margin=margin, debug=1, min_alpha=min_alpha, max_runout=max_runout)
+
+                if ret is not None:
+                    seen,chull_list,domain_list = ret
+                    chulls.append(shapely.geometry.Polygon(chull_list))
+                    doms.append(shapely.geometry.Polygon(domain_list))
+                else:
+                    # Not able to make a domain for this PRA
+                    chulls.append(shapely.geometry.Polygon([]))
+                    doms.append(shapely.geometry.Polygon([]))
+
 
             # Store the _rel file
             shputil.write_df(
@@ -285,30 +297,29 @@ def rule(scene_dir, dem_filled_file, return_period, forest,
                 os.path.join(scene_dir, 'RELEASE', f'{jb.ramms_name}_rel.shp'),
                 wkt=scene_args['coordinate_system'])
 
-
             # Store the _chull file
-            dom_df = pd.DataFrame(index=cat_df.index)
-            dom_df['chull'] = chulls
+            chull_df = pd.DataFrame(index=cat_df.index)
+            chull_df['Id'] = cat_df['Id']
+            chull_df['chull'] = chulls
+            #print('chull_df = ', chull_df)
+            print('chull_df columns ', chull_df.columns)
             shputil.write_df(
-                df, 'chull', 'Polygon',
+                chull_df, 'chull', 'Polygon',
                 os.path.join(scene_dir, 'RELEASE', f'{jb.ramms_name}_chull.shp'),
                 wkt=scene_args['coordinate_system'])
 
             # Store the _dom file
-            df = pd.DataFrame(index=cat_df.index)
-            df['domain'] = doms
+            dom_df = pd.DataFrame(index=cat_df.index)
+            dom_df['Id'] = cat_df['Id']
+            dom_df['domain'] = doms
             shputil.write_df(
-                df, 'domain', 'Polygon',
+                dom_df, 'domain', 'Polygon',
                 os.path.join(scene_dir, 'RELEASE', f'{jb.ramms_name}_dom.shp'),
                 wkt=scene_args['coordinate_system'])
 
 
-        rule = make.Rule(action, inputs, outputs)
-        rule.ramms_names = ramms_names
-
-    return action
-
-def chunk_rule(
+    rule = make.Rule(action, inputs, outputs)
+    return rule, ramms_names
 
 
 

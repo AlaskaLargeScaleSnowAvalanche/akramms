@@ -35,8 +35,11 @@ def add_stage0_rules(makefile, scene_dir):
 
             # Post-Process eCognition Output (the pra_file)
             # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
-            release_shplists = makefile.add(
-                r_pra_post.rule(scene_dir, return_period, forest, require_all=False)).outputs
+            pra_post_rule, ramms_names = r_pra_post.rule(
+                scene_dir, dem_filled_file, return_period, forest)
+            release_shplists = makefile.add(pra_post_rule).outputs
+
+            makefile.add(r_ramms.chunk_rule(scene_dir, ramms_names))
 
 def read_shplists(scene_args):
     """Returns: release_files"""
