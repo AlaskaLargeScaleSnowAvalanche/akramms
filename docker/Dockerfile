@@ -24,10 +24,10 @@ RUN apt install --yes python3 python-is-python3
 COPY dotwine.tar.gz /opt
 
 # Install RAMMS .exe file (and any supporting DLLs)
-ADD RAMMS/230321 /opt/ramms
-RUN echo '230321.1' >/opt/build_version.txt
+ADD RAMMS/230401 /opt/ramms
+RUN echo '230401.1' >/opt/build_version.txt
 
-ADD RAMMS/230321 /opt/ramms
+ADD RAMMS/230401 /opt/ramms
 
 # https://betterprogramming.pub/how-to-version-your-docker-images-1d5c577ebf54
 
