@@ -4,7 +4,7 @@ from akramms import r_prepare, r_ecog, r_pra_post, r_domain_builder, r_ramms
 from akramms.util import paramutil,harnutil,rammsutil
 import os,sys
 import setuptools.sandbox
-
+import pandas as pd
 
 def add_stage0_rules(makefile, scene_dir):
 
@@ -41,8 +41,8 @@ def add_stage0_rules(makefile, scene_dir):
 
             makefile.add(r_ramms.chunk_rule(scene_dir, ramms_names))
 
-def read_shplists(scene_args):
-    """Returns: release_files"""
+def read_release_files(scene_args):
+    """Returns: release_files for all chunks"""
 
     release_files = list()    # Release files we will run RAMMS on
     for return_period in scene_args['return_periods']:
@@ -61,10 +61,15 @@ def read_shplists(scene_args):
                     scene_args['name'], None, forest, resolution,
                     return_period, pra_size, None)
 
-                release_shplist = os.path.join(scene_args['scene_dir'], 'RAMMS', f'{jb.ramms_name}_rel.shplist')
+                chunks_df = pd.read_csv(r_ramms.chunks_csv(scene_args['scene_dir'], jb.ramms_name))
+                chunk_ids = chunks_df.segment.unique()
 
-                with open(release_shplist, 'r') as fin:
-                    release_files.extend(config.roots.syspath(x.strip()) for x in fin)
+                for segment in chunk_ids:
+                    jb1 = jb.copy(segment=segment)
+                    release_file = os.path.join(jb1.ramms_dir, 'RELEASE', f'{jb1.ramms_name}_rel.shp')
+                    print('release_file ', release_file)
+                    release_files.append(release_file)
+
     return release_files
 
 def add_stage1_rules(makefile, scene_dir):
@@ -75,8 +80,8 @@ def add_stage1_rules(makefile, scene_dir):
     dem_root = os.path.split(dem_file)[1][:-4]
     dem_filled_file = os.path.join(scene_dir, f'{dem_root}_filled.tif')
 
-    # Read release files from *_rel.shplist
-    release_files = read_shplists(scene_args)
+    # Read per-chunk release files from *_rel.shplist
+    release_files = read_release_files(scene_args)
 
     # Domain finder for post-process output
     for release_file in release_files:

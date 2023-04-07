@@ -160,7 +160,7 @@ def rule(scene_dir, dem_filled_file, return_period, forest,
     outputs = list()
     ramms_names = list(master_ramms_names(scene_args, return_period, forest))
     for jb,_ in ramms_names:
-        for dir,ext in (('RELEASE', '_rel.shp'), ('DOMAIN','_chull.shp'), ('DOMAIN','_dom.shp')):
+        for dir,ext in (('RELEASE', '_rel.shp'), ('RELEASE','_chull.shp'), ('RELEASE','_dom.shp')):
             outputs.append(
                 os.path.join(scene_dir, dir, f'{jb.ramms_name}{ext}'))
 

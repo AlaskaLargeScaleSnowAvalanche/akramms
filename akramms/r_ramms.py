@@ -94,7 +94,7 @@ def write_scenario_txt(jb, alt_lim_top=1500, alt_lim_low=1000, ncpu=config.ramms
             out.write(scenario_tpl.format(**kwargs))
 
 
-def orammsdir_rule(scene_dir, ramms_names, oramms_name=None, **scenario_kwargs):
+def rammsdir_rule(scene_dir, release_file, oramms_name=None, **scenario_kwargs):
 
     """Generates the scenario file, which becomes key to running RAMMS.
     release:
@@ -126,6 +126,9 @@ def orammsdir_rule(scene_dir, ramms_names, oramms_name=None, **scenario_kwargs):
     outputs = [scenario_txt] + linked_files
     return make.Rule(action, inputs, outputs)
 
+def chunks_csv(scene_dir, ramms_name):
+    return os.path.join(scene_dir, 'RELEASE', f'{ramms_name}_chunks.csv')
+
 def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
 
     """Generates the scenario file, which becomes key to running RAMMS.
@@ -139,8 +142,7 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
 
     outputs = list()
     for jb,pra_size in ramms_names:
-        outputs.append(
-            os.path.join(scene_args['scene_dir'], 'RELEASE', f'{jb.ramms_name}_chunks.txt'))
+        outputs.append(chunks_csv(scene_args['scene_dir'], jb.ramms_name))
 
 
     def action(tdir):
@@ -153,8 +155,9 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
 
             # Read _rel and _dom shapefiles
             base = os.path.join(scene_args['scene_dir'], 'RELEASE', f'{jb.ramms_name}')
-            rel_df = shputil.read_df(f'{base}_rel.shp', shape='pra')
-            dom_df = shputil.read_df(f'{base}_dom.shp', shape='dom')
+            rel_df = shputil.read_df(f'{base}_rel.shp', shape='pra').drop('fid', axis=1)
+
+            dom_df = shputil.read_df(f'{base}_dom.shp', shape='dom').drop('fid', axis=1)
             df = rel_df.merge(dom_df, on='Id')
 
             # Drop rows with missing domain
@@ -162,9 +165,9 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
 
             ofnames = list()
             chunk_info = list()
-            for chunki in range(0,df.shape[0],config.max_ramms_pras):
+            for segment,chunkix in enumerate(range(0,df.shape[0],config.max_ramms_pras)):
                 # Select out chunk
-                dfc = df[i:i+config.max_ramms_pras]
+                dfc = df[chunkix:chunkix+config.max_ramms_pras]
 
                 # Add the chunk number to the name
                 jb1 = copy.copy(jb)
@@ -176,31 +179,38 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
 
                 # Write the _rel.shp file
                 ofname = os.path.join(jb1.ramms_dir, 'RELEASE', f'{jb1.ramms_name}_rel.shp')
+                #print('xxxxx writing ', ofname)
                 os.makedirs(os.path.dirname(ofname), exist_ok=True)
-                shputil.write_df(dfc[list(rel_df)], 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_syste'])
+                #print('rel_def ', rel_df.columns)
+                #print('dfc     ', dfc.columns)
+                #rel_cols = list(rel_df.columns)
+                #print('rel_cols ', rel_cols)
+#                print(rel_df[['fid', 'Id']])
+                _dfx = dfc[list(rel_df.columns)]
+                shputil.write_df(_dfx, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
             
-                # Write the _dom.shp file
+                # Write the _dom.shp file 
                 ofname = os.path.join(jb1.ramms_dir, 'DOMAIN', f'{jb1.ramms_name}_dom.shp')
                 os.makedirs(os.path.dirname(ofname), exist_ok=True)
-                shputil.write_df(dfc[list(dom_df)], 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_syste'])
+                shputil.write_df(dfc[list(dom_df)], 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
 
                 # Write the .rel and .dom files for each avalanche
                 os.makedirs(jb1.avalanche_dir, exist_ok=True)
-                for _,row in chunk_df.iterrows():
-                    ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}.rel')
+                for _,row in dfc.iterrows():
+                    id = row['Id']
+                    ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}_{id}.rel')
                     rammsutil.write_polygon(row['pra'], ofname)
-                    ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}.dom')
+                    ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}_{id}.dom')
                     rammsutil.write_polygon(row['dom'], ofname)
 
                 # Store chunk info
-                chunk_info += [(chunki, id) for id in dfc['Id']]
-                #chunk_info.append(chunki, list(dfc['Id']))
+                chunk_info += [(segment, id) for id in dfc['Id']]
+                #chunk_info.append(segment, list(dfc['Id']))
             
             # Write names of our PRA files into the _chunks.txt output file
-            chunk_index_df = pd.DataFrame(chunk_info, columns=['chunk_index', 'Id'])
-            ofname = f'{base}_chunks.csv'
-            with open(output, 'w') as out:
-                chunk_index_df.to_csv(ofname)
+            chunk_index_df = pd.DataFrame(chunk_info, columns=['segment', 'Id'])
+#            with open(, 'w') as out:
+            chunk_index_df.to_csv(f'{base}_chunks.csv', index=False)
 
     inputs = list()
     for jb,_ in ramms_names:
