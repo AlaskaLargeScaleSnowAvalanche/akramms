@@ -136,8 +136,8 @@ _doneRE3 = re.compile(r'\s*Finished writing GEOTIFF files!')
 
 class LineProcessor1:
 
-    def __init__(self, avalanche_dir):
-        self.avalanche_dir = avalance_dir
+    def __init__(self, avalanche_dirs):
+        self.avalanche_dirs = avalanche_dirs
         self.ready_to_exit = False
         self.t0 = time.time()
         self.nvar = self.count_var_files()
@@ -145,9 +145,10 @@ class LineProcessor1:
     def count_var_files(self):
         # Count the number of .var files
         nvar = 0
-        for leaf in os.listdir(self.avalanche_dir):
-            if leaf.endswith('.var'):
-                nvar += 1
+        for avalanche_dir in self.avalanche_dirs:
+            for leaf in os.listdir(avalanche_dir):
+                if leaf.endswith('.var'):
+                    nvar += 1
         return nvar
 
 
@@ -195,7 +196,7 @@ class LineProcessor3:
             return False
         return True
 
-def _run_on_windows_once(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
+def _run_on_windows_once(idlrt_exe, ramms_version, ramms_dir, avalanche_dirs, ramms_stage):
     """Call this to run top-level RAMMS locally on Windows.
     idlrt_exe:
         Windows path to idlrt.exe IDL runtime
@@ -203,6 +204,8 @@ def _run_on_windows_once(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
         Version of RAMMS to run (eg: '221101')
     ramms_dir:
         RAMMS directory to run
+    avalanche_dirs:
+        Avalanche directories inside the ramms_dir
     ramms_stage: 1|2|3
         Stage of RAMMS to execute on this run (eg: 1)
     Returns retry:
@@ -250,7 +253,7 @@ def _run_on_windows_once(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
         out.write(bat_contents)
 
     # Prepare to process RAMMS Lines
-    line_processor = LineProcessor1() if ramms_stage == 1 else LineProcessor3()
+    line_processor = LineProcessor1(avalanche_dirs) if ramms_stage == 1 else LineProcessor3()
 
     # Run RAMMS
     retry = True    # Should we try running this again?
@@ -329,7 +332,7 @@ def _run_on_windows_once(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
 def _run_on_windows(*args, ntry=1):
     """Retry up to a specified number of times."""
     for n in range(ntry):
-        print(f'===***===*** Retrying _run_on_windows: {n}'
+        print(f'===***===*** Retrying _run_on_windows: {n}')
         if not _run_on_windows_once(*args):
             break
 
@@ -342,12 +345,15 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
 
     release_files_rel = [x for x in inputs_rel if x.endswith('_rel.shp')]
     print('release_files_rel ', release_files_rel)
+    release_files = [config.roots.syspath(x_rel) for x_rel in release_files_rel]
+    jbs = [rammsutil.parse_release_file(x) for x in release_files]
+    avalanche_dirs = set(jb.avalanche_dir for jb in jbs)
 
     # Collect output files, to be be transferred back to Linux
     outputs = list()
 
     # Run RAMMS locally, managing the IDL process
-    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 1, ntry=2)
+    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, avalanche_dirs, 1, ntry=2)
 
     # Rename the log file to reflect stage1
     ilogfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock.log')
@@ -369,9 +375,10 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
             for ext in
             ('.av2', '.dom', '.rel', '.var', '.xy-coord', '.xyz')))
 
-    for release_file_rel in release_files_rel:
-        release_file = config.roots.syspath(release_file_rel)
+#    for release_file_rel in release_files_rel:
+#        release_file = config.roots.syspath(release_file_rel)
 
+    for release_file in release_files:
         # Identify our list of avalanche directories based release files listed as inputs
         # Turn release file name into directory of avalanche simulations
         jb = rammsutil.parse_release_file(release_file)
