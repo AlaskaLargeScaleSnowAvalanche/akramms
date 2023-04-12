@@ -84,7 +84,7 @@ def add_stage1_rules(makefile, scene_dir):
     release_files = read_release_files(scene_args)
 
     # Domain finder for post-process output
-    for release_file in release_files:
+    for release_file in release_files:    # This loop is PER-CHUNK!!!
         jb = rammsutil.parse_release_file(release_file)
 
 #        pra_burn_file = os.path.join(jb.ramms_dir, 'RELEASE', f'{jb.ramms_name}_burn.pik.gz')
@@ -98,15 +98,15 @@ def add_stage1_rules(makefile, scene_dir):
             dem_filled_file, release_file, chull_file, domain_file, min_alpha=18., margin=config.initial_margins[jb.pra_size]))
 
 
-        # Now we have the input files for a RAMMS run:
-        #    rammsdir_files, release_files, domain_files
-        rammsdir_files = makefile.add(r_ramms.rammsdir_rule(
-            scene_dir, release_file)).outputs
+#        # Now we have the input files for a RAMMS run:
+#        #    rammsdir_files, release_files, domain_files
+#        rammsdir_files = makefile.add(r_ramms.rammsdir_rule(
+#            scene_dir, release_file)).outputs
 
         # RAMMS Stage 1: IDL Prep
-        ramms_files = shputil.expand_list([release_file, domain_file]) + rammsdir_files
+#        ramms_files = shputil.expand_list([release_file, domain_file]) + rammsdir_files
         stage1_outputs = makefile.add(r_ramms.ramms_stage1_rule(
-            release_file, ramms_files, dry_run=False, submit=True)).outputs
+            release_file, [release_file, domain_file], dry_run=False, submit=True)).outputs
 
     return release_files
 

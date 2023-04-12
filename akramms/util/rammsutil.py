@@ -53,7 +53,7 @@ class RammsName:
 
         # Root of the RAMMS run (from RAMM's perspective)
         if self.return_period is not None:
-            self.rammsdir_name = f'{self.scene_name}{self.ssegment}{self.return_period}{self.pra_size}{self.For}_{self.resolution}m{self.sid}' 
+            self.rammsdir_name = f'{self.scene_name}{self.ssegment}{self.return_period}{self.pra_size}{self.For}_{self.resolution}m'#{self.sid}' 
             self.ramms_dir = os.path.join(self.ramms_harness, self.rammsdir_name)
 
         # Place where slope files are placed.
@@ -109,7 +109,7 @@ def parse_release_file(release_file):
 
     RELEASE_dir,leaf = os.path.split(release_file)
     ramms_dir = os.path.split(RELEASE_dir)[0]
-    ramms_harness = os.path.split(ramms_dir)[0]
+    ramms_harness = os.path.abspath(os.path.split(ramms_dir)[0])
     match = release_fileRE.match(leaf)
 
     scene_name = match.group(1)

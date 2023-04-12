@@ -1,4 +1,5 @@
 import os,subprocess,re,sys,itertools,gzip,collections,io,typing,codecs,copy
+import multiprocessing
 import numpy as np
 import datetime,time,zipfile
 import contextlib
@@ -214,12 +215,107 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
 
     inputs = list()
     for jb,_ in ramms_names:
-        # Make symlinks for DEM file, etc.
+        # Get list of symlinks we WILL make, use that to determine input files
         links = dem_forest_links(scene_args, jb.ramms_dir, jb.slope_name, forest=jb.forest)
         inputs += [d[0] for d in links]
 
     return make.Rule(action, inputs, outputs)
 # --------------------------------------------------------------------
+def tiffmap(jb1):
+
+    """Returns a mapping between a parsed RAMMS dir vs. "permanent"
+    names for .tif files that can be reused for different chunks in
+    RAMMS Stage 1.  After RAMMS stage 1, files will be copied from the
+    chunk to their general location, as appropriate.
+
+    jb1:
+        Parsed release file name of one chunk
+    Returns: [(fname_chunk, fname_general), ...]
+
+    """
+
+    # Parsed release file name of the dummy overall run used to create
+    # reusable names for the TIF files.
+    jb0 = jb1.copy(segment=None)
+    scene_dir = os.path.dirname(jb1.ramms_harness)
+    scene_args = params.load(scene_dir)
+
+    results_dir1 = os.path.join(jb1.ramms_dir, 'RESULTS', jb1.rammsdir_name)
+
+    map = [
+        # ./juneau10000030MFor_5m/DEM/juneau100000For_5m_dem.tif
+        (f'{jb1.ramms_dir}/DEM/{jb1.ramms_name}_dem.tif', scene_args['dem_file']),
+
+        # ./juneau10000030MFor_5m/FOREST/juneau100000For_5m_forest.tif
+        (f'{jb1.ramms_dir}/FOREST/{jb1.ramms_name}_forest.tif', scene_args['forest_file']),
+
+        # -------------- Items for all sub-directories of the slope_dir
+        # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/slope.tif
+        (f'{jb1.slope_dir}/slope.tif',
+            f'SLOPE_TIF/{jb0.slope_name}/slope.tif'),
+        # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/curvidl.tif
+        (f'{jb1.slope_dir}/curvidl.tif',
+            f'SLOPE_TIF/{jb0.slope_name}/curvidl.tif'),
+
+        # -------------- Items for each subdir
+        # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/juneau100000For_5m_M30_xi.tif
+        (f'{jb1.slope_dir}/{jb1.slope_name}_{jb0.pra_size}{jb1.return_period}_xi.tif',
+            f'SLOPE_TIF/{jb0.slope_name}/{jb0.slope_name}_{jb0.pra_size}{jb0.return_period}_xi.tif'),
+
+        # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/juneau100000For_5m_M30_mu.tif
+        (f'{jb1.slope_dir}/{jb1.slope_name}_{jb0.pra_size}{jb1.return_period}_mu.tif',
+            f'SLOPE_TIF/{jb0.slope_name}/{jb0.slope_name}_{jb0.pra_size}{jb0.return_period}_mu.tif'),
+
+        # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/logfiles/muxi_class.tif
+    ]
+
+    map = [
+        (os.path.join(jb0.ramms_harness, x), os.path.join(scene_dir, y))
+        for x,y in map]
+
+    return map
+
+
+# --------------------------------------------------------------------
+_izip_exts = ['.rel', '.xyz', '.av2', '.xy-coord', '.var', '.dom']
+def compress_avalanche_inputs(jb, ids):
+    """Puts all avalanche inputs into a single Zip file."""
+#    jb = rammsutil.parse_release_file(release_file)
+    jb = jb.copy()
+    for id in ids:
+        jb.set(id=id)
+        base = os.path.join(jb.avalanche_dir, f'{jb.ramms_name}')
+        zip_file = f'{base}_in.zip'
+        print(f'Compressing {zip_file}')
+
+        files = [f'{base}{ext}' for ext in _izip_exts]
+        arcnames = [f'{base}{ext}' for ext in _izip_exts]
+        arcnames[-1] = f'{base}_v01.dom'    # First of many .dom files
+
+        if (not os.path.exists(f'{base}_in.zip')) and \
+            all(os.path.exists(x) for x in files):
+
+            # Compress Avalanche intput files into a Zipfile
+            with zipfile.ZipFile(
+                zip_file, 'w', compression=zipfile.ZIP_DEFLATED) \
+                as izip:
+
+                for file,arcname in zip(files,arcnames):
+                    izip.write(file, arcname=arcname)
+
+            # Remove old files
+            for file in files:
+#                print(f'rm {file}')
+                os.remove(file)
+
+# --------------------------------------------------------------------
+
+def striped_chunks(l, n):
+    """Yield n number of striped chunks from l."""
+    # https://stackoverflow.com/questions/24483182/python-split-list-into-n-chunks
+    for i in range(0, n):
+        yield l[i::n]
+
 def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):
     """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)
 
@@ -234,6 +330,18 @@ def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):
     done_output = os.path.join(jb.ramms_dir, 'RESULTS', f'{jb.ramms_name}_stage1.txt')
 
     def action(tdir):
+        # ---------------------------------------------------------
+        # From former rammsdir rule
+
+        # ---------------------------------------------------------
+
+        # Copy files from previous RAMMS Stage 1, to speed things up
+        tmap = tiffmap(jb)
+        for fname0,fname1 in tmap:
+            if (not os.path.exists(fname0)) and os.path.exists(fname1):
+                dir0 = os.path.dirname(fname0)
+                os.makedirs(dir0, exist_ok=True)
+                shutil.copy(fname1, fname0)
 
         ramms_dir_rel = config.roots.relpath(jb.ramms_dir)
         cmd = ['sh', 
@@ -243,11 +351,32 @@ def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):
 
         # RAMMS Stage 1 accepts inputs on stdin
         # rammsdist.run_on_windows_stage() calls read_inputs()
+#        dynamic_outputs = list()
         dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=True)
 
         # Write output files
         with open(done_output, 'w') as out:
             out.write('Finished RAMMS Stage 1\n')
+
+        # Copy .tif files to be reused by later RAMMS Stage 1
+        for fname0,fname1 in tmap:
+            dir1 = os.path.dirname(fname1)
+            os.makedirs(dir1, exist_ok=True)
+            if not os.path.exists(fname1):
+                shutil.copy(fname0, fname1)
+            os.remove(fname0)
+
+        # Compress Avalanche inputs, ready for Docker container
+        df = shputil.read_df(release_file, read_shapes=False)
+        all_ids = list(df['Id'])
+        procs = list()
+        for ids in striped_chunks(all_ids, config.ncpu_compress):
+            proc = multiprocessing.Process(
+                target=lambda: compress_avalanche_inputs(jb,ids))
+            proc.start()
+            procs.append(proc)
+        for proc in procs:
+            proc.join()
 
         # Submit the individual avalanche runs immediately so we can
         # get going while preparing more RAMMS directories.

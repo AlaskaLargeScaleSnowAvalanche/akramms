@@ -114,19 +114,6 @@ def kill_idl():
         time.sleep(1)
 
 # -----------------------------------------------------
-
-#_doneRE = re.compile(r"\s*Creating MUXI-Files...")    # Demo
-# RAMMS IDL prints this when it is done with Stage 1
-_doneREs = {
-    1 : re.compile(r'\s*(Starting LSHM SIMULATIONS|LSHM Analysis finished successfully|- VAR-Files: All files created \(IDLBridge\)!)'),
-    3 : re.compile(r'\s*Finished writing GEOTIFF files!'),
-#    3 : re.compile(r'LSHM Analysis finished successfully'),
-}
-
-#_doneRE = re.compile(r"\s*Finsihed writing GEOTIFF files!")    # Prod
-
-
-# -----------------------------------------------------------------------
 def read_inputs():
     """Read list of input files from stdin"""
 
@@ -143,7 +130,72 @@ def read_inputs():
 
 # -----------------------------------------------------------------------
 _releaseRE = re.compile(r'\s*RELEASE\s+(\d+)/(\d+)')
-def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
+_doneRE1 = re.compile(
+    r'\s*(Starting LSHM SIMULATIONS|LSHM Analysis finished successfully|- VAR-Files: All files created \(IDLBridge\)!)')
+_doneRE3 = re.compile(r'\s*Finished writing GEOTIFF files!')
+
+class LineProcessor1:
+
+    def __init__(self, avalanche_dir):
+        self.avalanche_dir = avalance_dir
+        self.ready_to_exit = False
+        self.t0 = time.time()
+        self.nvar = self.count_var_files()
+
+    def count_var_files(self):
+        # Count the number of .var files
+        nvar = 0
+        for leaf in os.listdir(self.avalanche_dir):
+            if leaf.endswith('.var'):
+                nvar += 1
+        return nvar
+
+
+        # If >5 seconds have passed, check to see if the number of VAR
+        # files has increased.
+        t1 = time.time()
+        if t1 - self.t0 > 5:
+            self.t0 = t1
+            nvar = self.count_var_files()
+            if nvar > self.nvar:
+                self.nvar = nvar
+            else:
+                raise EOFError()
+
+    def check_end_chunk(self):
+        nvar = self.count_var_files()
+
+
+    def watch(self, line):
+        # ---- Process the line we have read
+        # Seek info on progress through release files
+        # Eg: RELEASE 1/3
+        match = _releaseRE.match(line)
+        if match is not None:
+            release_file_ix = int(match.group(1))
+            num_release_files = int(match.group(2))
+            if release_file_ix == num_release_files:
+                self.ready_to_exit = True
+
+        # If we've seen enough release files, look out for our
+        # "done message."
+        if self.ready_to_exit and (_doneRE1.match(line) is not None):
+            return False
+
+        return True
+
+class LineProcessor3:
+    def check_end_chunk(self):
+        return True
+
+    def watch(self, line):
+        # If we've seen enough release files, look out for our
+        # "done message."
+        if _doneRE3.match(line) is not None:
+            return False
+        return True
+
+def _run_on_windows_once(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
     """Call this to run top-level RAMMS locally on Windows.
     idlrt_exe:
         Windows path to idlrt.exe IDL runtime
@@ -153,9 +205,9 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
         RAMMS directory to run
     ramms_stage: 1|2|3
         Stage of RAMMS to execute on this run (eg: 1)
-    Returns:
-        Nothing if OK.
-        Raises Exception if it did not complete.
+    Returns retry:
+        True if we should retry.
+        False if we should NOT retry
     """
     print(f'***** Running Top-Level RAMMS on {ramms_dir}')
 
@@ -170,7 +222,7 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
 
     # This flag means we are ready to exit as soon as we identify the
     # "done message" (see _doneREs)
-    ready_to_exit = (ramms_stage != 1)        
+    #ready_to_exit = (ramms_stage != 1)        
     
     # ----------------------------------------------------------------
     # Make sure we've added our stub properly
@@ -197,7 +249,11 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
         print(bat_contents)
         out.write(bat_contents)
 
+    # Prepare to process RAMMS Lines
+    line_processor = LineProcessor1() if ramms_stage == 1 else LineProcessor3()
+
     # Run RAMMS
+    retry = True    # Should we try running this again?
     try:
         fin = None
         proc1 = subprocess.Popen(batfile)
@@ -225,27 +281,18 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
                     print()
                 continue
 
-            # Read out everything in logfile since last time we looked
             while True:
                 line = fin.readline()
                 if not line:
-                    break    # Nothing more to read for now
+                    # Nothing more to read for now
+                    if not line_processor.check_end_chunk():
+                        print('_run_on_windows() exiting')
+                        sys.stdout.flush()
+                        raise EOFError()   # Break out of double loop
+                    break    
 
                 print(line+'*', end='')
-
-                # ---- Process the line we have read
-                # Seek info on progress through release files
-                # Eg: RELEASE 1/3
-                match = _releaseRE.match(line)
-                if match is not None:
-                    release_file_ix = int(match.group(1))
-                    num_release_files = int(match.group(2))
-                    if release_file_ix == num_release_files:
-                        ready_to_exit = True
-
-                # If we've seen enough release files, look out for our
-                # "done message."
-                if ready_to_exit and (_doneREs[ramms_stage].match(line) is not None):
+                if not line_processor.watch(line):
                     print('_run_on_windows() exiting')
                     sys.stdout.flush()
                     raise EOFError()   # Break out of double loop
@@ -254,9 +301,13 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
 
     except EOFError:
         # Proper signal of end of IDL output; exit gracefully
-        pass
+        retry = False
+    except TimeoutError:
+        # IDL has hung, we should retry
+        retry = True
     except Exception as e:
         # Inform user of errors in this program
+        retry = False
         traceback.print_exc()
         sys.stdout.flush()
         sys.stderr.flush()
@@ -273,6 +324,14 @@ def _run_on_windows(idlrt_exe, ramms_version, ramms_dir, ramms_stage):
             print('************ ALL DONE!!! ****************')
             sys.stdout.flush()
             sys.stderr.flush()
+    return retry
+
+def _run_on_windows(*args, ntry=1):
+    """Retry up to a specified number of times."""
+    for n in range(ntry):
+        print(f'===***===*** Retrying _run_on_windows: {n}'
+        if not _run_on_windows_once(*args):
+            break
 
 # -----------------------------------------------------------------------
 # -----------------------------------------------------------------------
@@ -288,7 +347,7 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
     outputs = list()
 
     # Run RAMMS locally, managing the IDL process
-    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 1)
+    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 1, ntry=2)
 
     # Rename the log file to reflect stage1
     ilogfile = os.path.join(ramms_dir, 'RESULTS', 'lshm_rock.log')
@@ -308,7 +367,7 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
     outRE = re.compile('|'.join(
         r'[^.]*{}$'.format(ext.replace('.', r'\.')) \
             for ext in
-            ('.av2', '.dom', '.rel', '.var.gz', '.xy-coord.gz', '.xyz.gz')))
+            ('.av2', '.dom', '.rel', '.var', '.xy-coord', '.xyz')))
 
     for release_file_rel in release_files_rel:
         release_file = config.roots.syspath(release_file_rel)
@@ -362,7 +421,7 @@ def run_on_windows_stage3(idlrt_exe, ramms_version, ramms_dir):
 
 #    print('** TODO: Uncomment so we actually run RAMMS **')
     print('Running RAMMS Stage 3 on Windows (launching IDL now)')
-    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 3)
+    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 3, ntry=1)
 
 
     # Figure out which output files exist, and print to STDOUT

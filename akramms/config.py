@@ -57,6 +57,7 @@ max_ramms_pras = 100
 ramms_ncpu = 8    # Native RAMMS Stage 2; does not matter because we use HTCondor instead
 #ramms_ncpu_preprocess = 8    # This matters for RAMMS Stage 1 (and maybe Stage 3)
 ramms_ncpu_preprocess = 1    # 1 is fastest, due to IDL's overhead in parallelizing and the small granularity of RAMMS Stage 1
+ncpu_compress = 8    # Number of CPUs to use when compressing stuff after RAMMS Stage 1
 
 # ------------------------------
 # DEBUG parameters
