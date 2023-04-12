@@ -286,7 +286,6 @@ def compress_avalanche_inputs(jb, ids):
         jb.set(id=id)
         base = os.path.join(jb.avalanche_dir, f'{jb.ramms_name}')
         zip_file = f'{base}_in.zip'
-        print(f'Compressing {zip_file}')
 
         files = [f'{base}{ext}' for ext in _izip_exts]
         arcnames = [f'{base}{ext}' for ext in _izip_exts]
@@ -294,6 +293,8 @@ def compress_avalanche_inputs(jb, ids):
 
         if (not os.path.exists(f'{base}_in.zip')) and \
             all(os.path.exists(x) for x in files):
+
+            print(f'Compressing {zip_file}')
 
             # Compress Avalanche intput files into a Zipfile
             with zipfile.ZipFile(

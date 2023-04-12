@@ -139,7 +139,7 @@ def run_remote(inputs, cmd, tdir, write_inputs=False):
         proc.wait(timeout=10)    # The process should be exited anyway, wait for 10 seconds
         if proc.returncode != 0:
             raise subprocess.CalledProcessError(proc.returncode, cmd)
-    except TimeoutExpired as e:
+    except subprocess.TimeoutExpired as e:
         # The IDL on the other side has not exited cleanly.  We should
         # continue on Linux side; and next time Windows stuff is run,
         # IDL will be killed before it begins.
