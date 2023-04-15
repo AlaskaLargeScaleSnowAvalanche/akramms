@@ -133,14 +133,13 @@ _releaseRE = re.compile(r'\s*RELEASE\s+(\d+)/(\d+)')
 _doneRE1 = re.compile(
     r'\s*(Starting LSHM SIMULATIONS|LSHM Analysis finished successfully|- VAR-Files: All files created \(IDLBridge\)!)')
 _doneRE3 = re.compile(r'\s*Finished writing GEOTIFF files!')
-
+_varRE = re.compile(r'\s*VAR-FILES\s*')
 class LineProcessor1:
 
     def __init__(self, avalanche_dirs):
         self.avalanche_dirs = avalanche_dirs
         self.ready_to_exit = False
-        self.t0 = time.time()
-        self.nvar = self.count_var_files()
+        self.var_begin = False
 
     def count_var_files(self):
         # Count the number of .var files
@@ -152,20 +151,24 @@ class LineProcessor1:
         return nvar
 
 
+    def check_end_chunk(self):
+        # Don't start counting VAR files until we've begun generating them
+        if not self.var_begin:
+            return True
+
         # If >5 seconds have passed, check to see if the number of VAR
         # files has increased.
         t1 = time.time()
-        if t1 - self.t0 > 5:
-            self.t0 = t1
-            nvar = self.count_var_files()
-            if nvar > self.nvar:
-                self.nvar = nvar
-            else:
-                raise EOFError()
+        if t1 - self.t0 < 5:
+            return True
 
-    def check_end_chunk(self):
+        self.t0 = t1
         nvar = self.count_var_files()
-
+        if nvar > self.nvar:
+            self.nvar = nvar
+            return True
+        else:
+            return False
 
     def watch(self, line):
         # ---- Process the line we have read
@@ -177,6 +180,12 @@ class LineProcessor1:
             num_release_files = int(match.group(2))
             if release_file_ix == num_release_files:
                 self.ready_to_exit = True
+
+        # Check for beginning of VAR file generation
+        if _varRE.match(line) is not None:
+            self.var_begin = True
+            self.nvar = self.count_var_files()
+            self.t0 = time.time()+10    # Give an extra 10 seconds at first
 
         # If we've seen enough release files, look out for our
         # "done message."
@@ -289,14 +298,14 @@ def _run_on_windows_once(idlrt_exe, ramms_version, ramms_dir, avalanche_dirs, ra
                 if not line:
                     # Nothing more to read for now
                     if not line_processor.check_end_chunk():
-                        print('_run_on_windows() exiting')
+                        print('_run_on_windows() exiting (check end chunk)')
                         sys.stdout.flush()
-                        raise EOFError()   # Break out of double loop
+                        raise TimeoutError()   # Break out of double loop
                     break    
 
                 print(line+'*', end='')
                 if not line_processor.watch(line):
-                    print('_run_on_windows() exiting')
+                    print('_run_on_windows() exiting (watch)')
                     sys.stdout.flush()
                     raise EOFError()   # Break out of double loop
 
