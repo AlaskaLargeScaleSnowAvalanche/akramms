@@ -379,6 +379,21 @@ def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):
         for proc in procs:
             proc.join()
 
+        # Check final outputs
+        missing = list()
+        jb1 = jb.copy()
+        for id in all_ids:
+            jb1.set(id=id)
+            base = os.path.join(jb.avalanche_dir, f'{jb1.ramms_name}')
+            in_zip = f'{base}_in.zip'
+            if not os.path.exists(in_zip):
+                missing.append(in_zip)
+        if len(missing) > 0:
+            for x in missing:
+                print('Missing: ', x)
+            raise ValueError('Missing avalanche input files')
+
+
         # Submit the individual avalanche runs immediately so we can
         # get going while preparing more RAMMS directories.
         if submit:
