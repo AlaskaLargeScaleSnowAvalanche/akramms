@@ -4,37 +4,10 @@ base = sys.argv[1]
 RAMMS_DIR = os.getcwd()    # HTCondor sets this
 HOME = '/tmp/home'
 
-av2_file = os.path.join(RAMMS_DIR, f'{base}.av2')
-#av3_file = os.path.join(HOME, f'{base}.av3')   # For some reason this crashes inside the RAMMS C++
 av3_file = os.path.join(RAMMS_DIR, f'{base}.av3')
 log_base = os.path.join(RAMMS_DIR, base)
 #out_file = f'{log_base}.out'
 
-# ----------------------------------------
-pathRE = re.compile(r'Domain\s+[^\s]*\s+([^\s]*)\s*', re.MULTILINE)
-def write_av3(av2_file, av3_file):
-    """Rewrite .av2 file to avoid absolute paths (on a Windows machine)"""
-
-    with open(av2_file) as fin:
-        av2_str = fin.read()
-
-    # Figure out directory to blank out (as a string)
-    match = pathRE.search(av2_str)
-    dom_file = match.group(1)
-    dir = dom_file[:dom_file.rindex('\\')+1]
-
-    # Blank out all occurrences of that dir
-    av3_str = av2_str.replace(dir, '')
-
-
-    # Go one dir up
-    dir = dir[:-1]    # Remove trailing backslash
-    dir = dir[:dir.rindex('\\')]
-    print(f'dir "{dir}"')
-    av3_str = av3_str.replace(dir, '..')
-
-    with open(av3_file, 'w') as out:
-        out.write(av3_str)
 # ----------------------------------------
 with open('/opt/build_version.txt') as fin:
     build_version = fin.read().strip()
@@ -53,20 +26,39 @@ cmd = ['tar', 'xfz', '/opt/dotwine.tar.gz']
 print(' '.join(cmd))
 subprocess.run(cmd, check=True, env=env)
 
-# Write the .av3 file
-write_av3(av2_file, av3_file)
+# --------------------------------------------
+# Unzip the files
+in_zip = os.path.join(RAMMS_DIR, f'{base}_in.zip')
 
-# Gunzip files; leave original .gz in scratch dir
-for ext in ('var', 'xy-coord', 'xyz'):
-    ifname = os.path.join(RAMMS_DIR, f'{base}.{ext}.gz')
-    ofname = os.path.join(RAMMS_DIR, f'{base}.{ext}')
-    with gzip.open(ifname, 'rb') as fin:
-        with open(ofname, 'wb') as out:
-            shutil.copyfileobj(fin, out)
+domRE = re.compile(r'(.*)_v(\d+).dom')
+with zipfile.ZipFile(in_zip, 'r') as izip:
+    infos = izip.infolist()
+
+    # Unzip everything but the .dom file
+    max_itry = -1
+    iofiles = list()
+    for info in infos:
+        match = domRE.match(info.filename)
+        if match is not None:
+            # It's a .dom.vXXX file.; identify the one with largest number
+            itry = int(match.group(2))
+            if itry > max_itry:
+                dom_file = match.group(1) + '.dom'
+                dom_info = info
+                max_itry = itry
+        else:
+            # It's not a .dom file, just unzip it.
+            with open(os.path.join(RAMMS_DIR, info.filename), 'wb') as out:
+                print('Unzipping {info.filename} ({info.date_time})')
+                out.write(izip.read(info))    # read()returns bytes
+
+    # Unzip the .dom file (of maximum version number)
+    print(f'Unzipping {dom_info.filename} ({dom_info.date_time})')
+    with open(os.path.join(RAMMS_DIR, dom_file), 'wb') as out:
+        out.write(izip.read(dom_info))
 
 # ----------------------
 # Launch RAMMS exe to run one avalanche
-os.chdir(RAMMS_DIR)
 if True:
     cmd = ['wine', '/opt/ramms/bin/ramms_aval_LHM.exe', av3_file, f'{log_base}.out']
     print(' '.join(cmd))
@@ -80,17 +72,20 @@ else:
         out.write(' FINAL OUTFLOW VOLUME: 17')
 
 # We were successful... add outputs to our zip
-# files_for_zip.add(f'{log_base}.out')
+ files_for_zip.add(f'{log_base}.out')
 files_for_zip.add(f'{log_base}.out.log')
 # ----------------------
 
 # See if avalanche overran its domain
+out_zip_fname = f'{log_base}_out.zip'    # Assume it did not overrun base and we have a successful run
 with open(f'{log_base}.out.log') as fin:
     for line in fin:
         if line.startswith(' FINAL OUTFLOW VOLUME:'):
             with open(f'{log_base}.out.overrun', 'w') as out:
                 out.write('Avalanche overran its domain\n')
             files_for_zip.add(f'{log_base}.out.overrun')
+            # Name our output zipfile to indicate we don't yet have a final answer.
+#            out_zip_fname = f'{log_base}_out_v{max_itry}.zip'
 
 #except Exception as e:
 #    # Something went wrong... dump it to the log file
@@ -102,22 +97,8 @@ with open(f'{log_base}.out.log') as fin:
 #    files_for_zip.add(f'{log_base}.out.log')
 
 # Put all outputs in a single zip file
-with zipfile.ZipFile(f'{log_base}.log.zip', 'w', zipfile.ZIP_DEFLATED) as out_zip:
+
+with zipfile.ZipFile(out_zip_fname, 'w', zipfile.ZIP_DEFLATED) as out_zip:
     for file in sorted(list(files_for_zip)):
-        arcname = os.path.split(file)[1]
-        out_zip.write(file, arcname=arcname)    # arcname is simple file without path
+        out_zip.write(file, arcname=os.path.split(file)[1])
 
-# ------------------------------------------------------
-# gzip the output to temporary file
-cmd = ['gzip', '-c', f'{log_base}.out']
-with open(f'{log_base}.out.gz.tmp', 'wb') as out:
-    subprocess.run(cmd, check=True, env=env, stdout=out)
-
-# Atomically write the final output file
-os.rename(f'{log_base}.out.gz.tmp', f'{log_base}.out.gz')
-
-# Remove the uncompressed file
-try:
-    os.remove(f'{log_base}.out')
-except OSError:
-    pass

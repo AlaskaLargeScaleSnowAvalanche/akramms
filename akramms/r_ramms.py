@@ -277,7 +277,28 @@ def tiffmap(jb1):
 
 
 # --------------------------------------------------------------------
-_izip_exts = ['.rel', '.xyz', '.av2', '.xy-coord', '.var', '.dom']
+pathRE = re.compile(r'Domain\s+[^\s]*\s+([^\s]*)\s*', re.MULTILINE)
+def av2_to_av3(av2_str):
+    """Rewrite .av2 file to avoid absolute paths, and convert to
+    forward slash.  This prepares it to run in a Docker container."""
+
+    # Figure out directory to blank out (as a string)
+    match = pathRE.search(av2_str)
+    dom_file = match.group(1)
+    dir = dom_file[:dom_file.rindex('\\')+1]
+
+    # Blank out all occurrences of that dir
+    av3_str = av2_str.replace(dir, '')
+
+    # Go one dir up
+    dir = dir[:-1]    # Remove trailing backslash
+    dir = dir[:dir.rindex('\\')]
+    print(f'dir "{dir}"')
+    av3_str = av3_str.replace(dir, '..')
+
+    return av3_str
+# ----------------------------------------
+_izip_exts = ['.rel', '.xyz', '.xy-coord', '.var', '.dom']
 def compress_avalanche_inputs(jb, ids):
     """Puts all avalanche inputs into a single Zip file."""
 #    jb = rammsutil.parse_release_file(release_file)
@@ -288,8 +309,8 @@ def compress_avalanche_inputs(jb, ids):
         zip_file = f'{base}_in.zip'
 
         files = [f'{base}{ext}' for ext in _izip_exts]
-        arcnames = [f'{base}{ext}' for ext in _izip_exts]
-        arcnames[-1] = f'{base}_v01.dom'    # First of many .dom files
+        arcnames = [f'{jb.ramms_name}{ext}' for ext in _izip_exts]
+        arcnames[-1] = f'{jb.ramms_name}.dom.v1'    # First of many .dom files
 
         if (not os.path.exists(f'{base}_in.zip')) and \
             all(os.path.exists(x) for x in files):
@@ -304,9 +325,16 @@ def compress_avalanche_inputs(jb, ids):
                 for file,arcname in zip(files,arcnames):
                     izip.write(file, arcname=arcname)
 
+                # Write the .av3 files based on the .av2 file
+                arcname = f'{jb.ramms_name}.av3'
+                av2_file = f'{base}.av2'
+                files.append(av2_file)
+                with open(av2_file, 'r') as fin:
+                    av3_str = av2_to_av3(fin.read())
+                izip.writestr(arcname, av3_str)
+                
             # Remove old files
             for file in files:
-#                print(f'rm {file}')
                 os.remove(file)
 
 # --------------------------------------------------------------------
@@ -419,16 +447,16 @@ executable              = /usr/bin/python
 arguments               = /opt/runaval.py {job_name}
 
 initialdir              = {run_dir}
-transfer_input_files    = {job_name}.av2,{job_name}.dom,{job_name}.rel,{job_name}.xyz.gz,{job_name}.xy-coord.gz,{job_name}.var.gz
-transfer_output_files   = {job_name}.log.zip,{job_name}.out.gz
+transfer_input_files    = {job_name}_in.zip
+transfer_output_files   = {job_name}_out.zip
 should_transfer_files   = YES
 when_to_transfer_output = ON_EXIT
 on_exit_hold            = False
 on_exit_remove          = True
 
-output                  = {job_name}.job.out
-error                   = {job_name}.job.err
-log                     = {job_name}.job.log
+output                  = {job_name}_job.out
+error                   = {job_name}_job.err
+log                     = {job_name}_job.log
 request_cpus            = 1
 request_memory          = 1000M
 queue 1
