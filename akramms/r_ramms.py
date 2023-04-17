@@ -497,29 +497,29 @@ def submit_job(run_dir, job_name):#, local=False):
     if proc.returncode != 0:
         raise subprocess.CalledProcessError(proc.returncode, cmd)
 
-def analyze_rundir(run_dir, job_base):
-    """Find all avalanche files in the run_dir related to this shapefile
-    Returns: {id: [suffix, ...], ...}
-        For each avalanche ID in run_dir, a list of the related files
-        that exist, identified by filename suffix.
-
-        Eg: if avalanche ID 8733 exists in run_dir, an entry might look like:
-            8733: {'av2', 'xyz.gz', 'xy-coord.gz', 'var.gz', 'dom', 'rel', ...}
-
-    """
-    job_fileRE = re.compile(r'^{}_(\d+)\.(.*)$'.format(job_base))
-    id_suffixes = list()    # [(id,suffix), ...]
-    if os.path.isdir(run_dir):
-        for leaf in os.listdir(run_dir):
-            match = job_fileRE.match(leaf)
-            if match is None:
-                continue
-            id_suffixes.append((int(match.group(1)), match.group(2)))
-    id_suffixes.sort()
-
-    # Create: suffixes = {id0: {suffixes}, id1: {suffixes}, ...}
-    return ((id,set(x[1] for x in tuples)) \
-        for id,tuples in itertools.groupby(id_suffixes, lambda x: x[0]))
+#def analyze_rundir(run_dir, job_base):
+#    """Find all avalanche files in the run_dir related to this shapefile
+#    Returns: {id: [suffix, ...], ...}
+#        For each avalanche ID in run_dir, a list of the related files
+#        that exist, identified by filename suffix.
+#
+#        Eg: if avalanche ID 8733 exists in run_dir, an entry might look like:
+#            8733: {'av2', 'xyz.gz', 'xy-coord.gz', 'var.gz', 'dom', 'rel', ...}
+#
+#    """
+#    job_fileRE = re.compile(r'^{}_(\d+)\.(.*)$'.format(job_base))
+#    id_suffixes = list()    # [(id,suffix), ...]
+#    if os.path.isdir(run_dir):
+#        for leaf in os.listdir(run_dir):
+#            match = job_fileRE.match(leaf)
+#            if match is None:
+#                continue
+#            id_suffixes.append((int(match.group(1)), match.group(2)))
+#    id_suffixes.sort()
+#
+#    # Create: suffixes = {id0: {suffixes}, id1: {suffixes}, ...}
+#    return ((id,set(x[1] for x in tuples)) \
+#        for id,tuples in itertools.groupby(id_suffixes, lambda x: x[0]))
 
 
 def query_condor(job_base):
@@ -611,7 +611,7 @@ def job_statuses(release_files):
         # Identify avalanches that have been submitted / are still running
 
         # List files on disk
-        job_suffixes = dict(analyze_rundir(jb.avalanche_dir, jb.ramms_name))
+#        job_suffixes = dict(analyze_rundir(jb.avalanche_dir, jb.ramms_name))
 
         # --------------------------------------------------
 
@@ -621,25 +621,10 @@ def job_statuses(release_files):
 
             job_name = f'{jb.ramms_name}_{id}'
 
-            # If nothing for this key exists, then probably top-level
-            # RAMMS has not been run yet for this run_dir
-            if id not in job_suffixes:
+            # Mark as NOINPUT if the _in.zip file is not there.
+            if not os.path.exists(os.path.join(jb.avalanche_dir, f'{job_name}_in.zip')):
                 statuses.append((jb.avalanche_dir, id, JobStatus.NOINPUT))
                 continue
-            suffixes = job_suffixes[id]
-
-            # Mark as INCOMPLETE if not all input files are there
-            input_suffixes = ('rel', 'dom', 'av2', 'var.gz', 'xy-coord.gz', 'xyz.gz')
-            ninputs = sum(x in suffixes for x in input_suffixes)
-
-            if ninputs == 0:
-                statuses.append((jb.avalanche_dir, id, JobStatus.NOINPUT))
-                continue
-
-            if ninputs < len(input_suffixes):
-                statuses.append((jb.avalanche_dir, id, JobStatus.INCOMPLETE))
-                continue
-
 
             # See if Condor tells is what's going on with the job
             if job_name in condor_statuses:
@@ -649,13 +634,13 @@ def job_statuses(release_files):
             # Not in Condor?  Either it hasn't launched, or it's finished / failed
             # Let's look at the files on disk to decide.
 
-            # Identify avalanches that have finished: .out.gz exists and has non-zero size
+            # Identify avalanches that have finished: _out.zip exists and has non-zero size
             # (User can reset jobs by removing *.job.log)
-            if ('log.zip' in suffixes) and ('out.gz' in suffixes):
-                log_zip = os.path.join(jb.avalanche_dir, '{}_{}.log.zip'.format(jb.ramms_name, id))
+            out_zip = os.path.join(jb.avalanche_dir, f'{job_name}_out.zip')
+            if os.path.exists(out_zip):
 
                 # Check for abandoned job
-                statinfo = os.stat(log_zip)
+                statinfo = os.stat(out_zip)
                 if (statinfo.st_size==0):
                     # The HTCondor output file has been created, but
                     # no sign of the HTCondor job to write it at the
@@ -667,7 +652,7 @@ def job_statuses(release_files):
                 # We tentatively think the job is finished.  But let's
                 # look inside the zip file to make sure the domain
                 # wasn't overrun.
-                with zipfile.ZipFile(log_zip, 'r') as in_zip:
+                with zipfile.ZipFile(out_zip, 'r') as in_zip:
                     arcnames = [os.path.split(x)[1] for x in in_zip.namelist()]
                 if any(x.endswith('.out.overrun') for x in arcnames):
                     statuses.append((jb.avalanche_dir, id, JobStatus.OVERRUN))
