@@ -21,10 +21,13 @@ env['HOME'] = HOME
 os.makedirs(os.path.join(HOME, 'Desktop'), exist_ok=True)
 
 # Set up wine
-os.chdir(HOME)
-cmd = ['tar', 'xfz', '/opt/dotwine.tar.gz']
-print(' '.join(cmd))
-subprocess.run(cmd, check=True, env=env)
+try:
+    os.chdir(HOME)
+    cmd = ['tar', 'xfz', '/opt/dotwine.tar.gz']
+    print(' '.join(cmd))
+    subprocess.run(cmd, check=True, env=env)
+finally:
+    os.chdir(RAMMS_DIR)    # Poor mans popd
 
 # --------------------------------------------
 # Unzip the files
@@ -59,36 +62,47 @@ with zipfile.ZipFile(in_zip, 'r') as izip:
         out.write(izip.read(dom_info))
 
 # ----------------------
-# Launch RAMMS exe to run one avalanche
-if True:
-    cmd = ['wine', '/opt/ramms/bin/ramms_aval_LHM.exe', av3_file, f'{log_base}.out']
-    print(' '.join(cmd))
-    subprocess.run(cmd, check=True, env=env)
-else:
-    # Write dummy output for testing
-    print('**** Writing dummy outputs for testing of runaval.py ****')
-    with open(f'{log_base}.out', 'w') as out:
-        out.write('Sample output\n')
-    with open(f'{log_base}.out.log', 'w') as out:
-        out.write('Sample log file\n')
-        out.write(' FINAL OUTFLOW VOLUME: 17\n')
+# Debug: Print out files in current directory (on HTCondor)
+print('Local Files:')
+files = sorted(os.listdir('.'))
+print('\n'.join(files))
 
-# We were successful... add outputs to our zip
+# ----------------------
+# Launch RAMMS exe to run one avalanche
+
+out_zip_fname = f'{log_base}.out.zip'    # Assume it did not overrun base and we have a successful run
 files_for_zip.add(f'{log_base}.out')
 files_for_zip.add(f'{log_base}.out.log')
-# ----------------------
 
-# See if avalanche overran its domain
-out_zip_fname = f'{log_base}.out.zip'    # Assume it did not overrun base and we have a successful run
-with open(f'{log_base}.out.log') as fin:
-    for line in fin:
-        if line.startswith(' FINAL OUTFLOW VOLUME:'):
-            with open(f'{log_base}.out.overrun', 'w') as out:
-                out.write('Avalanche overran its domain\n')
-            files_for_zip.add(f'{log_base}.out.overrun')
-            # Name our output zipfile to indicate we don't yet have a final answer.
-#            out_zip_fname = f'{log_base}_out_v{max_itry}.zip'
+try:
 
+    if True:
+        cmd = ['wine', '/opt/ramms/bin/ramms_aval_LHM.exe', av3_file, f'{log_base}.out']
+        print(' '.join(cmd))
+        subprocess.run(cmd, check=True, env=env)
+    else:
+        # Write dummy output for testing
+        print('**** Writing dummy outputs for testing of runaval.py ****')
+        with open(f'{log_base}.out', 'w') as out:
+            out.write('Sample output\n')
+        with open(f'{log_base}.out.log', 'w') as out:
+            out.write('Sample log file\n')
+            out.write(' FINAL OUTFLOW VOLUME: 17\n')
+
+    # We were successful... add outputs to our zip
+
+    # See if avalanche overran its domain
+    with open(f'{log_base}.out.log') as fin:
+        for line in fin:
+            if line.startswith(' FINAL OUTFLOW VOLUME:'):
+                with open(f'{log_base}.out.overrun', 'w') as out:
+                    out.write('Avalanche overran its domain\n')
+                files_for_zip.add(f'{log_base}.out.overrun')
+                # Name our output zipfile to indicate we don't yet have a final answer.
+#                out_zip_fname = f'{log_base}_out_v{max_itry}.zip'
+
+
+# Do not catch exceptions... they will propagate to the .job.err file!
 #except Exception as e:
 #    # Something went wrong... dump it to the log file
 #    with open(f'{log_base}.out.log', 'a') as out:
@@ -98,9 +112,10 @@ with open(f'{log_base}.out.log') as fin:
 #
 #    files_for_zip.add(f'{log_base}.out.log')
 
-# Put all outputs in a single zip file
-
-with zipfile.ZipFile(out_zip_fname, 'w', zipfile.ZIP_DEFLATED) as out_zip:
-    for file in sorted(list(files_for_zip)):
-        out_zip.write(file, arcname=os.path.split(file)[1])
+finally:
+    # Whatever happened, make sure we collect the files written by the .exe
+    with zipfile.ZipFile(out_zip_fname, 'w', zipfile.ZIP_DEFLATED) as out_zip:
+        for file in sorted(list(files_for_zip)):
+            if os.path.exists(file):
+                out_zip.write(file, arcname=os.path.split(file)[1])
 
