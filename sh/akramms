@@ -89,26 +89,34 @@ def info(args):
 
 @subcommand([
     argument('ramms', help='RAMMS directory or release file to inspect'),
-    argument('ids', type=int, nargs='*', help='ID of avalanche in run_dir to inspect')])
+    argument('id', type=int, help='ID of avalanche in run_dir to inspect'),
+    argument('ext', default='.out.log', help='Extension of filename to  cat')])
 def cat(args):
-    r_ramms.cat(args.ramms, args.ids, out_bytes=sys.stdout.buffer)
+    r_ramms.cat(args.ramms, [args.id], ext=args.ext, out_bytes=sys.stdout.buffer)
 
 # https://stackoverflow.com/questions/51585110/how-to-encode-a-text-stream-into-a-byte-stream-in-python-3
 @subcommand([
     argument('ramms', help='RAMMS directory or release file to inspect'),
-    argument('ids', type=int, nargs='*', help='ID of avalanche in run_dir to inspect')])
+    argument('id', type=int, help='ID of avalanche in run_dir to inspect'),
+    argument('ext', default='.out.log', help='Extension of filename to  cat')])
 def less(args):
     stdout0 = sys.stdout
     try:
         less = subprocess.Popen(['less'], stdin=subprocess.PIPE)
         
         #sys.stdout = codecs.getwriter('utf-8')(less.stdin)
-        r_ramms.cat(args.ramms, args.ids, out_bytes=less.stdin)
+        r_ramms.cat(args.ramms, [args.id], ext=args.ext, out_bytes=less.stdin)
         less.communicate()
     finally:
         sys.stdout = stdout0
 
-
+@subcommand([
+    argument('ramms', help='RAMMS directory or release file to inspect'),
+    argument('id', type=int, help='ID of avalanche in run_dir to inspect')])
+def ls(args):
+    for jb,id,info in r_ramms.ls(args.ramms, [args.id]):
+        sdt = '{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}'.format(*info.date_time)
+        print(f'{info.file_size: >11,} {sdt:19} {info.filename}')
 
 @subcommand([
     argument('ramms', help='RAMMS directory or release file to inspect'),

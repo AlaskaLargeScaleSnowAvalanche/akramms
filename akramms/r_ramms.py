@@ -306,13 +306,13 @@ def compress_avalanche_inputs(jb, ids):
     for id in ids:
         jb.set(id=id)
         base = os.path.join(jb.avalanche_dir, f'{jb.ramms_name}')
-        zip_file = f'{base}_in.zip'
+        zip_file = f'{base}.in.zip'
 
         files = [f'{base}{ext}' for ext in _izip_exts]
         arcnames = [f'{jb.ramms_name}{ext}' for ext in _izip_exts]
-        arcnames[-1] = f'{jb.ramms_name}.dom.v1'    # First of many .dom files
+        arcnames[-1] = f'{jb.ramms_name}.v1.dom'    # First of many .dom files
 
-        if (not os.path.exists(f'{base}_in.zip')) and \
+        if (not os.path.exists(f'{base}.in.zip')) and \
             all(os.path.exists(x) for x in files):
 
             print(f'Compressing {zip_file}')
@@ -413,7 +413,7 @@ def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):
         for id in all_ids:
             jb1.set(id=id)
             base = os.path.join(jb.avalanche_dir, f'{jb1.ramms_name}')
-            in_zip = f'{base}_in.zip'
+            in_zip = f'{base}.in.zip'
             if not os.path.exists(in_zip):
                 missing.append(in_zip)
         if len(missing) > 0:
@@ -447,16 +447,16 @@ executable              = /usr/bin/python
 arguments               = /opt/runaval.py {job_name}
 
 initialdir              = {run_dir}
-transfer_input_files    = {job_name}_in.zip
-transfer_output_files   = {job_name}_out.zip
+transfer_input_files    = {job_name}.in.zip
+transfer_output_files   = {job_name}.out.zip
 should_transfer_files   = YES
 when_to_transfer_output = ON_EXIT
 on_exit_hold            = False
 on_exit_remove          = True
 
-output                  = {job_name}_job.out
-error                   = {job_name}_job.err
-log                     = {job_name}_job.log
+output                  = {job_name}.job.out
+error                   = {job_name}.job.err
+log                     = {job_name}.job.log
 request_cpus            = 1
 request_memory          = 1000M
 queue 1
@@ -621,8 +621,8 @@ def job_statuses(release_files):
 
             job_name = f'{jb.ramms_name}_{id}'
 
-            # Mark as NOINPUT if the _in.zip file is not there.
-            if not os.path.exists(os.path.join(jb.avalanche_dir, f'{job_name}_in.zip')):
+            # Mark as NOINPUT if the .in.zip file is not there.
+            if not os.path.exists(os.path.join(jb.avalanche_dir, f'{job_name}.in.zip')):
                 statuses.append((jb.avalanche_dir, id, JobStatus.NOINPUT))
                 continue
 
@@ -634,9 +634,9 @@ def job_statuses(release_files):
             # Not in Condor?  Either it hasn't launched, or it's finished / failed
             # Let's look at the files on disk to decide.
 
-            # Identify avalanches that have finished: _out.zip exists and has non-zero size
+            # Identify avalanches that have finished: .out.zip exists and has non-zero size
             # (User can reset jobs by removing *.job.log)
-            out_zip = os.path.join(jb.avalanche_dir, f'{job_name}_out.zip')
+            out_zip = os.path.join(jb.avalanche_dir, f'{job_name}.out.zip')
             if os.path.exists(out_zip):
 
                 # Check for abandoned job
@@ -727,7 +727,9 @@ def enlarge_domain(run_dir, job_name, enlarge_increment=5000.):
             max_verison = max(max_version, int(match.group(1)))
 
         # Copy to one bigger, then overwrite
-        shutil.copy2(dom_file, dom_file + '.v{}'.format(max_version+1))
+        shutil.copy2(
+            dom_file,
+            os.path.join(run_dir, f'{job_name}.v{max_version+1}.dom'))
         shutil.copy2(log_zip_file, log_zip_file + '.v{}'.format(max_version+1))
         rammsutil.write_polygon(dom1, dom_file)    # New timestamp
 
@@ -811,15 +813,29 @@ def ramms_iter(ramms_spec, ids=list()):
         yield rf_by_id[id],id
 
 
+# Converts an extension on an arcname to extension on the zip filename
+# (i.e.whether it is in _in.zip or _out.zip)
+arcext2filext = {
+    '.rel': '.in.zip',
+    '.xyz': '.in.zip',
+    '.xy-coord': '.in.zip',
+    '.var': '.in.zip',
+    '.av3': '.in.zip',
+    '.dom': '.in.zip',
+    '.out': '.out.zip',
+    '.out.log': '.out.zip',
+    '.out.overrun': '.out.zip',
+}
+
 # https://stackoverflow.com/questions/34447623/wrap-an-open-stream-with-io-textiowrapper
-def cat(ramms_spec, ids=list(), out_bytes=sys.stdout.buffer):
+def cat(ramms_spec, ids=list(), ext='.out.log', out_bytes=sys.stdout.buffer):
     out_text = codecs.getwriter('utf-8')(out_bytes)
     for jb,id in ramms_iter(ramms_spec, ids=ids):
-        log_zip = jb.log_zip(id)
-        with zipfile.ZipFile( log_zip, 'r') as izip:
-            print('======== {}'.format(log_zip), file=out_text)
+        zip_fname = jb.zip_file(id, arcext2filext[ext])
+        with zipfile.ZipFile(zip_fname, 'r') as izip:
+            print('======== {}'.format(zip_fname), file=out_text)
             sys.stdout.flush()
-            bytes = izip.read(jb.arcname(id, '.out.log'))
+            bytes = izip.read(jb.arcname(id, ext))
             out_bytes.write(bytes)
 
             #os.write(1, bytes)    # 1 = STDOUT
@@ -827,6 +843,19 @@ def cat(ramms_spec, ids=list(), out_bytes=sys.stdout.buffer):
             #    stdout.write(bytes)
             #    stdout.flush()
 
+def ls(ramms_spec, ids):
+    """List the contenst of the .in.zip and .out.zip files for an id"""
+    ret = list()
+    for jb,id in ramms_iter(ramms_spec, ids=ids):
+        zip_fnames = [jb.zip_file(id, ext) for ext in ('.in.zip', '.out.zip')]
+        for zip_fname in zip_fnames:
+            if not os.path.exists(zip_fname):
+                continue
+            with zipfile.ZipFile(zip_fname, 'r') as izip:
+                infos = izip.infolist()
+                ret += [(jb,id,info) for info in infos]
+
+    return ret
 
 
 def infos(release_files, ids=None):

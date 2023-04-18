@@ -28,9 +28,9 @@ subprocess.run(cmd, check=True, env=env)
 
 # --------------------------------------------
 # Unzip the files
-in_zip = os.path.join(RAMMS_DIR, f'{base}_in.zip')
+in_zip = os.path.join(RAMMS_DIR, f'{base}.in.zip')
 
-domRE = re.compile(r'(.*)_v(\d+).dom')
+domRE = re.compile(r'(.*)\.v(\d+)\.dom')
 with zipfile.ZipFile(in_zip, 'r') as izip:
     infos = izip.infolist()
 
@@ -39,6 +39,7 @@ with zipfile.ZipFile(in_zip, 'r') as izip:
     iofiles = list()
     for info in infos:
         match = domRE.match(info.filename)
+        print('domRE: {} --> {}'.format(info.filename, match))
         if match is not None:
             # It's a .dom.vXXX file.; identify the one with largest number
             itry = int(match.group(2))
@@ -49,7 +50,7 @@ with zipfile.ZipFile(in_zip, 'r') as izip:
         else:
             # It's not a .dom file, just unzip it.
             with open(os.path.join(RAMMS_DIR, info.filename), 'wb') as out:
-                print('Unzipping {info.filename} ({info.date_time})')
+                print(f'Unzipping {info.filename} ({info.date_time})')
                 out.write(izip.read(info))    # read()returns bytes
 
     # Unzip the .dom file (of maximum version number)
@@ -65,19 +66,20 @@ if True:
     subprocess.run(cmd, check=True, env=env)
 else:
     # Write dummy output for testing
+    print('**** Writing dummy outputs for testing of runaval.py ****')
     with open(f'{log_base}.out', 'w') as out:
         out.write('Sample output\n')
     with open(f'{log_base}.out.log', 'w') as out:
         out.write('Sample log file\n')
-        out.write(' FINAL OUTFLOW VOLUME: 17')
+        out.write(' FINAL OUTFLOW VOLUME: 17\n')
 
 # We were successful... add outputs to our zip
- files_for_zip.add(f'{log_base}.out')
+files_for_zip.add(f'{log_base}.out')
 files_for_zip.add(f'{log_base}.out.log')
 # ----------------------
 
 # See if avalanche overran its domain
-out_zip_fname = f'{log_base}_out.zip'    # Assume it did not overrun base and we have a successful run
+out_zip_fname = f'{log_base}.out.zip'    # Assume it did not overrun base and we have a successful run
 with open(f'{log_base}.out.log') as fin:
     for line in fin:
         if line.startswith(' FINAL OUTFLOW VOLUME:'):

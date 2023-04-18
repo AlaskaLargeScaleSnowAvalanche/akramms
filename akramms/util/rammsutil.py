@@ -91,8 +91,8 @@ class RammsName:
         return f'{self.avalanche_base}_{id}{ext}'
 
 
-    def log_zip(self, id):
-        return os.path.join(self.avalanche_dir, self.arcname(id, '.log.zip'))
+    def zip_file(self, id, ext='.in.zip'):
+        return os.path.join(self.avalanche_dir, self.arcname(id, ext))
 
     def arcname(self, id, ext):
         """Name of the a file within the Zip archive of an avalanche
