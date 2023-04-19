@@ -112,7 +112,7 @@ def master_ramms_names(scene_args, return_period, forest):
         if pra_size not in config.allowed_pra_sizes:
             continue
         jb = rammsutil.RammsName(
-            os.path.join(scene_args['scene_dir'], 'RAMMS'),
+            os.path.join(scene_args['scene_dir'], 'CHUNKS'),
             scene_args['name'], None, forest, scene_args['resolution'],
             return_period, pra_size, None)
         yield jb, pra_size
@@ -354,8 +354,8 @@ def rule(scene_dir, dem_filled_file, return_period, forest,
 #        # DEBUG: Only do 'L' for now
 #        if pra_size not in config.allowed_pra_sizes:
 #            continue
-#        jb = rammsutil.RammsName(os.path.join(scene_dir, 'RAMMS'), scene_name, None, forest, resolution, return_period, pra_size, None)
+#        jb = rammsutil.RammsName(os.path.join(scene_dir, 'CHUNKS'), scene_name, None, forest, resolution, return_period, pra_size, None)
 #        ramms_names.append((jb,pra_size))
 #        # This filename does NOT have any segment numbers.
-#        outputs.append(os.path.join(scene_dir, 'RAMMS', f'{jb.ramms_name}_rel.shplist'))
+#        outputs.append(os.path.join(scene_dir, 'CHUNKS', f'{jb.ramms_name}_rel.shplist'))
 #

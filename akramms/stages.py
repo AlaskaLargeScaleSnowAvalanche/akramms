@@ -57,7 +57,7 @@ def read_release_files(scene_args):
                 scene_name = scene_args['name']
 
                 jb = rammsutil.RammsName(
-                    os.path.join(scene_args['scene_dir'], 'RAMMS'),
+                    os.path.join(scene_args['scene_dir'], 'CHUNKS'),
                     scene_args['name'], None, forest, resolution,
                     return_period, pra_size, None)
 
