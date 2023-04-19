@@ -195,13 +195,14 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
                 os.makedirs(os.path.dirname(ofname), exist_ok=True)
                 shputil.write_df(dfc[list(dom_df)], 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
 
-                # Write the .rel and .dom files for each avalanche
+                # Write the .relp and .domp files for each avalanche
+                # (Secondary files, as written by Python)
                 os.makedirs(jb1.avalanche_dir, exist_ok=True)
                 for _,row in dfc.iterrows():
                     id = row['Id']
-                    ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}_{id}.rel')
+                    ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}_{id}.relp')
                     rammsutil.write_polygon(row['pra'], ofname)
-                    ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}_{id}.dom')
+                    ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}_{id}.domp')
                     rammsutil.write_polygon(row['dom'], ofname)
 
                 # Store chunk info
@@ -298,7 +299,7 @@ def av2_to_av3(av2_str):
 
     return av3_str
 # ----------------------------------------
-_izip_exts = ['.rel', '.xyz', '.xy-coord', '.var', '.dom']
+_izip_exts = ['.relp', '.domp', '.xyz', '.xy-coord', '.var', '.rel', '.dom']  # .dom MUST be last
 def compress_avalanche_inputs(jb, ids):
     """Puts all avalanche inputs into a single Zip file."""
 #    jb = rammsutil.parse_release_file(release_file)
@@ -818,12 +819,14 @@ def ramms_iter(ramms_spec, ids=list()):
 # Converts an extension on an arcname to extension on the zip filename
 # (i.e.whether it is in _in.zip or _out.zip)
 arcext2filext = {
+    '.relp': '.in.zip',
+    '.domp': '.in.zip',
     '.rel': '.in.zip',
+    '.dom': '.in.zip',
     '.xyz': '.in.zip',
     '.xy-coord': '.in.zip',
     '.var': '.in.zip',
     '.av3': '.in.zip',
-    '.dom': '.in.zip',
     '.out': '.out.zip',
     '.out.log': '.out.zip',
     '.out.overrun': '.out.zip',
@@ -833,7 +836,11 @@ arcext2filext = {
 def cat(ramms_spec, ids=list(), ext='.out.log', out_bytes=sys.stdout.buffer):
     out_text = codecs.getwriter('utf-8')(out_bytes)
     for jb,id in ramms_iter(ramms_spec, ids=ids):
-        zip_fname = jb.zip_file(id, arcext2filext[ext])
+        try:
+            zip_fname = jb.zip_file(id, arcext2filext[ext])
+        except KeyError:
+            zip_fname = jb.zip_file(id, '.in.zip')
+
         with zipfile.ZipFile(zip_fname, 'r') as izip:
             print('======== {}'.format(zip_fname), file=out_text)
             sys.stdout.flush()
