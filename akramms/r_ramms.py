@@ -393,7 +393,9 @@ def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):
             os.makedirs(dir1, exist_ok=True)
             if not os.path.exists(fname1):
                 shutil.copy(fname0, fname1)
-            os.remove(fname0)
+
+            # Do NOT remove, we will need for Stage 2 (the .exe file).
+            # os.remove(fname0)
 
         # Compress Avalanche inputs, ready for Docker container
         df = shputil.read_df(release_file, read_shapes=False)
@@ -635,7 +637,7 @@ def job_statuses(release_files):
             # Let's look at the files on disk to decide.
 
             # Identify avalanches that have finished: .out.zip exists and has non-zero size
-            # (User can reset jobs by removing *.job.log)
+            # (User can reset jobs by removing *.out.zip)
             out_zip = os.path.join(jb.avalanche_dir, f'{job_name}.out.zip')
             if os.path.exists(out_zip):
 

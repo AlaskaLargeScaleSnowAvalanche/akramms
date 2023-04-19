@@ -238,9 +238,10 @@ def rule(scene_dir, dem_filled_file, return_period, forest,
         # TODO: Discuss with Gabe, how we do the wind load.
         df['Wind'] = np.clip((df['Mean_DEM'] - 1000.) * .0001, 0., 0.1)
 
-        # Calculate final d0 (d0_{return_period})
+        # Calculate final d0: d0_10, d0_30, d0_100, d0_300
         d0_vname = f'd0_{return_period}'
         df[d0_vname] = ((df['d0star'] + df['Wind']) * df['slopecorr'])
+        df[d0_vname] = 1.0    # DEBUG: d0_30 is unrealistically low.
 
         # Calculate volume (VOL_returnperiod)
         VOL_vname = f'VOL_{return_period}'

@@ -52,9 +52,14 @@ with zipfile.ZipFile(in_zip, 'r') as izip:
                 max_itry = itry
         else:
             # It's not a .dom file, just unzip it.
+            bytes = izip.read(info)
             with open(os.path.join(RAMMS_DIR, info.filename), 'wb') as out:
                 print(f'Unzipping {info.filename} ({info.date_time})')
-                out.write(izip.read(info))    # read()returns bytes
+                out.write(bytes)    # read()returns bytes
+
+            # DEBUG: Try providing everything in .gz format too!
+            with gzip.open(os.path.join(RAMMS_DIR, info.filename+'.gz'), 'wb') as out:
+                out.write(bytes)
 
     # Unzip the .dom file (of maximum version number)
     print(f'Unzipping {dom_info.filename} ({dom_info.date_time})')
