@@ -95,37 +95,37 @@ def write_scenario_txt(jb, alt_lim_top=1500, alt_lim_low=1000, ncpu=config.ramms
             out.write(scenario_tpl.format(**kwargs))
 
 
-def rammsdir_rule(scene_dir, release_file, oramms_name=None, **scenario_kwargs):
-
-    """Generates the scenario file, which becomes key to running RAMMS.
-    release:
-        Release file to process
-    oramms_name:
-        Output RAMMS directory to create
-    """
-    jb = rammsutil.parse_release_file(release_file)
-    if oramms_name is None:
-        oramms_name = jb
-
-    scene_args = params.load(scene_dir)
-    resolution = scene_args['resolution']
-    name = scene_args['name']
-    scenario_txt = os.path.join(jb.ramms_dir, 'scenario.txt')
-
-    links = dem_forest_links(scene_args, jb.ramms_dir, oramms_name.slope_name, forest=jb.forest)
-
-    def action(tdir):
-        # Make symlinks for DEM file, etc.
-        for ifile,ofile in links:
-            setlink_or_copy(ifile, ofile)
-
-        # Write scenario.txt
-        write_scenario_txt(jb, **scenario_kwargs)
-
-    inputs = [d[0] for d in links]
-    linked_files = [d[1] for d in links]
-    outputs = [scenario_txt] + linked_files
-    return make.Rule(action, inputs, outputs)
+# def rammsdir_rule(scene_dir, release_file, oramms_name=None, **scenario_kwargs):
+# 
+#     """Generates the scenario file, which becomes key to running RAMMS.
+#     release:
+#         Release file to process
+#     oramms_name:
+#         Output RAMMS directory to create
+#     """
+#     jb = rammsutil.parse_release_file(release_file)
+#     if oramms_name is None:
+#         oramms_name = jb
+# 
+#     scene_args = params.load(scene_dir)
+#     resolution = scene_args['resolution']
+#     name = scene_args['name']
+#     scenario_txt = os.path.join(jb.ramms_dir, 'scenario.txt')
+# 
+#     links = dem_forest_links(scene_args, jb.ramms_dir, oramms_name.slope_name, forest=jb.forest)
+# 
+#     def action(tdir):
+#         # Make symlinks for DEM file, etc.
+#         for ifile,ofile in links:
+#             setlink_or_copy(ifile, ofile)
+# 
+#         # Write scenario.txt
+#         write_scenario_txt(jb, **scenario_kwargs)
+# 
+#     inputs = [d[0] for d in links]
+#     linked_files = [d[1] for d in links]
+#     outputs = [scenario_txt] + linked_files
+#     return make.Rule(action, inputs, outputs)
 
 def chunks_csv(scene_dir, ramms_name):
     return os.path.join(scene_dir, 'RELEASE', f'{ramms_name}_chunks.csv')
@@ -150,15 +150,18 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
 
         for jb,pra_size in ramms_names:
 
-            # Make symlinks for DEM file, etc.
-            for ifile,ofile in dem_forest_links(scene_args, jb.ramms_dir, jb.slope_name, forest=jb.forest):
-                setlink_or_copy(ifile, ofile)
-
             # Read _rel and _dom shapefiles
             base = os.path.join(scene_args['scene_dir'], 'RELEASE', f'{jb.ramms_name}')
             rel_df = shputil.read_df(f'{base}_rel.shp', shape='pra').drop('fid', axis=1)
 
             dom_df = shputil.read_df(f'{base}_dom.shp', shape='dom').drop('fid', axis=1)
+
+#            print('********* rel ')
+#            print(rel_df[['area_m2','Mean_DEM','Mean_Slope','Id','VOL_30']])
+#            print('********* dom ')
+#            print(dom_df)
+#            sys.exit(0)
+
             df = rel_df.merge(dom_df, on='Id')
 
             # Drop rows with missing domain
@@ -173,6 +176,12 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
                 # Add the chunk number to the name
                 jb1 = copy.copy(jb)
                 jb1.set(segment=segment)
+
+                # Make symlinks for DEM file, etc.
+                for ifile,ofile in dem_forest_links(scene_args, jb1.ramms_dir, jb1.slope_name, forest=jb1.forest):
+                    setlink_or_copy(ifile, ofile)
+
+
 
                 # Write scenario.txt
                 scenario_txt = os.path.join(jb1.ramms_dir, 'scenario.txt')
