@@ -132,8 +132,21 @@ def read_inputs():
 _releaseRE = re.compile(r'\s*RELEASE\s+(\d+)/(\d+)')
 _doneRE1 = re.compile(
     r'\s*(Starting LSHM SIMULATIONS|LSHM Analysis finished successfully|- VAR-Files: All files created \(IDLBridge\)!)')
-_doneRE3 = re.compile(r'\s*Finished writing GEOTIFF files!')
-_varRE = re.compile(r'\s*VAR-FILES\s*')
+
+_genRE = re.compile(r'\s*INPUT FILES DOM\s*')
+#_varRE = re.compile(r'\s*VAR-FILES\s*')
+
+#\s*(INPUT FILES DOM|INPUT FILES REL|INPUT FILES XYZ|INPUT FILES^|XY-COORDS-FILES|VAR-FILES
+#
+#_sectionRE = re.compile(r'\s*- DEBUG-MODE, creating input ([^ ]+) files in series')
+#section2ext = {
+#    'DOM': '.dom',
+#    'REL': '.rel',
+#    'XYZ': '.xyz',
+#    'AV2': '.av2',
+#    'XY-COORDS': '.xy-coord',
+
+
 class LineProcessor1:
 
     def __init__(self, avalanche_dirs):
@@ -150,6 +163,11 @@ class LineProcessor1:
                     nvar += 1
         return nvar
 
+    def count_files(self):
+        nfiles = 0
+        for avalanche_dir in self.avalanche_dirs:
+            nfiles += len(os.listdir(avalanche_dir))
+
 
     def check_end_chunk(self):
         # Don't start counting VAR files until we've begun generating them
@@ -163,7 +181,7 @@ class LineProcessor1:
             return True
 
         self.t0 = t1
-        nvar = self.count_var_files()
+        nvar = self.count_files()
         if nvar > self.nvar:
             self.nvar = nvar
             return True
@@ -181,10 +199,10 @@ class LineProcessor1:
             if release_file_ix == num_release_files:
                 self.ready_to_exit = True
 
-        # Check for beginning of VAR file generation
-        if _varRE.match(line) is not None:
+        # Check for beginning of file generation
+        if _genRE.match(line) is not None:
             self.var_begin = True
-            self.nvar = self.count_var_files()
+            self.nvar = self.count_files()
             self.t0 = time.time()+10    # Give an extra 10 seconds at first
 
         # If we've seen enough release files, look out for our
@@ -194,6 +212,7 @@ class LineProcessor1:
 
         return True
 
+_doneRE3 = re.compile(r'\s*Finished writing GEOTIFF files!')
 class LineProcessor3:
     def check_end_chunk(self):
         return True
