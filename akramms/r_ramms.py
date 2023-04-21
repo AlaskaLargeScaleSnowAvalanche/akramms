@@ -308,6 +308,14 @@ def av2_to_av3(av2_str):
 
     return av3_str
 # ----------------------------------------
+def file_is_good(fname):
+    # Make sure file exists in non-zero length
+    if not os.path.exists(fname):
+        return False
+    if os.path.getsize(fname) == 0:
+        return False
+    return True
+    
 _izip_exts = ['.relp', '.domp', '.xyz', '.xy-coord', '.var', '.rel', '.dom']  # .dom MUST be last
 def compress_avalanche_inputs(jb, ids):
     """Puts all avalanche inputs into a single Zip file."""
@@ -323,7 +331,7 @@ def compress_avalanche_inputs(jb, ids):
         arcnames[-1] = f'{jb.ramms_name}.v1.dom'    # First of many .dom files
 
         if (not os.path.exists(f'{base}.in.zip')) and \
-            all(os.path.exists(x) for x in files):
+            all(file_is_good(x) for x in files):
 
             print(f'Compressing {zip_file}')
 
@@ -342,10 +350,11 @@ def compress_avalanche_inputs(jb, ids):
                 with open(av2_file, 'r') as fin:
                     av3_str = av2_to_av3(fin.read())
                 izip.writestr(arcname, av3_str)
-                
-            # Remove old files
-            for file in files:
-                os.remove(file)
+
+# DEBUG: Don't Remove
+#            # Remove old files
+#            for file in files:
+#                os.remove(file)
 
 # --------------------------------------------------------------------
 

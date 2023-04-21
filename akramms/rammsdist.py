@@ -355,6 +355,17 @@ def _run_on_windows_once(idlrt_exe, ramms_version, ramms_dir, avalanche_dirs, ra
             print('************ ALL DONE!!! ****************')
             sys.stdout.flush()
             sys.stderr.flush()
+
+        # Delete any zero-length files
+        for avalanche_dir in avalanche_dirs:
+            for leaf in os.listdir(avalanche_dir):
+                fname = os.path.join(avalanche_dir, leaf)
+                if os.path.getsize(fname) == 0:
+                    os.remove(fname)
+
+
+
+
     return retry
 
 def _run_on_windows(*args, ntry=1):
