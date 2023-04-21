@@ -167,7 +167,7 @@ class LineProcessor1:
         nfiles = 0
         for avalanche_dir in self.avalanche_dirs:
             nfiles += len(os.listdir(avalanche_dir))
-
+        return nfiles
 
     def check_end_chunk(self):
         # Don't start counting VAR files until we've begun generating them
