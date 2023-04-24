@@ -21,6 +21,19 @@ def setlink_or_copy(ifile, ofile):
         ioutil.setlink(ifile, ofile)
 
 # --------------------------------------------------------------------
+
+# 2023-04-24 Marc Christen said:
+#   As you do not run Stage 2 in RAMMS, you do not use the variable
+#   “NRCPUS” in the scenario-file. In the new version (link below) you
+#   can now use this variable. NRCPUS = 8 means, that RAMMS will start
+#   the first 8 exe-files to create the xy_coord-files in parallel, but
+#   then RAMMS will wait for the 8-th exe-file to finish. Then RAMMS
+#   will start the next 8 exe-files, and so on…..This will give a small
+#   break, such that not 100 exe-files will execute in parallel. What do
+#   you think? Could you please try this workaround for the moment? Of
+#   course you could also increase NRCPUS, or decrease…..
+
+
 scenario_tpl = \
 r"""LSHM    {scenario_name}
 MODULE  AVAL
@@ -253,11 +266,11 @@ def tiffmap(jb1):
     results_dir1 = os.path.join(jb1.ramms_dir, 'RESULTS', jb1.rammsdir_name)
 
     map = [
-        # ./juneau10000030MFor_5m/DEM/juneau100000For_5m_dem.tif
-        (f'{jb1.ramms_dir}/DEM/{jb1.ramms_name}_dem.tif', scene_args['dem_file']),
+#        # ./juneau10000030MFor_5m/DEM/juneau100000For_5m_dem.tif
+#        (f'{jb1.ramms_dir}/DEM/{jb1.ramms_name}_dem.tif', scene_args['dem_file']),
 
-        # ./juneau10000030MFor_5m/FOREST/juneau100000For_5m_forest.tif
-        (f'{jb1.ramms_dir}/FOREST/{jb1.ramms_name}_forest.tif', scene_args['forest_file']),
+#        # ./juneau10000030MFor_5m/FOREST/juneau100000For_5m_forest.tif
+#        (f'{jb1.ramms_dir}/FOREST/{jb1.ramms_name}_forest.tif', scene_args['forest_file']),
 
         # -------------- Items for all sub-directories of the slope_dir
         # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/slope.tif
