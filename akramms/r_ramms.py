@@ -959,6 +959,75 @@ def infos(release_files, ids=None):
 # =============================================================================
 # ===== RAMMS Stage 3
 
+def copy_from_zip(zip_file, arcname, ofname):
+    """Copies a single entry from a zipfile to a file.
+    zip_file:
+        The open ZilFile
+    arcname:
+        Archive name of the file to copy
+    ofname:
+        Name in filesystem to copy to.
+    """
+    bytes = zip_file.read(aname)
+    with open(ofname, 'w') as out:
+        out.write(bytes)
+
+def copy_from_zip_to_gz(zip_file, arcname, ofname):
+    """Copies a single entry from a zipfile to a file.
+    zip_file:
+        The open ZilFile
+    arcname:
+        Archive name of the file to copy
+    ofname:
+        Name in filesystem to copy to.
+    """
+    bytes = zip_file.read(aname)
+    with gzip.open(ofname, 'w') as out:
+        out.write(bytes)
+
+domRE = re.compile(r'(.*)\.v(\d+)\.dom')
+def latest_dom_file(arcnames):
+    """Digs through .in.zip to find the latest .vXXX.dom file"""
+    max_itry = -1
+    for arcname in arcnames:
+        match = domRE.match(arcname)
+        if match is not None:
+            # It's a .dom.vXXX file.; identify the one with largest number
+            itry = int(match.group(2))
+            if itry > max_itry:
+                dom_arcname = arcname
+                max_itry = itry
+
+    return dom_arcname
+
+def copy_stage3_inputs(iavalanche_dir, aname, oavalanche_dir):
+    """
+    aname:
+        Base name of avalanche, including the ID but no file extension.
+    """
+
+    # Copy .rel and .dom from .in.zip
+    with zipfile.ZipFile(os.path.join(iavalanche_dir, aname+'.in.zip')) as in_zip:
+        copy_from_zip(in_zip, f'{aname}.rel', os.path.join(oavalanche_dir, f'{aname}.rel'))
+
+        # .dom requires a bit of digging...
+        copy_from_zip(in_zip,
+            latest_dom_file(in_zip.arcnames()),
+            os.path.join(oavalanche_dir, f'{aname}.dom'))
+
+        # .xy-coord.gz needs to be re-compressed
+        copy_from_zip_to_gz(
+            in_zip, f'{aname}.xy-coord',
+            os.path.join(oavalanche_dir, f'{aname}.xy-coord.gz'))
+
+
+    # Copy .out.gz and .xy-coord.gz from .out.zip
+    with zipfile.ZipFile(os.path.join(iavalanche_dir, aname+'.out.zip')) as out_zip:
+        # .out.gz needs to be recompressed
+        copy_from_zip_to_gz(
+            out_zip, f'{aname}.out',
+            os.path.join(oavalanche_dir, f'{aname}.out.gz'))
+
 
 
 def assemble_stage3(oramms_name, release_files):
@@ -1064,7 +1133,7 @@ def assemble_stage3(oramms_name, release_files):
 #        obase = f'{jb.scene_name}{jb.For}_{jb.resolution}m_{jb.return_period}{jb.pra_size}'
 
         # Figure out which avalanches have been run
-        required_exts = {'.dom', '.rel', '.out.gz', '.xy-coord.gz'}
+        required_exts = {'.in.zip', '.out.zip',}
         id_exts = dict()
         ifileRE = re.compile(r'{}_(\d+)(\..+)'.format(jb.ramms_name))
         for leaf in os.listdir(jb.avalanche_dir):
@@ -1084,15 +1153,23 @@ def assemble_stage3(oramms_name, release_files):
                         id_exts[id] = {ext}
 
         # Copy files that have complete outputs
+        requireds = [
+            ('.in.zip', '.rel'),
+
         os.makedirs(oavalanche_dir, exist_ok=True)
         for id,exts in id_exts.items():
             print(id,exts)
             if len(exts) < len(required_exts):
                 continue
-            for ext in exts:
-                ifname = os.path.join(jb.avalanche_dir, f'{jb.ramms_name}_{id}{ext}')
-                ofname = os.path.join(oavalanche_dir, f'{oramms_name.ramms_name}_{id}{ext}')
-                shutil.copy(ifname, ofname)
+
+            copy_stage3_inputs(
+                jb.avalanche_dir, f'{jb.ramms_name}_{id}'
+                oavalanche_dir)
+
+#            for ext in exts:
+#                ifname = os.path.join(jb.avalanche_dir, f'{jb.ramms_name}_{id}{ext}')
+#                ofname = os.path.join(oavalanche_dir, f'{oramms_name.ramms_name}_{id}{ext}')
+#                shutil.copy(ifname, ofname)
 
 
 def run_ramms_stage3(oramms_name):

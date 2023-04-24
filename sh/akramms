@@ -150,8 +150,8 @@ def mosaic(args):
     release_files = rammsutil.get_release_files(args.ramms)
     for oramms_name,release_files in rammsutil.groupby_oramms(release_files):
         print(f'=========== Assembling {oramms_name.ramms_dir}')
-        r_ramms.assemble_stage3(oramms_name, release_files)
-        r_ramms.run_ramms_stage3(oramms_name)
+#        r_ramms.assemble_stage3(oramms_name, release_files)
+#        r_ramms.run_ramms_stage3(oramms_name)
 
 def main():
     args = cli.parse_args()
