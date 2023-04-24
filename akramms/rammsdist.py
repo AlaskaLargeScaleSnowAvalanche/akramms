@@ -177,7 +177,7 @@ class LineProcessor1:
         # If >5 seconds have passed, check to see if the number of VAR
         # files has increased.
         t1 = time.time()
-        if t1 - self.t0 < 5:
+        if t1 - self.t0 < 15:    # 15s timeout
             return True
 
         self.t0 = t1
