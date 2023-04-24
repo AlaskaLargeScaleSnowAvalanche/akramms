@@ -144,7 +144,11 @@ def _get_release_files(spec):
     if spec.endswith('.shp'):
         return [spec]
 
+    # See if we're in the main Scene directory
     dir = os.path.abspath(spec)
+    CHUNKS = os.path.join(dir, 'CHUNKS')
+    if os.path.isdir(CHUNKS):
+        dir = CHUNKS
     parts = dir.split(os.sep)
 
     # See if we're in, eg:
@@ -157,13 +161,15 @@ def _get_release_files(spec):
 
     # See if we're in a subdirectory
     for i in range(len(parts)):
-        if parts[i] == 'RAMMS':
-            # RAMMS/ is the last part of the path, we have multiple dirs.
-            if len(parts) == i:
-                ramms_dirs = [os.path.join(x) for x in os.listdir(dir)]
+        if parts[i] == 'CHUNKS':
+            # CHUNKS/ is the last part of the path, we have multiple dirs.
+            print('888888888888 parts ', parts)
+            if i == len(parts)-1:
+                ramms_dirs = [os.path.join(dir,x) for x in os.listdir(dir)]
+                print('ramms_dirs ', ramms_dirs)
                 return _ramms_to_release(ramms_dirs)
             else:
-                # We have a path one lower than RAMMS, use it.
+                # We have a path one lower than CHUNKS, use it.
                 return _ramms_to_release([os.sep.join(parts[:i+2])])
 
     raise ValueError('Could not interpret spec {} as one or more RAMMS dirs'.format(spec))

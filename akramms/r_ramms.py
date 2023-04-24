@@ -364,10 +364,9 @@ def compress_avalanche_inputs(jb, ids):
                     av3_str = av2_to_av3(fin.read())
                 izip.writestr(arcname, av3_str)
 
-# DEBUG: Don't Remove
-#            # Remove old files
-#            for file in files:
-#                os.remove(file)
+            # Remove old files
+            for file in files:
+                os.remove(file)
 
 # --------------------------------------------------------------------
 

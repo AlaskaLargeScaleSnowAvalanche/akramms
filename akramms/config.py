@@ -43,6 +43,9 @@ shared_filesystem = True
 
 debug = False
 
+# Submit Avalanche simulations to Stage 2 immediately upon completion of Stage 1?
+auto_submit = True
+
 #ramms_version = '230126'
 #ramms_version = '230210'
 #ramms_version = '230321'
