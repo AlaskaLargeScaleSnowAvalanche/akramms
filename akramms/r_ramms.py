@@ -1168,7 +1168,14 @@ def run_ramms_stage3(oramms_name):
     with ioutil.TmpDir() as tdir:
         dynamic_outputs = harnutil.run_remote([], cmd, tdir, write_inputs=False)
 
-    return dynamic_outputs
+
+    # Move output files to final place
+    for ifname_rel in dynamic_outputs:
+        ifname = config.roots.syspath(ifname_rel)
+        ofname = os.path.join(oramms_name.scene_dir, 'AVMAPS', os.path.split(ifname)[1])
+        os.rename(ifname, ofname)
+
+#    return dynamic_outputs
 
 
 
@@ -1187,6 +1194,7 @@ def ramms_stage3_rule(ramms_dir, release_files):
     #     juneau130yFor\RESULTS\juneau1_For\juneau1_For_L300_xi.tif
 
     inputs = list()
+    ramms3_outputs = list()    # Outputs of raw RAMMS Stage 3
     outputs = list()
     for release_file in release_files:
         jb = rammsutil.parse_release_file(release_file)
@@ -1212,7 +1220,8 @@ def ramms_stage3_rule(ramms_dir, release_files):
             '.dbf', '.shp', '.shx',
             '_AblagerungStef.tif', '_COUNT.tif', '_ID.tif', '_Xi.tif',
             '_maxHeight.tif', '_maxPRESSURE.tif', '_maxVelocity.tif'):
-            outputs.append(os.path.join(jb.ramms_dir, f'{jb.ramms_name}{ext}'))
+            ramms3_outputs.append(os.path.join(jb.ramms_dir, f'{jb.ramms_name}{ext}'))
+            outputs.append(os.path.join(jb.scene_dir, 'AVMAPS', f'{jb.ramms_name}{ext}'))
 
     # ----------------------------------------------------
     def action(tdir):

@@ -444,9 +444,10 @@ def run_on_windows_stage3(idlrt_exe, ramms_version, ramms_dir):
     avalanche_dirs = list()
     for x0 in os.listdir(results_dir):
         slope_dir = os.path.join(results_dir, x0)
-        if os.path.isdir(slope_dir):
-            slope_dirs.append(slope_dir)
-        
+        if not os.path.isdir(slope_dir):
+            continue
+
+        slope_dirs.append(slope_dir)        
         for y0 in os.listdir(slope_dir):
             avalanche_dir = os.path.join(slope_dir, y0)
             if os.path.isdir(avalanche_dir):
