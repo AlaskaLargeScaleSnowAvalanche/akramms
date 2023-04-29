@@ -47,13 +47,14 @@ class RammsName:
         self.For = 'For' if self.forest else 'NoFor'
         self.ssegment = '' if self.segment is None else '{:05d}'.format(self.segment)
         self.sid = '' if self.id is None else f'_{self.id}'
-        suffix = '' if self.return_period is None else f'_{self.return_period}{self.pra_size}'
+        spra_size = '' if self.pra_size is None else f'{self.pra_size}'
+        suffix = '' if self.return_period is None else f'_{self.return_period}{spra_size}'
         self.reldom_name = f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m{suffix}'
         self.ramms_name = self.reldom_name + str(self.sid)  #f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m{suffix}{self.sid}'
 
         # Root of the RAMMS run (from RAMM's perspective)
         if self.return_period is not None:
-            self.rammsdir_name = f'{self.scene_name}{self.ssegment}{self.return_period}{self.pra_size}{self.For}_{self.resolution}m'#{self.sid}' 
+            self.rammsdir_name = f'{self.scene_name}{self.ssegment}{self.return_period}{spra_size}{self.For}_{self.resolution}m'#{self.sid}' 
             self.ramms_dir = os.path.join(self.ramms_harness, self.rammsdir_name)
 
         # Place where slope files are placed.
@@ -62,7 +63,7 @@ class RammsName:
         self.slope_dir = os.path.join(self.ramms_dir, 'RESULTS', self.slope_name)
 
         # Place where individual avalanche computations take place
-        self.avalanche_dir = os.path.join(self.slope_dir, f'{self.return_period}{self.pra_size}')
+        self.avalanche_dir = os.path.join(self.slope_dir, f'{self.return_period}{spra_size}')
 
         # ------------------ Name of individual avla
         # Base pathname for avalanche files; just append _{id}.{ext}

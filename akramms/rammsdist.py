@@ -177,7 +177,7 @@ class LineProcessor1:
         # If >5 seconds have passed, check to see if the number of VAR
         # files has increased.
         t1 = time.time()
-        if t1 - self.t0 < 15:    # 15s timeout
+        if t1 - self.t0 < 5:
             return True
 
         self.t0 = t1
@@ -435,60 +435,36 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
 # -----------------------------------------------------------------------
 def run_on_windows_stage3(idlrt_exe, ramms_version, ramms_dir):
 
+    results_dir = os.path.join(ramms_dir, 'RESULTS')
+
+    # Get list of avalanche_dirs
+    # Look for top-level directories under RESULTS.
+    # Each one of them will hold one or more sets of final outputs
+    slope_dirs = list()
+    avalanche_dirs = list()
+    for x0 in os.listdir(results_dir):
+        slope_dir = os.path.join(results_dir, x0)
+        if os.path.isdir(slope_dir):
+            slope_dirs.append(slope_dir)
+        
+        for y0 in os.listdir(slope_dir):
+            avalanche_dir = os.path.join(slope_dir, y0)
+            if os.path.isdir(avalanche_dir):
+                avalanche_dirs.append(avalanche_dir)
+
     # We have been provided a number of input files implicitly.
-
-    # Un-gzip .xy-coord.gz files (leave .out.gz gzipped)
-    gzipRE = re.compile(r'[^.]*\.xy-coord\.gz$|[^.]*\.log.zip$')
-    for path,dirs,files in os.walk(os.path.join(ramms_dir, 'RESULTS')):
-        for f in files:
-            if gzipRE.match(f) is not None:
-                if f.endswith('.gz'):
-                    # Gunzip the .xy-coord file
-                    ifname = os.path.join(path, f)
-                    ofname = os.path.join(path, f[:-3])    # Remove .gz
-                    if True or not os.path.exists(ofname):  # TODO: compare timestamps
-                        print(f'Un-gzipping {ifname}')
-                        with gzip.open(ifname, 'rb') as fin:
-                            with open(ofname, 'wb') as out:
-                                shutil.copyfileobj(fin, out)
-
-                elif f.endswith('.zip'):
-                    # Unzip the log
-                    ifname = os.path.join(path, f)
-                    print(f'Extracting log from {ifname}')
-                    with zipfile.ZipFile(ifname, 'r') as izip:
-                        arcnames = [os.path.split(x)[1] for x in izip.namelist()
-                            if x.endswith('.out.log')]
-                        for arcname in arcnames:
-                            ofname = os.path.join(path, arcname)
-                            if True or not os.path.exists(ofname):  # TODO: compare timestamps
-                                bytes = izip.read(arcname)
-                                with open(ofname, 'wb') as out:
-                                    out.write(bytes)
-
-#    print('** TODO: Uncomment so we actually run RAMMS **')
     print('Running RAMMS Stage 3 on Windows (launching IDL now)')
-    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, 3, ntry=1)
-
+    _run_on_windows(idlrt_exe, ramms_version, ramms_dir, avalanche_dirs, 3, ntry=1)
 
     # Figure out which output files exist, and print to STDOUT
 
-#    # Determine the directory where RAMMS outputs are, by reading the
-#    # scenario.txt file
-#    scenario_file = os.path.join(ramms_dir, 'scenario.txt')
-#    dirRE = re.compile('^DIR\s+(.*)$')
-#    with open(scenario_file) as fin:
-#        line = next(fin)
-#        match = dirRE.match(line)
-#        if match is not None:
-#            data_dir = match.group(1)    # Top-level dir where the individaul avalanche files are; (same as ramms_dir, so no point in reading it out)
-#            break
-            
     # Look for top-level directories under RESULTS.
     # Each one of them will hold one or more sets of final outputs
     outputs = list()
     results_dir = os.path.join(ramms_dir, 'RESULTS')
     outputs.append(os.path.join(results_dir, 'lshm_rock.log'))
+
+    # List files in the slope_dirs
     for x0 in os.listdir(results_dir):
         dir = os.path.join(results_dir, x0)
         if not os.path.isdir(dir):

@@ -473,6 +473,7 @@ def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):
 
 DOCKER_TAG = config.docker_tag()
 
+#requirements = opsys == 'WINDOWS'
 submit_tpl = \
 """universe                = docker
 docker_image            = {DOCKER_TAG}
@@ -968,8 +969,8 @@ def copy_from_zip(zip_file, arcname, ofname):
     ofname:
         Name in filesystem to copy to.
     """
-    bytes = zip_file.read(aname)
-    with open(ofname, 'w') as out:
+    bytes = zip_file.read(arcname)
+    with open(ofname, 'wb') as out:
         out.write(bytes)
 
 def copy_from_zip_to_gz(zip_file, arcname, ofname):
@@ -981,7 +982,7 @@ def copy_from_zip_to_gz(zip_file, arcname, ofname):
     ofname:
         Name in filesystem to copy to.
     """
-    bytes = zip_file.read(aname)
+    bytes = zip_file.read(arcname)
     with gzip.open(ofname, 'w') as out:
         out.write(bytes)
 
@@ -1006,19 +1007,21 @@ def copy_stage3_inputs(iavalanche_dir, aname, oavalanche_dir):
         Base name of avalanche, including the ID but no file extension.
     """
 
+    all_exist = all(
+        os.path.exists(os.path.join(oavalanche_dir, f'{aname}.rel'))
+        for ext in ('.rel', '.dom', '.xy-coord.gz', '.out.gz'))
+    if all_exist:
+        return
+
     # Copy .rel and .dom from .in.zip
     with zipfile.ZipFile(os.path.join(iavalanche_dir, aname+'.in.zip')) as in_zip:
-        copy_from_zip(in_zip, f'{aname}.rel', os.path.join(oavalanche_dir, f'{aname}.rel'))
+        for ext in ('.rel', '.xy-coord'):
+            copy_from_zip(in_zip, f'{aname}{ext}', os.path.join(oavalanche_dir, f'{aname}{ext}'))
 
         # .dom requires a bit of digging...
         copy_from_zip(in_zip,
-            latest_dom_file(in_zip.arcnames()),
+            latest_dom_file(in_zip.namelist()),
             os.path.join(oavalanche_dir, f'{aname}.dom'))
-
-        # .xy-coord.gz needs to be re-compressed
-        copy_from_zip_to_gz(
-            in_zip, f'{aname}.xy-coord',
-            os.path.join(oavalanche_dir, f'{aname}.xy-coord.gz'))
 
 
     # Copy .out.gz and .xy-coord.gz from .out.zip
@@ -1071,6 +1074,7 @@ def assemble_stage3(oramms_name, release_files):
 
     # Copy / Symlink DEM and FOREST files
     jb = rammsutil.parse_release_file(release_files[0])
+
     scene_args = params.load(oramms_name.scene_dir)
     links = dem_forest_links(scene_args, oramms_name.ramms_dir, oramms_name.slope_name, forest=jb.forest)
     links.append((
@@ -1081,31 +1085,28 @@ def assemble_stage3(oramms_name, release_files):
     for ifile,ofile in links:
         setlink_or_copy(ifile, ofile)
 
-    # Decide on what the _rel.shp and _dom.shp files should be called
-    orel_base = os.path.join(oramms_name.ramms_dir, 'RELEASE', oramms_name.reldom_name+'_rel')
-    odom_base = os.path.join(oramms_name.ramms_dir, 'DOMAIN', oramms_name.reldom_name+'_dom')
 
     # Find all available individual runs
     for ix,release_file in enumerate(release_files):
+        # DEBUG
+        if ix>1:
+            break
+
         jb = rammsutil.parse_release_file(release_file)
+        ojb = oramms_name.copy(pra_size=jb.pra_size)
         ids = get_job_ids(release_file)
+
+
+        # Decide on what the _rel.shp and _dom.shp files should be called
+        orel_base = os.path.join(oramms_name.ramms_dir, 'RELEASE', ojb.reldom_name+'_rel')
+        odom_base = os.path.join(oramms_name.ramms_dir, 'DOMAIN', ojb.reldom_name+'_dom')
 
         # Copy _rel.shp and _dom.shp files
         irel_base = os.path.join(jb.ramms_dir, 'RELEASE', jb.reldom_name+'_rel')
         idom_base = os.path.join(jb.ramms_dir, 'DOMAIN', jb.reldom_name+'_dom')
 
-#        irel_base = os.path.splitext(release_file)[0]
-#        irel_baseleaf = os.path.split(irel_base)[1]
-#        idom_base = (irel_base[:-4] + '_dom').replace('RELEASE', 'DOMAIN')
-#
-#        orel_base = os.path.join(oramms_name.ramms_dir, 'RELEASE', irel_baseleaf)
-#        odom_base = os.path.join(oramms_name.ramms_dir, 'DOMAIN', irel_baseleaf)
-
         # Merge shapefiles
         links = list()
-#        for ext in ('.dbf', '.prj', '.shp', '.shx'):
-#            links.append((f'{irel_base}{ext}', f'{orel_base}{ext}'))
-#            links.append((f'{idom_base}{ext}', f'{odom_base}{ext}'))
         links.append((f'{irel_base}.shp', f'{orel_base}.shp'))
         links.append((f'{idom_base}.shp', f'{odom_base}.shp'))
 
@@ -1120,17 +1121,10 @@ def assemble_stage3(oramms_name, release_files):
                 cmd = ['ogr2ogr', '-f', 'gpkg', '-append', '-update', ofile, ifile]
             subprocess.run(cmd, check=True)
 
-#        oslope_dir = os.path.join(oramms_dir, 'RESULTS',
-#            f'{jb.scene_name}{jb.For}_{jb.resolution}m')
-#        oavalanche_dir = os.path.join(oslope_dir,
-#            f'{jb.return_period}{jb.pra_size}')
         oslope_dir = oramms_name.slope_dir
-        oavalanche_dir = oramms_name.avalanche_dir
-            
-        ireleasefile_dir = os.path.split(release_file)[0]
+        oavalanche_dir = os.path.join(oramms_name.slope_dir, f'{ojb.return_period}{ojb.pra_size}')
 
-#        ibase = f'{jb.scene_name}{jb.ssegment}{jb.For}_{jb.resolution}m_{jb.return_period}{jb.pra_size}'
-#        obase = f'{jb.scene_name}{jb.For}_{jb.resolution}m_{jb.return_period}{jb.pra_size}'
+        ireleasefile_dir = os.path.split(release_file)[0]
 
         # Figure out which avalanches have been run
         required_exts = {'.in.zip', '.out.zip',}
@@ -1153,9 +1147,6 @@ def assemble_stage3(oramms_name, release_files):
                         id_exts[id] = {ext}
 
         # Copy files that have complete outputs
-        requireds = [
-            ('.in.zip', '.rel'),
-
         os.makedirs(oavalanche_dir, exist_ok=True)
         for id,exts in id_exts.items():
             print(id,exts)
@@ -1163,13 +1154,8 @@ def assemble_stage3(oramms_name, release_files):
                 continue
 
             copy_stage3_inputs(
-                jb.avalanche_dir, f'{jb.ramms_name}_{id}'
+                jb.avalanche_dir, f'{jb.ramms_name}_{id}',
                 oavalanche_dir)
-
-#            for ext in exts:
-#                ifname = os.path.join(jb.avalanche_dir, f'{jb.ramms_name}_{id}{ext}')
-#                ofname = os.path.join(oavalanche_dir, f'{oramms_name.ramms_name}_{id}{ext}')
-#                shutil.copy(ifname, ofname)
 
 
 def run_ramms_stage3(oramms_name):
