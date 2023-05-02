@@ -125,10 +125,11 @@ def spec(args):
     release_files = rammsutil.get_release_files(args.ramms)
     for fname in release_files:
         print(fname)
+        print('---- tiffmap:')
         jb = rammsutil.parse_release_file(fname)
         map = r_ramms.tiffmap(jb)
         for x in map:
-            print(x)
+            print('    ',x)
 
 @subcommand([
     argument('scene', help='Top-Level scene directory to setup through stages 0 and 1.'),

@@ -34,6 +34,7 @@ def add_stage0_rules(makefile, scene_dir):
 #                r_domain_builder.burn_pra_rule(dem_file, pra_file, pra_burn_file))
 
             # Post-Process eCognition Output (the pra_file)
+            # and also split into chunks.
             # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
             pra_post_rule, ramms_names = r_pra_post.rule(
                 scene_dir, dem_filled_file, return_period, forest)
@@ -61,7 +62,7 @@ def read_release_files(scene_args):
                     scene_args['name'], None, forest, resolution,
                     return_period, pra_size, None)
 
-                chunks_df = pd.read_csv(r_ramms.chunks_csv(scene_args['scene_dir'], jb.ramms_name))
+                chunks_df = pd.read_csv(rammsutil.chunks_csv(scene_args['scene_dir'], jb.ramms_name))
                 chunk_ids = chunks_df.segment.unique()
 
                 for segment in chunk_ids:

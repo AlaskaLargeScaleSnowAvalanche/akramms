@@ -198,6 +198,7 @@ class LineProcessor1:
             num_release_files = int(match.group(2))
             if release_file_ix == num_release_files:
                 self.ready_to_exit = True
+            return True
 
         # Check for beginning of file generation
         if _genRE.match(line) is not None:
@@ -214,13 +215,27 @@ class LineProcessor1:
 
 _doneRE3 = re.compile(r'\s*Finished writing GEOTIFF files!')
 class LineProcessor3:
+    def __init__(self, avalanche_dirs):
+        self.ready_to_exit = False
+
     def check_end_chunk(self):
         return True
 
     def watch(self, line):
+        # ---- Process the line we have read
+        # Seek info on progress through release files
+        # Eg: RELEASE 1/3
+        match = _releaseRE.match(line)
+        if match is not None:
+            release_file_ix = int(match.group(1))
+            num_release_files = int(match.group(2))
+            if release_file_ix == num_release_files:
+                self.ready_to_exit = True
+            return True
+
         # If we've seen enough release files, look out for our
         # "done message."
-        if _doneRE3.match(line) is not None:
+        if self.ready_to_exit and (_doneRE3.match(line) is not None):
             return False
         return True
 

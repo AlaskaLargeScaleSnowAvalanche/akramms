@@ -2,6 +2,7 @@ import os,re,typing,functools,copy,glob
 import numpy as np
 import shapely
 import pandas as pd
+from akramms import config
 
 PRA_SIZES = {
     'T' : 'tiny',
@@ -136,6 +137,17 @@ def _ramms_to_release(ramms_dirs):
 
     return release_files
 
+def chunks_csv(scene_dir, ramms_name):
+    """Returns name of the _chunks.csv control file for top-level (non-split) shapefiles."""
+    #return os.path.join(scene_dir, 'RELEASE', f'{ramms_name}_chunks.csv')
+    return os.path.join(scene_dir, 'stage0', f'{ramms_name}_chunks.csv')
+
+#def release_csv(scene_dir, ramms_name):
+#    """Returns name of the _release.csv for top-level (non-split) shapefiles."""
+#    #return os.path.join(scene_dir, 'RELEASE', f'{ramms_name}_chunks.csv')
+#    return os.path.join(scene_dir, 'stage0', f'{ramms_name}_release.csv')
+
+
 def _get_release_files(spec):
     """Given a directory above or below the RAMMS directory, finds a
     "ramms dir," which is one level below RAMMS/."""
@@ -149,7 +161,19 @@ def _get_release_files(spec):
     dir = os.path.abspath(spec)
     CHUNKS = os.path.join(dir, 'CHUNKS')
     if os.path.isdir(CHUNKS):
-        dir = CHUNKS
+        release_files = []
+        stage0_dir = os.path.join(dir, 'stage0')
+        for leaf in os.listdir(stage0_dir):
+            if not leaf.endswith('_chunks.csv'):
+                continue
+            df = pd.read_csv(os.path.join(stage0_dir, leaf))
+            df = df[df['segment'] < config.max_chunks]    # Cut down based on config
+
+            for chunk_name in df['chunk_name'].unique():
+                chunk_dir = os.path.join(dir, 'CHUNKS', chunk_name)
+                release_files += _get_release_files(chunk_dir)
+        return release_files
+            
     parts = dir.split(os.sep)
 
     # See if we're in, eg:
@@ -164,7 +188,6 @@ def _get_release_files(spec):
     for i in range(len(parts)):
         if parts[i] == 'CHUNKS':
             # CHUNKS/ is the last part of the path, we have multiple dirs.
-            print('888888888888 parts ', parts)
             if i == len(parts)-1:
                 ramms_dirs = [os.path.join(dir,x) for x in os.listdir(dir)]
                 print('ramms_dirs ', ramms_dirs)

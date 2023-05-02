@@ -140,12 +140,10 @@ def write_scenario_txt(jb, alt_lim_top=1500, alt_lim_low=1000, ncpu=config.ramms
 #     outputs = [scenario_txt] + linked_files
 #     return make.Rule(action, inputs, outputs)
 
-def chunks_csv(scene_dir, ramms_name):
-    return os.path.join(scene_dir, 'RELEASE', f'{ramms_name}_chunks.csv')
-
 def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
-
     """Generates the scenario file, which becomes key to running RAMMS.
+    Also split into chunks.
+
     release:
         Release file to process
     oramms_name:
@@ -156,7 +154,7 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
 
     outputs = list()
     for jb,pra_size in ramms_names:
-        outputs.append(chunks_csv(scene_args['scene_dir'], jb.ramms_name))
+        outputs.append(rammsutil.chunks_csv(scene_args['scene_dir'], jb.ramms_name))
 
 
     def action(tdir):
@@ -183,6 +181,10 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
             ofnames = list()
             chunk_info = list()
             for segment,chunkix in enumerate(range(0,df.shape[0],config.max_ramms_pras)):
+                # DEBUG
+                if segment >= config.max_chunks:
+                    break
+
                 # Select out chunk
                 dfc = df[chunkix:chunkix+config.max_ramms_pras]
 
@@ -228,14 +230,20 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
                     rammsutil.write_polygon(row['dom'], ofname)
 
                 # Store chunk info
-                chunk_info += [(segment, id) for id in dfc['Id']]
+                For = 'For' if jb1.forest else 'NoFor'
+                chunk_info += [
+                    (segment, id,
+                    f'{jb1.scene_name}{jb1.segment:05d}{jb1.return_period}{jb1.pra_size}{For}_{jb1.resolution}m')
+                    for id in dfc['Id']]
                 #chunk_info.append(segment, list(dfc['Id']))
             
             # Write names of our PRA files into the _chunks.txt output file
-            chunk_index_df = pd.DataFrame(chunk_info, columns=['segment', 'Id'])
+            chunk_index_df = pd.DataFrame(chunk_info, columns=['segment', 'Id', 'chunk_name'])
 #            with open(, 'w') as out:
-            chunk_index_df.to_csv(f'{base}_chunks.csv', index=False)
-
+            #chunk_index_df.to_csv(f'{base}_chunks.csv', index=False)
+            ccsv = rammsutil.chunks_csv(scene_args['scene_dir'], jb.ramms_name)
+            os.makedirs(os.path.dirname(ccsv), exist_ok=True)
+            chunk_index_df.to_csv(ccsv)
     inputs = list()
     for jb,_ in ramms_names:
         # Get list of symlinks we WILL make, use that to determine input files
@@ -387,7 +395,8 @@ def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):
     #logfile = os.path.join(jb.ramms_dir, 'RESULTS', 'lshm_rock.log')
 
     # Write extra output files to show we finished stage1 for a particular release file
-    done_output = os.path.join(jb.ramms_dir, 'RESULTS', f'{jb.ramms_name}_stage1.txt')
+#    done_output = os.path.join(jb.ramms_dir, 'RESULTS', f'{jb.ramms_name}_stage1.txt')
+    done_output = os.path.join(jb.scene_dir, 'stage1', f'{jb.ramms_name}.txt')
 
     def action(tdir):
         # ---------------------------------------------------------
@@ -415,6 +424,7 @@ def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):
         dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=True)
 
         # Write output files
+        os.makedirs(os.path.dirname(done_output), exist_ok=True)
         with open(done_output, 'w') as out:
             out.write('Finished RAMMS Stage 1\n')
 
@@ -1088,9 +1098,9 @@ def assemble_stage3(oramms_name, release_files):
 
     # Find all available individual runs
     for ix,release_file in enumerate(release_files):
-        # DEBUG
-        if ix>1:
-            break
+#        # DEBUG
+#        if ix>1:
+#            break
 
         jb = rammsutil.parse_release_file(release_file)
         ojb = oramms_name.copy(pra_size=jb.pra_size)
@@ -1148,16 +1158,20 @@ def assemble_stage3(oramms_name, release_files):
 
         # Copy files that have complete outputs
         os.makedirs(oavalanche_dir, exist_ok=True)
+        print('Assembling PRAs:')
         for id,exts in id_exts.items():
-            print(id,exts)
+            print(f' {id}', end='')
+            sys.stdout.flush()
             if len(exts) < len(required_exts):
                 continue
 
             copy_stage3_inputs(
                 jb.avalanche_dir, f'{jb.ramms_name}_{id}',
                 oavalanche_dir)
+        print()
 
 
+_ramms3_exclude = {'forest.sav', 'lshm_rock.log'}
 def run_ramms_stage3(oramms_name):
     oramms_dir = oramms_name.ramms_dir
     oramms_dir_rel = config.roots.relpath(oramms_dir)
@@ -1170,9 +1184,14 @@ def run_ramms_stage3(oramms_name):
 
 
     # Move output files to final place
+    avmaps_dir = os.path.join(oramms_name.scene_dir, 'AVMAPS')
+    os.makedirs(avmaps_dir, exist_ok=True)
     for ifname_rel in dynamic_outputs:
         ifname = config.roots.syspath(ifname_rel)
-        ofname = os.path.join(oramms_name.scene_dir, 'AVMAPS', os.path.split(ifname)[1])
+        ileaf = os.path.split(ifname)[1]
+        if ileaf in _ramms3_exclude:
+            continue
+        ofname = os.path.join(avmaps_dir, ileaf)
         os.rename(ifname, ofname)
 
 #    return dynamic_outputs

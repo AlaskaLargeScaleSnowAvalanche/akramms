@@ -66,10 +66,13 @@ ncpu_compress = 8    # Number of CPUs to use when compressing stuff after RAMMS 
 # ------------------------------
 # DEBUG parameters
 #allowed_pra_sizes = {'T', 'S', 'M', 'L'}
-allowed_pra_sizes = {'M'}
+allowed_pra_sizes = {'L', 'M'}
 #allowed_pra_sizes = {'M', 'S'}
 #allowed_forests = {True}
 #allowed_return_periods = {30}
+
+# Maximum number of chunks in one set
+max_chunks = 2
 
 # Amount of margin to provide avalanche for first run
 initial_margins = {
