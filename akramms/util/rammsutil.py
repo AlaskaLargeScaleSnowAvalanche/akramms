@@ -104,6 +104,10 @@ class RammsName:
         """
         return f'{self.scene_name}{self.ssegment}{self.For}_{self.resolution}m_{self.return_period}{self.pra_size}_{id}{ext}'
 
+    def key(self):
+        """Standard sort order for RammsNames"""
+        return (self.scene_name, self.forest, self.resolution, self.return_period, self.pra_size, self.segment, self.id, self)
+
 # -------------------------------------------------------
 release_fileRE = re.compile(r'^(.+)(\d\d\d\d\d)(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(.*)(\..*)')
 
@@ -201,6 +205,12 @@ def _get_release_files(spec):
 
     raise ValueError('Could not interpret spec {} as one or more RAMMS dirs'.format(spec))
 
+def sort_release_files(ret):
+    jbs = [(parse_release_file(release_file).key(), release_file) for release_file in ret]
+    jbs.sort()
+    release_files = [rf for _,rf in jbs]
+    return release_files
+
 def get_release_files(spec):
     # Expand wildcards
     specs = glob.glob(spec)
@@ -210,8 +220,9 @@ def get_release_files(spec):
     ret = list()
     for spec1 in specs:
         ret += _get_release_files(spec1)
-    return ret
 
+    # Sort!
+    return sort_release_files(ret)
 # ---------------------------------------------------------
 def read_polygon(poly_file):
     """Reads a RAMMS polygon file (eg: .dom) into a Shapely Polygon."""

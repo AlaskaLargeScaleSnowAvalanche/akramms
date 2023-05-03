@@ -667,12 +667,12 @@ def job_statuses(release_files):
 
             # Mark as NOINPUT if the .in.zip file is not there.
             if not os.path.exists(os.path.join(jb.avalanche_dir, f'{job_name}.in.zip')):
-                statuses.append((jb.avalanche_dir, id, JobStatus.NOINPUT))
+                statuses.append((jb, id, JobStatus.NOINPUT))
                 continue
 
             # See if Condor tells is what's going on with the job
             if job_name in condor_statuses:
-                statuses.append((jb.avalanche_dir, id, condor_statuses[job_name]))
+                statuses.append((jb, id, condor_statuses[job_name]))
                 continue
 
             # Not in Condor?  Either it hasn't launched, or it's finished / failed
@@ -690,7 +690,7 @@ def job_statuses(release_files):
                     # no sign of the HTCondor job to write it at the
                     # end.  Sounds like things were killed, send
                     # status back to TODO.
-                    statuses.append((jb.avalanche_dir, id, JobStatus.TODO))
+                    statuses.append((jb, id, JobStatus.TODO))
                     continue
 
                 # We tentatively think the job is finished.  But let's
@@ -699,23 +699,27 @@ def job_statuses(release_files):
                 with zipfile.ZipFile(out_zip, 'r') as in_zip:
                     arcnames = [os.path.split(x)[1] for x in in_zip.namelist()]
                 if any(x.endswith('.out.overrun') for x in arcnames):
-                    statuses.append((jb.avalanche_dir, id, JobStatus.OVERRUN))
+                    statuses.append((jb, id, JobStatus.OVERRUN))
                 else:
-                    statuses.append((jb.avalanche_dir, id, JobStatus.FINISHED))
+                    statuses.append((jb, id, JobStatus.FINISHED))
                 continue
 
             # Default to TODO
-            statuses.append((jb.avalanche_dir, id, JobStatus.TODO))
+            statuses.append((jb, id, JobStatus.TODO))
 
-
-    df = pd.DataFrame(statuses, columns=('run_dir', 'id', 'job_status'))
-    df = df.sort_values(by=['run_dir', 'job_status', 'id'])
+    statuses = [(jb.key(), id, status) for jb,id,status in statuses]
+    df = pd.DataFrame(statuses, columns=('jb_key', 'id', 'job_status'))
+    df = df.sort_values(by=['jb_key', 'id'])
+    #df = df[['run_dir', 'id', 'job_status']]
+#    print(df)
     return df
 # --------------------------------------------------------
 def print_job_statuses(df):
-    for (run_dir, job_status), group in df.groupby(['run_dir', 'job_status']):
+#    for (run_dir, job_status), group in df.groupby(['run_dir', 'job_status']):
+    for (jb_key, job_status), group in df.groupby(['jb_key', 'job_status']):
+        jb = jb_key[-1]
 
-        print('=========== {} {}:'.format(job_status_labels[job_status], run_dir))
+        print('=========== {} {}:'.format(job_status_labels[job_status], jb.avalanche_dir))
         print(sorted(group['id'].tolist()))
 
 
