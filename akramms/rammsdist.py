@@ -174,10 +174,10 @@ class LineProcessor1:
         if not self.var_begin:
             return True
 
-        # If >5 seconds have passed, check to see if the number of VAR
+        # If >30 seconds have passed, check to see if the number of VAR
         # files has increased.
         t1 = time.time()
-        if t1 - self.t0 < 5:
+        if t1 - self.t0 < 30:
             return True
 
         self.t0 = t1
@@ -215,9 +215,9 @@ class LineProcessor1:
 
 _doneRE3 = re.compile(r'\s*Finished writing GEOTIFF files!')
 class LineProcessor3:
-    def __init__(self, avalanche_dirs):
-        self.ready_to_exit = False
-
+    def __init__(self):
+#        self.ready_to_exit = False
+        self.ready_to_exit = True    # Bug in RAMMS, only does one release file anyway
     def check_end_chunk(self):
         return True
 
@@ -455,7 +455,7 @@ def run_on_windows_stage3(idlrt_exe, ramms_version, ramms_dir):
     # Get list of avalanche_dirs
     # Look for top-level directories under RESULTS.
     # Each one of them will hold one or more sets of final outputs
-    slope_dirs = list()
+    slope_dirs = list()
     avalanche_dirs = list()
     for x0 in os.listdir(results_dir):
         slope_dir = os.path.join(results_dir, x0)
