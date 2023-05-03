@@ -707,8 +707,9 @@ def job_statuses(release_files):
             # Default to TODO
             statuses.append((jb, id, JobStatus.TODO))
 
-    statuses = [(jb.key(), id, status) for jb,id,status in statuses]
-    df = pd.DataFrame(statuses, columns=('jb_key', 'id', 'job_status'))
+    statuses = [(jb.key(), jb, id, status) for jb,id,status in statuses]
+#    df = pd.DataFrame(statuses, columns=('jb_key', 'id', 'job_status'))
+    df = pd.DataFrame(statuses, columns=('jb_key', 'jb', 'id', 'job_status'))
     df = df.sort_values(by=['jb_key', 'id'])
     #df = df[['run_dir', 'id', 'job_status']]
 #    print(df)
@@ -740,10 +741,11 @@ def submit_jobs(release_files, ids=None):
 #    print('df = ',df)
     for _,row in df.iterrows():
         if ids is None or row['id'] in ids:
-            parts = row['run_dir'].split(os.sep)
+            run_dir = row['jb'].avalanche_dir
+            parts = run_dir.split(os.sep)
             job_name = '{}_{}_{}'.format(parts[-2], parts[-1], row['id'])
-            print('submit ', row['run_dir'], job_name)
-            submit_job(row['run_dir'], job_name)
+            print('submit ', run_dir, job_name)
+            submit_job(run_dir, job_name)
 
     return df
 
@@ -786,7 +788,8 @@ def enlarge_domains(release_files, ids=None):
     df = job_statuses(release_files)
     df = df[df.job_status == JobStatus.OVERRUN]
     for _,row in df.iterrows():
-        run_dir = row.run_dir
+        jb = row.jb
+        run_dir = jb.avalanche_dir
         parts = run_dir.split(os.sep)
         job_name = '{}_{}_{}'.format(parts[-2], parts[-1], row['id'])
         if ids is None or row['id'] in ids:
