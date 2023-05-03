@@ -182,7 +182,7 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
             chunk_info = list()
             for segment,chunkix in enumerate(range(0,df.shape[0],config.max_ramms_pras)):
                 # DEBUG
-                if segment >= config.max_chunks:
+                if (config.max_chunks is not None) and (segment >= config.max_chunks):
                     break
 
                 # Select out chunk
@@ -1171,7 +1171,10 @@ def assemble_stage3(oramms_name, release_files):
         print()
 
 
-_ramms3_exclude = {'forest.sav', 'lshm_rock.log'}
+#_ramms3_exclude = {'forest.sav', 'lshm_rock.log'}
+
+_ramms3RE = re.compile(r'(.*)(\.shx|\.shp|\.dbf|_maxPRESSURE\.tif|_maxHeight\.tif|_Xi\.tif|_AblagerungStef\.tif|_ID\.tif|_COUNT\.tif)')
+
 def run_ramms_stage3(oramms_name):
     oramms_dir = oramms_name.ramms_dir
     oramms_dir_rel = config.roots.relpath(oramms_dir)
@@ -1183,18 +1186,44 @@ def run_ramms_stage3(oramms_name):
         dynamic_outputs = harnutil.run_remote([], cmd, tdir, write_inputs=False)
 
 
-    # Move output files to final place
-    avmaps_dir = os.path.join(oramms_name.scene_dir, 'AVMAPS')
-    os.makedirs(avmaps_dir, exist_ok=True)
+    # Copy output into final zip file
+    # (for easy transport to visulatization computer)
+    maps_dir = os.path.join(oramms_name.scene_dir, 'maps')
+    os.makedirs(maps_dir, exist_ok=True)
+
+
+    # Group output files into the Zip we will put them in
+    groups = dict()
     for ifname_rel in dynamic_outputs:
         ifname = config.roots.syspath(ifname_rel)
-        ileaf = os.path.split(ifname)[1]
-        if ileaf in _ramms3_exclude:
+        arcname = os.path.split(ifname)[1]
+        match = _ramms3RE.match(arcname)
+        if match is None:
             continue
-        ofname = os.path.join(avmaps_dir, ileaf)
-        os.rename(ifname, ofname)
 
-#    return dynamic_outputs
+        root = match.group(1)
+        try:
+            group = groups[root]
+        except KeyError:
+            group = list()
+            groups[root] = group
+        group.append((arcname, ifname))
+
+
+    # Make the Zip files
+    zip_outputs = list()
+    for root,members in groups.items():
+        zip_fname = os.path.join(maps_dir, f'{root}_maps.zip')
+        with zipfile.ZipFile(zip_fname, 'w', compression=zipfile.ZIP_DEFLATED) as mzip:
+            for arcname, ifname in members:
+                mzip.write(ifname, arcname=arcname)
+        zip_outputs.append(zip_fname)
+
+    # Delete ORAMMS directory
+    shutil.rmtree(oramms_dir, ignore_errors=True)
+
+    # Convert zip outputs to relative filenames
+    return [config.roots.relpath(x) for x in zip_outputs]
 
 
 

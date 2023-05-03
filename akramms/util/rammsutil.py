@@ -12,8 +12,10 @@ PRA_SIZES = {
 # ---------------------------------------------------------------
 class RammsName:
     all_cols = ['ramms_harness', 'scene_name', 'segment', 'forest', 'resolution', 'return_period', 'pra_size', 'id']
-    required_cols = ['ramms_harness', 'scene_name', 'forest', 'resolution']
-    optional_cols = ['segment', 'return_period', 'pra_size', 'id']
+
+    # Columns used to determine ORAMMS name
+    required_cols = ['ramms_harness', 'scene_name', 'forest', 'resolution', 'return_period', 'pra_size']
+    optional_cols = ['segment', 'id']
 
     def __init__(self, ramms_harness, scene_name, segment, forest, resolution, return_period, pra_size, id):
         """
@@ -167,7 +169,8 @@ def _get_release_files(spec):
             if not leaf.endswith('_chunks.csv'):
                 continue
             df = pd.read_csv(os.path.join(stage0_dir, leaf))
-            df = df[df['segment'] < config.max_chunks]    # Cut down based on config
+            if config.max_chunks is not None:
+                df = df[df['segment'] < config.max_chunks]    # Cut down based on config
 
             for chunk_name in df['chunk_name'].unique():
                 chunk_dir = os.path.join(dir, 'CHUNKS', chunk_name)
