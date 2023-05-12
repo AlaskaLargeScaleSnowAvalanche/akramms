@@ -1180,7 +1180,7 @@ def assemble_stage3(oramms_name, release_files):
 
 #_ramms3_exclude = {'forest.sav', 'lshm_rock.log'}
 
-_ramms3RE = re.compile(r'(.*)(\.shx|\.shp|\.dbf|_maxPRESSURE\.tif|_maxHeight\.tif|_Xi\.tif|_AblagerungStef\.tif|_ID\.tif|_COUNT\.tif)')
+_ramms3RE = re.compile(r'(.*)(\.shx|\.shp|\.dbf|_maxPRESSURE\.tif|_maxHeight\.tif|_Xi\.tif|_ID\.tif|_COUNT\.tif)')
 
 def run_ramms_stage3(oramms_name):
     oramms_dir = oramms_name.ramms_dir

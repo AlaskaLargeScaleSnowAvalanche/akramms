@@ -71,13 +71,7 @@ class WrfLookup:
         self.scene2wrf = pyproj.Transformer.from_crs(scene_crs, wrf_crs, always_xy=True)
 
         # Load the data file
-        with netCDF4.Dataset(data_fname) as nc:
-            # Masked array
-            ncv = nc.variables[vname]
-            orig_units = ncv.units
-            masked_data = ncv[:,:]    # sx3(j=south_north,i=west_east)
-        data_rawunits, converged = gridfill.fill(masked_data, 1, 0, .1)#, itermax=10000)
-        self.data = cfutil.convert(data_rawunits, orig_units, units)
+        self.data = wrfutil.read(data_fname, units=units)
 
 #        # Write a GeoTIFF file of our results
 #        wrfutil.write_geotiff(self.geo_info, self.data, 'x.tif')
