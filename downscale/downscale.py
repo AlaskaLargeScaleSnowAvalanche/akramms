@@ -115,7 +115,7 @@ def main():
 
     # Calculate volume per unit horizontal area (VOL_returnperiod)
     # df[VOL_vname] = df['area_m2'] / np.cos(df['Mean_Slope']*degree) * df[d0_vname]
-    volume = df[d0_vname]) / np.cos(slope*degree)
+    volume = d0 / np.cos(slope*degree)
 
     # --------------------------------------------------------------------------------------
 
