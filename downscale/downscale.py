@@ -4,6 +4,47 @@ from akramms import config,params
 from uafgi.util import gdalutil,wrfutil
 from osgeo import gdalconst
 
+
+"""
+https://nhess.copernicus.org/preprints/nhess-2022-112/nhess-2022-112.pdf
+
+The derivation of the 3-day snow depth increase was based on long-term
+snow measurement series at meteorological sta- tions representative
+for the chosen area. As shown in Fig. 4, two extreme value statistic
+methods were applied: the general- ized extreme value distribution
+with maximum likelihood estimations (GEV - MLE) and the Gumble
+distribution (Bocchiola et al., 2008) with maximum likelihood
+estimations (GUM-MLE). Table 1 shows that both methods produce similar
+values, but slightly higher values with GUM-MLE. This depends on the
+choice of the fitted correlation through the value distribution.
+Since the GUM distribution rather represents a "worst case" for the
+respective return period and Bocchiola et al. (2008) con- firms the
+application of this method, these values were chosen for the fracture
+depth determination. To account for elevation of the release area, a
+correction factor has to be applied. Blanchet et al. (2009) estimated
+this factor to be about +/- 2 cm per 100 elevation meters, whereas
+Swiss practitioners usually use a gradient of 5 cm per 100 elevation
+meters (Margreth et al., 2008). In consideration of the large
+avalanche scenarios, we applied 5 cm per 100 elevation meters to each
+release polygon corresponding to further studies in the Swiss Alps
+(Bühler et al., 2022). For steeper terrain, we assumed that less snow
+accumulates than in flat terrain. This is applied automatically in the
+ArcGIS Python Script for fracture depth (d0) calculation by using the
+function ψ = 0.219/sin(α) − 0.202 × cos(α) with α being the slope
+angle (Bühler et al., 2018).
+
+See here:
+
+Bühler, Y., von Rickenbach, D., Christen, M., Margreth, S., Stoffel,
+L., Stoffel, A., and Kühne, R.: Linking modelled potential release
+areas with avalanche dynamic simulations: An automated approach for
+efficient avalanche hazard indication mapping, Linking modelled
+potential release areas with avalanche dynamic simulations: An
+automated approach for efficient avalanche hazard indication mapping,
+2018.
+"""
+
+
 # wrf-format files
 sx3_dir = config.roots.syspath('{DATA}/lader/sx3')
 wrf_geo_nc = os.path.join(sx3_dir, 'geo_southeast.nc')
@@ -23,7 +64,7 @@ def slope_file(scene_args, forest, *args):
     For = 'For' if forest else 'NoFor'
     name = scene_args['name']
     resolution = scene_args['resolution']
-    return os.path.join(scene_args['dir'], 'SLOPE_TIF', f'{name}{For}_{resolution}m', *args)
+    return os.path.join(scene_args['scene_dir'], 'SLOPE_TIF', f'{name}{For}_{resolution}m', *args)
 
 # ------------------------------------------------
 def regrid_wrf(idir, ileaf, vname, odir, scene_name, wrf_grid_info, scene_grid_info):
@@ -53,15 +94,33 @@ def regrid_wrf(idir, ileaf, vname, odir, scene_name, wrf_grid_info, scene_grid_i
 # ------------------------------------------------
 
 def main():
-    # Read regridded WRF files: DEM and sx3 (snow depth)
+
     scene_args = params.load(scene_dir)
+
+    # Read hi-res DEM
+    print('Reading: ', scene_args['dem_file'])
     scene_grid_info, scene_dem, dem_nodata = gdalutil.read_raster(scene_args['dem_file'])
+
+    # Read slope --- and regrid to larger bounds used by the DEM
+    sf = slope_file(scene_args, True, 'slope.tif')
+    print('Reading: ', sf)
+    xslope_grid_info, xslope, slope_nodata = gdalutil.read_raster(sf)
+
+    slope = gdalutil.regrid(
+        xslope, xslope_grid_info, slope_nodata,
+        scene_grid_info, slope_nodata,
+        resample_algo=gdalconst.GRA_NearestNeighbour)
+    xslope = None
+
+    print('    slope: ', slope.shape)
+    print('scene_dem: ', scene_dem.shape)
+
+    # Read regridded WRF files: DEM and sx3 (snow depth)
     print('dem_nodata = ', dem_nodata)
     wrf_grid_info = wrfutil.wrf_info(wrf_geo_nc)
     lwrf_dem,lwrf_dem_nodata = regrid_wrf(
         sx3_dir, 'geo_southeast.nc', 'HGT_M', '.', scene_args['name'],
         wrf_grid_info, scene_grid_info)
-
     lwrf_sx3,lwrf_sx3_nodata = regrid_wrf(
         sx3_dir, 'ccsm_sx3_2010.nc', 'sx3', '.', scene_args['name'],
         wrf_grid_info, scene_grid_info)
@@ -69,9 +128,12 @@ def main():
     # Figure where we are masked
     mask_out = (lwrf_sx3 == lwrf_sx3_nodata)
 
-    # Read slope
-    slope_grid_info, slope, slope_nodata = gdal.read_raster(slope_file(scene_args, True, 'slope.tif'))
+    print('scene_dem: ', scene_dem.shape)
+    print(' lwrf_dem: ', lwrf_dem.shape)
+    print('      sx3: ', lwrf_sx3.shape)
 
+    sx3 = lwrf_sx3
+    dem = lwrf_dem
 
     # ---------------------------------------------------------------------
 
@@ -81,6 +143,7 @@ def main():
         (lwrf_dem - scene_args['reference_elevation']) \
             * gradient_snowdepth_si_units
     sx3_corrected = (sx3 + snowdepth_correction)
+
     # TODO: Why are we multiplying by cos(28) = .883?
 
     # Very old rule developed 30-40 years ago: the steeper the
@@ -101,8 +164,11 @@ def main():
     # TODO: Discuss with Gabe.  Do we want to apply slope angle correction?
     # If yes, we can make it much simpler than what we have here.
     mean_slope_rad = slope * degree
-    slopecorr =  0.291 / \
-        (np.sin(mean_slope_rad) - 0.202 * np.cos(mean_slope_rad))
+    slopecorr = 0.219 / np.sin(mean_slope_rad) - 0.202 * np.cos(mean_slope_rad)
+
+#    # Store in GeoTIFF
+#    gdalutil.write_raster('slopecorr.tif', scene_grid_info, sx3_corrected, final_nodata)
+#    return
 
     # Wind load interpolation between 100 (0) and 200 (full wind load) elevation
     # Change max wind load dependent on scenario!!
@@ -112,6 +178,8 @@ def main():
     # Calculate final d0: d0_10, d0_30, d0_100, d0_300
     d0 = (d0star + wind) * slopecorr
     #d0 = 0.5    # DEBUG: d0_30 is unrealistically low.
+
+
 
     # Calculate volume per unit horizontal area (VOL_returnperiod)
     # df[VOL_vname] = df['area_m2'] / np.cos(df['Mean_Slope']*degree) * df[d0_vname]
@@ -123,8 +191,6 @@ def main():
 #    demdiff = scene_dem - lwrf_dem
 #    final_nodata = -1e30
 #    demdiff[mask_out] = final_nodata
-#
-#    # Store in GeoTIFF
-#    gdalutil.write_raster('demdiff.tif', scene_grid_info, demdiff, final_nodata)
+
 
 main()
