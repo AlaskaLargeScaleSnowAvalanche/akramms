@@ -92,6 +92,7 @@ def regrid_wrf(idir, ileaf, vname, odir, scene_name, wrf_grid_info, scene_grid_i
     return lwrf_val,nodata_value
 
 # ------------------------------------------------
+def read_slope_tif(scene_args):
 
 def main():
 
@@ -99,7 +100,7 @@ def main():
 
     # Read hi-res DEM
     print('Reading: ', scene_args['dem_file'])
-    scene_grid_info, scene_dem, dem_nodata = gdalutil.read_raster(scene_args['dem_file'])
+    gridI, demI, demI_nodata = gdalutil.read_raster(scene_args['dem_file'])
 
     # Read slope --- and regrid to larger bounds used by the DEM
     sf = slope_file(scene_args, True, 'slope.tif')
@@ -108,27 +109,27 @@ def main():
 
     slope = gdalutil.regrid(
         xslope, xslope_grid_info, slope_nodata,
-        scene_grid_info, slope_nodata,
+        gridI, slope_nodata,
         resample_algo=gdalconst.GRA_NearestNeighbour)
     xslope = None
 
     print('    slope: ', slope.shape)
-    print('scene_dem: ', scene_dem.shape)
+    print('demI: ', demI.shape)
 
     # Read regridded WRF files: DEM and sx3 (snow depth)
-    print('dem_nodata = ', dem_nodata)
+    print('demI_nodata = ', demI_nodata)
     wrf_grid_info = wrfutil.wrf_info(wrf_geo_nc)
-    lwrf_dem,lwrf_dem_nodata = regrid_wrf(
+    lwrf_dem,lwrf_demI_nodata = regrid_wrf(
         sx3_dir, 'geo_southeast.nc', 'HGT_M', '.', scene_args['name'],
-        wrf_grid_info, scene_grid_info)
+        wrf_grid_info, gridI)
     lwrf_sx3,lwrf_sx3_nodata = regrid_wrf(
         sx3_dir, 'ccsm_sx3_2010.nc', 'sx3', '.', scene_args['name'],
-        wrf_grid_info, scene_grid_info)
+        wrf_grid_info, gridI)
 
     # Figure where we are masked
     mask_out = (lwrf_sx3 == lwrf_sx3_nodata)
 
-    print('scene_dem: ', scene_dem.shape)
+    print('demI: ', demI.shape)
     print(' lwrf_dem: ', lwrf_dem.shape)
     print('      sx3: ', lwrf_sx3.shape)
 
@@ -167,7 +168,7 @@ def main():
     slopecorr = 0.219 / np.sin(mean_slope_rad) - 0.202 * np.cos(mean_slope_rad)
 
 #    # Store in GeoTIFF
-#    gdalutil.write_raster('slopecorr.tif', scene_grid_info, sx3_corrected, final_nodata)
+#    gdalutil.write_raster('slopecorr.tif', gridI, sx3_corrected, final_nodata)
 #    return
 
     # Wind load interpolation between 100 (0) and 200 (full wind load) elevation
@@ -188,7 +189,7 @@ def main():
     # --------------------------------------------------------------------------------------
 
 #    # Compute something
-#    demdiff = scene_dem - lwrf_dem
+#    demdiff = demI - lwrf_dem
 #    final_nodata = -1e30
 #    demdiff[mask_out] = final_nodata
 
