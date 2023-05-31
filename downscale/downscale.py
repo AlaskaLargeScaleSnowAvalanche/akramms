@@ -67,8 +67,8 @@ def slope_file(scene_args, forest, *args):
     return os.path.join(scene_args['scene_dir'], 'SLOPE_TIF', f'{name}{For}_{resolution}m', *args)
 
 # ------------------------------------------------
-def regrid_wrf(idir, ileaf, vname, odir, scene_name, wrf_grid_info, scene_grid_info):
-    """Regrids a WRF file"""
+def regrid_wrf(idir, ileaf, vname, odir, scene_name, wrf_grid, scene_grid):
+    """Loads and regrids a WRF file (memoized)"""
     ifname = os.path.join(idir, ileaf)
     ileaf_base = os.path.splitext(ileaf)[0]
     ofname = os.path.join(odir, f'{ileaf_base}_{scene_name}.tif')
@@ -76,7 +76,7 @@ def regrid_wrf(idir, ileaf, vname, odir, scene_name, wrf_grid_info, scene_grid_i
         print('Reading regridded file: {}'.format(ofname))
         _,lwrf_val,nodata_value = gdalutil.read_raster(ofname)
     else:
-        #wrf_grid_info = wrfutil.wrf_info(wrf_geo_nc)
+        #wrf_grid = wrfutil.wrf_info(wrf_geo_nc)
         print('Reading ', ifname, vname)
         wrf_val,nodata_value = wrfutil.read_raw(ifname, vname)
         if len(wrf_val.shape) == 3:
@@ -84,10 +84,10 @@ def regrid_wrf(idir, ileaf, vname, odir, scene_name, wrf_grid_info, scene_grid_i
 
         print(f'nodata_value({vname}) = {nodata_value}')
         lwrf_val = gdalutil.regrid(
-            wrf_val, wrf_grid_info, nodata_value,
-            scene_grid_info, nodata_value,
+            wrf_val, wrf_grid, nodata_value,
+            scene_grid, nodata_value,
             resample_algo=gdalconst.GRA_NearestNeighbour)
-        gdalutil.write_raster(ofname, scene_grid_info, lwrf_val, nodata_value)
+        gdalutil.write_raster(ofname, scene_grid, lwrf_val, nodata_value)
 
     return lwrf_val,nodata_value
 
@@ -118,23 +118,23 @@ def main():
 
     # Read regridded WRF files: DEM and sx3 (snow depth)
     print('demI_nodata = ', demI_nodata)
-    wrf_grid_info = wrfutil.wrf_info(wrf_geo_nc)
-    lwrf_dem,lwrf_demI_nodata = regrid_wrf(
+    gridA = wrfutil.wrf_info(wrf_geo_nc)
+    wrfdemI,wrfdemI_nodata = regrid_wrf(
         sx3_dir, 'geo_southeast.nc', 'HGT_M', '.', scene_args['name'],
-        wrf_grid_info, gridI)
-    lwrf_sx3,lwrf_sx3_nodata = regrid_wrf(
+        gridA, gridI)
+    sx3I,sx3I_nodata = regrid_wrf(
         sx3_dir, 'ccsm_sx3_2010.nc', 'sx3', '.', scene_args['name'],
-        wrf_grid_info, gridI)
+        gridA, gridI)
 
     # Figure where we are masked
-    mask_out = (lwrf_sx3 == lwrf_sx3_nodata)
+    mask_out = (sx3I == sx3I_nodata)
 
-    print('demI: ', demI.shape)
-    print(' lwrf_dem: ', lwrf_dem.shape)
-    print('      sx3: ', lwrf_sx3.shape)
+    print('    demI: ', demI.shape)
+    print(' wrfdemI: ', wrfdemI.shape)
+    print('    sx3I: ', sx3I.shape)
 
-    sx3 = lwrf_sx3
-    dem = lwrf_dem
+    sx3 = sx3I
+    dem = wrfdemI
 
     # ---------------------------------------------------------------------
 
@@ -174,7 +174,7 @@ def main():
     # Wind load interpolation between 100 (0) and 200 (full wind load) elevation
     # Change max wind load dependent on scenario!!
     # TODO: Discuss with Gabe, how we do the wind load.
-    wind = np.clip((dem - 1000.) * .0001, 0., 0.1)
+    wind = np.clip((wrfdemI - 1000.) * .0001, 0., 0.1)
 
     # Calculate final d0: d0_10, d0_30, d0_100, d0_300
     d0 = (d0star + wind) * slopecorr
