@@ -32,6 +32,12 @@ d8graph_mod = Extension('d8graph',
     extra_compile_args=['-std=c++17']
 )
 
+_smoother_mod = Extension('_smoother',
+    sources=['akramms/raster.cpp', 'akramms/smoother.cpp'],
+    include_dirs=[numpy.get_include(), '.'],
+    extra_compile_args=['-std=c++17']
+)
+
 setup(name = 'akramms',
         description='Alaska Large Scale Avalanche Simulations',
-        ext_modules = [d8graph_mod])
+        ext_modules = [d8graph_mod, _smoother_mod])
