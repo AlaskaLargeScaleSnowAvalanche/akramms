@@ -1,104 +1,103 @@
 #include <icebin/smoother.hpp>
+#include <akramms/ulam.hpp>
 
 static char module_docstring[] = 
 "3D Elevation-Aware Gaussian Smoother";
 
 namespace icebin {
 
-Smoother::~Smoother() {}
 
-// ---------------------------------------------------------
-Smoother::Smoother(std::vector<Smoother::Tuple> &&_tuples,
-    std::array<double,3> const &_sigma) :
-    nsigma(2.),
-    nsigma_squared(nsigma*nsigma),
-    sigma(_sigma),
-    tuples(std::move(_tuples))
+/** Computes 1D index offsets of cells within a certain radius of a
+    central cell on a regular grid. */
+std::vector<std::tuple<std::array<int,2>, double>> oval_offsets(
+    RasterInfo const &gridI,
+    double const limit)        // How far in x/y space to go
 {
-    // Create an RTree and insert our tuples into it
-    for (auto t(tuples.begin()); t != tuples.end(); ++t) {
-        rtree.Insert(&t->centroid[0], &t->centroid[0], &*t);
-    }
-}
-// -----------------------------------------------------------
-/** Inner loop for Smoother::matrix() */
-bool Smoother::matrix_callback(Smoother::Tuple const *t)
-{
-    // t0 = point from outer loop
-    // t = point from innter loop
+    double const limit2 = limit*limit;
+    // Determine how far out on the Ulam spiral we need to go for the
+    // template for 3sigma
+    int sigma_i = int(std::ceil(limit/gridI.dx))
+    int sigma_j = int(std::ceil(limit/gridI.dy))
+    sigma_n = std::max({    // Maximum Ulam index of anything in 2sigma range
+        ulam_xy_to_n(sigma_i,0),
+        ulam_xy_to_n(-sigma_i,0),
+        ulam_xy_to_n(0,sigma_j),
+        ulam_xy_to_n(0,-sigma_j)});
 
-    // Compute a scaled distance metric, based on the radius in each direction
-    double norm_distance_squared = 0;
-    for (int i=0; i<3; ++i) {
-        double const d = (t->centroid[i] - t0->centroid[i]) / sigma[i];
-        norm_distance_squared += d*d;
-    }
+    // Generate Gaussian template
+    // Pre-compute x^2 + y^2; later add z^2 to compute distance betwen two gridcells in 3-space
+    std::vector<std::tuple<std::array<int,2>, double>> offsets;
+    for (int n=0; n<=sigma_n; ++n) {
+        auto ij = ulam_n_to_xy(n);
+        double const ii = ij[0];
+        double const jj = ij[1];
+        double const x = ii * gridI.dx;
+        double const y = jj * gridI.dy;
+        double xydist2 = x*x + y*y;
 
-    if (norm_distance_squared < nsigma_squared) {
-        double const gaussian_ij = std::exp(-.5 * norm_distance_squared);
-        double w = gaussian_ij * t->area;
-        M_raw.push_back(std::make_pair(t->iX_d, w));
-        denom_sum += w;
-    }
-    return true;
-}
-
-void Smoother::matrix(std::vector<int> &js, std::vector<int> &is, std::vector<double> &vals)
-{
-    using namespace std::placeholders;  // for _1, _2, _3...
-
-    RTree::Callback callback(std::bind(&Smoother::matrix_callback, this, _1));
-    for (auto _t0(tuples.begin()); _t0 != tuples.end(); ++_t0) {
-        t0 = &*_t0;
-        M_raw.clear();
-        denom_sum = 0;
-
-        // Pair t0 with nearby points
-        std::array<double,3> min, max;
-        for (int i=0; i<3; ++i) {
-            min[i] = t0->centroid[i] - nsigma*sigma[i];
-            max[i] = t0->centroid[i] + nsigma*sigma[i];
-        }
-        rtree.Search(min, max, callback);
-
-        // Add to the final matrix
-        double factor = 1. / denom_sum;
-        for (auto ii=M_raw.begin(); ii != M_raw.end(); ++ii) {
-            iis.push_back(t0->iX_d);
-            jjs.push_back(ii->first);
-            vals.push_back(factor * ii->second);
-            // ret.add({t0->iX_d, ii->first}, factor * ii->second);
+        // If it's within 2-sigma in the xy plan, it MIGHT also be within 2-sigma in 3-space
+        if (xydist2 <= limit2) {
+            offsets.push_back(std::make_tuple(ij, xydist2));
         }
     }
+
+    return offsets;
 }
-// -----------------------------------------------------------
-void _smoother_matrix_RasterInfo(
+
+
+void _smoother_smooth(
     RasterInfo const &gridI,
     double const *elev_s,    // 1D array of elevations: elev_s[jj,ii]
-    std::array<double,3> const &sigma,
+    std::array<double,3> const &sigma,    // [x, y, z]
+    double const *inI,        // Input value on I grid inI[jj, ii]
     // OUTPUT
-    std::vector<int> &js,
-    std::vector<int> &is,
-    std::vector<double> &vals)
+    double *outI)            // Store output value on I grid HERE outI[jj,ii]
 {
-    std::vector<Smoother::Tuple> tuples;
+    // Index offsets to gridcells to consider
+    auto offsets(oval_offsets(gridI, 2.*sigma));
+
+    // Loop through destination cells
     double const area = gridI.dx * gridI.dy;
 
-    for (int jj=0; jj<gridI.ny; ++jj)
-    for (int ii=0; ii<gridI.nx; ++ii) {
-        int iX_s = jj * gridI.nx + ii;
+    for (int j1=0; j1<gridI.ny; ++j1)
+    for (int i1=0; i1<gridI.nx; ++i1) {
+        int const ix1 = j1 * gridI.nx + i1;    // ix1 = destination gridcell
+        double const elev1 = elev_s[ix1];
+        if (std::isnan(elev1)) continue;
 
-        // Ignore masked-out gridcells (in case dimX (dimI) includes all ice gridcells)
-        double const elev(elev_s(iX_s));
-        if (std::isnan(elev)) continue;
+        double sum = 0;
+        int n = 0;
+        for (auto &off : offsets_ix) {
+            int const deltai = std::get<0>(off)[0];
+            int const deltaj = std::get<0>(off)[1];
+            double const xydist2 = std::get<1>(off);
 
-        //auto iX_d(dimX.to_dense(iX_s));
+            // Find a valid point in the template
+            int const i0 = i1 + deltai;
+            if ((i0 < 0) || (i0 > gridI.nx)) continue;
+            int const j0 = j1 + deltaj;
+            if ((j0 < 0) || (j0 > gridI.ny)) continue;
+            ix0 = i0 * gridI.nx + j1;
+            double const elev0 = elev_s[ix0];
+            if (std::isnan(elev0)) continue;
 
-        tuples.push_back(Smoother::Tuple(iX_s, gridI.to_xy(ii, jj), elev, area));
+            // Determine distance for Gaussian function
+            // offsets_ij[0]*offsets_ij[0] + offsets_ij[1]*offsets_ij[1] + ...
+            double const delta_elev = (elev1 - elev0);
+            double const xyzdist2 = xydist2[ix0] + delta_elev * delta_elev;
+
+            // Add to accumulator
+            sum += inI[ix0] * std::exp(-.5 * xyzdist2);
+            ++n;
+        }
+
+        // Compute final weight for the smoothing matrix entry: (ix1, ix0)
+        outI[ix1] = sum / (double)n;
     }
-    Smoother smoother(std::move(tuples), sigma);
-    smoother.matrix(js, is, vals);
 }
+
+
+
 } // namespace
 // =====================================================================
 // Python Interface
