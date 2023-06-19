@@ -2,6 +2,9 @@
 #ifndef AKRAMMS_RASTER_HPP
 #define AKRAMMS_RASTER_HPP
 
+#include <string>
+#include <array>
+
 namespace akramms {
 
 class RasterInfo {
@@ -33,8 +36,9 @@ public:
         std::array<double, 6> const &GT(this->geoinv);
         int ir = GT[0] + x*GT[1] + y*GT[2];
         int jr = GT[3] + x*GT[4] + y*GT[5];
-        return std::array<double,2> {ir, jr};
+        return std::array<int,2> {ir, jr};
     }
 };
 
 }    // namespace
+#endif

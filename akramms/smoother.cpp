@@ -1,10 +1,18 @@
-#include <icebin/smoother.hpp>
+#include <Python.h>
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include <numpy/arrayobject.h>
+//#include "structmember.h"    // Map C struct members to Python attributes
+
+#include <vector>
+
+//#include <akramms/smoother.hpp>
 #include <akramms/ulam.hpp>
+#include <akramms/raster.hpp>
 
 static char module_docstring[] = 
 "3D Elevation-Aware Gaussian Smoother";
 
-namespace icebin {
+namespace akramms {
 
 
 /** Computes 1D index offsets of cells within a certain radius of a
@@ -16,9 +24,9 @@ std::vector<std::tuple<std::array<int,2>, double>> oval_offsets(
     double const limit2 = limit*limit;
     // Determine how far out on the Ulam spiral we need to go for the
     // template for 3sigma
-    int sigma_i = int(std::ceil(limit/gridI.dx))
-    int sigma_j = int(std::ceil(limit/gridI.dy))
-    sigma_n = std::max({    // Maximum Ulam index of anything in 2sigma range
+    int sigma_i = std::ceil(limit/gridI.dx);
+    int sigma_j = std::ceil(limit/gridI.dy);
+    int sigma_n = std::max({    // Maximum Ulam index of anything in 2sigma range
         ulam_xy_to_n(sigma_i,0),
         ulam_xy_to_n(-sigma_i,0),
         ulam_xy_to_n(0,sigma_j),
@@ -47,27 +55,27 @@ std::vector<std::tuple<std::array<int,2>, double>> oval_offsets(
 
 void _smoother_smooth(
     RasterInfo const &gridI,
-    double const *elev_s,    // 1D array of elevations: elev_s[jj,ii]
+    double const *elev,    // 1D array of elevations: elev[jj,ii]; nan for unused gridcells
     std::array<double,3> const &sigma,    // [x, y, z]
     double const *inI,        // Input value on I grid inI[jj, ii]
     // OUTPUT
     double *outI)            // Store output value on I grid HERE outI[jj,ii]
 {
     // Index offsets to gridcells to consider
-    auto offsets(oval_offsets(gridI, 2.*sigma));
+    auto offsets(oval_offsets(gridI, 2.*std::max(sigma[0], sigma[1])));
 
     // Loop through destination cells
-    double const area = gridI.dx * gridI.dy;
+    //double const area = gridI.dx * gridI.dy;
 
     for (int j1=0; j1<gridI.ny; ++j1)
     for (int i1=0; i1<gridI.nx; ++i1) {
         int const ix1 = j1 * gridI.nx + i1;    // ix1 = destination gridcell
-        double const elev1 = elev_s[ix1];
+        double const elev1 = elev[ix1];
         if (std::isnan(elev1)) continue;
 
         double sum = 0;
         int n = 0;
-        for (auto &off : offsets_ix) {
+        for (auto &off : offsets) {
             int const deltai = std::get<0>(off)[0];
             int const deltaj = std::get<0>(off)[1];
             double const xydist2 = std::get<1>(off);
@@ -77,17 +85,17 @@ void _smoother_smooth(
             if ((i0 < 0) || (i0 > gridI.nx)) continue;
             int const j0 = j1 + deltaj;
             if ((j0 < 0) || (j0 > gridI.ny)) continue;
-            ix0 = i0 * gridI.nx + j1;
-            double const elev0 = elev_s[ix0];
+            int const ix0 = i0 * gridI.nx + j1;
+            double const elev0 = elev[ix0];
             if (std::isnan(elev0)) continue;
 
             // Determine distance for Gaussian function
             // offsets_ij[0]*offsets_ij[0] + offsets_ij[1]*offsets_ij[1] + ...
             double const delta_elev = (elev1 - elev0);
-            double const xyzdist2 = xydist2[ix0] + delta_elev * delta_elev;
+            double const xyzdist2 = xydist2 + delta_elev * delta_elev;
 
             // Add to accumulator
-            sum += inI[ix0] * std::exp(-.5 * xyzdist2);
+            sum += inI[ix0] * std::exp(-.5 * xyzdist2);    // Gaussian
             ++n;
         }
 
@@ -104,7 +112,8 @@ void _smoother_smooth(
 
 using namespace akramms;
 
-// ----------------------------------------------------------------------------------------
+// -----------------------------------------------------------------
+#if 0
 /** Simple allocation of 1D Numpy array
 shape0:
     Length of array
@@ -124,129 +133,132 @@ static PyArrayObject *np_new_1d(npy_intp shape0, int typenum)
         // PyArray_FLAGS(dem), ...
         NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED, NULL);
 }
+#endif
 // ---------------------------------------------------------
-static char const *smoother_matrix_docstring =
-R"SMoother Matrix Docstring
-";
-static PyObject *smoother_matrix(PyObject *module, PyObject *args, PyObject *kwargs)
+static bool check_array(PyArrayObject *_arr, std::string const &name, int const nxy)
 {
     char msg[256];    // Error message
 
-    int nx, ny;
-    PyObject *_geotransform;    // Geotransform
-    PyArrayObject *_elev;
-    PyObject *_sigma;
-
-    // Parse args and kwargs
-    static char const *kwlist[] = {NULL};
-    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "iiOO!O|",
-        (char **)kwlist,
-        &PyArray_Type, &dem_filled,
-        &dem_nodata,
-        //&PyArray_Type, &neighbor1,
-        &_geotransform,
-        &PyArray_Type, &_elev,
-        &_sigma
-        )) return NULL;
-
-    // -------------------------- Convert Args to C++
-    // ----- geotransform
-    std::array<double, 6> geotransform;
-    if PySequence_Length(_geotransform) != 6 {
-        PyErr_SetString(PyExc_TypeError, "geotransform must have length 6");
-        return NULL;
-    }
-    for (int i=0; i<6; ++i) {
-        PyObject *ele = PySequence_GetItem(_geotransform, i);
-        geotransform[i] = PyFloat_AsDouble(ele);
-        Py_DECREF(ele);
-    }
-
-    // ----- gridI
-    RasterInfo const gridI("", nx, ny, geotransform);
-    int nxy = gridI.nx * gridI.ny;
-
-    // ----- elev
-    double const *elev;
-
     // Check storage
-    if (!PyArray_ISCARRAY_RO(_elev)) {
-        snprintf(msg, 256, "Parameter elev must be C-style, contiguous array.");
+    if (!PyArray_ISCARRAY_RO(_arr)) {
+        snprintf(msg, 256, "Parameter %s must be C-style, contiguous array.", name.c_str());
         PyErr_SetString(PyExc_TypeError, msg);
-        return NULL;
+        return false;
     }
 
     // Check type
-    if (PyArray_DESCR(_elev)->type_num != NPY_DOUBLE) {
-        snprintf(msg, 256, "Parameter elev must have dtype double.");
+    if (PyArray_DESCR(_arr)->type_num != NPY_DOUBLE) {
+        snprintf(msg, 256, "Parameter %s must have dtype double.", name.c_str());
         PyErr_SetString(PyExc_TypeError, msg);
         return false;
     }
 
     // Check total number of elements (we will flatten to 1D in C++)
-    if (PyArray_SIZE(_elev) != nxy) {
-        snprintf(msg, 256, "Parameter elev must have %d elements.", nxy);
+    if (PyArray_SIZE(_arr) != nxy) {
+        snprintf(msg, 256, "Parameter %s must have %d elements.", name.c_str(), nxy);
         PyErr_SetString(PyExc_TypeError, msg);
         return false;
     }
 
+    return true;
+
+}
+// ---------------------------------------------------------
+bool check_sequence(PyObject *_seq, std::string const &name, int len)
+{
+    char msg[256];    // Error message
+    if (PySequence_Length(_seq) != len) {
+        snprintf(msg, 256, "%s must have length %d", name.c_str(), len);
+        PyErr_SetString(PyExc_TypeError, msg);
+
+        return false;
+    }
+    return true;
+}
+
+
+template<int len>
+std::array<double, len> fixed_sequence(PyObject *_seq)
+{
+    std::array<double, len> arr;
+    for (int i=0; i<len; ++i) {
+        PyObject *ele = PySequence_GetItem(_seq, i);
+        arr[i] = PyFloat_AsDouble(ele);
+        Py_DECREF(ele);
+    }
+    return arr;
+}
+// ---------------------------------------------------------
+static char const *smoother_smooth_docstring =
+R"(SMoother Function Docstring
+)";
+static PyObject *smoother_smooth(PyObject *module, PyObject *args, PyObject *kwargs)
+{
+    int nx, ny;
+    PyObject *_geotransform;    // Geotransform
+    PyArrayObject *_elev;
+    PyObject *_sigma;
+    PyArrayObject *_inI;
+
+    // Parse args and kwargs
+    static char const *kwlist[] = {NULL};
+    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "iiOO!OO!|",
+        (char **)kwlist,
+        &nx, &ny,
+        &_geotransform,
+        &PyArray_Type, &_elev,
+        &_sigma,
+        &PyArray_Type, &_inI
+        )) return NULL;
+
+    // -------------------------- Convert Args to C++
+    // ----- geotransform
+    if (!check_sequence(_geotransform, "geotransform", 6)) return NULL;
+    std::array<double,6> const geotransform(fixed_sequence<6>(_geotransform));
+
+    // ----- gridI
+    RasterInfo const gridI("", nx, ny, geotransform);
+    int const nxy = gridI.nx * gridI.ny;
+
+    // ----- elev
+    if (!check_array(_elev, "elev", nxy)) return NULL;
     double const * const elev((double *)PyArray_DATA(_elev));
 
     // ----- sigma
-    std::array<double, 3> sigma;
-    if PySequence_Length(_sigma) != 3 {
-        PyErr_SetString(PyExc_TypeError, "sigma must have length 3");
-        return NULL;
-    }
-    for (int i=0; i<6; ++i) {
-        PyObject *ele = PySequence_GetItem(_sigma, i);
-        sigma[i] = PyFloat_AsDouble(ele);
-        Py_DECREF(ele);
-    }
+    if (!check_sequence(_sigma, "sigma", 3)) return NULL;
+    std::array<double,3> const sigma(fixed_sequence<3>(_sigma));
+
+    // ----- inI
+    if (!check_array(_inI, "inI", nxy)) return NULL;
+    double const * const inI((double *)PyArray_DATA(_inI));
 
     // ------------------------------------------------------------------------
     // Run it
-    std::vector<int> _js;
-    std::vector<int> _is;
-    std::vector<double> _vals;
-    _smoother_matrix_RasterInfo(gridI, elev, sigma, _js, _is, _vals);
+    PyArrayObject *_outI = (PyArrayObject *)PyArray_NewLikeArray(_inI, NPY_KEEPORDER, NULL, 0);
+    double * const outI((double *)PyArray_DATA(_outI));
+    _smoother_smooth(gridI, elev, sigma, inI, outI);
 
     // ------------------------------------------------------------------------
-    // Convert results to Python
-    PyArrayObject *is = np_new_1d((npy_intp)_is.size(), NPY_INT32);
-    PyArrayObject *js = np_new_1d((npy_intp)_js.size(), NPY_INT32);
-    PyArrayObject *vals = np_new_1d((npy_intp)_vals.size(), NPY_FLOAT);
-    int *is0 = PyArray_DATA(is);
-    int *js0 = PyArray_DATA(js);
-    int *vals0 = PyArray_DATA(vals);
-    for (size_t i=0; i<_vals.size(); ++i) {
-        is0[i] = _is[i];
-        js0[i] = _js[i];
-        vals0[i] = _vals[i];
-    }
-
-    // return (vals, (is, js)) for scipy.sparse.coo_matrix()
-    return PyTuple_Pack(2, vals0,
-        PyTubple_Pack(2, is0, js0));
-
+    // Return created array
+    return (PyObject *)_outI;
 }
 
 // ============================================================
 // Random other Python C Extension Stuff
 static PyMethodDef SmootherMethods[] = {
     {"matrix",
-        (PyCFunction)smoother_matrix,
-        METH_VARARGS | METH_KEYWORDS, smoother_matrix_docstring},
+        (PyCFunction)smoother_smooth,
+        METH_VARARGS | METH_KEYWORDS, smoother_smooth_docstring},
 
     // Sentinel
     {NULL, NULL, 0, NULL}
 };
 
 
-/* This initiates the module using the abo🙃ve definitions. */
+/* This initiates the module using the above definitions. */
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
-    "_smoother",    // Name of module
+    "smoother",    // Name of module
     module_docstring,    // Per-module docstring
     -1,  /* size of per-interpreter state of the module,
                  or -1 if the module keeps state in global variables. */

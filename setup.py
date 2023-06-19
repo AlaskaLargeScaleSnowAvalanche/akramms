@@ -32,7 +32,7 @@ d8graph_mod = Extension('d8graph',
     extra_compile_args=['-std=c++17']
 )
 
-_smoother_mod = Extension('_smoother',
+_smoother_mod = Extension('smoother',
     sources=['akramms/raster.cpp', 'akramms/smoother.cpp'],
     include_dirs=[numpy.get_include(), '.'],
     extra_compile_args=['-std=c++17']

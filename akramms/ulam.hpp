@@ -1,6 +1,7 @@
 #ifndef ULAM_HPP
 #define ULAM_HPP
 
+#include <array>
 #include <cmath>
 
 namespace akramms {

@@ -2,8 +2,8 @@
 #define ICEBIN_SMOOTHER_HPP
 
 #include <cmath>
-#include <akramms/RTree.hpp>
-#include <akramms.raster.hpp>
+//#include <akramms/RTree.hpp>
+#include <akramms/raster.hpp>
 
 namespace akramms {
 
@@ -110,7 +110,6 @@ public:
         different elevation classes.
 */
 extern void void smoothing_matrix(
-    TupleListT<2> &ret_d,
     RasterInfo const &gridI,
     double const *elev_s,    // 1D array of elevations: elev_s[jj,ii]
     double const *area_s,    // 1D array of cell areas: area_s[jj,ii]

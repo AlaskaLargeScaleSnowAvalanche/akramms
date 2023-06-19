@@ -40,7 +40,7 @@ inline std::array<double, 6> invert_geotransform(std::array<double, 6> const &gt
                                       std::max(std::fabs(gt_in[4]), std::fabs(gt_in[5])));
 
     if (std::fabs(det) <= 1e-10 * magnitude * magnitude)
-        throw runtime_error("invert_geotransform(): zero determinate\n");
+        throw std::runtime_error("invert_geotransform(): zero determinate\n");
 
     const double inv_det = 1.0 / det;
 
