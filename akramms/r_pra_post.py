@@ -199,12 +199,15 @@ def rule(scene_dir, dem_filled_file, return_period, forest,
 # If PRA is above DEM gridcell then must inflate reanalysis snow volume.  If PRA is below DEM, then defalte it.
         # def['Mean_DEM'] is mean elevation of the PRA
 
-        gradient_snowdepth_si_units = .01 * scene_args['gradient_snowdepth'] # gradient_snowdepth parameter is in m/100m, translate to unitless
+# No lapse rate or smoothing for now
+#        gradient_snowdepth_si_units = .01 * scene_args['gradient_snowdepth'] # gradient_snowdepth parameter is in m/100m, translate to unitless
+#
+#        snowdepth_correction = \
+#            (df['Mean_DEM'] - scene_args['reference_elevation']) \
+#            * gradient_snowdepth_si_units
+#        sx3_corrected = (df['sx3'] + snowdepth_correction)
+        sx3_corrected = df['sx3']
 
-        snowdepth_correction = \
-            (df['Mean_DEM'] - scene_args['reference_elevation']) \
-            * gradient_snowdepth_si_units
-        sx3_corrected = (df['sx3'] + snowdepth_correction)
         # TODO: Why are we multiplying by cos(28) = .883?
 
         # Very old rule developed 30-40 years ago: the steeper the
@@ -230,12 +233,13 @@ def rule(scene_dir, dem_filled_file, return_period, forest,
         # Wind load interpolation between 100 (0) and 200 (full wind load) elevation
         # Change max wind load dependent on scenario!!
         # TODO: Discuss with Gabe, how we do the wind load.
-        df['Wind'] = np.clip((df['Mean_DEM'] - 1000.) * .0001, 0., 0.1)
+#        df['Wind'] = np.clip((df['Mean_DEM'] - 1000.) * .0001, 0., 0.1)
+        df['Wind'] = 0    # Wind loading doesn't make sense without downscaling.
 
         # Calculate final d0: d0_10, d0_30, d0_100, d0_300
         d0_vname = f'd0_{return_period}'
         df[d0_vname] = ((df['d0star'] + df['Wind']) * df['slopecorr'])
-        df[d0_vname] = 0.5    # DEBUG: d0_30 is unrealistically low.
+#        df[d0_vname] = 0.5    # DEBUG: d0_30 is unrealistically low.
 
         # Calculate volume (VOL_returnperiod)
         VOL_vname = f'VOL_{return_period}'
