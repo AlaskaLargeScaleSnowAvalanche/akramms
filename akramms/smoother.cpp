@@ -3,11 +3,12 @@
 #include <numpy/arrayobject.h>
 //#include "structmember.h"    // Map C struct members to Python attributes
 
+#include <string>
 #include <vector>
 
 //#include <akramms/smoother.hpp>
 #include <akramms/ulam.hpp>
-#include <akramms/raster.hpp>
+//#include <akramms/raster.hpp>
 
 static char module_docstring[] = 
 "3D Elevation-Aware Gaussian Smoother";
@@ -18,14 +19,15 @@ namespace akramms {
 /** Computes 1D index offsets of cells within a certain radius of a
     central cell on a regular grid. */
 std::vector<std::tuple<std::array<int,2>, double>> oval_offsets(
-    RasterInfo const &gridI,
+    double const dx, double const dy,
+    //RasterInfo const &gridI,
     double const limit)        // How far in x/y space to go
 {
     double const limit2 = limit*limit;
     // Determine how far out on the Ulam spiral we need to go for the
     // template for 3sigma
-    int sigma_i = std::ceil(limit/gridI.dx);
-    int sigma_j = std::ceil(limit/gridI.dy);
+    int sigma_i = std::ceil(limit/dx);
+    int sigma_j = std::ceil(limit/dy);
     int sigma_n = std::max({    // Maximum Ulam index of anything in 2sigma range
         ulam_xy_to_n(sigma_i,0),
         ulam_xy_to_n(-sigma_i,0),
@@ -39,12 +41,13 @@ std::vector<std::tuple<std::array<int,2>, double>> oval_offsets(
         auto ij = ulam_n_to_xy(n);
         double const ii = ij[0];
         double const jj = ij[1];
-        double const x = ii * gridI.dx;
-        double const y = jj * gridI.dy;
+        double const x = ii * dx;
+        double const y = jj * dy;
         double xydist2 = x*x + y*y;
 
         // If it's within 2-sigma in the xy plan, it MIGHT also be within 2-sigma in 3-space
         if (xydist2 <= limit2) {
+//            printf("off %d (%d, %d) -> %g\n", n, ij[0], ij[1], xydist2);
             offsets.push_back(std::make_tuple(ij, xydist2));
         }
     }
@@ -54,27 +57,37 @@ std::vector<std::tuple<std::array<int,2>, double>> oval_offsets(
 
 
 void _smoother_smooth(
-    RasterInfo const &gridI,
+    int const nx, int const ny,
+    double const dx, double const dy,
+    // RasterInfo const &gridI,
     double const *elev,    // 1D array of elevations: elev[jj,ii]; nan for unused gridcells
     std::array<double,3> const &sigma,    // [x, y, z]
     double const *inI,        // Input value on I grid inI[jj, ii]
     // OUTPUT
     double *outI)            // Store output value on I grid HERE outI[jj,ii]
 {
+    // How far out in Gaussian to go out
+    double const nsigma = 2.;    // 2 \sigma in standardized Gaussian
+    double const nsigma_squared = nsigma*nsigma;
+
     // Index offsets to gridcells to consider
-    auto offsets(oval_offsets(gridI, 2.*std::max(sigma[0], sigma[1])));
+    auto offsets(oval_offsets(dx, dy, 2.*std::max(sigma[0], sigma[1])));
 
     // Loop through destination cells
-    //double const area = gridI.dx * gridI.dy;
+    //double const area = dx * dy;
 
-    for (int j1=0; j1<gridI.ny; ++j1)
-    for (int i1=0; i1<gridI.nx; ++i1) {
-        int const ix1 = j1 * gridI.nx + i1;    // ix1 = destination gridcell
+    double const by_sigma0 = 1. / sigma[0];
+    double const by_sigma1 = 1. / sigma[1];
+    double const by_sigma2 = 1. / sigma[2];
+
+    for (int j1=0; j1<ny; ++j1)
+    for (int i1=0; i1<nx; ++i1) {
+        int const ix1 = j1 * nx + i1;    // ix1 = destination gridcell
         double const elev1 = elev[ix1];
         if (std::isnan(elev1)) continue;
 
         double sum = 0;
-        int n = 0;
+        double sum_weights = 0;
         for (auto &off : offsets) {
             int const deltai = std::get<0>(off)[0];
             int const deltaj = std::get<0>(off)[1];
@@ -82,25 +95,41 @@ void _smoother_smooth(
 
             // Find a valid point in the template
             int const i0 = i1 + deltai;
-            if ((i0 < 0) || (i0 > gridI.nx)) continue;
+            if ((i0 < 0) || (i0 > nx)) continue;
             int const j0 = j1 + deltaj;
-            if ((j0 < 0) || (j0 > gridI.ny)) continue;
-            int const ix0 = i0 * gridI.nx + j1;
+            if ((j0 < 0) || (j0 > ny)) continue;
+            int const ix0 = j0 * nx + i0;
             double const elev0 = elev[ix0];
             if (std::isnan(elev0)) continue;
 
-            // Determine distance for Gaussian function
-            // offsets_ij[0]*offsets_ij[0] + offsets_ij[1]*offsets_ij[1] + ...
-            double const delta_elev = (elev1 - elev0);
-            double const xyzdist2 = xydist2 + delta_elev * delta_elev;
+
+            // Compute a scaled distance metric, based on the radius
+            // in each direction
+            double const d0 = deltai * dx * by_sigma0;
+            double const d1 = deltaj * dy * by_sigma1;
+            double const d2 = (elev1 - elev0) * by_sigma2;
+            double const norm_distance_squared = d0*d0 + d1*d1 + d2*d2;
+
+            // Make sure we are within range of the scaled Gaussian
+            if (norm_distance_squared > nsigma_squared) continue;
+
+#if 0
+            // Compute the Gaussian independently in each dimension
+            // and multiply to gether.  (Gaussian with diagonal
+            // covariance matrix) No need to normalize because we do
+            // that empirically
+            // https://cs229.stanford.edu/section/gaussians.pdf
+#endif   
 
             // Add to accumulator
-            sum += inI[ix0] * std::exp(-.5 * xyzdist2);    // Gaussian
-            ++n;
+            double const weight = std::exp(-.5 * norm_distance_squared);    // Gaussian
+//            printf("%d += %g * %d\n", ix1, weight, ix0-ix1);
+            sum += inI[ix0] * weight;
+            sum_weights += weight;
         }
 
         // Compute final weight for the smoothing matrix entry: (ix1, ix0)
-        outI[ix1] = sum / (double)n;
+        outI[ix1] = sum / sum_weights;
     }
 }
 
@@ -195,17 +224,23 @@ R"(SMoother Function Docstring
 static PyObject *smoother_smooth(PyObject *module, PyObject *args, PyObject *kwargs)
 {
     int nx, ny;
-    PyObject *_geotransform;    // Geotransform
+    double dx, dy;
+    //PyObject *_geotransform;    // Geotransform
     PyArrayObject *_elev;
     PyObject *_sigma;
     PyArrayObject *_inI;
 
     // Parse args and kwargs
-    static char const *kwlist[] = {NULL};
-    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "iiOO!OO!|",
+    static char const *kwlist[] = {
+        // *args
+        "nx", "ny", "dx", "dy", "elev", "sigma", "inI",
+        // **kwargs
+        NULL};
+    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "iiddO!OO!|",
         (char **)kwlist,
         &nx, &ny,
-        &_geotransform,
+        &dx, &dy,
+        // &_geotransform,
         &PyArray_Type, &_elev,
         &_sigma,
         &PyArray_Type, &_inI
@@ -213,12 +248,12 @@ static PyObject *smoother_smooth(PyObject *module, PyObject *args, PyObject *kwa
 
     // -------------------------- Convert Args to C++
     // ----- geotransform
-    if (!check_sequence(_geotransform, "geotransform", 6)) return NULL;
-    std::array<double,6> const geotransform(fixed_sequence<6>(_geotransform));
+    //if (!check_sequence(_geotransform, "geotransform", 6)) return NULL;
+    //std::array<double,6> const geotransform(fixed_sequence<6>(_geotransform));
 
     // ----- gridI
-    RasterInfo const gridI("", nx, ny, geotransform);
-    int const nxy = gridI.nx * gridI.ny;
+    //RasterInfo const gridI("", nx, ny, geotransform);
+    int const nxy = nx * ny;
 
     // ----- elev
     if (!check_array(_elev, "elev", nxy)) return NULL;
@@ -236,7 +271,7 @@ static PyObject *smoother_smooth(PyObject *module, PyObject *args, PyObject *kwa
     // Run it
     PyArrayObject *_outI = (PyArrayObject *)PyArray_NewLikeArray(_inI, NPY_KEEPORDER, NULL, 0);
     double * const outI((double *)PyArray_DATA(_outI));
-    _smoother_smooth(gridI, elev, sigma, inI, outI);
+    _smoother_smooth(nx, ny, dx, dy, elev, sigma, inI, outI);
 
     // ------------------------------------------------------------------------
     // Return created array
@@ -246,7 +281,7 @@ static PyObject *smoother_smooth(PyObject *module, PyObject *args, PyObject *kwa
 // ============================================================
 // Random other Python C Extension Stuff
 static PyMethodDef SmootherMethods[] = {
-    {"matrix",
+    {"smooth",
         (PyCFunction)smoother_smooth,
         METH_VARARGS | METH_KEYWORDS, smoother_smooth_docstring},
 
