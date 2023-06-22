@@ -26,6 +26,33 @@ def subcommand(args=[], parent=subparsers):
         parser.set_defaults(func=func)
     return decorator
 # ------------------------------------------------------------------------
+# Files and folders to copy from one scene to jumpstart the next.
+_init_files = [
+    'stats_kernel.txt',
+    'crs.prj',
+    'data_prep_PRA_args.pik',
+    'juneau1_DataPrep_InputParameters.csv',
+    'Juneau_IFSAR_DTM_AKAlbers_EPSG_3338_sinks.tif',
+    'Juneau_IFSAR_DTM_AKAlbers_EPSG_3338_neighbor1.tif',
+    'Juneau_IFSAR_DTM_AKAlbers_EPSG_3338_filled.tif',
+    'eCog',
+    r'PRA_frequent\info',
+    'PRA_frequent',
+    'scene.nc',
+    'status.txt']
+
+@subcommand([
+    argument('dir0', help='Source run dir'),
+    argument('dir1', help='Destination run dir')])
+def initcopy(args):
+    """Runs a single RAMMS avalanche on the local machine, via Docker"""
+    from uafgi.util import ioutil
+
+    dir0 = os.path.abspath(args.dir0)
+    dir1 = os.path.abspath(argis.dir1)
+    ioutil.sync_files(dir0, fnames, dir1)
+
+# ------------------------------------------------------------------------
 
 @subcommand([argument('ramms', help='RAMMS directory or release file to inspect')])
 def ps(args):
