@@ -27,6 +27,7 @@ def subcommand(args=[], parent=subparsers):
     return decorator
 # ------------------------------------------------------------------------
 # Files and folders to copy from one scene to jumpstart the next.
+# TODO: Make this work for general scenes
 _init_files = [
     'stats_kernel.txt',
     'crs.prj',
@@ -49,8 +50,8 @@ def initcopy(args):
     from uafgi.util import ioutil
 
     dir0 = os.path.abspath(args.dir0)
-    dir1 = os.path.abspath(argis.dir1)
-    ioutil.sync_files(dir0, fnames, dir1)
+    dir1 = os.path.abspath(args.dir1)
+    ioutil.sync_files(dir0, _init_files, dir1)
 
 # ------------------------------------------------------------------------
 

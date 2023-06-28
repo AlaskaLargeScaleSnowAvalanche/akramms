@@ -1,6 +1,6 @@
 from uafgi.util import make,shputil
 from akramms import config,params,process_tree
-from akramms import r_prepare, r_ecog, r_pra_post, r_domain_builder, r_ramms
+from akramms import r_prepare, r_ecog, r_pra_post, r_domain_builder, r_ramms, r_snow
 from akramms.util import paramutil,harnutil,rammsutil
 import os,sys
 import setuptools.sandbox
@@ -9,6 +9,10 @@ import pandas as pd
 def add_stage0_rules(makefile, scene_dir):
 
     scene_args = params.load(scene_dir)
+
+    # Create snow input file on the scene grid
+    snow_input = makefile.add(r_snow.select_sx3_rule(
+        scene_dir, scene_dir['snowdepth_file'], scene_dir['snowdepth_geo'])).outputs[0]
 
     # Run ArcGIS script to prepare files for eCognition
     prepare_outputs = makefile.add(r_prepare.rule(scene_dir)).outputs
@@ -37,7 +41,7 @@ def add_stage0_rules(makefile, scene_dir):
             # and also split into chunks.
             # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
             pra_post_rule, ramms_names = r_pra_post.rule(
-                scene_dir, dem_filled_file, return_period, forest)
+                scene_dir, dem_filled_file, return_period, forest, snow_input)
             release_shplists = makefile.add(pra_post_rule).outputs
 
             makefile.add(r_ramms.chunk_rule(scene_dir, ramms_names))

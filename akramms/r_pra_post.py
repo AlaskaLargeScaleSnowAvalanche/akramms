@@ -85,13 +85,23 @@ class WrfLookup:
         j = round(jr)
         return self.data[j,i]
 
-    def to_ij(self, poly):
+#    def to_ij(self, poly):
+#        centroid = poly.centroid    # In scene coordinates
+#        x_scene, y_scene = (centroid.x, centroid.y)
+#        x_wrf,y_wrf = self.scene2wrf.transform(x_scene, y_scene)    # --> WRF coordinates
+#        i,j = self.geo_info.to_ij(x_wrf, y_wrf)    # --> (j,i) index into data
+#        return (round(i), round(j))
+
+class RasterLookup:
+    """Alternative to WrfLookup, pick out of a raster file on local grid"""
+    def __init__(self, raster_file):
+        self.geo_info,self.value,self.value_nd = gdalutil.read_raster(raster_file)
+    
+    def value_at_centroid(self, poly):
         centroid = poly.centroid    # In scene coordinates
         x_scene, y_scene = (centroid.x, centroid.y)
-        x_wrf,y_wrf = self.scene2wrf.transform(x_scene, y_scene)    # --> WRF coordinates
-        i,j = self.geo_info.to_ij(x_wrf, y_wrf)    # --> (j,i) index into data
-        return (round(i), round(j))
-
+        i,j = self.geo_info.to_ij(x_scene, y_scene)    # --> (j,i) index into data
+        return self.value[j,i]
 # ---------------------------------------------------------------------------------
 _post_cat_bounds = (0.,5000.,25000.,60000.,1e10)    # Dummy value at end
 # {'T': (low, high), 'S': (low, high), ...}
@@ -113,7 +123,10 @@ def master_ramms_names(scene_args, return_period, forest):
 
 
 
-def rule(scene_dir, dem_filled_file, return_period, forest,
+
+
+
+def rule(scene_dir, dem_filled_file, return_period, forest, snowdepthI_tif,
     min_alpha=18., max_runout=10000., margin=0.):
     """
     scene_dir:
@@ -128,7 +141,8 @@ def rule(scene_dir, dem_filled_file, return_period, forest,
 
     forest: bool
         Whether we are doing with / without forest
-
+    snowdepthI_tif: str
+        Name of the snowdepth file, in local scene coordinates, that we will use.
 
     min_alpha: [deg]
         Minimum slope that "avalanche" can continue in domain finder
@@ -159,15 +173,15 @@ def rule(scene_dir, dem_filled_file, return_period, forest,
                 os.path.join(scene_dir, dir, f'{jb.ramms_name}{ext}'))
 
     # Add one-off input files
-    inputs += [scene_args['snowdepth_file'], scene_args['snowdepth_geo']]
+    inputs.append(snowdepthI_tif)
 
     def action(tdir):
 
         # Create lookup for snow depth in WRF output file
-        snow_lookup = WrfLookup(
-            scene_args['coordinate_system'], scene_args['snowdepth_file'],
-            'sx3', scene_args['snowdepth_geo'], units='m')
-        snow_info = snow_lookup.geo_info
+#        snow_lookup = WrfLookup(
+#            scene_args['coordinate_system'], scene_args['snowdepth_file'],
+#            'sx3', scene_args['snowdepth_geo'], units='m')
+        snow_lookup = RasterLookup(snowdepthI_tif)
 
         degree = np.pi / 180.
         name = scene_args['name']
