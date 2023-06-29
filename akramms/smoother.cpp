@@ -5,6 +5,7 @@
 
 #include <string>
 #include <vector>
+#include <tuple>
 
 //#include <akramms/smoother.hpp>
 #include <akramms/ulam.hpp>
@@ -26,13 +27,22 @@ std::vector<std::tuple<std::array<int,2>, double>> oval_offsets(
     double const limit2 = limit*limit;
     // Determine how far out on the Ulam spiral we need to go for the
     // template for 3sigma
-    int sigma_i = std::ceil(limit/dx);
-    int sigma_j = std::ceil(limit/dy);
+    int const sigma_i = std::ceil(limit/dx);
+    int const sigma_j = std::ceil(limit/dy);
+#if 1
+    // Needed for gcc with --std=c++17
+    int const sigma_n0 = ulam_xy_to_n(sigma_i,0);
+    int const sigma_n1 = std::max(sigma_n0, ulam_xy_to_n(-sigma_i,0));
+    int const sigma_n2 = std::max(sigma_n1, ulam_xy_to_n(0,sigma_j));
+    int const sigma_n = std::max(sigma_n2, ulam_xy_to_n(0,-sigma_j));
+#else
+    // Works with llvm clang 13.1.6
     int sigma_n = std::max({    // Maximum Ulam index of anything in 2sigma range
         ulam_xy_to_n(sigma_i,0),
         ulam_xy_to_n(-sigma_i,0),
         ulam_xy_to_n(0,sigma_j),
         ulam_xy_to_n(0,-sigma_j)});
+#endif
 
     // Generate Gaussian template
     // Pre-compute x^2 + y^2; later add z^2 to compute distance betwen two gridcells in 3-space
@@ -91,7 +101,7 @@ void _smoother_smooth(
         for (auto &off : offsets) {
             int const deltai = std::get<0>(off)[0];
             int const deltaj = std::get<0>(off)[1];
-            double const xydist2 = std::get<1>(off);
+            // double const xydist2 = std::get<1>(off);  // UNUSED
 
             // Find a valid point in the template
             int const i0 = i1 + deltai;
