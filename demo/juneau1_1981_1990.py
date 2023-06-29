@@ -7,12 +7,10 @@ from akramms import config
 
 def main():
 
-    scene_dir = config.roots.join('prj', 'juneau1_1981_1990')
-
     # Set up a new workspace directory, and set ALL parameters for our computation
     # (across ArcGIS, eCognition, RAMMS, etc)
     scene_dir = r_prepare.prepare_scene(
-        config.roots.join('prj', 'juneau1'), defaults='alaska',
+        config.roots.join('prj', 'juneau1_1981_1990'), defaults='alaska',
 #        return_periods=[10,30,100,300],
 #        forests=[1,0],    # True,False],
         return_periods=[30],

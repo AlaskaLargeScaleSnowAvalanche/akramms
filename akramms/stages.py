@@ -12,7 +12,7 @@ def add_stage0_rules(makefile, scene_dir):
 
     # Create snow input file on the scene grid
     snow_input = makefile.add(r_snow.select_sx3_rule(
-        scene_dir, scene_dir['snowdepth_file'], scene_dir['snowdepth_geo'])).outputs[0]
+        scene_dir, scene_args['snowdepth_file'], scene_args['snowdepth_geo'])).outputs[0]
 
     # Run ArcGIS script to prepare files for eCognition
     prepare_outputs = makefile.add(r_prepare.rule(scene_dir)).outputs
