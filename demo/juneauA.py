@@ -10,7 +10,7 @@ def main():
     # Set up a new workspace directory, and set ALL parameters for our computation
     # (across ArcGIS, eCognition, RAMMS, etc)
     scene_dir = r_prepare.prepare_scene(
-        config.roots.join('prj', 'juneau1_1981_1990'), defaults='alaska',
+        config.roots.join('prj', 'juneauA'), defaults='alaska',
 #        return_periods=[10,30,100,300],
 #        forests=[1,0],    # True,False],
         return_periods=[30],
@@ -20,11 +20,12 @@ def main():
         snowdepth_geo=config.roots.join('data', 'lader', 'sx3', 'geo_southeast.nc'),
         snowdepth_file=config.roots.join('data', 'outputs', 'sx3', 'ccsm_sx3_1981_1990.nc'))
 
+    ioutil.setlink(scene_dir, config.roots.join('prj', 'juneau_1981_1990'))
 
     scene_args = params.load(scene_dir)
     print(scene_args)
 
     stages.run_stage0(scene_dir)
-    stages.run_stage1(scene_dir)
+#    stages.run_stage1(scene_dir)
 
 main()

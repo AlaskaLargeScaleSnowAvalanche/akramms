@@ -95,13 +95,17 @@ class WrfLookup:
 class RasterLookup:
     """Alternative to WrfLookup, pick out of a raster file on local grid"""
     def __init__(self, raster_file):
+        print('RasterLookup reading ', raster_file)
         self.geo_info,self.value,self.value_nd = gdalutil.read_raster(raster_file)
+        self.centroids = list()
     
     def value_at_centroid(self, poly):
         centroid = poly.centroid    # In scene coordinates
         x_scene, y_scene = (centroid.x, centroid.y)
         i,j = self.geo_info.to_ij(x_scene, y_scene)    # --> (j,i) index into data
-        return self.value[j,i]
+#        print(f'value_at_centroid({j},{i}) = {self.value[j,i]}')
+        self.centroids.append((j,i))
+        return (j,i,self.value[j,i])
 # ---------------------------------------------------------------------------------
 _post_cat_bounds = (0.,5000.,25000.,60000.,1e10)    # Dummy value at end
 # {'T': (low, high), 'S': (low, high), ...}
@@ -191,7 +195,11 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowdepthI_tif,
         print('======== Reading {}'.format(inputs[0]))
         df = shputil.read_df(inputs[0], shape='pra')
         df = df.rename(columns={'fid': 'Id'})    # RAMMS etc. want it named "Id"
-        sx3_mm_swe = df['pra'].map(snow_lookup.value_at_centroid)    # Raw snow amount [kg m-2]
+        jisx3 = df['pra'].map(snow_lookup.value_at_centroid)    # j,i,Raw snow amount [kg m-2]
+        df['j'] = jisx3.map(lambda x: x[0])
+        df['i'] = jisx3.map(lambda x: x[1])
+        sx3_mm_swe = jisx3.map(lambda x: x[2])
+
         by_SNOW_DENSITY = 1. / 200.    # [m^3 kg-1]   (Wolken; based on data we have on field work in these areas).
         # Typical values: 1m
         df['sx3'] = sx3_mm_swe * by_SNOW_DENSITY    # Depth of SNOW [m]
@@ -329,6 +337,18 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowdepthI_tif,
                 dom_df, 'domain', 'Polygon',
                 os.path.join(scene_dir, 'RELEASE', f'{jb.ramms_name}_dom.shp'),
                 wkt=scene_args['coordinate_system'])
+
+            # Create a _centroid file
+            centroids = np.zeros(snow_lookup.value.shape, dtype='b')    # byte
+            jj = cat_df['j'].to_numpy()
+            ii = cat_df['i'].to_numpy()
+            print('jj ', jj)
+            print('ii ', ii)
+            for j,i in zip(jj,ii):
+                centroids[j,i] = 1
+            gdalutil.write_raster(
+                os.path.join(scene_dir, 'RELEASE', f'{jb.ramms_name}_centroids.tif'),
+                snow_lookup.geo_info, centroids, 0, type=gdal.GDT_Byte)
 
 
     rule = make.Rule(action, inputs, outputs)
