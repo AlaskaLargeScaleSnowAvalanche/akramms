@@ -76,7 +76,7 @@ def main():
         ofbase = os.path.join(odir, base)
 
         print(f'------- {ifname}')
-        sx3, sx3_nd = wrfutil.read_raw(ifname, 'sx3')    
+        sx3, sx3_nd = wrfutil.read_raw(ifname, 'sx3', fill_holes=True)
         print(ofbase)
         write_file(gridA, sx3, ofbase, types={'tif'})
 
