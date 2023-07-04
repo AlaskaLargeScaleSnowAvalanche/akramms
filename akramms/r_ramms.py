@@ -715,9 +715,12 @@ def job_statuses(release_files):
 #    print(df)
     return df
 # --------------------------------------------------------
+_include_statuses = {JobStatus.NOINPUT, JobStatus.INCOMPLETE, JobStatus.TODO, JobStatus.INPROCESS, JobStatus.OVERRUN, JobStatus.FAILED}
 def print_job_statuses(df):
 #    for (run_dir, job_status), group in df.groupby(['run_dir', 'job_status']):
     for (jb_key, job_status), group in df.groupby(['jb_key', 'job_status']):
+        if job_status not in _include_statuses:
+            continue
         jb = jb_key[-1]
 
         print('=========== {} {}:'.format(job_status_labels[job_status], jb.avalanche_dir))

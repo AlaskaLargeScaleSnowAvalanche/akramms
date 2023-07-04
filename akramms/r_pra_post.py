@@ -12,42 +12,8 @@ from akramms import config
 import pyproj
 import netCDF4
 import numpy as np
-import gridfill
 import d8graph
 
-# From the gridfill docs...
-#def gridfill.fill(grids, xdim, ydim, eps, relax=.6, itermax=100, initzonal=False,
-#         cyclic=False, verbose=False):
-#    """
-#    Fill missing values in grids with values derived by solving
-#    Poisson's equation using a relaxation scheme.
-#    **Arguments:**
-#    *grid*
-#        A masked array with missing values to fill.
-#    *xdim*, *ydim*
-#        The numbers of the dimensions in *grid* that represent the
-#        x-coordinate and y-coordinate respectively.
-#    *eps*
-#        Tolerance for determining the solution complete.
-#    **Keyword arguments:**
-#    *relax*
-#        Relaxation constant. Usually 0.45 <= *relax* <= 0.6. Defaults to
-#        0.6.
-#    *itermax*
-#        Maximum number of iterations of the relaxation scheme. Defaults
-#        to 100 iterations.
-#    *initzonal*
-#        If *False* missing values will be initialized to zero, if *True*
-#        missing values will be initialized to the zonal mean. Defaults
-#        to *False*.
-#    *cyclic*
-#        Set to *False* if the x-coordinate of the grid is not cyclic,
-#        set to *True* if it is cyclic. Defaults to *False*.
-#    *verbose*
-#        If *True* information about algorithm performance will be
-#        printed to stdout, if *False* nothing is printed. Defaults to
-#        *False*.
-#    """
 
 class WrfLookup:
     def __init__(self, scene_wkt, data_fname, vname, geo_fname, units=None):
@@ -228,7 +194,7 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowdepthI_tif,
 #            (df['Mean_DEM'] - scene_args['reference_elevation']) \
 #            * gradient_snowdepth_si_units
 #        sx3_corrected = (df['sx3'] + snowdepth_correction)
-        sx3_corrected = df['sx3']
+        sx3_corrected = df['sx3']    # [m]
 
         # TODO: Why are we multiplying by cos(28) = .883?
 
@@ -240,9 +206,9 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowdepthI_tif,
         # has, MIGHT be useful for Alaska.  TODO: Discuss with
         # Gabe).  If snow is very moist...???
         if False:
-            df['d0star'] = sx3_corrected * np.cos(28. * degree)
+            df['d0star'] = sx3_corrected * np.cos(28. * degree)    # [m]
         else:
-            df['d0star'] = sx3_corrected
+            df['d0star'] = sx3_corrected    # [m]
 
 
         # --- Slope angle correction (slopecorr)
@@ -260,7 +226,7 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowdepthI_tif,
 
         # Calculate final d0: d0_10, d0_30, d0_100, d0_300
         d0_vname = f'd0_{return_period}'
-        df[d0_vname] = ((df['d0star'] + df['Wind']) * df['slopecorr'])
+        df[d0_vname] = ((df['d0star'] + df['Wind']) * df['slopecorr'])    # [m]
 #        df[d0_vname] = 0.5    # DEBUG: d0_30 is unrealistically low.
 
         # Calculate volume (VOL_returnperiod)
@@ -339,16 +305,17 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowdepthI_tif,
                 wkt=scene_args['coordinate_system'])
 
             # Create a _centroid file
-            centroids = np.zeros(snow_lookup.value.shape, dtype='b')    # byte
-            jj = cat_df['j'].to_numpy()
-            ii = cat_df['i'].to_numpy()
-            print('jj ', jj)
-            print('ii ', ii)
-            for j,i in zip(jj,ii):
-                centroids[j,i] = 1
-            gdalutil.write_raster(
-                os.path.join(scene_dir, 'RELEASE', f'{jb.ramms_name}_centroids.tif'),
-                snow_lookup.geo_info, centroids, 0, type=gdal.GDT_Byte)
+            if False:
+                centroids = np.zeros(snow_lookup.value.shape, dtype='b')    # byte
+                jj = cat_df['j'].to_numpy()
+                ii = cat_df['i'].to_numpy()
+#                print('jj ', jj)
+#                print('ii ', ii)
+                for j,i in zip(jj,ii):
+                    centroids[j,i] = 1
+                gdalutil.write_raster(
+                    os.path.join(scene_dir, 'RELEASE', f'{jb.ramms_name}_centroids.tif'),
+                    snow_lookup.geo_info, centroids, 0, type=gdal.GDT_Byte)
 
 
     rule = make.Rule(action, inputs, outputs)

@@ -26,6 +26,6 @@ def main():
     print(scene_args)
 
     stages.run_stage0(scene_dir)
-#    stages.run_stage1(scene_dir)
+    stages.run_stage1(scene_dir)
 
 main()
