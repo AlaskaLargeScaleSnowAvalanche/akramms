@@ -24,6 +24,7 @@ except KeyError:
 pythonpath += [
     os.path.join(HARNESS, 'uafgi'),
     os.path.join(HARNESS, 'akramms'),
+    os.path.join(HARNESS, 'rq'),
 ]
 if os.path.exists(SITE_PACKAGES):
     for leaf in os.listdir(SITE_PACKAGES):
