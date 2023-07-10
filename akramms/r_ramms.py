@@ -421,7 +421,8 @@ def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):
         # RAMMS Stage 1 accepts inputs on stdin
         # rammsdist.run_on_windows_stage() calls read_inputs()
 #        dynamic_outputs = list()
-        dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=True)
+#        dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=True)
+        dynamic_outputs = harnutil.run_remote_queued(inputs, cmd, tdir, write_inputs=True)
 
         # Write output files
         os.makedirs(os.path.dirname(done_output), exist_ok=True)
@@ -1193,7 +1194,7 @@ def run_ramms_stage3(oramms_name):
         '--ramms-version', config.ramms_version,
         config.roots_w.syspath(oramms_dir_rel, bash=True), '3']    # '3'=stage 3
     with ioutil.TmpDir() as tdir:
-        dynamic_outputs = harnutil.run_remote([], cmd, tdir, write_inputs=False)
+        dynamic_outputs = harnutil.run_remote_queued([], cmd, tdir, write_inputs=False, at_front=True)
 
 
     # Copy output into final zip file

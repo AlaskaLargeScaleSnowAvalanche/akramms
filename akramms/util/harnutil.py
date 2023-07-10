@@ -1,5 +1,6 @@
 import os,subprocess,re,sys,contextlib
 import functools
+import redis,rq
 from akramms import config
 
 HARNESS = config.HARNESS    # Alias
@@ -84,9 +85,8 @@ def rsync_files(fnames, tdir, flags=['--copy-links', '-avz'], direction='up'):
 
 
 def run_remote(inputs, cmd, tdir,
-    with contextlib.ExitStack() as stack:
-        write_inputs=False, sync_files=(not config.shared_filesystem),
-        stdout_log=None):
+        write_inputs=False, sync_files=(not config.shared_filesystem)):
+
         """Runs a command on the remote Windows machine.
         inputs:
             Input files to copy to Windows before running.
@@ -101,11 +101,6 @@ def run_remote(inputs, cmd, tdir,
         # Sync RAMMS input files to remote dir
         if sync_files:
             rsync_files(inputs, tdir, direction='up')
-
-        # Open file to log stdout
-        stdout_log = None
-        if stdout_log is not None:
-            log_out = stack.enter_context(open(stdout_log, 'w'))
 
         # Start the remote process
         cmd = config.ssh_w + cmd
@@ -130,9 +125,7 @@ def run_remote(inputs, cmd, tdir,
             if not line:
                 break
             print(line, end='')
-            print(line, end='', file=stdout_out)
             sys.stdout.flush()
-            stdout_out.flush()
 
             # Exit if remote program is exiting
             if line == 'END OUTPUTS':
@@ -167,20 +160,22 @@ class QueueRunner:
         self.redis = redis.Redis()
         self.queue = rq.Queue(connection=self.redis, **kwargs)
 
-    def run(self, *args, timeout=1800, stdout_log=None, **kwargs):
-        job = rq.job.Job.create(args=args, kwargs=kwargs)
+    def run(self, func, *args, timeout=1800, at_front=False, **kwargs):
+        print('func = ', func)
+        job = rq.job.Job.create(func, connection=self.redis, args=args, kwargs=kwargs)
         #job = self.queue.enqueue(*args, **kwargs)
-        self.queue.enqueue(job)
+        self.queue.enqueue_job(job, at_front=at_front)
         try:
             result = rq.results.Result.fetch_latest(job, serializer=job.serializer, timeout=timeout)
             if result.type == result.Type.SUCCESSFUL: 
-                print('Success ', result.return_value) 
-                return result.return_value
+                ret = result.return_value
+                print('Success ', ret)
+                return ret
             else: 
                 print('Failure ', result.exc_string)
                 raise RuntimeError(result.exc_string)
 
-        finally:
+        except:
             print('Canceling...')
             try:
                 rq.command.send_stop_job_command(self.redis, job.id)
@@ -200,13 +195,10 @@ class QueueRunner:
 
             raise
 
+queue_runner = QueueRunner()
 
-def run_remote_queued(inputs, cmd, tdir, **kwargs):
-    stdout_log = tdir.join('stdout.log')
-    kw = dict(kwargs)
-    kw['timeout'] = 30*60    # 30 minutes
-    job = rq.job.Job.create(run_remote, args=(inputs, cmd, tdir), kwargs=kw)
-    qr.run(job)
+def run_remote_queued(*args, **kwargs):
+    return queue_runner.run(run_remote, *args, **kwargs)
 
 
 def print_outputs(outputs):
