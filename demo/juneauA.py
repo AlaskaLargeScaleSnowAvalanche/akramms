@@ -11,6 +11,7 @@ def main():
     # (across ArcGIS, eCognition, RAMMS, etc)
     scene_dir = r_prepare.prepare_scene(
         config.roots.join('prj', 'juneauA'), defaults='alaska',
+        basename='juneau',
 #        return_periods=[10,30,100,300],
 #        forests=[1,0],    # True,False],
         return_periods=[30],

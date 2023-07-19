@@ -213,15 +213,17 @@ def export(args):
     scene_dir = os.path.abspath(os.path.realpath(args.scene))
     scene_args = params.load(scene_dir)
 
-    with ioutil.TmpDir() as tdir:
+    snowdepth0_leaf = os.path.split(config.roots.syspath(scene_args['snowdepth_file']))[1]
+    snowdepth0_root = os.path.splitext(snowdepth0_leaf)[0]
+    export_name = f"{scene_args['basename']}_{snowdepth0_root}_{scene_args['downscale']}"
 
+
+    with ioutil.TmpDir() as tdir:
         # Top-level files
-        snowdepth0_leaf = os.path.split(config.roots.syspath(scene_args['snowdepth_file']))[1]
-        snowdepth0_root = os.path.splitext(snowdepth0_leaf)[0]
-        snowdepth_leaf = f"{snowdepth0_root}_{scene_args['name']}_select.tif"
+        snowdepth_leaf = f"{snowdepth0_root}_{scene_args['name']}_{scene_args['downscale']}.tif"
         rclone_relfiles(
             os.path.join(config.roots.lookup['PRJ'], scene_args['name']),
-            'alaska:AvalancheShare/results/{}'.format(scene_args['name']),
+            f'alaska:AvalancheShare/results/{export_name}',
             ['scene.nc', 'scene.cdl', snowdepth_leaf], tdir)
 
 
@@ -234,7 +236,7 @@ def export(args):
 
         rclone_relfiles(
             os.path.join(config.roots.lookup['PRJ'], scene_args['name'], 'maps'),
-            'alaska:AvalancheShare/results/{}'.format(scene_args['name']),
+            f'alaska:AvalancheShare/results/{export_name}',
             relfiles, tdir)
 
 
