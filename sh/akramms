@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 #
 
+from akramms import config,params
 import argparse,itertools,os,subprocess,sys,io,codecs
 from akramms import r_ramms
 from akramms.util import rammsutil
+from uafgi.util import ioutil
 
 # ------------------------------------------------------------------------
 # https://mike.depalatis.net/blog/simplifying-argparse.html
@@ -47,7 +49,6 @@ _init_files = [
     argument('dir1', help='Destination run dir')])
 def initcopy(args):
     """Runs a single RAMMS avalanche on the local machine, via Docker"""
-    from uafgi.util import ioutil
 
     dir0 = os.path.abspath(args.dir0)
     dir1 = os.path.abspath(args.dir1)
@@ -178,9 +179,65 @@ def setup(args):
 def mosaic(args):
     release_files = rammsutil.get_release_files(args.ramms)
     for oramms_name,release_files in rammsutil.groupby_oramms(release_files):
+
+
+        omap_name = os.path.join(oramms_name.scene_dir, 'maps', f'{oramms_name.ramms_name}_maps.zip')
+        if os.path.exists(omap_name):
+            print(f'=========== Exists, not redoing: {omap_name}')
+            continue
+
         print(f'=========== Assembling {oramms_name.ramms_dir}')
         r_ramms.assemble_stage3(oramms_name, release_files)
         r_ramms.run_ramms_stage3(oramms_name)
+#        print('orrrrrrrrr ', oramms_name.__dict__)
+
+
+def rclone_relfiles(src, dest, relfiles, tdir):
+    # Rclone the files
+        listfile = tdir.filename(prefix='relfiles')
+        with open(listfile, 'w') as out:
+            for file in relfiles:
+                out.write(f'{file}\n')
+
+        # Use that in rclone command
+        cmd = ['rclone', '-v', 'copy', '--files-from', listfile,
+            src, dest]
+        print(' '.join(cmd))
+        subprocess.run(cmd, check=True)
+
+
+@subcommand([
+    argument('scene', help='Top-Level scene directory to setup through stages 0 and 1.'),
+])
+def export(args):
+    scene_dir = os.path.abspath(os.path.realpath(args.scene))
+    scene_args = params.load(scene_dir)
+
+    with ioutil.TmpDir() as tdir:
+
+        # Top-level files
+        snowdepth0_leaf = os.path.split(config.roots.syspath(scene_args['snowdepth_file']))[1]
+        snowdepth0_root = os.path.splitext(snowdepth0_leaf)[0]
+        snowdepth_leaf = f"{snowdepth0_root}_{scene_args['name']}_select.tif"
+        rclone_relfiles(
+            os.path.join(config.roots.lookup['PRJ'], scene_args['name']),
+            'alaska:AvalancheShare/results/{}'.format(scene_args['name']),
+            ['scene.nc', 'scene.cdl', snowdepth_leaf], tdir)
+
+
+        # File ins maps/ directory
+        relfiles = list()
+        dir = os.path.join(scene_dir, 'maps')
+        for name in os.listdir(dir):
+            if name.endswith('.zip'):
+                relfiles.append(name)
+
+        rclone_relfiles(
+            os.path.join(config.roots.lookup['PRJ'], scene_args['name'], 'maps'),
+            'alaska:AvalancheShare/results/{}'.format(scene_args['name']),
+            relfiles, tdir)
+
+
 
 def main():
     args = cli.parse_args()

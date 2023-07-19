@@ -17,7 +17,7 @@ def default_roots(sep, harness):
     return pathutil.RootsDict(sep, (
         ('HARNESS', harness),
         ('DATA', sep.join((harness, 'data'))),
-        ('PRJ', sep.join((harness, 'prj')))
+        ('PRJ', sep.join((harness, 'prj'))),
     ))
 
 roots_l = default_roots(os.sep, os.path.abspath(os.path.realpath(os.path.join(os.path.dirname(__file__), '..', '..'))))

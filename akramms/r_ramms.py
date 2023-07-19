@@ -1182,20 +1182,42 @@ def assemble_stage3(oramms_name, release_files):
         print()
 
 
+
+def write_to_zip(mzip, ifname, arcname):
+    """The Windows fileshare we are using has poor consistency properties.
+    Do some exponential backoff to wait until the file is written."""
+
+    backoff = 1
+    while True:
+        try:
+            mzip.write(ifname, arcname=arcname)
+            return
+        except FileNotFoundError as err:
+            print('Retrying write to zip for ', ifname)
+            if backoff >= 16:
+                raise
+            time.sleep(backoff)
+            backoff *= 2
+
+
 #_ramms3_exclude = {'forest.sav', 'lshm_rock.log'}
 
 _ramms3RE = re.compile(r'(.*)(\.shx|\.shp|\.dbf|_maxPRESSURE\.tif|_maxHeight\.tif|_Xi\.tif|_ID\.tif|_COUNT\.tif)')
 
 def run_ramms_stage3(oramms_name):
+
     oramms_dir = oramms_name.ramms_dir
     oramms_dir_rel = config.roots.relpath(oramms_dir)
     cmd = ['sh', 
         config.roots_w.join('HARNESS', 'akramms', 'sh', 'run_ramms.sh', bash=True),
         '--ramms-version', config.ramms_version,
         config.roots_w.syspath(oramms_dir_rel, bash=True), '3']    # '3'=stage 3
-    with ioutil.TmpDir() as tdir:
-        dynamic_outputs = harnutil.run_remote_queued([], cmd, tdir, write_inputs=False, at_front=True)
 
+    with ioutil.TmpDir() as tdir:
+        # Long timeout because mosaic can take a long time!!!
+        dynamic_outputs = harnutil.run_remote_queued([], cmd, tdir, write_inputs=False, at_front=True, timeout=3*3600)
+
+#    dynamic_outputs = ['/mnt/avalanche_sim/prj/juneauA/ORAMMS/juneauA30LFor_5m/RESULTS/juneauAFor_5m/forest.sav', '/mnt/avalanche_sim/prj/juneauA/ORAMMS/juneauA30LFor_5m/RESULTS/juneauAFor_5m/juneauAFor_5m_30L.dbf', '/mnt/avalanche_sim/prj/juneauA/ORAMMS/juneauA30LFor_5m/RESULTS/juneauAFor_5m/juneauAFor_5m_30L.shp', '/mnt/avalanche_sim/prj/juneauA/ORAMMS/juneauA30LFor_5m/RESULTS/juneauAFor_5m/juneauAFor_5m_30L.shx', '/mnt/avalanche_sim/prj/juneauA/ORAMMS/juneauA30LFor_5m/RESULTS/juneauAFor_5m/juneauAFor_5m_30L_AblagerungStef.tif', '/mnt/avalanche_sim/prj/juneauA/ORAMMS/juneauA30LFor_5m/RESULTS/juneauAFor_5m/juneauAFor_5m_30L_COUNT.tif', '/mnt/avalanche_sim/prj/juneauA/ORAMMS/juneauA30LFor_5m/RESULTS/juneauAFor_5m/juneauAFor_5m_30L_ID.tif', '/mnt/avalanche_sim/prj/juneauA/ORAMMS/juneauA30LFor_5m/RESULTS/juneauAFor_5m/juneauAFor_5m_30L_Xi.tif', '/mnt/avalanche_sim/prj/juneauA/ORAMMS/juneauA30LFor_5m/RESULTS/juneauAFor_5m/juneauAFor_5m_30L_maxHeight.tif', '/mnt/avalanche_sim/prj/juneauA/ORAMMS/juneauA30LFor_5m/RESULTS/juneauAFor_5m/juneauAFor_5m_30L_maxPRESSURE.tif', '/mnt/avalanche_sim/prj/juneauA/ORAMMS/juneauA30LFor_5m/RESULTS/juneauAFor_5m/juneauAFor_5m_30L_maxVelocity.tif', '/mnt/avalanche_sim/prj/juneauA/ORAMMS/juneauA30LFor_5m/RESULTS/lshm_rock.log']
 
     # Copy output into final zip file
     # (for easy transport to visulatization computer)
@@ -1223,15 +1245,31 @@ def run_ramms_stage3(oramms_name):
 
     # Make the Zip files
     zip_outputs = list()
-    for root,members in groups.items():
+    for root,members0 in groups.items():
+
+        # (Files are added in general creation order)
+
+        # Copy in the main scene.cdl file
+        members = [('scene.cdl', os.path.join(oramms_name.scene_dir, 'scene.cdl'))]
+
+        # Identify files from the RELEASE dir to copy in
+        release_dir = os.path.join(oramms_name.scene_dir, 'RELEASE')
+        for name in sorted(os.listdir(release_dir)):
+            if name.startswith(root):
+                members.append((name, os.path.join(release_dir, name)))
+
+        # Add in the original files
+        members += members0
+
+        # Create the zipfile
         zip_fname = os.path.join(maps_dir, f'{root}_maps.zip')
         with zipfile.ZipFile(zip_fname, 'w', compression=zipfile.ZIP_DEFLATED) as mzip:
             for arcname, ifname in members:
-                mzip.write(ifname, arcname=arcname)
+                write_to_zip(mzip, ifname, arcname)
         zip_outputs.append(zip_fname)
 
     # Delete ORAMMS directory
-    shutil.rmtree(oramms_dir, ignore_errors=True)
+#    shutil.rmtree(oramms_dir, ignore_errors=True)
 
     # Convert zip outputs to relative filenames
     return [config.roots.relpath(x) for x in zip_outputs]

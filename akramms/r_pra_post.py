@@ -250,6 +250,8 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowdepthI_tif,
             cat_rows = df['area_m2'].between(low, high, inclusive='left')
             cat_df = df[cat_rows]
 
+            # Remove PRAs of elevation <150m
+            cat_df = cat_df[cat_df['Mean_DEM'] >= 150.]            
 
             # Calculate domains
             chulls = list()

@@ -160,9 +160,12 @@ class QueueRunner:
         self.redis = redis.Redis()
         self.queue = rq.Queue(connection=self.redis, **kwargs)
 
-    def run(self, func, *args, timeout=1800, at_front=False, **kwargs):
+    # Timeout includes time waiting in the queue; so it needs to be as long as the longest job we MIGHT run.
+    def run(self, func, *args, timeout=3*3600, at_front=False, **kwargs):
         print('func = ', func)
-        job = rq.job.Job.create(func, connection=self.redis, args=args, kwargs=kwargs)
+#        kw = dict(kwargs)
+#        kw['timeout'] = timeout
+        job = rq.job.Job.create(func, connection=self.redis, timeout=timeout, args=args, kwargs=kwargs)
         #job = self.queue.enqueue(*args, **kwargs)
         self.queue.enqueue_job(job, at_front=at_front)
         try:
