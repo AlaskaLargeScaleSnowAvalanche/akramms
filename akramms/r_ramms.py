@@ -1055,6 +1055,25 @@ def copy_stage3_inputs(iavalanche_dir, job_name, oavalanche_dir):
             os.path.join(oavalanche_dir, f'{job_name}.out.gz'))
 
 
+def stage3_status(release_files, map_zip):
+    """
+    Determines:
+        in_time = Max time for xyz.in.zip
+        out_time = Max time for xyz.out.zip
+
+    If in_time > out_time:
+        More avalanches are needed before Stage 3 can be run.
+    If out_time > map_zip:
+        Stage 3 needs to be re-run
+    else:
+        Output map.zip file is up to date, Stage 3 is not needed
+
+    release_files:
+        A set of release files to go into one Stage 3 run
+        (Eg: All the T,S,M or L chunks)
+
+    """
+
 
 def assemble_stage3(oramms_name, release_files):
     """Iterates through a set of avalanches by spec

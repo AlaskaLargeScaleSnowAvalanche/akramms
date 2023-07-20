@@ -187,8 +187,9 @@ def mosaic(args):
             continue
 
         print(f'=========== Assembling {oramms_name.ramms_dir}')
-        r_ramms.assemble_stage3(oramms_name, release_files)
-        r_ramms.run_ramms_stage3(oramms_name)
+        needs_regen = r_ramms.assemble_stage3(oramms_name, release_files)
+        if needs_regen:
+            r_ramms.run_ramms_stage3(oramms_name)
 #        print('orrrrrrrrr ', oramms_name.__dict__)
 
 
