@@ -1,4 +1,4 @@
-import os,re,typing,functools,copy,glob
+import os,re,typing,functools,copy,glob,io
 import numpy as np
 import shapely
 import pandas as pd
@@ -224,9 +224,13 @@ def get_release_files(spec):
     # Sort!
     return sort_release_files(ret)
 # ---------------------------------------------------------
-def read_polygon(poly_file):
-    """Reads a RAMMS polygon file (eg: .dom) into a Shapely Polygon."""
-    with open(poly_file) as fin:
+def read_polygon_from_zip(in_zip, poly_file):
+    """Reads a RAMMS polygon file (eg: .dom) into a Shapely Polygon.
+    in_zip:
+        Open handle to {job_name}.in.zip
+    poly_file:
+        The arcname (archive name) of the file to read from the open zipfile"""
+    with io.StringIO(in_zip.read(poly_file).decode('UTF-8')) as fin:
         line = next(fin).split(' ')
         # Get just the x,y coordinates, no count at beginning, no repeat at end
         coords = [float(x) for x in line[1:-2]]
@@ -240,6 +244,21 @@ def write_polygon(p, poly_file):
         for x,y in coords:
             out.write(f' {x} {y}')
         out.write('\n')
+
+def write_polygon_to_zip(p, out_zip, arcname):
+    """out_zip:
+        Open zipfile
+    """
+    out = io.StringIO()
+
+    coords = list(p.boundary.coords)
+    out.write('{}'.format(len(coords)))
+    for x,y in coords:
+        out.write(f' {x} {y}')
+    out.write('\n')
+
+    # Write it to the ZipFile
+    out_zip.writestr(arcname, out.getvalue())
 # --------------------------------------------------------
 def edge_lengths(p):
     pts = np.array(p.boundary.coords)

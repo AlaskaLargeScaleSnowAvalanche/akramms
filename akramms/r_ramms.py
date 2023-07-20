@@ -739,7 +739,6 @@ def submit_jobs(release_files, ids=None):
             Job statuses BEFORE submissions were made
     """
 
-    print('release_files = ',release_files)
     df = job_statuses(release_files)
     df = df[df.job_status.isin({JobStatus.TODO, JobStatus.OVERRUN})]
 #    print('df = ',df)
@@ -759,55 +758,48 @@ def submit_jobs(release_files, ids=None):
 
 # -----------------------------------------------------------
 def enlarge_domain(run_dir, job_name, enlarge_increment=5000.):
+    zip_fname = os.path.join(run_dir, job_name+'.in.zip')
+    print(f'Enlarging domain in: {zip_fname}')
 
-    # Read the .dom file and make it bigger by 1000m
-    dom_file = os.path.join(run_dir, f'{job_name}.dom')
-    log_zip_file = os.path.join(run_dir, f'{job_name}.log.zip')
-    dom0 = rammsutil.read_polygon(dom_file)
-    dom1 = rammsutil.add_margin(dom0, enlarge_increment)
-    with np.printoptions(precision=0, suppress=True):
-        print('{}:\n  {} -> {}'.format(job_name, rammsutil.edge_lengths(dom0), rammsutil.edge_lengths(dom1)))
+    with zipfile.ZipFile(zip_fname, 'a') as in_zip:
+        latest_arcname = latest_dom_file(in_zip.namelist())    # Eg: {job_name}.v1.dom
+        next_arcname = incr_dom_file(latest_arcname)
+        print(f'{job_name}: reading {latest_arcname}')
+        dom0 = rammsutil.read_polygon_from_zip(in_zip, latest_arcname)
+        dom1 = rammsutil.add_margin(dom0, enlarge_increment)
 
-    # ----Rename old .dom file and write new one
-    if True:
-        domRE = re.compile(r'^{}.dom.v(\d+)$'.format(dom_file))
+        with np.printoptions(precision=0, suppress=True):
+            print('{}:\n  {} -> {}'.format(job_name, rammsutil.edge_lengths(dom0), rammsutil.edge_lengths(dom1)))
 
-        # Figure out largest .dom.vXXX file that exists
-        max_version = 0
-        for file in os.listdir(run_dir):
-            match = domRE.match(file)
-            if match is None:
-                continue
-            max_verison = max(max_version, int(match.group(1)))
+        rammsutil.write_polygon_to_zip(dom1, in_zip, next_arcname)
 
-        # Copy to one bigger, then overwrite
-        shutil.copy2(
-            dom_file,
-            os.path.join(run_dir, f'{job_name}.v{max_version+1}.dom'))
-        shutil.copy2(log_zip_file, log_zip_file + '.v{}'.format(max_version+1))
-        rammsutil.write_polygon(dom1, dom_file)    # New timestamp
-
+    # Resubmit with the expanded domain
+    print('Resubmitting: {}/{}'.format(run_dir, job_name))
+    submit_job(run_dir, job_name)
 
 def enlarge_domains(release_files, ids=None):
+    print('Fetching job statuses...')
     df = job_statuses(release_files)
     df = df[df.job_status == JobStatus.OVERRUN]
     for _,row in df.iterrows():
         jb = row.jb
         run_dir = jb.avalanche_dir
-        parts = run_dir.split(os.sep)
-        job_name = '{}_{}_{}'.format(parts[-2], parts[-1], row['id'])
+        job_name = f"{jb.ramms_name}_{row['id']}"
         if ids is None or row['id'] in ids:
 
-            # ONLY enlarge if the .log.zip file is newer than the .dom file
+            # TODO: ONLY enlarge if the .in.zip is newer than the .out.zip file
+
+
+            # ONLY enlarge if the .out.zip file is newer than the .in.zip file
             # (Otherwise, we apparently already enlarged but have not yet re-run)
-            log_file = os.path.join(run_dir, f'{job_name}.log.zip')
-            dom_file = os.path.join(run_dir, f'{job_name}.dom')
-            log_tm = os.path.getmtime(log_file)
+            out_zip = os.path.join(run_dir, f'{job_name}.out.zip')
+            in_zip = os.path.join(run_dir, f'{job_name}.in.zip')
+            out_zip_tm = os.path.getmtime(out_zip)
             try:
-                dom_tm = os.path.getmtime(dom_file)
+                in_zip_tm = os.path.getmtime(in_zip)
             except OSError:    # File not exist
-                dom_tm = -1
-            if log_tm > dom_tm:
+                in_zip_tm = -1
+            if out_zip_tm > in_zip_tm:
                 enlarge_domain(run_dir, job_name)
 #            submit_job(run_dir, job_name)
 
@@ -1009,7 +1001,9 @@ def copy_from_zip_to_gz(zip_file, arcname, ofname):
 
 domRE = re.compile(r'(.*)\.v(\d+)\.dom')
 def latest_dom_file(arcnames):
-    """Digs through .in.zip to find the latest .vXXX.dom file"""
+    """Digs through .in.zip to find the latest .vXXX.dom file
+    Returns:
+        The "arcname" (archive name) of the most recent dom file"""
     max_itry = -1
     for arcname in arcnames:
         match = domRE.match(arcname)
@@ -1022,35 +1016,43 @@ def latest_dom_file(arcnames):
 
     return dom_arcname
 
-def copy_stage3_inputs(iavalanche_dir, aname, oavalanche_dir):
+def incr_dom_file(arcname):
+    """Increments the version number of a dom file, to generate the
+    arcname for the next dom file."""
+    match = domRE.match(arcname)
+    itry = int(match.group(2)) + 1
+    return f'{match.group(1)}.v{itry}.dom'
+
+
+def copy_stage3_inputs(iavalanche_dir, job_name, oavalanche_dir):
     """
-    aname:
+    job_name:
         Base name of avalanche, including the ID but no file extension.
     """
 
     all_exist = all(
-        os.path.exists(os.path.join(oavalanche_dir, f'{aname}.rel'))
+        os.path.exists(os.path.join(oavalanche_dir, f'{job_name}.rel'))
         for ext in ('.rel', '.dom', '.xy-coord.gz', '.out.gz'))
     if all_exist:
         return
 
     # Copy .rel and .dom from .in.zip
-    with zipfile.ZipFile(os.path.join(iavalanche_dir, aname+'.in.zip')) as in_zip:
+    with zipfile.ZipFile(os.path.join(iavalanche_dir, job_name+'.in.zip')) as in_zip:
         for ext in ('.rel', '.xy-coord'):
-            copy_from_zip(in_zip, f'{aname}{ext}', os.path.join(oavalanche_dir, f'{aname}{ext}'))
+            copy_from_zip(in_zip, f'{job_name}{ext}', os.path.join(oavalanche_dir, f'{job_name}{ext}'))
 
         # .dom requires a bit of digging...
         copy_from_zip(in_zip,
             latest_dom_file(in_zip.namelist()),
-            os.path.join(oavalanche_dir, f'{aname}.dom'))
+            os.path.join(oavalanche_dir, f'{job_name}.dom'))
 
 
     # Copy .out.gz and .xy-coord.gz from .out.zip
-    with zipfile.ZipFile(os.path.join(iavalanche_dir, aname+'.out.zip')) as out_zip:
+    with zipfile.ZipFile(os.path.join(iavalanche_dir, job_name+'.out.zip')) as out_zip:
         # .out.gz needs to be recompressed
         copy_from_zip_to_gz(
-            out_zip, f'{aname}.out',
-            os.path.join(oavalanche_dir, f'{aname}.out.gz'))
+            out_zip, f'{job_name}.out',
+            os.path.join(oavalanche_dir, f'{job_name}.out.gz'))
 
 
 
