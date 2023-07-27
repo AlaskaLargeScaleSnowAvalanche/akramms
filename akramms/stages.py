@@ -171,12 +171,12 @@ def run_stage2(scene_dir):
 
     pass
 # =====================================================================
-def run_stage3(scene_dir):
-    dummy = make.Makefile()
-    ramms_dirs_release_files = add_stage1_rules(dummy, scene_dir)
-
-    makefile = make.Makefile()
-    stage3_outputs = add_stage3_rules(makefile, ramms_dirs_release_files)
-
-    makefile.generate('juneau1_mk', run=True, ncpu=1)
-    return stage3_outputs
+#def run_stage3(scene_dir):
+#    dummy = make.Makefile()
+#    ramms_dirs_release_files = add_stage1_rules(dummy, scene_dir)
+#
+#    makefile = make.Makefile()
+#    stage3_outputs = add_stage3_rules(makefile, ramms_dirs_release_files)
+#
+#    makefile.generate('juneau1_mk', run=True, ncpu=1)
+#    return stage3_outputs

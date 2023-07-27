@@ -14,8 +14,8 @@ class RammsName:
     all_cols = ['ramms_harness', 'scene_name', 'segment', 'forest', 'resolution', 'return_period', 'pra_size', 'id']
 
     # Columns used to determine ORAMMS name
-    required_cols = ['ramms_harness', 'scene_name', 'forest', 'resolution', 'return_period', 'pra_size']
-    optional_cols = ['segment', 'id']
+    required_cols = ['ramms_harness', 'scene_name', 'forest', 'resolution', 'return_period'] #, 'pra_size']
+    optional_cols = ['segment', 'pra_size', 'id']
 
     def __init__(self, ramms_harness, scene_name, segment, forest, resolution, return_period, pra_size, id):
         """
@@ -319,7 +319,7 @@ def oramms_mapping(oramms_harness, release_files):
     rows = list()
     for release_file in release_files:
         jb = parse_release_file(release_file)
-        rows.append(jb.args)
+        rows.append(jb.args)    # jb.args = dict of original arguments to RammsName constructor
     df = pd.DataFrame(rows)
 
     # Boil down input RAMMS Names into output...

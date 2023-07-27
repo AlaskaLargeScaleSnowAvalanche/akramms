@@ -1353,12 +1353,9 @@ def do_mosaics(release_files):
 
     # Group into individual Stage 3 runs
     for oramms_name,rfs in rammsutil.groupby_oramms(release_files):
+
+        # I'm in the middle of changing how this works????
         mosaic_rule(oramms_name, rfs)
-
-
-
-
-
 
         omap_name = os.path.join(oramms_name.scene_dir, 'maps', f'{oramms_name.ramms_name}_maps.zip')
         if os.path.exists(omap_name):
