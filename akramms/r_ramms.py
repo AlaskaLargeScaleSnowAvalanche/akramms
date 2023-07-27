@@ -1055,8 +1055,9 @@ def copy_stage3_inputs(iavalanche_dir, job_name, oavalanche_dir):
             os.path.join(oavalanche_dir, f'{job_name}.out.gz'))
 
 
-def stage3_status(release_files, map_zip):
+def stage3_status(scene_dir, release_files, map_zip):
     """
+
     Determines:
         in_time = Max time for xyz.in.zip
         out_time = Max time for xyz.out.zip
@@ -1068,11 +1069,14 @@ def stage3_status(release_files, map_zip):
     else:
         Output map.zip file is up to date, Stage 3 is not needed
 
+    scene_dir:
+        Overall top-level directory
     release_files:
         A set of release files to go into one Stage 3 run
         (Eg: All the T,S,M or L chunks)
 
     """
+    maps_dir = os.path.join(oramms_name.scene_dir, 'maps')
 
 
 def assemble_stage3(oramms_name, release_files):
@@ -1295,165 +1299,75 @@ def run_ramms_stage3(oramms_name):
     # Convert zip outputs to relative filenames
     return [config.roots.relpath(x) for x in zip_outputs]
 
-
-
-def ramms_stage3_rule(ramms_dir, release_files):
-    """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)
-    For now, do no inputs to stage3.  It's hard to predict exactly
-    what the input files should be.
-
-    release_files:
-        Must be ALL the (active) release files for ramms_dir.
+# --------------------------------------------------------------
+# --------------------------------------------------------------
+def mosaic_rule(scene_dir, oramms_name, release_files):
+    """Runs RAMMS Stage 3 ONCE, to generate a single _map.zip output file.
+    oramms_name: rammsutil.RammsName
+        The coherent group name for all the inputs.
+        Used to generate the output filename
+    release_files: [str, ...]
+        Filenames of the per-chunk release files to be assembled.
     """
 
-    # Leave these out for now:
-    # (See email from Marc, they have a wrong name...)
-    #     juneau130yFor\RESULTS\juneau1_For\juneau1_For_L300_mu.tif
-    #     juneau130yFor\RESULTS\juneau1_For\juneau1_For_L300_xi.tif
+    scene_args = params.load(scene_dir)
+    ojb = oramms_name
 
-    inputs = list()
-    ramms3_outputs = list()    # Outputs of raw RAMMS Stage 3
-    outputs = list()
-    for release_file in release_files:
-        jb = rammsutil.parse_release_file(release_file)
+    # Output files...
+    maps_zip = os.path.join(scene_dir, 'maps',
+        oramms_name.format(scene_args['map_name_format'], scene_args))
+    outputs = [maps_zip]
 
-        # -----------------------------------------------------------
-        # Inputs are the "declaration" files from RAMMS Stage 2 that
-        # avalanches from each release file have been completed.
-        # (Sometimes not all individual avalanches can complete, for
-        # various reasons).
-        input = os.path.join(ramms_dir, 'RESULTS', f'{jb.ramms_name}_stage2.txt')
-        inputs.append(input)
+    # No input files for now, we will check manually
 
-        # -----------------------------------------------------------
-        # Outputs are the end-user GeoTIFF files that RAMMS Stage 3 writes.
-
-        # Misc. Files
-        for leaf in ('curvidl.tif', 'slope.tif', 'logfiles/muxi_altlimits.log', 'logfiles/muxi_class.tif'):
-            outputs.append(os.path.join(jb.slope_dir, leaf))
-
-        # The main GeoTIFF Files
-        base = os.path.join(dir, '{}_{}'.format(jb.prefix, jb.suffix))    # Eg: juneau1_For_5m_30L
-        for ext in (
-            '.dbf', '.shp', '.shx',
-            '_AblagerungStef.tif', '_COUNT.tif', '_ID.tif', '_Xi.tif',
-            '_maxHeight.tif', '_maxPRESSURE.tif', '_maxVelocity.tif'):
-            ramms3_outputs.append(os.path.join(jb.ramms_dir, f'{jb.ramms_name}{ext}'))
-            outputs.append(os.path.join(jb.scene_dir, 'AVMAPS', f'{jb.ramms_name}{ext}'))
-
-    # ----------------------------------------------------
     def action(tdir):
-        # Dynamic input files for RAMMS Stage 3 are the result file of each
-        # RAMMS Core avalanche.  Each avalanche produced a .dom,
-        # .log.zip, .out.gz and .xy-coord.gz file.  If there are
-        # missing files, they will not be included.  We must account
-        # for The possibility that not all intended avalanche
-        # simulations were able to run.
-        xferRE = re.compile('|'.join(r'^[^.]*{}$'.format(ext)
-            for ext in (r'\.dom', r'\.log\.zip', r'\.out\.gz', r'\.xy-coord\.gz')))
 
-        inputs = list()
-        for path,dirs,files in os.walk(os.path.join(ramms_dir, 'RESULTS')):
-            for f in files:
-                if xferRE.match(f) is not None:
-                    inputs.append(os.path.join(path, f))
+        # Get
+        for release_file in release_files:
+            iramms_name = rammsutil.parse_release_file(release_file)
 
-        
-        # Run RAMMS and sync files back
-        #dynamic_outputs = run_ramms(ramms_dir, 3, inputs)
+            # Look at all the .in.zip and .out.zip files...
+            df = shputil.read_df(release_file, read_shapes=False)
+            for id in list(df['Id']):
+                job_name = f"{iramms_name.ramms_name}_{id}"
+                out_zip = os.path.join(iramms_name.avalanche_dir, f'{job_name}.out.zip')
+                in_zip = os.path.join(iramms_name.avalanche_dir, f'{job_name}.in.zip')
 
-        cmd = ['sh', 
-            config.roots_w.join('HARNESS', 'akramms', 'sh', 'run_ramms.sh', bash=True),
-            '--ramms-version', config.ramms_version,
-            config.roots_w.syspath(ramms_dir_rel, bash=True), '3']    # '3'=stage 3
-        # rammsdist.run_on_windows_stage() does not call read_inputs()
-        dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=False)
 
-        return dynamic_outputs
+                # in_zip doesn't exist: Something wrong in Stage1
+                # out_zip doesn't exist: Stage 2 not yet run     
+                # in_zip newer than out_zip: Stage 2 needs to be re-run
 
-    return make.Rule(action, inputs, outputs)
-# --------------------------------------------------------------------
-#    # Unpack / gzip individual avalanche .zip files
-#
-#    # rsync to 
-#
-#Send: .dom, .log.zip, .out.gz, .xy-coord.gz
-#
-#
-#-rw-r--r-- 1 efischer Domain Users     104 Jan 17 18:58 juneau1_For_5m_30L_3743.dom
-#-rw-r--r-- 1 efischer Domain Users   57858 Jan 18 08:17 juneau1_For_5m_30L_3743.out.gz
-#-rw-r--r-- 1 efischer Domain Users    6180 Jan 18  2023 juneau1_For_5m_30L_3743.out.log
-#-rw-r--r-- 1 efischer Domain Users 5392660 Jan 17 19:02 juneau1_For_5m_30L_3743.xy-coord
-#
-#
-## Gunzip files; leave original .gz in scratch dir
-#for ext in ('var', 'xy-coord', 'xyz'):
-#    ifname = os.path.join(RAMMS_DIR, f'{base}.{ext}.gz')
-#    ofname = os.path.join(RAMMS_DIR, f'{base}.{ext}')
-#    with gzip.open(ifname, 'rb') as fin:
-#        with open(ofname, 'wb') as out:
-#            shutil.copyfileobj(fin, out)
-#
-#
-#
-#    pass
+                # If all of out_zip older than maps_zip, then nothing to do.           
+
+
+
+
+        print(oramms_name, release_files)
+        print()
+
+    return make.Rule(action, [], outputs)
+
+def do_mosaics(release_files):
+    """Does multiple RAMMS Stage 3 runs for a number of top-level release files"""
+
+    # Group into individual Stage 3 runs
+    for oramms_name,rfs in rammsutil.groupby_oramms(release_files):
+        mosaic_rule(oramms_name, rfs)
 
 
 
 
 
-# =============================================================================
-# =============================================================================
-# Code not currently being used; but will need it for domain enlarging
 
-def run_simulations0(ramms_dir, release_files, sleep=10*60):
+        omap_name = os.path.join(oramms_name.scene_dir, 'maps', f'{oramms_name.ramms_name}_maps.zip')
+        if os.path.exists(omap_name):
+            print(f'=========== Exists, not redoing: {omap_name}')
+            continue
 
-    """Submits simulations and babysits them, polling periodically until they are done.
-    ramms_dir:
-        Eg: /home/efischer/av/prj/juneau1/RAMMS/juneau130yFor
-    Returns:
-        JobPartition
-    """
-
-    while True:
-        st = job_statuses(release_files)
-        print_job_statuses(st)
-
-        # Write out latest status in user-readable format
-        now = datetime.datetime.now()
-        with open(os.path.join(ramms_dir, 'status_summary.txt'), 'w') as out:
-            out.write(f'RAMMS Avalanche Job Status as of: {now:%Y-%m-%d %H:%M:%S}\n')
-            for lab in _job_partition_labels:
-                out.write(f'================= {lab}\n')
-                jobs = getattr(st, lab)
-                out.write('\n'.join('    '+job_name for run_dir,job_name in jobs))
-                out.write('\n')
-
-        # Nothing more to do: everything is either finished or failed.
-        if len(st['todo']) == 0 and len(st['inprocess']) == 0:
-            break
-
-        # Submit all the jobs that need to be submitted
-        for run_dir,job_name in st['todo']:
-            submit_job(run_dir, job_name)
-        
-        # Come back later
-        print('Sleeping...')
-        time.sleep(10)
-
-    return st
-
-
-
-
-# Operations for command line program:
-# 1. show status of overall RAMMS run / single release shapefile / single avalanche
-# 2. Inspect single run: show domain size, and other stuff
-# 3. Mark a shapefile complete IN SPITE OF outstanding failed avlanches
-#
-# Try grepping the out.log file as soon as the run completes, mark it as bad immediately somehow
-
-# -------------------------------------------------------
-#def inspect_job(ramms_dir, job_name):
-#    prefix,suffix = parse_job_name(job_name)
+        print(f'=========== Assembling {oramms_name.ramms_dir}')
+        needs_regen = r_ramms.assemble_stage3(oramms_name, release_files)
+        if needs_regen:
+            r_ramms.run_ramms_stage3(oramms_name)
+#        print('orrrrrrrrr ', oramms_name.__dict__)
 

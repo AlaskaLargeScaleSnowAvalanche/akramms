@@ -108,6 +108,19 @@ class RammsName:
         """Standard sort order for RammsNames"""
         return (self.scene_name, self.forest, self.resolution, self.return_period, self.pra_size, self.segment, self.id, self)
 
+    def format(self, format, scene_args=None):
+        """Formats a general name, including parts from the RammsName
+        and also the general scene."""
+
+        if scene_args is None:
+            dd = dict()
+        else:
+            dd = dict(scene_args)
+        dd['For'] = 'For' if self.forest else 'NoFor'
+        dd.update(getattr(self,col) for col in RammsName.all_cols)
+
+        return format.format(**dd)
+
 # -------------------------------------------------------
 release_fileRE = re.compile(r'^(.+)(\d\d\d\d\d)(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(.*)(\..*)')
 

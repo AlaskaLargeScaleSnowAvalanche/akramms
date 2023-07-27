@@ -178,19 +178,19 @@ def setup(args):
 ])
 def mosaic(args):
     release_files = rammsutil.get_release_files(args.ramms)
-    for oramms_name,release_files in rammsutil.groupby_oramms(release_files):
+    r_ramms.do_mosaics(release_files)
 
 
-        omap_name = os.path.join(oramms_name.scene_dir, 'maps', f'{oramms_name.ramms_name}_maps.zip')
-        if os.path.exists(omap_name):
-            print(f'=========== Exists, not redoing: {omap_name}')
-            continue
+#        omap_name = os.path.join(oramms_name.scene_dir, 'maps', f'{oramms_name.ramms_name}_maps.zip')
+#        if os.path.exists(omap_name):
+#            print(f'=========== Exists, not redoing: {omap_name}')
+#            continue
 
-        print(f'=========== Assembling {oramms_name.ramms_dir}')
-        needs_regen = r_ramms.assemble_stage3(oramms_name, release_files)
-        if needs_regen:
-            r_ramms.run_ramms_stage3(oramms_name)
-#        print('orrrrrrrrr ', oramms_name.__dict__)
+#        print(f'=========== Assembling {oramms_name.ramms_dir}')
+#        needs_regen = r_ramms.assemble_stage3(oramms_name, release_files)
+#        if needs_regen:
+#            r_ramms.run_ramms_stage3(oramms_name)
+##        print('orrrrrrrrr ', oramms_name.__dict__)
 
 
 def rclone_relfiles(src, dest, relfiles, tdir):

@@ -66,6 +66,8 @@ ALL = paramutil.parse([
         """Name of file containing snow depth information"""),
     ('downscale', None, 'str', True,
         """Algorithm used to downscale WRF snowdepth files to local grid."""),
+    ('long_name', None, 'str', True,
+        """Long-term permanent name for this scene."""),
 
     ])
 
