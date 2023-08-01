@@ -9,8 +9,8 @@ ALL = paramutil.parse([
     # Basic parameters of the scene
     ('name', None, 'str', False,
         """Root name of scene; to use for filenames, plotting, etc"""),
-    ('basename', None, 'str', False,
-        """part of name shared with other similar scenes."""),
+#    ('basename', None, 'str', False,
+#        """part of name shared with other similar scenes."""),
     ('dem_file', None, 'input_file', True,
         """Name of DEM file to use (GeoTIFF)"""),
     ('forest_file', None, 'input_file', False,
@@ -66,8 +66,10 @@ ALL = paramutil.parse([
         """Name of file containing snow depth information"""),
     ('downscale', None, 'str', True,
         """Algorithm used to downscale WRF snowdepth files to local grid."""),
-    ('long_name', None, 'str', True,
+    ('longname', None, 'str', True,
         """Long-term permanent name for this scene."""),
+    ('map_name_format', None, 'str', True,
+        """Format for output map files"""),
 
     ])
 

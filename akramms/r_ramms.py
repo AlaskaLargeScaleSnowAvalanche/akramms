@@ -1301,15 +1301,19 @@ def run_ramms_stage3(oramms_name):
 
 # --------------------------------------------------------------
 # --------------------------------------------------------------
-def mosaic_rule(scene_dir, oramms_name, release_files):
+def mosaic_rule(oramms_name, release_files, force=False):
     """Runs RAMMS Stage 3 ONCE, to generate a single _map.zip output file.
     oramms_name: rammsutil.RammsName
         The coherent group name for all the inputs.
         Used to generate the output filename
     release_files: [str, ...]
         Filenames of the per-chunk release files to be assembled.
+    force:
+        Re-run mosaic even if some avalanches are missing?
     """
 
+    # Get the scene_dir
+    scene_dir = rammsutil.parse_release_file(release_files[0]).scene_dir
     scene_args = params.load(scene_dir)
     ojb = oramms_name
 
@@ -1318,15 +1322,23 @@ def mosaic_rule(scene_dir, oramms_name, release_files):
         oramms_name.format(scene_args['map_name_format'], scene_args))
     outputs = [maps_zip]
 
-    # No input files for now, we will check manually
+    # No input files for now, we will check manually while running the rule
+    release_files1 = release_files
 
     def action(tdir):
+        release_files = release_files1
 
-        # Get
+        missing_in_zips = list()
+        missing_out_zips = list()
+
+        maps_needs_regen = False
+        print('Checking input and output files for mosiac...')
         for release_file in release_files:
+            print(f'    {release_file}')
             iramms_name = rammsutil.parse_release_file(release_file)
 
             # Look at all the .in.zip and .out.zip files...
+            maps_zip_mtime = os.path.getmtime(maps_zip) if os.path.exists(maps_zip) else 0
             df = shputil.read_df(release_file, read_shapes=False)
             for id in list(df['Id']):
                 job_name = f"{iramms_name.ramms_name}_{id}"
@@ -1335,16 +1347,47 @@ def mosaic_rule(scene_dir, oramms_name, release_files):
 
 
                 # in_zip doesn't exist: Something wrong in Stage1
-                # out_zip doesn't exist: Stage 2 not yet run     
+                if not os.path.exists(in_zip):
+                    missing_in_zips.append(in_zip)
+
+                # out_zip doesn't exist: Stage 2 not yet run
+                if not os.path.exists(out_zip):
+                    missing_out_zips.append(out_zip)
+
                 # in_zip newer than out_zip: Stage 2 needs to be re-run
+                in_zip_mtime = os.path.getmtime(in_zip)
+                out_zip_mtime = os.path.getmtime(out_zip)
+                if in_zip_mtime > out_zip_mtime:
+                    missing_out_zips.append(out_zip)
 
                 # If all of out_zip older than maps_zip, then nothing to do.           
+                if out_zip_mtime > maps_zip_mtime:
+                    maps_needs_regen = True
+                    #print(f'Regen needed because of {out_zip}')
 
+        # Search for reasons we cannot regenerated
+        can_regen = True
+        if len(missing_in_zips) > 0:
+            print('========== The following avalanche input files are missing:')
+            for x in missing_in_zips:
+                print(x)
+            can_regen = False
 
+        if len(missing_out_zips) > 0:
+            print('========== The following avalanche output files are missing or are older than their input:')
+            for x in missing_out_zips:
+                print(x)
+            can_regen = False
 
-
-        print(oramms_name, release_files)
-        print()
+        if (not can_regen) and (not force):
+            print('**** Unable to re-run mosaic because of incomplete avalanche outputs')
+        elif maps_needs_regen:
+            print('Running Ramms Stage 3 for: ', oramms_name.ramms_name, len(release_files))
+            release_files = release_files[0:1]    # DEBUG
+            assemble_stage3(oramms_name, release_files)
+            run_ramms_stage3(oramms_name)
+        else:
+            print('No need to re-run mosiac, the output is newer than the inputs')
 
     return make.Rule(action, [], outputs)
 
@@ -1355,16 +1398,4 @@ def do_mosaics(release_files):
     for oramms_name,rfs in rammsutil.groupby_oramms(release_files):
 
         # I'm in the middle of changing how this works????
-        mosaic_rule(oramms_name, rfs)
-
-        omap_name = os.path.join(oramms_name.scene_dir, 'maps', f'{oramms_name.ramms_name}_maps.zip')
-        if os.path.exists(omap_name):
-            print(f'=========== Exists, not redoing: {omap_name}')
-            continue
-
-        print(f'=========== Assembling {oramms_name.ramms_dir}')
-        needs_regen = r_ramms.assemble_stage3(oramms_name, release_files)
-        if needs_regen:
-            r_ramms.run_ramms_stage3(oramms_name)
-#        print('orrrrrrrrr ', oramms_name.__dict__)
-
+        mosaic_rule(oramms_name, rfs)()

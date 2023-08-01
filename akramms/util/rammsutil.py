@@ -117,7 +117,7 @@ class RammsName:
         else:
             dd = dict(scene_args)
         dd['For'] = 'For' if self.forest else 'NoFor'
-        dd.update(getattr(self,col) for col in RammsName.all_cols)
+        dd.update((col,getattr(self,col)) for col in RammsName.all_cols)
 
         return format.format(**dd)
 

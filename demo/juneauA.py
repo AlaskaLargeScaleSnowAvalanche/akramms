@@ -15,7 +15,8 @@ def main():
     # (across ArcGIS, eCognition, RAMMS, etc)
     scene_dir = r_prepare.prepare_scene(
         config.roots.join('prj', 'juneauA'), defaults='alaska',
-        basename='juneau',
+#        basename='juneau',
+        longname='juneau_1981_1990',
 #        return_periods=[10,30,100,300],
 #        forests=[1,0],    # True,False],
         return_periods=[30],
@@ -25,14 +26,14 @@ def main():
         snowdepth_geo=config.roots.join('data', 'lader', 'sx3', 'geo_southeast.nc'),
         snowdepth_file=config.roots.join('data', 'outputs', 'sx3', snowdepth_leaf),
         downscale=downscale,
-        map_name_format=f'{basename}-{snowdepth_leaf}-{downscale}-{For}-{return_period}-{pra_size}-maps.zip')
+        map_name_format='{longname}-{downscale}-{For}-{return_period}-maps.zip')
 
-    ioutil.setlink(scene_dir, config.roots.join('prj', 'juneau_1981_1990'))
+#    ioutil.setlink(scene_dir, config.roots.join('prj', 'juneau_1981_1990'))
 
     scene_args = params.load(scene_dir)
     print(scene_args)
 
-    stages.run_stage0(scene_dir)
-    stages.run_stage1(scene_dir)
+#    stages.run_stage0(scene_dir)
+#    stages.run_stage1(scene_dir)
 
 main()
