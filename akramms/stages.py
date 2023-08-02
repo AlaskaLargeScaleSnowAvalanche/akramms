@@ -14,6 +14,15 @@ def add_stage0_rules(makefile, scene_dir):
     if scene_args['downscale'] == 'select':
         snow_input = makefile.add(r_snow.select_sx3_rule(
             scene_dir, scene_args['snowdepth_file'], scene_args['snowdepth_geo'])).outputs[0]
+    elif scene_args['downscale'] == 'lapse':
+        distance_from_coastA_tif = os.path.join(scene_dir, 'distance_from_coastA.tif')
+        makefile.add(r_snow.distance_from_coast_rule(
+            scene_args['snowdepth_geo'], distance_from_coastA_tif))
+
+        snow_input = makefile.add(r_snow.lapse_sx3_rule(
+            scene_dir, scene_args['snowdepth_file'], scene_args['snowdepth_geo'],
+            distance_from_coastA_tif)).outputs[0]
+
     else:
         raise ValueError("Illegel downscale algorithm: '{}'".format(scene_args['downscale']))
 

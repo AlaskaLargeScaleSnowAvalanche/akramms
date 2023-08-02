@@ -58,12 +58,14 @@ def grad(val, dy, dx):
 
 def compute_lapse(H, T, dy, dx):
     """Compute a gridded lapse rate based on local finite differences
-    ee:
-        Elevations
-    vv:
+    H: [m]
+        Elevation
+    T: [m]
         A gridded value
+        (in this case, units of sx3 = [mm])
     dx,dy:
         Size of gridcell
+    Returns: Units: [H]/[T] = [mm / m] == [m / km]
     """
 
     # A New Methodology for Estimating the Surface Temperature Lapse

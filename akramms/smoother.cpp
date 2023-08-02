@@ -229,7 +229,7 @@ std::array<double, len> fixed_sequence(PyObject *_seq)
 }
 // ---------------------------------------------------------
 static char const *smoother_smooth_docstring =
-R"(SMoother Function Docstring
+R"(Smoother Function Docstring
 )";
 static PyObject *smoother_smooth(PyObject *module, PyObject *args, PyObject *kwargs)
 {
