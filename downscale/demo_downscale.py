@@ -13,7 +13,7 @@ def main():
     distance_from_coastA_tif = os.path.join(scene_dir, 'distance_from_coastA.tif')
     rule = r_snow.distance_from_coast_rule(
         scene_args['snowdepth_geo'], distance_from_coastA_tif)
-    rule()
+#    rule()
 
     rule = r_snow.lapse_sx3_rule(
         scene_dir, scene_args['snowdepth_file'], scene_args['snowdepth_geo'],

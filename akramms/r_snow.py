@@ -2,8 +2,9 @@ import subprocess
 import os,pathlib,shutil
 import netCDF4
 import numpy as np
+import pandas as pd
 import rtree
-from osgeo import gdalconst
+from osgeo import gdalconst,gdal
 from uafgi.util import wrfutil,gdalutil
 from akramms import config,process_tree
 from akramms.util import paramutil,harnutil,arcgisutil
@@ -149,7 +150,7 @@ def select_sx3_rule(scene_dir, sx3_file, geo_nc, smooth=False):
             resample_algo=gdalconst.GRA_NearestNeighbour)
 
         # Write output
-        gdalutil.write_raster(outputs[0], gridI, sx3I, sx3A_nd)
+        gdalutil.write_raster(outputs[0], gridI, sx3I, sx3A_nd, type=gdal.GDT_Float32)
  
     return make.Rule(action, inputs, outputs)
 
@@ -181,13 +182,12 @@ def lapse_by_distance_from_coast(cdistA):
     lapseA[mask_in] = lr0 + slope * (cdistA[mask_in] - dc0)
 
     # Lapse rate from cells >= 240km from coase
-    mask_in = (cdist >= dc1)
-    lapseA[mask_in] = dc1
-
+    mask_in = (cdistA >= dc1)
+    lapseA[mask_in] = lr1
 
     return lapseA
 
-def lapse_sx3_rule(scene_dir, sx3_file, geo_nc, distance_tif):
+def lapse_sx3_rule(scene_dir, sx3_file, geo_nc, distance_from_coastA_tif):
     """Regrids Lader's SX3 to the scene grid, and selects the nearest neighbor.
     sx3_file: (A grid)
         Name of the input WRF NetCDF file to use.
@@ -197,17 +197,17 @@ def lapse_sx3_rule(scene_dir, sx3_file, geo_nc, distance_tif):
     geo_nc:
         Name of the WRF geometry file that describes input.
         Eg: config.syspath('{DATA}/lader/sx3/geo_southeast.nc')
-    distance_tif: (A grid)
+    distance_from_coastA_tif: (A grid)
         File containing distance from gridcells
     """
 
     scene_args = params.load(scene_dir)
     scene_name = scene_args['name']
 
-    inputs = [sx3_file, distance_tif]
+    inputs = [sx3_file, distance_from_coastA_tif]
     leaf = os.path.split(sx3_file)[1]
     base = os.path.splitext(leaf)[0]
-    outputs = [os.path.join(scene_dir, f'{base}_{scene_name}_select.tif')]
+    outputs = [os.path.join(scene_dir, f'{base}_{scene_name}_lapse.tif')]
 
     def action(tdir):
 
@@ -219,41 +219,83 @@ def lapse_sx3_rule(scene_dir, sx3_file, geo_nc, distance_tif):
 
         # Construct output grid (and also read the DEM, which might be useful elsewhere)
         gridI, elevI, elevI_nd = gdalutil.read_raster(scene_args['dem_file'])
+        print('elevI_nd = ', elevI_nd)
 
         # Regrid sx3
-        sx3I = gdalutil.regrid(
-            sx3A, gridA, float(sx3A_nd),
-            gridI, float(sx3A_nd),
-            resample_algo=gdalconst.GRA_NearestNeighbour)
+        sx3I_tif = os.path.join(scene_dir, 'sx3I.tif')
+        if os.path.exists(sx3I_tif):
+            _,sx3I,_ = gdalutil.read_raster(sx3I_tif)
+        else:
+            print('Computing sx3I...')
+            sx3I = gdalutil.regrid(
+                sx3A, gridA, float(sx3A_nd),
+                gridI, float(sx3A_nd),
+                resample_algo=gdalconst.GRA_NearestNeighbour)
+            gdalutil.write_raster(
+                sx3I_tif,
+                gridI, sx3I, sx3A_nd, type=gdal.GDT_Float32)
+
 
         # --------------------------------------------------------
         # Read input from distance file
-        gridA0, distanceA, distanceA_nd = gdalutil.read_raster(distance_tif)
+        gridA0, distanceA, distanceA_nd = gdalutil.read_raster(distance_from_coastA_tif)
 
         # Compute lapse rate based on distance from coast
-        lapseA = lapse_by_distance_from_coast(distanceA)
-        lapseAI = gdalutil.regrid(
-            elevA, gridA, float(-1.e30),
-            gridI, float(-1.e30),
-            resample_algo=gdalconst.GRA_NearestNeighbour)
+
+        lapseAI_tif = os.path.join(scene_dir, 'lapseAI.tif')
+        if os.path.exists(lapseAI_tif):
+            _,lapseAI,_ = gdalutil.read_raster(lapseAI_tif)
+        else:
+            print('Computing lapseA...')
+            lapseA = lapse_by_distance_from_coast(distanceA)
+            gdalutil.write_raster(
+                os.path.join(scene_dir, 'lapseA.tif'),
+                gridA, lapseA, -1.e30, type=gdal.GDT_Float32)
+
+            print('Computing lapseAI...')
+            lapseAI = gdalutil.regrid(
+                lapseA, gridA, float(-1.e30),
+                gridI, float(-1.e30),
+                resample_algo=gdalconst.GRA_NearestNeighbour)
+            gdalutil.write_raster(
+                lapseAI_tif,
+                gridI, lapseAI, -1.e30, type=gdal.GDT_Float32)
 
         # Determine "average over A grid" elevation of each gridcell in I
-        elevA = gdalutil.regrid(
-            elevI, gridI, float(elevI_nd),
-            gridA, float(elevI_nd),
-            resample_algo=gdalconst.GRA_Average)
-        elevAI = gdalutil.regrid(
-            elevA, gridA, float(elevI_nd),
-            gridI, float(elevI_nd),
-            resample_algo=gdalconst.GRA_NearestNeighbour)
+        elevAI_tif = os.path.join(scene_dir, 'elevAI.tif')
+        if os.path.exists(elevAI_tif):
+            _,elevAI,_ = gdalutil.read_raster(elevAI_tif)
+        else:
+            elevA = gdalutil.regrid(
+                elevI, gridI, float(elevI_nd),
+                gridA, float(elevI_nd),
+                resample_algo=gdalconst.GRA_Average)
+            elevAI = gdalutil.regrid(
+                elevA, gridA, float(elevI_nd),
+                gridI, float(elevI_nd),
+                resample_algo=gdalconst.GRA_NearestNeighbour)
+
+            gdalutil.write_raster(elevAI_tif, gridI, elevAI, elevI_nd, type=gdal.GDT_Float32)
+
+        # Determine elevation difference used to downscale
+        elevdiffI_tif = os.path.join(scene_dir, 'elevdiffI.tif')
+        if os.path.exists(elevdiffI_tif):
+            _,elevdiffI,_ = gdalutil.read_raster(elevdiffI_tif)
+        else:
+            # TODO: Mysterious corners of elevAI that should be filled actually have NOVAL.
+            # Maybe something funny happening for GRA_Average on small numbers of points?
+            mask_out = np.logical_or(elevI == elevI_nd, elevAI == elevI_nd)
+            elevdiffI = elevI - elevAI
+            elevdiffI[mask_out] = 0
+            gdalutil.write_raster(elevdiffI_tif, gridI, elevdiffI, elevI_nd, type=gdal.GDT_Float32)
 
         # Adjust sx3I base on lapse rate
-        sx3I += lapseAI * (elevI - elevAI)
+        sx3I += lapseAI * elevdiffI
         sx3I[sx3I < 0] = 0
 
         # --------------------------------------------------------
         # Write output
-        gdalutil.write_raster(outputs[0], gridI, sx3I, sx3A_nd)
+        gdalutil.write_raster(outputs[0], gridI, sx3I, sx3A_nd, type=gdal.GDT_Float32)
  
     return make.Rule(action, inputs, outputs)
 
