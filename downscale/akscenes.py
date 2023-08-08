@@ -7,7 +7,12 @@ import pandas as pd
 from akramms import params
 
 # Compute the differen scenes across the state of Alaska
-def main():
+def def write_scene_domins(ofname):
+    if os.path.exists(ofname):
+        print(f'Scenes file already created: {ofname}')
+        return
+    print(f'Creating scenes file {ofname}')
+
     scene_size = (50000., 50000.)   # 50km^2
     scene_margin = (10000,10000)    # 10km margin
 
@@ -82,16 +87,23 @@ def main():
 
     df = pd.DataFrame(rows, columns=('ix', 'iy', 'domain'))
     wkt=params.DEFAULTS['alaska']['coordinate_system']
-    shputil.write_df(df, 'domain', 'Polygon', 'scene_domains.shp', wkt=wkt)
-
-    return
+    shputil.write_df(df, 'domain', 'Polygon', ofname, wkt=wkt)
 
 
-#        print(mp)
-#        print(type(mp))
+    # Try gdal_translate on one local area
+    row = df[(df.ix==71) & (df.iy==10)]
+    print(row)
 
 
 
+def main():
+    scenes_file = 'scene_domains.shp'
+    write_scene_domains(scenes_file)
+
+
+    pd = shputil.read_df(scenes_file).set_index(['ix','iy'])
+    row = pd.loc([71,10])
+    print(row)
 
 
 main()
