@@ -1,3 +1,4 @@
+import os,subprocess
 import shapely.geometry
 from osgeo import ogr
 from akramms import config
@@ -7,18 +8,21 @@ import pandas as pd
 from akramms import params
 
 # Compute the differen scenes across the state of Alaska
-def def write_scene_domins(ofname):
+def write_scene_domains(ofname):
     if os.path.exists(ofname):
         print(f'Scenes file already created: {ofname}')
         return
     print(f'Creating scenes file {ofname}')
 
-    scene_size = (50000., 50000.)   # 50km^2
-    scene_margin = (10000,10000)    # 10km margin
+    ofname_margin = os.path.splitext(ofname)[0] + '_margin.shp'
+
+    scene_size = (20000., 20000.)   # 50km^2
+    scene_margin = (2000,2000)    # 10km margin
 
 
     # ---------------------------------------------------
     # Load the Alaska domain shapefile
+    print('Loading SE Alaska shapefile')
     avdomain_zip = config.roots.syspath('{DATA}/wolken/SE_AK_Domain_Land.zip')
 
     driver = ogr.GetDriverByName('ESRI Shapefile')
@@ -50,6 +54,7 @@ def def write_scene_domins(ofname):
 
 
     # Load the overall Alaska shapefile
+    print('Loading overall Alaska shapefile')
     all_alaska_zip = config.roots.syspath('{DATA}/fischer/AlaskaBounds.shp')
     all_alaska = list(shputil.read(all_alaska_zip))[0]['_shape']
     print(all_alaska)
@@ -72,22 +77,34 @@ def def write_scene_domins(ofname):
     xmarg = scene_margin[0]*xsgn
     ymarg = scene_margin[1]*ysgn
     rows = list()
+    rows_margin = list()
     for iy in range(len(ypoints)-1):
         for ix in range(len(xpoints)-1):
             coords = [
+                (xpoints[ix], ypoints[iy]),
+                (xpoints[ix+1], ypoints[iy]),
+                (xpoints[ix+1], ypoints[iy+1]),
+                (xpoints[ix], ypoints[iy+1]),
+                (xpoints[ix], ypoints[iy]),
+            ]
+            poly = shapely.geometry.Polygon(coords)
+            coords_margin = [
                 (xpoints[ix]-xmarg, ypoints[iy]-ymarg),
                 (xpoints[ix+1]+xmarg, ypoints[iy]-ymarg),
                 (xpoints[ix+1]+xmarg, ypoints[iy+1]+ymarg),
                 (xpoints[ix]-xmarg, ypoints[iy+1]+ymarg),
                 (xpoints[ix]-xmarg, ypoints[iy]-ymarg),
             ]
-            poly = shapely.geometry.Polygon(coords)
+            poly_margin = shapely.geometry.Polygon(coords_margin)
             if poly.intersects(avdomain):
                 rows.append((ix,iy,poly))
+                rows_margin.append((ix,iy,poly_margin))
 
-    df = pd.DataFrame(rows, columns=('ix', 'iy', 'domain'))
     wkt=params.DEFAULTS['alaska']['coordinate_system']
+    df = pd.DataFrame(rows, columns=('ix', 'iy', 'domain'))
     shputil.write_df(df, 'domain', 'Polygon', ofname, wkt=wkt)
+    df_margin = pd.DataFrame(rows_margin, columns=('ix', 'iy', 'domain'))
+    shputil.write_df(df_margin, 'domain', 'Polygon', ofname_margin, wkt=wkt)
 
 
     # Try gdal_translate on one local area
@@ -100,10 +117,31 @@ def main():
     scenes_file = 'scene_domains.shp'
     write_scene_domains(scenes_file)
 
-
+    # Select out one domain
     pd = shputil.read_df(scenes_file).set_index(['ix','iy'])
-    row = pd.loc([71,10])
+    row = pd.loc[180,24]
     print(row)
 
+    # x0 and x1 will always be less than y0 and y1 because the polygon
+    # is always counter clockwise.
+
+    xx,yy = row['shape'].exterior.coords.xy
+    print('xx ', xx)
+    print('yy ', yy)
+    x0 = xx[0]
+    x1 = xx[2]
+    y0 = yy[0]
+    y1 = yy[2]
+
+    print('deltax ', x1-x0)
+    print('deltay ', y1-y0)
+    ifsar_vrt = config.roots.syspath('{DATA}/fischer/ifsar_DTM.vrt')
+    cmd = ['gdal_translate']
+    # https://gis.stackexchange.com/questions/1104/should-gdal-be-set-to-produce-geotiff-files-with-compression-which-algorithm-sh
+    cmd += ['-co', 'COMPRESS=DEFLATE']
+    cmd += ['-eco']    # Error when completely outside (SANITY CHECK)
+    cmd += ['-projwin', str(x0), str(y1), str(x1), str(y0), ifsar_vrt, 'xdtm.tif']    # North-up
+    print(cmd)
+    subprocess.run(cmd, check=True)
 
 main()
