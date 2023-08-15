@@ -14,7 +14,7 @@ from akramms import params
 
 # -----------------------------------------------------------------------
 # ---------------------------------------------------------------------------
-def prepare_scene(scene_dir, defaults=dict(), **kwargs):
+def r_prepare_scene(scene_dir, defaults=dict(), **kwargs):
 
     """Sets up a new scene by creating a directory with all
     parameters required for processing.
@@ -33,28 +33,39 @@ def prepare_scene(scene_dir, defaults=dict(), **kwargs):
 
     """
 
-    # Create the directory
-    scene_dir = os.path.abspath(scene_dir)
-    os.makedirs(scene_dir, exist_ok=True)
+    def action(tdir):
 
-    # Assemble the scene args, using default params if provided
-    if isinstance(defaults, str):    # Lookup pre-loaded defaults
-        defaults = params.DEFAULTS[defaults]
-    scene_args = paramutil.validate_args({**defaults, **kwargs}, params=params.ALL)
+        # Create the directory
+        scene_dir = os.path.abspath(scene_dir)
+        os.makedirs(scene_dir, exist_ok=True)
 
-    # Get the scene name as the leaf of the scene_dir
-    if 'name' not in scene_args:
-        scene_args['name'] = os.path.split(scene_dir)[1]
+        # Assemble the scene args, using default params if provided
+        if isinstance(defaults, str):    # Lookup pre-loaded defaults
+            defaults = params.DEFAULTS[defaults]
+        scene_args = paramutil.validate_args({**defaults, **kwargs}, params=params.ALL)
 
-    # Store the overall scene parameters
-    paramutil.dump_nc(os.path.join(scene_dir, 'scene.nc'), scene_args, params=params.ALL)
-    cmd = ['ncdump', os.path.join(scene_dir, 'scene.nc')]
-    with open(os.path.join(scene_dir, 'scene.cdl'), 'w') as out:
-        subprocess.run(cmd, stdout=out)
+        # Get the scene name as the leaf of the scene_dir
+        if 'name' not in scene_args:
+            scene_args['name'] = os.path.split(scene_dir)[1]
 
-    return scene_dir
+        # Store the overall scene parameters
+        paramutil.dump_nc(os.path.join(scene_dir, 'scene.nc'), scene_args, params=params.ALL)
+        cmd = ['ncdump', os.path.join(scene_dir, 'scene.nc')]
+        with open(os.path.join(scene_dir, 'scene.cdl'), 'w') as out:
+            subprocess.run(cmd, stdout=out)
+
+    inputs = [kwargs['dem_file'], kwargs['snowdepth_file']]
+    if 'forest_file' in kwargs:
+        inputs.append(kwargs['forest_file'])
+    outputs = [os.path.join(scene_dir, 'scene.nc')]
+
+    return make.Rule(inputs, outputs, action)
 
 # ---------------------------------------------------------------------------
+@functools.lru_cache()
+def r_prepare_scene(scene_dir, defaults=dict(), **kwargs):
+    def action(tdir):
+        prepare_scene(scene_dir, defaults=defaults, **kwargs)
 
 
 # ---------------------------------------------------------------------------

@@ -14,7 +14,8 @@ from akramms import params
 """Rules to prepare the snow field for direct use in determining snow depth for PRAs."""
 
 # --------------------------------------------------------------------------
-def distance_from_coast_rule(wrf_geo_nc, ofname):
+@functools.lru_cache()
+def r_distance_from_coast(wrf_geo_nc, ofname):
     """Computes the distance of every WRF gridcell from the coast
     wrf_geo_nc:
         The WRF geometry file.
@@ -113,6 +114,7 @@ def distance_from_coast_rule(wrf_geo_nc, ofname):
     return make.Rule(action, [wrf_geo_nc], [ofname])
 
 # --------------------------------------------------------------------------
+## TODO: Make this NOT a rule.
 def select_sx3_rule(scene_dir, sx3_file, geo_nc, smooth=False):
     """Regrids Lader's SX3 to the scene grid, and selects the nearest neighbor.
     sx3_file:

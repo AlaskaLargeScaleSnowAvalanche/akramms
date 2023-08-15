@@ -16,17 +16,17 @@ def main():
     scene_dir = r_prepare.prepare_scene(
         config.roots.join('prj', 'juneauA'), defaults='alaska',
 #        basename='juneau',
-        longname='juneau_1981_1990',
+#####        longname='juneau_1981_1990',
 #        return_periods=[10,30,100,300],
 #        forests=[1,0],    # True,False],
         return_periods=[30],
         forests=[1],
         dem_file=config.roots.join('data', 'wolken', 'BaseData_AKAlbers', 'Juneau_IFSAR_DTM_AKAlbers_EPSG_3338.tif'),
         forest_file=config.roots.join('data', 'wolken', 'BaseData_AKAlbers', 'Juneau_EvergreenForest_AKAlbers_EPSG_3338.tif'),
-        snowdepth_geo=config.roots.join('data', 'lader', 'sx3', 'geo_southeast.nc'),
+####        snowdepth_geo=config.roots.join('data', 'lader', 'sx3', 'geo_southeast.nc'),
         snowdepth_file=config.roots.join('data', 'outputs', 'sx3', snowdepth_leaf),
-        downscale=downscale,
-        map_name_format='{longname}-{downscale}-{For}-{return_period}-maps.zip')
+####        downscale=downscale,
+####        map_name_format='{longname}-{downscale}-{For}-{return_period}-maps.zip')
 
 #    ioutil.setlink(scene_dir, config.roots.join('prj', 'juneau_1981_1990'))
 
