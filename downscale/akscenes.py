@@ -118,7 +118,7 @@ def main():
     write_scene_domains(scenes_file)
 
     # Select out one domain
-    pd = shputil.read_df(scenes_file).set_index(['ix','iy'])
+    pd = shputil.read_df(scenes_file).set_ix(['index','iy'])
     row = pd.loc[180,24]
     print(row)
 
