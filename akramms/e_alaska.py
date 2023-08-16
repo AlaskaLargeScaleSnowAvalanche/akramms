@@ -22,7 +22,9 @@ domains = experiment.DomainGrid(
     domain_size, domain_margin)
 
 # /vzip/ is a GDAL thing for shapefiles contained in .zip
-experiment_region_shp = '/vzip/' + config.roots.syspath('{DATA}/wolken/SE_AK_Domain_Land.zip') + '/SE_AK_Domain_Land.shp',
+
+experiment_region_zip = config.roots.syspath('{DATA}/wolken/SE_AK_Domain_Land.zip')
+experiment_region_shp = '/vsizip/' + config.roots.syspath('{DATA}/wolken/SE_AK_Domain_Land.zip') + '/SE_AK_Domain_Land.shp'
 
 # Scehma of top-level tuple describing a single trial.
 combo_schema = schema.Schema({

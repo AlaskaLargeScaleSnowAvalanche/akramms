@@ -5,6 +5,7 @@ import math,os
 import numpy as np
 from osgeo import ogr
 import shapely
+import pandas as pd
 from uafgi.util import make,gisutil,shputil
 from akramms import config
 from akramms import d_ifsar, d_usgs_landcover
@@ -119,6 +120,7 @@ def r_active_domains(exp_mod):
     def action(tdir):
         # Load the experiment region and convert to Shapely Polygon
         driver = ogr.GetDriverByName('ESRI Shapefile')
+        print('Opening shapefile ', exp_mod.experiment_region_shp)
         src_ds = driver.Open(exp_mod.experiment_region_shp)
         src_lyr = src_ds.GetLayer()   # Put layer number or name in her
         while True:
@@ -140,19 +142,23 @@ def r_active_domains(exp_mod):
             experiment_region = shapely.geometry.MultiPolygon(polygons)
 
         rows = list()
-        for iy in range(0, self.ny):
-            for ix in range(0, self.nx):
-                domain = self.domain(ix, iy)
+        for iy in range(0, gridD.ny):
+            for ix in range(0, gridD.nx):
+                domain = gridD.poly(ix, iy)
                 if domain.intersects(experiment_region):
-                    domain_margin = self.domain(ix, iy, margin=True)
+                    domain_margin = gridD.poly(ix, iy, margin=True)
                     rows.append((ix,iy,domain,domain_margin))
 
         df = pd.DataFrame(rows, columns=('ix', 'iy', 'domain', 'domain_margin'))
+        df.ix = df.ix.astype('int32')
+        df.iy = df.iy.astype('int32')
+#        df = df.astype({'ix':'int', 'iy':'int'})
+
         os.makedirs(exp_mod.dir, exist_ok=True)
-        shputil.write_df(df[['ix', 'iy', 'domain']], 'domain', 'MutliPolygon', domains_shp)
-        shputil.write_df(df[['ix', 'iy', 'domain_margin']], 'domain_margin', 'MutliPolygon', domains_margin_shp)
-        
-    return make.Rule(action, [exp_mod.experiment_region_shp], [domains_shp, domains_margin_shp])
+        shputil.write_df(df[['ix', 'iy', 'domain']], 'domain', 'MultiPolygon', domains_shp)
+        shputil.write_df(df[['ix', 'iy', 'domain_margin']], 'domain_margin', 'MultiPolygon', domains_margin_shp)
+
+    return make.Rule(action, [exp_mod.experiment_region_zip], [domains_shp, domains_margin_shp])
 
 # -----------------------------------------------------------------------
 @functools.lru_cache()
