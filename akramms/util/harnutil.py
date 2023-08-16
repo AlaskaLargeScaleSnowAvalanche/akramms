@@ -1,6 +1,5 @@
 import os,subprocess,re,sys
 import functools
-import redis,rq
 from akramms import config
 
 HARNESS = config.HARNESS    # Alias

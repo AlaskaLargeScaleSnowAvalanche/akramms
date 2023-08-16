@@ -1,11 +1,13 @@
 # Fundamental stuff needed to run an experiment.
 
-import math
+import functools
+import math,os
 import numpy as np
-from osgo import ogr
-from uafgi.util import make
+from osgeo import ogr
+import shapely
+from uafgi.util import make,gisutil,shputil
 from akramms import config
-from akramms import d_ifar, d_usgs_landcover
+from akramms import d_ifsar, d_usgs_landcover
 
 class DomainGrid(gisutil.RasterInfo):    # (gridD)
     """Define a bunch of rectangles indexed by (idom, jdom).
@@ -16,7 +18,7 @@ class DomainGrid(gisutil.RasterInfo):    # (gridD)
 
     def __init__(self, wkt, index_region_shp, domain_size, domain_margin):
 
-    """
+        """
         wkt:
             Projection to use.
         index_region_shp: shapefile name
@@ -135,7 +137,7 @@ def r_active_domains(exp_mod):
                     x,y,z = ring.GetPoint(p)
                     points.append(shapely.geometry.Point(x,y))
                 polygons.append(shapely.geometry.Polygon(points))
-            experiment_region shapely.geometry.MultiPolygon(polygons)
+            experiment_region = shapely.geometry.MultiPolygon(polygons)
 
         rows = list()
         for iy in range(0, self.ny):
@@ -143,14 +145,14 @@ def r_active_domains(exp_mod):
                 domain = self.domain(ix, iy)
                 if domain.intersects(experiment_region):
                     domain_margin = self.domain(ix, iy, margin=True)
-                    rows.append((ix,iy,domain,domain_margin)
+                    rows.append((ix,iy,domain,domain_margin))
 
         df = pd.DataFrame(rows, columns=('ix', 'iy', 'domain', 'domain_margin'))
         os.makedirs(exp_mod.dir, exist_ok=True)
         shputil.write_df(df[['ix', 'iy', 'domain']], 'domain', 'MutliPolygon', domains_shp)
         shputil.write_df(df[['ix', 'iy', 'domain_margin']], 'domain_margin', 'MutliPolygon', domains_margin_shp)
         
-    return make.Rule([exp_mod.experiment_region_shp], [domains_shp, domains_margin_shp], action)
+    return make.Rule(action, [exp_mod.experiment_region_shp], [domains_shp, domains_margin_shp])
 
 # -----------------------------------------------------------------------
 @functools.lru_cache()
@@ -175,7 +177,7 @@ def r_ifsar(exp_mod, idom, jdom):
     def action(self, tdir):
         poly = exp_mod.domains.poly(combo.idom, combo.jdom, margin=True)
         return d_ifsar.extract(type, poly, ofname)
-    return make.Rule([ifsar_vrt], [ofname], action)
+    return make.Rule(action, [ifsar_vrt], [ofname])
 # -----------------------------------------------------------------------
 @functools.lru_cache()
 def r_landcover(exp_mod, idom, jdom):
@@ -193,9 +195,10 @@ def r_landcover(exp_mod, idom, jdom):
     def action(tdir):
         poly = exp_mod.domains.poly(combo.idom, combo.jdom, margin=True)
         return d_usgs_landcover.extract(type, poly, ofname)
-    return make.Rule([d_usgs_landcover.landcover_img], [ofname], action)
+    return make.Rule(action, [d_usgs_landcover.landcover_img], [ofname])
 # -----------------------------------------------------------------------
-@functools r_forest(exp_mod, idom, jdom):
+@functools.lru_cache()
+def r_forest(exp_mod, idom, jdom):
     """Convert a landcover file to a forest file."""
 
     landcover_tif = r_landcover(exp_mod, idom, jdom).outputs[0]
@@ -209,7 +212,7 @@ def r_landcover(exp_mod, idom, jdom):
         # Write it out!
         gdalutil.write_raster(ofname, grid_info, forest, 0, type=gdal.GDT_Byte)
 
-    return make.Rule([landcover_tif], [ofname], action)
+    return make.Rule(action, [landcover_tif], [ofname])
 
 # -----------------------------------------------------------------------
 @functools.lru_cache()
@@ -266,59 +269,7 @@ def r_snow(exp_mod, snow_dataset, downscale_algo, year0, year1, idom, jdom):
         else:
             raise ValueError(f'Unsupported downscale_algo: {downscale_algo}')
 
-    return make.Rule(inputs, [ofname], action)
+    return make.Rule(action, inputs, [ofname])
 
 # -----------------------------------------------------------------------
 
-
-stage0_rules(rules, scene_dir):
-
-    scene_args = params.load(scene_dir)
-
-    # Create snow input file on the scene grid
-    if scene_args['downscale'] == 'select':
-        snow_input = rules.add(r_snow.select_sx3_rule(
-            scene_dir, scene_args['snowdepth_file'], scene_args['snowdepth_geo'])).outputs[0]
-    elif scene_args['downscale'] == 'lapse':
-        distance_from_coastA_tif = os.path.join(scene_dir, 'distance_from_coastA.tif')
-        rules.add(r_snow.distance_from_coast_rule(
-            scene_args['snowdepth_geo'], distance_from_coastA_tif))
-
-        snow_input = rules.add(r_snow.lapse_sx3_rule(
-            scene_dir, scene_args['snowdepth_file'], scene_args['snowdepth_geo'],
-            distance_from_coastA_tif)).outputs[0]
-
-    else:
-        raise ValueError("Illegel downscale algorithm: '{}'".format(scene_args['downscale']))
-
-    # Run ArcGIS script to prepare files for eCognition
-    prepare_outputs = rules.add(r_prepare.rule(scene_dir)).outputs
-
-    # Get neighbor1 graph for DEM routing network
-    dem_file = scene_args['dem_file']
-    dem_filled_file,sinks_file,neighbor1_file = rules.add(r_domain_builder.neighbor1_rule(
-        dem_file, scene_dir, fill_sinks=True)).outputs
-
-    # Loop over combos
-#    ramms_dirs_release_files = list()    # [(ramms_dir, [release_file, ...]), ...]
-#    all_ramms_dirs = list()
-    all_release_files = list()    # Release files we will run RAMMS on
-    for return_period in scene_args['return_periods']:
-        for forest in scene_args['forests']:
-
-            # Run eCognition
-            rules.add(r_ecog.rule(scene_dir, prepare_outputs, return_period, forest))
-
-#            # Burn PRAs produced by eCognition into raster
-#            pra_file, pra_burn_file = process_tree.pra_files(scene_args, return_period, forest)
-#            rules.add(
-#                r_domain_builder.burn_pra_rule(dem_file, pra_file, pra_burn_file))
-
-            # Post-Process eCognition Output (the pra_file)
-            # and also split into chunks.
-            # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
-            pra_post_rule, ramms_names = r_pra_post.rule(
-                scene_dir, dem_filled_file, return_period, forest, snow_input)
-            release_shplists = rules.add(pra_post_rule).outputs
-
-            rules.add(r_ramms.chunk_rule(scene_dir, ramms_names))

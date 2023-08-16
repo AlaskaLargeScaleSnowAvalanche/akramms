@@ -3,9 +3,10 @@
 
 from akramms import config,params
 import argparse,itertools,os,subprocess,sys,io,codecs
-from akramms import r_ramms
+from akramms import r_ramms,experiment
 from akramms.util import rammsutil
-from uafgi.util import ioutil
+from uafgi.util import ioutil,make
+import importlib
 
 # ------------------------------------------------------------------------
 # https://mike.depalatis.net/blog/simplifying-argparse.html
@@ -242,15 +243,57 @@ def setup_scene(args):
     stages.run_stage0(scene_dir)
     stages.run_stage1(scene_dir)
 
+
+
+# ---------------------------------------------------------------------
+def load_exp_mod(ename):
+    try:
+        exp_mod = importlib.import_module(ename)
+    except ModuleNotFoundError:
+        try:
+            exp_mod = importlib.import_module('akramms.' + ename)
+        except ModuleNotFoundError:
+            raise ModuleNotFoundError(f'Cannot load module {ename} or akramms.{ename}')# from None
+    return exp_mod
+
+def get_exp_dir(exp_mod):
+    return config.roots.join('PRJ', exp_mod.name)
+
 @subcommand([
-    argument('experiment-dir', help='Directory of experiment'),
-    argument('-e', '--expmod', required=True,
+    argument('experiment-module',
         help='Python module describing the experiment'),
 ])
+def init(args):
+    exp_mod = load_exp_mod(getattr(args, 'experiment-module'))
+    exp_dir = get_exp_dir(exp_mod)
+
+    makefile = make.Makefile()
+    makefile.add(experiment.r_active_domains(exp_mod))
+    makefile.generate(os.path.join(exp_dir, 'init_mk'), run=True, ncpu=1)
+
+@subcommand([
+    argument('experiment-module',
+        help='Python module describing the experiment'),
+    argument('-c', '--combos', default='full',
+        help='Name of combo-generating function'),
+])
 def setup(args):
-    exp_dir = args.experiment_dir
-    exp_mod = args.expmod
-    print('xxx ', exp_dir, exp_mod)
+
+    # Load the module (initial 'akramms.' is optional)
+    exp_mod = load_exp_mod(getattr(args, 'experiment-module'))
+    exp_dir = get_exp_dir(exp_mod)
+
+    # Load combo-generating function
+    combos_fn = getattr(exp_mod, args.combos)
+
+    # Load combo-to-rule function
+    add_combo_fn = getattr(exp_mod, 'add_combo')
+
+    # Generate the makefile
+    makefile = make.Makefile()
+    for combo in combos_fn():
+        print('cobmo ', combo)
+        add_combo_fn(makefile, combo)
 
 def main():
     args = cli.parse_args()

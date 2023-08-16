@@ -1,9 +1,12 @@
-import schema as schema
+import os,collections
+import schema
+from uafgi.util import schemautil,shputil
+from akramms import config, experiment
 
 # Top-level experimental design for Alaska
 
 # Root directory of studies in this experiment
-name = 'alaska'
+name = 'ak'
 dir = os.path.join(config.roots['PRJ'], name)
 
 # Map coordinate system we use
@@ -47,7 +50,7 @@ combo_schema = schema.Schema({
 })
 
 combo_keys = list(combo_schema.schema.keys())
-Combo = collections.named_tuple('Combo', combo_keys)
+Combo = collections.namedtuple('Combo', combo_keys)
 
 # -------------------------------------------------------------
 def add_combo(makefile, combo):
@@ -57,7 +60,7 @@ def add_combo(makefile, combo):
 
     # Set of domains that cover our experiment region
     # (This file is the same for ALL trials)
-    makefile.add(experiment.r_active_domains(exp_mod))
+#    makefile.add(experiment.r_active_domains(exp_mod))
 
     # DTM and Forest (landcover==42)
     dem_tif = makefile.add(experiment.r_ifsar(exp_mod, combo.idom, combo.jdom))
@@ -94,21 +97,21 @@ def add_combo(makefile, combo):
 
 # -------------------------------------------------------------
 # Different subsets of combos to try when running the experiment
-def full_combos():
+def full():
     """Yields the combos for the FULL experiment.
     REQUIRES: domains.shp and domains_margin.shp
     """
 
-        domains_margin_shp = os.path.join(dir, 'domains_margin.shp')
-        domains_df = shputil.read_df(domains_margin_shp).setindex(['ix', 'iy'])
-        domains_ij = [(row.i,row.j) for row in domains_df.iterrows()]
+    domains_margin_shp = os.path.join(dir, 'domains_margin.shp')
+    domains_df = shputil.read_df(domains_margin_shp).setindex(['ix', 'iy'])
+    domains_ij = [(row.i,row.j) for row in domains_df.iterrows()]
 
-        # Generate set of trials
-        snow = 'ccsm'
-        downscale_algo = 'lapse'
-        for year0,year1 in [(1981, 1990),]:
-            for forest in ('For', 'NoFor'):
-                for return_period in [10,30,100,300]:
-                    for idom,jdom in domains_ij:
-                        yield Combo(snow, year0, year1, downscale_algo, forest, return_period, idom, jdom)
+    # Generate set of trials
+    snow = 'ccsm'
+    downscale_algo = 'lapse'
+    for year0,year1 in [(1981, 1990),]:
+        for forest in ('For', 'NoFor'):
+            for return_period in [10,30,100,300]:
+                for idom,jdom in domains_ij:
+                    yield Combo(snow, year0, year1, downscale_algo, forest, return_period, idom, jdom)
 

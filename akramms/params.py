@@ -4,10 +4,6 @@ import numpy as np
 from akramms.util import paramutil
 
 
-# Describes t
-ramms_schema = schema.Schema
-
-
 # List of all parameters involved in an overall run.
 # Param = collections.namedtuple('Param', ('name', 'units', 'type', 'required', 'description'))
 ALL = paramutil.parse([
