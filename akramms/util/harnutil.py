@@ -1,4 +1,4 @@
-import os,subprocess,re,sys,contextlib
+import os,subprocess,re,sys
 import functools
 import redis,rq
 from akramms import config
@@ -84,124 +84,76 @@ def rsync_files(fnames, tdir, flags=['--copy-links', '-avz'], direction='up'):
     return fnames_rel
 
 
-def run_remote(inputs, cmd, tdir,
-        write_inputs=False, sync_files=(not config.shared_filesystem)):
+def run_remote(inputs, cmd, tdir, write_inputs=False):
+    """Runs a command on the remote Windows machine.
+    inputs:
+        Input files to copy to Windows before running.
+    cmd: [str, ...]
+        The command to run on the remote host
+    write_inputs: bool
+        If set, write the input file list to STDIN, one file at a time.
+    Returns outputs:
+        Output files on remote machine (Relative pathnames)
+    """
 
-        """Runs a command on the remote Windows machine.
-        inputs:
-            Input files to copy to Windows before running.
-        cmd: [str, ...]
-            The command to run on the remote host
-        write_inputs: bool
-            If set, write the input file list to STDIN, one file at a time.
-        Returns outputs:
-            Output files on remote machine (Relative pathnames)
-        """
+    # Sync RAMMS input files to remote dir
+    if not config.shared_filesystem:
+        rsync_files(inputs, tdir, direction='up')
 
-        # Sync RAMMS input files to remote dir
-        if sync_files:
-            rsync_files(inputs, tdir, direction='up')
+    # Run RAMMS
 
-        # Start the remote process
-        cmd = config.ssh_w + cmd
-        kw = dict()
-        if write_inputs:
-            kw['stdin'] = stdin=subprocess.PIPE
-        print(' '.join(cmd))
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, **kw)
+    # Start the remote process
+    cmd = config.ssh_w + cmd
+    kw = dict()
+    if write_inputs:
+        kw['stdin'] = stdin=subprocess.PIPE
+    print(' '.join(cmd))
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, **kw)
 
-        # Write to processes stdin (relative path of input files)
-        if write_inputs:
-            inputs_txt = ''.join('INPUT: {}\r\n'.format(config.roots.relpath(input)) for input in inputs) + 'END INPUTS\r\n'
-            #for input in inputs:
+    # Write to processes stdin (relative path of input files)
+    if write_inputs:
+        inputs_txt = ''.join('INPUT: {}\r\n'.format(config.roots.relpath(input)) for input in inputs) + 'END INPUTS\r\n'
+        for input in inputs:
             proc.stdin.write(inputs_txt.encode('UTF-8'))
-            proc.stdin.flush()
+        proc.stdin.flush()
 
-        # Read outputs
-        outputs_rel = list()
-        outputRE = re.compile(r'OUTPUT:\s([^\s]*)\s*$')
-        while True:
-            line = proc.stdout.readline().decode('UTF-8')
-            if not line:
-                break
-            print(line, end='')
-            sys.stdout.flush()
+    # Read outputs
+    outputs_rel = list()
+    outputRE = re.compile(r'OUTPUT:\s([^\s]*)\s*$')
+    while True:
+        line = proc.stdout.readline().decode('UTF-8')
+        if not line:
+            break
+        print(line, end='')
+        sys.stdout.flush()
 
-            # Exit if remote program is exiting
-            if line == 'END OUTPUTS':
-                break
+        # Exit if remote program is exiting
+        if line == 'END OUTPUTS':
+            break
 
-            # Collect list of output files as declared by Windows-side program
-            match = outputRE.match(line)
-            if match is not None:
-                outputs_rel.append(match.group(1))
+        # Collect list of output files as declared by Windows-side program
+        match = outputRE.match(line)
+        if match is not None:
+            outputs_rel.append(match.group(1))
 
-        try:
-            proc.wait(timeout=10)    # The process should be exited anyway, wait for 10 seconds
-            if proc.returncode != 0:
-                raise subprocess.CalledProcessError(proc.returncode, cmd)
-        except subprocess.TimeoutExpired as e:
-            # The IDL on the other side has not exited cleanly.  We should
-            # continue on Linux side; and next time Windows stuff is run,
-            # IDL will be killed before it begins.
-            print('***** WARNING:')
-            print(e)
+    try:
+        proc.wait(timeout=10)    # The process should be exited anyway, wait for 10 seconds
+        if proc.returncode != 0:
+            raise subprocess.CalledProcessError(proc.returncode, cmd)
+    except subprocess.TimeoutExpired as e:
+        # The IDL on the other side has not exited cleanly.  We should
+        # continue on Linux side; and next time Windows stuff is run,
+        # IDL will be killed before it begins.
+        print('***** WARNING:')
+        print(e)
 
-        # outputs contains relative names of files.
-        if sync_files:
-            harnutil.rsync_files(outputs_b, tdir, direction='down')
+    # outputs contains relative names of files.
+    if not config.shared_filesystem:
+        harnutil.rsync_files(outputs_b, tdir, direction='down')
 
-        # Outputs as local filenames
-        outputs = [config.roots.syspath(x) for x in outputs_rel]
-        return outputs
-
-class QueueRunner:
-    def __init__(self, **kwargs):
-        self.redis = redis.Redis()
-        self.queue = rq.Queue(connection=self.redis, **kwargs)
-
-    # Timeout includes time waiting in the queue; so it needs to be as long as the longest job we MIGHT run.
-    def run(self, func, *args, timeout=3*3600, at_front=False, **kwargs):
-        print('func = ', func)
-#        kw = dict(kwargs)
-#        kw['timeout'] = timeout
-        job = rq.job.Job.create(func, connection=self.redis, timeout=timeout, args=args, kwargs=kwargs)
-        #job = self.queue.enqueue(*args, **kwargs)
-        self.queue.enqueue_job(job, at_front=at_front)
-        try:
-            result = rq.results.Result.fetch_latest(job, serializer=job.serializer, timeout=timeout)
-            if result.type == result.Type.SUCCESSFUL: 
-                ret = result.return_value
-                print('Success ', ret)
-                return ret
-            else: 
-                print('Failure ', result.exc_string)
-                raise RuntimeError(result.exc_string)
-
-        except:
-            print('Canceling...')
-            try:
-                rq.command.send_stop_job_command(self.redis, job.id)
-            except Exception as e:
-                print('Exception stopping job ', e)
-                # Job is not currently executing, No such job
-                pass
-            try:
-                job.cancel()
-            except Exception as e:
-                print('Exception canceling job ', e)
-
-            try:
-                job.delete()
-            except Exception as e:
-                print('Exception deleting job ', e)
-
-            raise
-
-queue_runner = QueueRunner()
-
-def run_remote_queued(*args, **kwargs):
-    return queue_runner.run(run_remote, *args, **kwargs)
+    # Outputs as local filenames
+    outputs = [config.roots.syspath(x) for x in outputs_rel]
+    return outputs
 
 
 def print_outputs(outputs):
