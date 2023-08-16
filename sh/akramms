@@ -160,16 +160,6 @@ def spec(args):
 #        for x in map:
 #            print('    ',x)
 
-@subcommand([
-    argument('scene', help='Top-Level scene directory to setup through stages 0 and 1.'),
-])
-def setup(args):
-    scene_dir = args.scene
-    scene_args = params.load(scene_dir)
-    print(scene_args)
-
-    stages.run_stage0(scene_dir)
-    stages.run_stage1(scene_dir)
 
 
 
@@ -241,6 +231,26 @@ def export(args):
             relfiles, tdir)
 
 
+@subcommand([
+    argument('scene', help='Top-Level scene directory to setup through stages 0 and 1.'),
+])
+def setup_scene(args):
+    scene_dir = args.scene
+    scene_args = params.load(scene_dir)
+    print(scene_args)
+
+    stages.run_stage0(scene_dir)
+    stages.run_stage1(scene_dir)
+
+@subcommand([
+    argument('experiment-dir', help='Directory of experiment'),
+    argument('-e', '--expmod', required=True,
+        help='Python module describing the experiment'),
+])
+def setup(args):
+    exp_dir = args.experiment_dir
+    exp_mod = args.expmod
+    print('xxx ', exp_dir, exp_mod)
 
 def main():
     args = cli.parse_args()
