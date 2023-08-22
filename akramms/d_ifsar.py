@@ -1,5 +1,6 @@
-import functools,re
+import functools,re,os,subprocess
 from akramms import config
+from uafgi.util import make
 
 # There needs to be a symlink to the ACTUAL location of the ifsar data
 ifsar_root = config.roots.syspath('{DATA}/ifsar')
@@ -59,7 +60,7 @@ def r_vrt(type):
         cmd += tile_relnames
         subprocess.run(cmd, cwd=data_root, check=True)
 
-    return make.Rule([], [ofname], action)
+    return make.Rule(action, [], [ofname])
 # ------------------------------------------------------------------
 def extract(type, poly, ofname):
     """
@@ -80,11 +81,17 @@ def extract(type, poly, ofname):
     cmd += ['-eco']    # Error when completely outside (SANITY CHECK)
 
     cmd.append('-projwin')
-    cmd += [str(n) for n in (min(x0,x1), min(y0,y1), max(x0,x1), max(y0,y1))]
+    cmd += [str(n) for n in (x0,y1,x1,y0)]
+
+    # This needs to be in i/j not x/y
+    # cmd.append('-srcwin')
+    # cmd += [str(n) for n in (min(x0,x1), min(y0,y1), abs(x1-x0), abs(y1-y0))]
+
+#    cmd += [str(n) for n in (min(x0,x1), min(y0,y1), max(x0,x1), max(y0,y1))]
 #    cmd += ['-projwin', str(x0), str(y1), str(x1), str(y0), ifsar_vrt, ofname]    # North-up
     cmd += [r_vrt(type).outputs[0], ofname]
 
-    os.makedirs(os.path.split(ofname)[0], check=True)
+    os.makedirs(os.path.split(ofname)[0], exist_ok=True)
     subprocess.run(cmd, check=True)
 
 # ------------------------------------------------------------------

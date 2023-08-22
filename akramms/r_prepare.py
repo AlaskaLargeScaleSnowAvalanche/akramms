@@ -1,4 +1,4 @@
-import subprocess
+import subprocess,functools
 import os,pathlib,shutil
 import netCDF4
 import numpy as np
@@ -59,14 +59,14 @@ def r_prepare_scene(scene_dir, defaults=dict(), **kwargs):
         inputs.append(kwargs['forest_file'])
     outputs = [os.path.join(scene_dir, 'scene.nc')]
 
-    return make.Rule(inputs, outputs, action)
+    return make.Rule(action, inputs, outputs)
 
 # ---------------------------------------------------------------------------
 @functools.lru_cache()
 def r_prepare_scene(scene_dir, defaults=dict(), **kwargs):
     def action(tdir):
         prepare_scene(scene_dir, defaults=defaults, **kwargs)
-
+    return make.Rule(action, [], [os.path.join(scene_dir, 'scene.nc')])
 
 # ---------------------------------------------------------------------------
 import_xml_tpl = """<?xml version="1.0" encoding="UTF-8"?>

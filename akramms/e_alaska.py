@@ -1,7 +1,7 @@
-import os,collections
+import os,collections,sys
 import schema
 from uafgi.util import schemautil,shputil
-from akramms import config, experiment
+from akramms import config, experiment,r_prepare
 
 # Top-level experimental design for Alaska
 
@@ -10,7 +10,7 @@ name = 'ak'
 dir = os.path.join(config.roots['PRJ'], name)
 
 # Map coordinate system we use
-wkt = 'PROJCS["NAD83 / Alaska Albers",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["Degree",0.017453292519943295]],PROJECTION["Albers"],PARAMETER["standard_parallel_1",55],PARAMETER["standard_parallel_2",65],PARAMETER["latitude_of_origin",50],PARAMETER["central_meridian",-154],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["Meter",1]]',
+wkt = 'PROJCS["NAD83 / Alaska Albers",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["Degree",0.017453292519943295]],PROJECTION["Albers"],PARAMETER["standard_parallel_1",55],PARAMETER["standard_parallel_2",65],PARAMETER["latitude_of_origin",50],PARAMETER["central_meridian",-154],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["Meter",1]]'
 
 # Define the domains within all of Alaska, each with an (idom, jdom) coordinate.
 domain_size = (30000., 30000.)   # 25km^2
@@ -18,8 +18,9 @@ domain_margin = (8000,8000)    # 8km margin
 domains = experiment.DomainGrid(
     wkt,
     config.roots.syspath('{DATA}/fischer/AlaskaBounds.shp'),
-    
     domain_size, domain_margin)
+
+# One of the "Juneau" domains has coordinates (ix,iy) = (113,26)
 
 # /vzip/ is a GDAL thing for shapefiles contained in .zip
 
@@ -55,6 +56,13 @@ combo_keys = list(combo_schema.schema.keys())
 Combo = collections.namedtuple('Combo', combo_keys)
 
 # -------------------------------------------------------------
+def combo_to_scene_subdir(combo):
+    trial_name = f'{name}_{combo.snow_dataset}_{combo.year0}_{combo.year1}_{combo.downscale_algo}_{combo.forest}_{combo.return_period}'
+    scene_name = f'x-{combo.idom:03d}-{combo.jdom:03d}'    # Underscores would confuse things
+
+    return os.path.join(trial_name, scene_name)
+
+# -------------------------------------------------------------
 def add_combo(makefile, combo):
     """Adds rules needed to set up (and also run) a trial."""
 
@@ -65,32 +73,37 @@ def add_combo(makefile, combo):
 #    makefile.add(experiment.r_active_domains(exp_mod))
 
     # DTM and Forest (landcover==42)
-    dem_tif = makefile.add(experiment.r_ifsar(exp_mod, combo.idom, combo.jdom))
+    dem_tif = makefile.add(experiment.r_ifsar(exp_mod, combo.idom, combo.jdom)).outputs[0]
     if combo.forest == 'For':
         landcover_tif = makefile.add(experiment.r_landcover(
-            exp_mod, combo.idom, combo.jdom))
+            exp_mod, combo.idom, combo.jdom)).outputs[0]
         forest_tif = makefile.add(experiment.r_forest(
-            exp_mod, combo.idom, combo.jdom))
+            exp_mod, combo.idom, combo.jdom)).outputs[0]
 
     # Snow downscaling
     if combo.downscale_algo == 'lapse':
-        makefile.add(experiment.r_dfcA(exp_mod, idom, jdom))
+        makefile.add(experiment.r_dfcA(exp_mod))
     sx3I_tif = makefile.add(experiment.r_snow(
         exp_mod, combo.snow_dataset, combo.downscale_algo,
         combo.year0, combo.year1, combo.idom, combo.jdom)).outputs[0]
 
     # Convert Combo to a scene_dir / scen_args
-    scene_name = f'{name}-{combo.idom:03d}-{combo.jdom:03d}'    # Underscores would confuse things
-    scene_dir = os.path.join(exp_mod.dir, scene_name)
+    scene_dir = os.path.join(exp_mod.dir, combo_to_scene_subdir(combo))
+
     kwargs = dict(
-        return_periods=[combo.return_period],
-        forests=[1 if combo.forest=='For' else 0],
+        return_periods=(combo.return_period,),
+        forests=((1 if combo.forest=='For' else 0),),
         dem_file=dem_tif,
         snowdepth_file=sx3I_tif)
     if combo.forest:
         kwargs['forest_file'] = forest_tif
-    makefile.add(r_prepare.r_prepare_scene(
-        scene_dir, defaults='alaska', **kwargs))
+
+    print(f'   scene_dir: {scene_dir}')
+    for k,v in kwargs.items():
+        print(f'   {k}: {v}')
+    rule = r_prepare.r_prepare_scene(
+        scene_dir, defaults='alaska', **kwargs)
+    makefile.add(rule)
 
 
     # TODO: call stages.add_stage0_rules() and stages.add_stage1_rules()
@@ -117,3 +130,7 @@ def full():
                 for idom,jdom in domains_ij:
                     yield Combo(snow, year0, year1, downscale_algo, forest, return_period, idom, jdom)
 
+# -----------------------------------------------------------------
+def juneau():
+    # Just one combo for now
+    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 26)    # A Juneau-close box

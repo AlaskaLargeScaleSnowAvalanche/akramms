@@ -2,7 +2,7 @@
 #
 
 from akramms import config,params
-import argparse,itertools,os,subprocess,sys,io,codecs
+import argparse,itertools,os,subprocess,sys,io,codecs,re
 from akramms import r_ramms,experiment
 from akramms.util import rammsutil
 from uafgi.util import ioutil,make
@@ -270,21 +270,27 @@ def init(args):
     makefile = make.Makefile()
     makefile.add(experiment.r_active_domains(exp_mod))
     makefile.generate(os.path.join(exp_dir, 'init_mk'), run=True, ncpu=1)
+# -----------------------------------------------------------
+experiment_specRE = re.compile(r'([^.]+)\.([^.]+)$')
+def _parse_experiment_spec(spec):
+    match = experiment_specRE.match(spec)
+    return (match.group(1), match.group(2))
 
 @subcommand([
-    argument('experiment-module',
-        help='Python module describing the experiment'),
-    argument('-c', '--combos', default='full',
-        help='Name of combo-generating function'),
+    argument('experiment-spec', type=_parse_experiment_spec,
+        help='Python module and combo function describing the experiment, eg: e_alaska.juneau'),
+#    argument('-c', '--combos', default='full',
+#        help='Name of combo-generating function'),
 ])
 def setup(args):
+    sexp_mod, sexp_fn = getattr(args, 'experiment-spec')
 
     # Load the module (initial 'akramms.' is optional)
-    exp_mod = load_exp_mod(getattr(args, 'experiment-module'))
+    exp_mod = load_exp_mod(sexp_mod)
     exp_dir = get_exp_dir(exp_mod)
 
     # Load combo-generating function
-    combos_fn = getattr(exp_mod, args.combos)
+    combos_fn = getattr(exp_mod, sexp_fn)
 
     # Load combo-to-rule function
     add_combo_fn = getattr(exp_mod, 'add_combo')
@@ -292,8 +298,10 @@ def setup(args):
     # Generate the makefile
     makefile = make.Makefile()
     for combo in combos_fn():
-        print('cobmo ', combo)
+        print(f'----- Adding Combo: {combo}')
         add_combo_fn(makefile, combo)
+
+    makefile.generate(os.path.join(exp_dir, 'init_mk'), run=True, ncpu=1)
 
 def main():
     args = cli.parse_args()

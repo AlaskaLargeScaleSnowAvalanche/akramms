@@ -1,5 +1,5 @@
 import subprocess
-import os,pathlib,shutil
+import os,pathlib,shutil,functools
 import netCDF4
 import numpy as np
 import pandas as pd
@@ -108,6 +108,7 @@ def r_distance_from_coast(wrf_geo_nc, ofname):
         distanceA = distanceA1.reshape((gridA.ny, gridA.nx))
 
         # Save it to GeoTIFF
+        os.makedirs(os.path.split(ofname)[0], exist_ok=True)
         gdalutil.write_raster(ofname, gridA, distanceA, 0, type=gdal.GDT_Float32)
         # gdalutil.write_raster('hgt.tif', gridA, wrfdemA, wrfdemA_nodata, type=gdal.GDT_Float32)
                 
@@ -220,7 +221,7 @@ def downscale_sx3_with_lapse(sx3_file, geo_nc, distance_from_coastA_tif, dem_tif
         The WRF output file containing sx3 snow variable
     geo_nc: (gridA)
         The WRF output file describing the CRS and geotransform
-    distance_from-coastA_tif: (gridA)
+    distance_from_coastA_tif: (gridA)
         Previously computed distance-from-coast measure (see above)
     dem_tif: (gridI)
         The hi-res DEM for a particular RAMMS scene
@@ -266,9 +267,9 @@ def downscale_sx3_with_lapse(sx3_file, geo_nc, distance_from_coastA_tif, dem_tif
     if True:
         print('Computing lapseA...')
         lapseA = lapse_by_distance_from_coast(distanceA)
-        gdalutil.write_raster(
-            os.path.join(scene_dir, 'lapseA.tif'),
-            gridA, lapseA, -1.e30, type=gdal.GDT_Float32)
+#        gdalutil.write_raster(
+#            os.path.join(scene_dir, 'lapseA.tif'),
+#            gridA, lapseA, -1.e30, type=gdal.GDT_Float32)
 
         print('Computing lapseAI...')
         lapseAI = gdalutil.regrid(
@@ -285,10 +286,12 @@ def downscale_sx3_with_lapse(sx3_file, geo_nc, distance_from_coastA_tif, dem_tif
 #        _,elevAI,_ = gdalutil.read_raster(elevAI_tif)
 #    else:
     if True:
+        print('Computing elevA...')
         elevA = gdalutil.regrid(
             elevI, gridI, float(elevI_nd),
             gridA, float(elevI_nd),
             resample_algo=gdalconst.GRA_Average)
+        print('Computing elevAI...')
         elevAI = gdalutil.regrid(
             elevA, gridA, float(elevI_nd),
             gridI, float(elevI_nd),
@@ -315,6 +318,8 @@ def downscale_sx3_with_lapse(sx3_file, geo_nc, distance_from_coastA_tif, dem_tif
 
     # --------------------------------------------------------
     # Write output
+    print(f'Writing output: {ofname}')
+    os.makedirs(os.path.split(ofname)[0], exist_ok=True)
     gdalutil.write_raster(ofname, gridI, sx3I, sx3A_nd, type=gdal.GDT_Float32)
 
 

@@ -1,4 +1,4 @@
-import os
+import os,subprocess
 from akramms import config
 
 # There needs to be a symlink to the ACTUAL location of the ifsar data
@@ -25,11 +25,10 @@ def extract(poly, ofname):
     cmd += ['-eco']    # Error when completely outside (SANITY CHECK)
 
     cmd.append('-projwin')
-    cmd += [str(n) for n in (min(x0,x1), min(y0,y1), max(x0,x1), max(y0,y1))]
-#    cmd += ['-projwin', str(x0), str(y1), str(x1), str(y0), ifsar_vrt, ofname]    # North-up
+    cmd += [str(n) for n in (x0,y1,x1,y0)]
     cmd += [landcover_img, ofname]
 
-    os.makedirs(os.path.split(ofname)[0], check=True)
+    os.makedirs(os.path.split(ofname)[0], exist_ok=True)
     subprocess.run(cmd, check=True)
 
 # ------------------------------------------------------------------
