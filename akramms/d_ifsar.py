@@ -78,6 +78,7 @@ def extract(type, poly, ofname):
     cmd = ['gdal_translate']
     # https://gis.stackexchange.com/questions/1104/should-gdal-be-set-to-produce-geotiff-files-with-compression-which-algorithm-sh
     cmd += ['-co', 'COMPRESS=DEFLATE']
+    cmd += ['-co', 'TFW=YES']   # https://gis.stackexchange.com/questions/271995/how-to-get-gdal-translate-to-create-world-file-for-geotiff
     cmd += ['-eco']    # Error when completely outside (SANITY CHECK)
 
     cmd.append('-projwin')

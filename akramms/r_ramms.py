@@ -241,7 +241,7 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
             chunk_index_df = pd.DataFrame(chunk_info, columns=['segment', 'Id', 'chunk_name'])
 #            with open(, 'w') as out:
             #chunk_index_df.to_csv(f'{base}_chunks.csv', index=False)
-            ccsv = rammsutil.chunks_csv(scene_args['scene_dir'], jb.ramms_name)
+            ccsv = rammsutil.chunks_csv(scene_args['scene_dir'], jb.ramms_name)    # ccsv = filename: *_chunks.csv
             os.makedirs(os.path.dirname(ccsv), exist_ok=True)
             chunk_index_df.to_csv(ccsv)
     inputs = list()
