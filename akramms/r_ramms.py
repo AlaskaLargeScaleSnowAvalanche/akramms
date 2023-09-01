@@ -191,6 +191,7 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
                 # Add the chunk number to the name
                 jb1 = copy.copy(jb)
                 jb1.set(segment=segment)
+                print(f'Generating CHUNK: {jb1.ramms_dir}')
 
                 # Make symlinks for DEM file, etc.
                 for ifile,ofile in dem_forest_links(scene_args, jb1.ramms_dir, jb1.slope_name, forest=jb1.forest):
@@ -338,10 +339,11 @@ def file_is_good(fname):
     return True
     
 _izip_exts = ['.relp', '.domp', '.xyz', '.xy-coord', '.var', '.rel', '.dom']  # .dom MUST be last
-def compress_avalanche_inputs(jb, ids):
+def compress_avalanche_inputs(jb, gridI, ids):
     """Puts all avalanche inputs into a single Zip file."""
 #    jb = rammsutil.parse_release_file(release_file)
     jb = jb.copy()
+    gridI_pik = pickle.dumps(gridI)
     for id in ids:
         jb.set(id=id)
         base = os.path.join(jb.avalanche_dir, f'{jb.ramms_name}')
@@ -361,6 +363,10 @@ def compress_avalanche_inputs(jb, ids):
                 zip_file, 'w', compression=zipfile.ZIP_DEFLATED) \
                 as izip:
 
+                # Write the grid info
+                izip.writestr('grid.pik', gridI_pik)
+
+                # Copy files
                 for file,arcname in zip(files,arcnames):
                     izip.write(file, arcname=arcname)
 
@@ -384,7 +390,7 @@ def striped_chunks(l, n):
     for i in range(0, n):
         yield l[i::n]
 
-def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):
+def ramms_stage1_rule(release_file, dem_file, inputs, dry_run=False, submit=False):
     """Runs Stage 1 of RAMMS (IDL code prepares individual avalanche runs)
 
     inputs:
@@ -439,13 +445,16 @@ def ramms_stage1_rule(release_file, inputs, dry_run=False, submit=False):
             # Do NOT remove, we will need for Stage 2 (the .exe file).
             # os.remove(fname0)
 
+        # Obtain raster grid and geotransform info
+        gridI = gdalutil.read_grid(dem_file)
+
         # Compress Avalanche inputs, ready for Docker container
         df = shputil.read_df(release_file, read_shapes=False)
         all_ids = list(df['Id'])
         procs = list()
         for ids in striped_chunks(all_ids, config.ncpu_compress):
             proc = multiprocessing.Process(
-                target=lambda: compress_avalanche_inputs(jb,ids))
+                target=lambda: compress_avalanche_inputs(jb, gridI, ids))
             proc.start()
             procs.append(proc)
         for proc in procs:
