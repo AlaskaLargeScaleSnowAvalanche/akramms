@@ -69,7 +69,7 @@ def mosaic_aval(exp_mod, gridM, avals, ofname_zip, rho=300, tdir=None, vars=_mos
     for fname in avals:
         with netCDF4.Dataset(fname) as nc:
 
-            # "gridA" = Avalanche's local grid (it will be one of the subdomains)
+            # "gridA" = Avalanche's local grid (it will be one of the subdomains), WITH MARGIN
             # Geotransform of this avalanche's local grid
             # TODO: Store Geotransform as machine-precision doubles in the file
             gridA_gt = np.array([float(x) for x in nc.variables['grid_mapping'].GeoTransform.split(' ')])
@@ -136,8 +136,8 @@ def main():
 
     res = exp_mod.resolution
     gridG = exp_mod.gridD.global_grid(res, res)
-    gridM = exp_mod.gridD.sub(113,26, res, res)    # Could be arbitrary rectangle
-    avals = ['/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/arc-113-026/aval-524.nc']
+    gridM = exp_mod.gridD.sub(113,45, res, res)    # Could be arbitrary rectangle
+    avals = ['/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/arc-113-045/aval-524.nc']
     with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
         mosaic_aval(exp_mod, gridM, avals, 'avals.zip', tdir=tdir)
 

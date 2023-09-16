@@ -235,6 +235,7 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
         df[VOL_vname] = (df['area_m2'] * df[d0_vname]) / np.cos(df['Mean_Slope']*degree)
 
         # Calculate domains
+        # (grind_info includes the domain margin)
         grid_info, dem_filled, dem_nodata = gdalutil.read_raster(dem_filled_file)
 
 
@@ -252,6 +253,12 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
 
             # Remove PRAs of elevation <150m
             cat_df = cat_df[cat_df['Mean_DEM'] >= 150.]            
+
+            # Remove PRAs that are >50% in the margin
+            for ix,(_,row) in enumerate(cat_df.iterrows()):
+                pra = row['pra']
+
+
 
             # Calculate domains
             chulls = list()
