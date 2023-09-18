@@ -97,31 +97,6 @@ def in_domain(domain, pra):
     """Returns True if the PRA is >50% in the domain"""
 
     ret = domain.contains(pra.centroid)
-    print('xx1 ', ret)
-    return ret
-
-
-
-    # Avoid problems with self-intersecting polygons.
-#    pra = pra.exterior
-
-    # https://gis.stackexchange.com/questions/251812/returning-percentage-of-area-of-polygon-intersecting-another-polygon-using-shape
-    if not pra.intersects(domain):
-        ret = False
-    else:
-        try:
-            ret = pra.intersection(domain).area > 0.5 * pra.area
-        except:
-            print('pra ', pra)
-            print('domain ', domain)
-            print('xxx ', pra.exterior.area, pra.exterior.intersection(domain))
-            raise
-
-
-    print('in_domain = ', ret)
-    return ret
-
-
 
 
 def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
