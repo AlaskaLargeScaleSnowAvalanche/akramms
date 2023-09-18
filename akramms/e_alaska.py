@@ -115,16 +115,15 @@ def add_combo(makefile, combo):
     # Determine which parts of the domain are interior (vs margin)
     # Coordinates are in (i,j) space relative to full-margin domain's origin
     domain_margin = gridD.sub(combo.idom, combo.jdom, exp_mod.resolution, exp_mod.resolution, margin=True)
-    domain_interior = gridD.sub(combo.idom, combo.jdom, exp_mod.resolution, exp_mod.resolution, margin=False)
+    domain = gridD.sub(combo.idom, combo.jdom, exp_mod.resolution, exp_mod.resolution, margin=False)
 
     kwargs = dict(
         resolution=resolution,
         # Bounds of interior, in the (i,j) space of the full-with-margin domain
-        interior_bounds = (
-            domain_interior.i0 - domain_margin.i0,
-            (domain_interior.i0 + domain_interior.nx) - domain_margin.i0,
-            domain_interior.j0 - domain_margin.j0,
-            (domain_interior.j0 + domain_interior.ny) - domain_margin.j0),
+        # https://stackoverflow.com/questions/20474549/extract-points-coordinates-from-a-polygon-in-shapely
+        domain = np.asarray(domain.exterior.coords).reshape(-1),
+        domain_margin = np.asarray(domain_margin.exterior.coords).reshape(-1),
+
         return_periods=(combo.return_period,),
         forests=((1 if combo.forest=='For' else 0),),
         dem_file=dem_tif,

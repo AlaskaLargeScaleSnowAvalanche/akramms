@@ -20,8 +20,16 @@ ALL = paramutil.parse([
         """Downscaled snow field on the local grid."""),
     ('clip_file', None, 'input_file', False,
         """Clip domain to this region (Shapefile)"""),
-    ('interior_bounds', None, 'list', True,
-        """i/j coordinates denoting the interior of the region (vs margin): (i0, i1, j0, j1)"""),
+#    ('interior_bounds', None, 'list', True,
+#        """i/j coordinates denoting the interior of the region (vs margin): (i0, i1, j0, j1)"""),
+
+    ('domain', None, 'list', False,
+        """[x0,y0, x1,y1, ...] Coordinates of the domain, without margin"""),
+    ('domain_margin', None, 'list', False,
+        """[x0,y0, x1,y1, ...] Coordinates of the domain, with margin"""),
+
+
+
 
     # Parameters for preprocessing and eCognition
     ('resolution', 'm', 'int', True,

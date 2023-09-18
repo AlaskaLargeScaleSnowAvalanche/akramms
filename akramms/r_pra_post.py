@@ -93,7 +93,13 @@ def master_ramms_names(scene_args, return_period, forest):
 
 
 
+def in_domain(domain, pra):
+    """Returns True if the PRA is >50% in the domain"""
 
+    # https://gis.stackexchange.com/questions/251812/returning-percentage-of-area-of-polygon-intersecting-another-polygon-using-shape
+    if not pra.intersects(domain):
+        return False
+    return pra.intersection(domain).area > 0.5 * pra.area
 
 
 def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
@@ -240,6 +246,13 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
 
 
         # ---------------------------------------------------------------
+        # Make rectangle of the interior bounds
+        domain = shapely.geometry.Polygon(scene_args['domain'])
+conver
+        ib_i0, ib_i1, ib_j0, ib_j1 = scene_args['interior_bounds']
+        interior_poly = shapely.geometry.Polygon([
+
+
         # Split into segments based on PRA size, and save
         ioutil.mkdirs_for_files(outputs)
         for jb,pra_size in ramms_names:
@@ -254,11 +267,12 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
             # Remove PRAs of elevation <150m
             cat_df = cat_df[cat_df['Mean_DEM'] >= 150.]            
 
-            # Remove PRAs that are >50% in the margin
-            for ix,(_,row) in enumerate(cat_df.iterrows()):
-                pra = row['pra']
-
-
+            # Only keep PRAs that are >50% in the interior part of the domain (not margin)
+            if 'domain' in scene_args:
+                _xy = scene_args['domain']
+                domain = Polygon(_xy.reshape((len(_xy)//2,2)))
+                in_domain_fn = lambda pra: in_domain(domain, pra)
+                cat_df = cat_df[cat_df['pra'].map(in_domain_fn)]
 
             # Calculate domains
             chulls = list()
