@@ -186,7 +186,7 @@ def nc_out(ncout, izip, arcname, attrs={}):
 
 
 # ----------------------------------------------------------
-def ramms_to_nc0(base, ofname):
+def ramms_to_nc0(out_zip, ofname):
     """
     base:
         Base name of avalanche, including full pathname.
@@ -209,6 +209,7 @@ def ramms_to_nc0(base, ofname):
 
 
     """
+    base = out_zip[:-1]    # Remove .out.zip
     leaf = os.path.split(base)[1]
     with zipfile.ZipFile(f'{base}.in.zip', 'r') as in_zip:
      with zipfile.ZipFile(f'{base}.out.zip', 'r') as out_zip:

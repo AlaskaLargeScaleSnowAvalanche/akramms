@@ -6,12 +6,13 @@ import traceback
 _relRE = re.compile(r'^(.*)_rel\.shp$')
 _out_zipRE = re.compile(r'^(.*)_(\d+)\.out\.zip$')
 # Status of each avalanche found on disk
-OK = 0
+OK = 0                # Implies .out.zip
 NO_IN_ZIP = 1
 OVERRUN = 2
 NO_OUT_ZIP = 3
 UNKNOWN_ERROR = 4
-MAX_STATUS = 4
+ARCHIVED = 5        # It's a .nc file
+MAX_STATUS = 5
 
 error_msgs = {
     NO_IN_ZIP: 'ERROR: No .in.zip for Avalanche IDs: {ids}',
@@ -19,6 +20,85 @@ error_msgs = {
     NO_OUT_ZIP: 'ERROR: No .out.zip for Avalanche IDs {ids}',
     UNKNOWN_ERROR: 'Unknown error archiving: {ids}',
 }
+
+
+#TODO: Put avalanche bounding box into NetCDF file.  (Or a related database file)
+
+# -----------------------------------------------------------------
+def getmtime(fname):
+    """Returns modification time of a file; or -1 if it doesn't exist."""
+    if os.path.exists(fname):
+        return os.path.getmtime(fname)
+    else:
+       return -1.0
+
+idRE = re.compile(r'.*_(\d+)\.out\.zip$')
+def extract_id(out_zip):
+    """Returns the avalanche ID from a .out.zip filename"""
+    return int(idRE.match(out_zip).group(1))
+
+# -----------------------------------------------------------------
+def arc_files(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
+    """Returns the names of archive files, based on a particular combo
+    and list of IDs within that combo.
+
+    exp_mod:
+        Main experiment info
+    combo:
+        Describes which RAMMS run within the experiment
+    id:
+        Which avalanche within the RAMMS run
+
+    """
+
+
+    # List all the output files in an experiment
+    x_dir = exp_mod.combo_to_scene_subdir(combo, type='x')
+    out_zips = {extract_id(x) : x
+        for x in glob.iglob(os.path.join(x_dir, 'CHUNKS', '*', '*', '*', '*', '*.out.zip'))}
+
+    arc_fnames = list()
+    for id in ids:
+        # ------- Get name and modification time of archive .nc file
+        arc_fname = os.path.join(
+            exp_mod.combo_to_scene_subdir(combo, type='arc'),
+            f'aval-{id}.nc')
+        if os.path.exists(arc_fname):
+            arc_mtime = os.path.getmtime(arc_fname)
+        else:
+            arc_mtime = -1.0
+
+        # -------- Get name and modification time of original .out.zip file
+        try:
+            out_zip = out_zips[id]
+            # Make sure the out.zip file is complete / ready to archive
+            status = out_zip_status(out_zip)
+            if status in ok_statuses:
+                out_zip_mtime = os.path.getmtime(out_zip)
+            else:
+                # Act like the .out.zip file does not exist
+                out_zip_mtime = -1.0
+        except KeyError:
+            out_zip_mtime = -1.0
+
+        # -------- Decide whether we need to regenerate
+        if arc_mtime > out_zip_mtime:
+            # Arc file exists and is up-to-date, DO NOT regenerate
+            arc_fnames.append(arc_fname)
+        elif out_zip_mtime > 0:
+            # .out.zip file is OK, so let's regenerate
+           ramms_to_nc0(basename, arc_fname)
+            arc_fnames.append(arc_fname)
+        else:
+            # Neither file exists, that's an error.
+            arc_fnames.append(None)
+
+    return arc_fnames
+
+
+
+
+# -----------------------------------------------------------------
 
 
 def archive_scene(scene_dir, archive_dir):
@@ -61,34 +141,7 @@ def archive_scene(scene_dir, archive_dir):
     # IDs.  If all avalanches have completed successfully, and there is
     # now "pollution" of other runs in this directory, the list should
     # be the same as shp_ids
-    out_zips = dict()
-    for out_zip in glob.iglob(os.path.join(scene_dir, 'CHUNKS', '*', '*', '*', '*', '*.out.zip')):
-
-        # If HTCondor is in the middle of writing the .out.zip file,
-        # it will have zero length.
-        if not r_ramms.file_is_good(out_zip):
-            continue
-
-        # Get the avalanche ID
-        out_zip_leaf = os.path.split(out_zip)[1]
-        match = _out_zipRE.match(out_zip_leaf)
-        id = int(match.group(2))
-
-        # Make sure .in.zip exists
-        in_zip = out_zip[:-8] + '.in.zip'
-        if not os.path.exists(in_zip):
-            out_zips[id] = (NO_IN_ZIP, out_zip)
-            continue
-
-        # Make sure the avalanche didn't overrun the domain.
-        with zipfile.ZipFile(out_zip, 'r') as in_zip:
-            arcnames = [os.path.split(x)[1] for x in in_zip.namelist()]
-        if any(x.endswith('.out.overrun') for x in arcnames):
-            out_zips[id] = (OVERRUN, out_zip)
-            continue
-
-        # Add as archivable ID
-        out_zips[id] = (OK, out_zip)
+    out_zips = {x.id: (x.status, x.fname) for x in avquery.list_unarchived(scene_dir)}
 
     todels = list()
 
@@ -101,7 +154,7 @@ def archive_scene(scene_dir, archive_dir):
 #TODO: Check file timestamps
         status,out_zip = out_zips.get(id, (NO_OUT_ZIP, None))
         print('yyy ', id, status, out_zip)
-        basepath = None if out_zip is None else out_zip[:-8]
+        basepath = None if out_zip is None else out_zip[:-8]   # ..../.../.../.../xxxxx.out.zip
 
         if os.path.exists(out_nc):
             # If the archive already exists, we can just delete the old

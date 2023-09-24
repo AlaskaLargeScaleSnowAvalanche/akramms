@@ -93,10 +93,12 @@ def master_ramms_names(scene_args, return_period, forest):
 
 
 
-def in_domain(domain, pra):
+def in_domain(xmin,ymin,xmax,ymax, pra):
     """Returns True if the PRA is >50% in the domain"""
-    ret = domain.contains(pra.centroid)
-    return ret
+#    ret = domain.contains(pra.centroid)
+    centroid = pra.centroid
+    x,y = centroid.x, centroid.y
+    return (x >= xmin) and (x < xmax) and (y >= ymin) and (y < ymax)
 
 
 def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
@@ -260,8 +262,15 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
             # Only keep PRAs that are >50% in the interior part of the domain (not margin)
             if 'domain' in scene_args:
                 _xy = np.array(scene_args['domain'], dtype='d')
-                domain = shapely.geometry.Polygon(_xy.reshape((len(_xy)//2,2)))
-                in_domain_fn = lambda pra: in_domain(domain, pra)
+                x0,y0 = _xy[0,:]
+                x1,y1 = _xy[2,:]
+                xmin = min(x0,x1)
+                xmax = max(x0,x1)
+                ymin = min(y0,y1)
+                ymax = max(y0,y1)
+                #domain = shapely.geometry.Polygon(_xy.reshape((len(_xy)//2,2)))
+                #in_domain_fn = lambda pra: in_domain(domain, pra)
+                in_domain_fn = lambda pra: in_domain(xmin,ymin,xmax,ymax, pra)
                 cat_df = cat_df[cat_df['pra'].map(in_domain_fn)]
 
             # Calculate domains
