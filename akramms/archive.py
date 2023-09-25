@@ -4,7 +4,7 @@ from akramms import ncaval,r_ramms
 import traceback
 
 _relRE = re.compile(r'^(.*)_rel\.shp$')
-_out_zipRE = re.compile(r'^(.*)_(\d+)\.out\.zip$')
+#_out_zipRE = re.compile(r'^(.*)_(\d+)\.out\.zip$')
 # Status of each avalanche found on disk
 OK = 0                # Implies .out.zip
 NO_IN_ZIP = 1
@@ -53,8 +53,6 @@ def getmtime(fname):
        return -1.0
 
 # -----------------------------------------------------------------
-arcRE = re.compile(r'aval-([TSML])-(d+)\.nc')
-out_zipRE = re.compile(r'[^_]+_[^_]+_(\d+[TSML])_(\d+)\.out\.zip$')
 def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
     """Returns the names of archive files, based on a particular combo
     and list of IDs within that combo.  Archives the avalanches if needed.
@@ -71,7 +69,7 @@ def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
     x_dir = exp_mod.combo_to_scene_subdir(combo, type='x')
     out_zips = dict()    
     for out_zip in glob.iglob(os.path.join(x_dir, 'CHUNKS', '*', '*', '*', '*', '*.out.zip')):
-        match = out_zipRE.match(out_zip)
+        match = exputil.out_zipRE.match(out_zip)
         sizecat = match.group(1)
         id = int(match.group(2))
         out_zips[id] = (out_zip, sizecat)    # full-pathname, sizecat
@@ -81,7 +79,7 @@ def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
     arc_dir = exp_mod.combo_to_scene_subdir(combo, type='arc')
     ncs = dict()
     for name in os.listdir(arc_dir):
-        match = arcRE.match(name)
+        match = exputil.avalRE.match(name)
         if match is not None:
             ncs[int(match.group(2))] = (name, match.group(1))    # leaf-name, sizecat
 

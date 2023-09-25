@@ -80,7 +80,7 @@ def combo_to_scene_subdir(combo, type='x'):
 # -------------------------------------------------------------
 def add_dem(makefile, idom, jdom, sanity_check=True):
     exp_mod = sys.modules[__name__]    # This module
-    return makefile.add(experiment.r_ifsar(exp_mod, idom, jdom, sanity_check=sanity_check)).outputs[0]
+    return makefile.add(r_experiment.r_ifsar(exp_mod, idom, jdom, sanity_check=sanity_check)).outputs[0]
 
 def add_combo(makefile, combo):
     """Adds rules needed to set up (and also run) a trial. (step1)"""
@@ -89,24 +89,24 @@ def add_combo(makefile, combo):
 
     # Set of domains that cover our experiment region
     # (This file is the same for ALL trials)
-#    makefile.add(experiment.r_active_domains(exp_mod))
+#    makefile.add(r_experiment.r_active_domains(exp_mod))
 
     # DTM and Forest (landcover==42)
-    dem_tif = add_dem(makefile, combo.idom, combo.jdom)  #makefile.add(experiment.r_ifsar(exp_mod, combo.idom, combo.jdom, resolution=resolution)).outputs[0]
+    dem_tif = add_dem(makefile, combo.idom, combo.jdom)  #makefile.add(r_experiment.r_ifsar(exp_mod, combo.idom, combo.jdom, resolution=resolution)).outputs[0]
     dem_filled_file,sinks_file,neighbor1_file = makefile.add(r_domain_builder.neighbor1_rule(
         dem_tif, os.path.split(dem_tif)[0], fill_sinks=True)).outputs
 
     # Forest File
     if combo.forest == 'For':
-        landcover_tif = makefile.add(experiment.r_landcover(
+        landcover_tif = makefile.add(r_experiment.r_landcover(
             exp_mod, combo.idom, combo.jdom)).outputs[0]
-        forest_tif = makefile.add(experiment.r_forest(
+        forest_tif = makefile.add(r_experiment.r_forest(
             exp_mod, combo.idom, combo.jdom)).outputs[0]
 
     # Snow downscaling
     if combo.downscale_algo == 'lapse':
-        makefile.add(experiment.r_dfcA(exp_mod))
-    sx3I_tif = makefile.add(experiment.r_snow(
+        makefile.add(r_experiment.r_dfcA(exp_mod))
+    sx3I_tif = makefile.add(r_experiment.r_snow(
         exp_mod, combo.snow_dataset, combo.downscale_algo,
         combo.year0, combo.year1, combo.idom, combo.jdom)).outputs[0]
 

@@ -11,24 +11,7 @@ from akramms import config
 from akramms import downscale_snow
 #from akramms import d_ifsar, d_usgs_landcover
 
-def global_grid(*args):
-    """
-    gridD: DomainGrid
-        The grid giving the sub-domains.
-    dx, dy: [m]
-        Grid resolution.  Must evenly divide gridD.dx
-    """
-
-    if len(args) == 1:
-        exp_mod = args[0]
-        gridD = exp_mod.gridD
-        dx = exp_mod.resolution
-        dy = exp_mod.resolution
-    else:
-        gridD, dx, dy = args
-
-
-# -----------------------------------------------------
+ # -----------------------------------------------------
 @functools.lru_cache()
 def r_active_domains(exp_mod):
     """Writes a shapefile defining the domains for THIS experiment that will be used...

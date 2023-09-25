@@ -247,16 +247,6 @@ def setup_scene(args):
 
 
 # ---------------------------------------------------------------------
-def load_exp_mod(ename):
-    try:
-        exp_mod = importlib.import_module(ename)
-    except ModuleNotFoundError:
-        try:
-            exp_mod = importlib.import_module('akramms.' + ename)
-        except ModuleNotFoundError:
-            raise ModuleNotFoundError(f'Cannot load module {ename} or akramms.{ename}')# from None
-    return exp_mod
-
 def get_exp_dir(exp_mod):
     return config.roots.join('PRJ', exp_mod.name)
 
