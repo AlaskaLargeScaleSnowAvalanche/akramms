@@ -1,15 +1,7 @@
 # Fundamental stuff needed to run an experiment.
 
-import functools
-import math,os,subprocess
-import numpy as np
-from osgeo import ogr,gdal
-import shapely
-import pandas as pd
-from uafgi.util import make,gisutil,shputil,gdalutil
+import re,os,collections,importlib
 from akramms import config
-from akramms import downscale_snow
-#from akramms import d_ifsar, d_usgs_landcover
 
 
 out_zipRE = re.compile(r'[^_]+_[^_]+_(\d+[TSML])_(\d+)\.out\.zip$')
@@ -62,7 +54,7 @@ def parse_scene_dir(scene_dir):
 avaltuple = collections.namedtuple('AvalTuple', ('exp_mod', 'combo', 'id'))
 
 
-def parse_avals(*args):
+def parse_avals(args):
     """
     1. Filename of existing arc-file: keep
     2. Filename of x-file: determine arc-dir, convert to arc-file
@@ -84,89 +76,6 @@ def parse_avals(*args):
         ids = list()
         state = 0
 
-    # Initial state: expecting an exp_mod, or maybe just a filename...
-    def parse0(arg):
-        if os.path.is_file(arg):
-            # Full pathname contains info on exp_mod, combo and id...
-
-            # ----------- See if it's a .out.zip or a .nc file
-            scene_type, idom, jdom = parse_scene_dir(os.path.basename(arg))
-            if scene_type == 'x':
-                pieces = arg.rsplit(os.sep, 8)[1:2]
-                combo_dir = pieces[1]    # ak-ccsm-...
-                x_dir = pieces[2]
-                out_zip = pieces[-1]
-
-                exp_mod,combo = parse_combo_dir(combo_dir, idom, jdom)
-
-                # Obtain ID from .out.zip
-                match = out_zipRE.match(out_zip)
-                id =int(match.group(2))
-
-                rets.append( (AvalTuple(exp_mod, combo, [id]), None) )
-                clear()
-                return
-
-            if leaf.startswith('aval-'):
-                rets.append( (None, os.path.abspath(arg)) )
-                clear()
-                return
-
-            raise ValueError('Cannot parse information from file: {arg}')
-
-        if os.path.is_dir(arg):
-                # ------------ See if it's a scene_dir (x-... or arc-...)
-                pieces = arg.rsplit(os.sep, 2)
-                combo_dir = pieces[1]
-                scene_dir = pieces[2]
-                xret = parse_scene_dir(scene_dir)
-                if xret is not None:
-                    # Parse as a scene_dir was successful
-                    scene_type, idom, jdom = xret
-                    exp_mod,combo = parse_combo_dir(combo_dir, idom, jdom)
-
-                exp_mod,combo = parse_combo_dir(combo_dir, idom, jdom)
-                state = 3    # Looking for avalanche ID...
-                return
-            except ValueError:
-                # ----------- Assume it's a top-level combo directory (missing idom/jdom)
-                scombo = combo_dir.split('-')
-                state = 1    # Looking for idom,jdom
-                return
-
-        # It's just a single item, used to build up the tuple slowly...
-        pieces = arg.split('-')
-        exp_mod = load(pieces[0])    # The first item better be the experiment
-        scombo = pieces[1:]    # The rest, if any, go to the scombo
-
-        # See if we're ready to make a Combo
-        if len(scombo) == len(exp_mod.schema.schema):
-            combo = 
-
-        state = 1
-        return
-
-    # Building up scombo slowly
-    def parse1(arg):
-        
-
-
-
-            match = scene_dirRE.match(arg)
-            if match is not None:
-                if match.group(1) == 'x':
-
-                else:    # aval-
-
-                combo_dir,x_dir =     #ak-ccsm-..., x-113-045
-                
-
-            pieces = arg.rsplit(os.sep, 
-
-    parse_by_state = {
-        0: parse0
-    }
-
     for arg in args:
         if state == 3:
             # Accumulate avalanche IDs
@@ -181,13 +90,85 @@ def parse_avals(*args):
             clear()
             state = 0
 
-        parse_by_state[state](arg)
+        if state == 0:
+            print('xxxxxxxxxx ', args)
+            if os.path.isfile(arg):
+                # Full pathname contains info on exp_mod, combo and id...
 
+                # ----------- See if it's a .out.zip or a .nc file
+                scene_type, idom, jdom = parse_scene_dir(os.path.basename(arg))
+                if scene_type == 'x':
+                    pieces = arg.rsplit(os.sep, 8)[1:2]
+                    combo_dir = pieces[1]    # ak-ccsm-...
+                    x_dir = pieces[2]
+                    out_zip = pieces[-1]
+
+                    exp_mod,combo = parse_combo_dir(combo_dir, idom, jdom)
+
+                    # Obtain ID from .out.zip
+                    match = out_zipRE.match(out_zip)
+                    id =int(match.group(2))
+
+                    rets.append( (AvalTuple(exp_mod, combo, [id]), None) )
+                    clear()
+                    continue
+
+                if leaf.startswith('aval-'):
+                    rets.append( (None, os.path.abspath(arg)) )
+                    clear()
+                    continue
+
+                raise ValueError('Cannot parse information from file: {arg}')
+
+            if os.path.isdir(arg):
+                # ------------ See if it's a scene_dir (x-... or arc-...)
+                pieces = arg.rsplit(os.sep, 2)
+                combo_dir = pieces[1]
+                scene_dir = pieces[2]
+                xret = parse_scene_dir(scene_dir)
+                if xret is not None:
+                    # Parse as a scene_dir was successful
+                    scene_type, idom, jdom = xret
+                    exp_mod,combo = parse_combo_dir(combo_dir, idom, jdom)
+
+                exp_mod,combo = parse_combo_dir(combo_dir, idom, jdom)
+                state = 3    # Looking for avalanche ID...
+                continue
+            else:
+                # Not a file or directory, just build up combo splitting on -
+                pieces = arg.split('-')
+                exp_mod = load(pieces[0])    # The first item better be the experiment
+                scombo = pieces[1:]
+                state = 1    # not yet full scombo
+                continue
+
+        if state == 1:
+            # Build up scombo piece by piece
+            pieces = arg.split('-')
+            if exp_mod is None:
+                exp_mod = load(pieces[0])    # The first item better be the experiment
+                scombo += pieces[1:]    # The rest, if any, go to the scombo
+            else:
+                scombo = pieces
+
+            # See if we're ready to make a Combo
+            if len(scombo) == len(exp_mod.schema.schema):
+                combo = parse_combo(exp_mod, scombo)
+                state = 3
+                continue    # Get more to consume
+
+    return rets
 
 # -------------------------------------------------------
 def combo_to_scene_dir(exp_mod, combo, type='x'):
     """Returns the full pathname for a RAMMS scene, based on its experiment and combo"""
     return os.path.join(config.roots['PRJ'], exp_mod.name,
-        exp_mod.combo_to_scene_subdir(combo, type=type)
+        exp_mod.combo_to_scene_subdir(combo, type=type))
+
+def main():
+    import sys
+    for aval in parse_avals(sys.argv[1:]):
+        print(aval)
+main()
  
 
