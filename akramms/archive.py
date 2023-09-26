@@ -1,6 +1,7 @@
 import shutil,os,re,zipfile,glob
 from uafgi.util import shputil
 from akramms import ncaval,r_ramms
+from akramms.util import avalparse
 import traceback
 
 _relRE = re.compile(r'^(.*)_rel\.shp$')
@@ -69,7 +70,7 @@ def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
     x_dir = exp_mod.combo_to_scene_subdir(combo, type='x')
     out_zips = dict()    
     for out_zip in glob.iglob(os.path.join(x_dir, 'CHUNKS', '*', '*', '*', '*', '*.out.zip')):
-        match = exputil.out_zipRE.match(out_zip)
+        match = avalparse.out_zipRE.match(out_zip)
         sizecat = match.group(1)
         id = int(match.group(2))
         out_zips[id] = (out_zip, sizecat)    # full-pathname, sizecat
@@ -79,7 +80,7 @@ def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
     arc_dir = exp_mod.combo_to_scene_subdir(combo, type='arc')
     ncs = dict()
     for name in os.listdir(arc_dir):
-        match = exputil.avalRE.match(name)
+        match = avalparse.avalRE.match(name)
         if match is not None:
             ncs[int(match.group(2))] = (name, match.group(1))    # leaf-name, sizecat
 
@@ -138,22 +139,6 @@ def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
     return arc_fnames, archived_out_zips
 
 # -----------------------------------------------------------------
-def ids_in_combo(exp_mod, combo):
-    """Read the RELEASE files to determine which avalanche IDs are
-    involved in a combo."""
-
-    # Look in RELEASE-dir shapefiles to determine theoretical set Avalanche IDs
-    # (By looking here, we avoid picking up random junk)
-    shp_ids = list()
-    for leaf in os.listdir(os.path.join(scene_dir, 'RELEASE')):
-        match = _relRE.match(leaf)
-        if match is not None:
-            df = shputil.read_df(
-                os.path.join(scene_dir, 'RELEASE', leaf), read_shapes=False)
-            shp_ids += df['Id'].tolist()
-
-    return shp_ids
-# -----------------------------------------------------------------
 def archive_combo(exp_mod, combo, ok_statuses={OK,OVERRUN}):
     """Archives all IDs in a combo.
     Returns: {id: arc_fname}
@@ -208,4 +193,4 @@ def main():
     combo = e_alaska.Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 45)
     fetch(e_alaska, combo, [2058])
 
-main()
+#main()

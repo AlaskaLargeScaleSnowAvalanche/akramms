@@ -3,6 +3,9 @@
 import re,os,collections,importlib
 from akramms import config
 
+"""Parse specifications from the user (on the command line) into a
+list of either AvalTuple objects or names of archived avalanches."""
+
 
 out_zipRE = re.compile(r'[^_]+_[^_]+_(\d+[TSML])_(\d+)\.out\.zip$')
 avalRE = re.compile(r'aval-([TSML])-(d+)\.nc')
@@ -91,7 +94,7 @@ def replace_wildcards(pieces):
 AvalTuple = collections.namedtuple('AvalTuple', ('exp_mod', 'combo', 'ids'))
 
 
-def parse_avals(args):
+def parse_aval_specs(args):
     """
     1. Filename of existing arc-file: keep
     2. Filename of x-file: determine arc-dir, convert to arc-file
