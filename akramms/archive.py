@@ -54,7 +54,7 @@ def getmtime(fname):
        return -1.0
 
 # -----------------------------------------------------------------
-def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
+def fetch(exp_mod, combo, ids, filter_fn=lambda x: True, ok_statuses={OK,OVERRUN}):
     """Returns the names of archive files, based on a particular combo
     and list of IDs within that combo.  Archives the avalanches if needed.
 
