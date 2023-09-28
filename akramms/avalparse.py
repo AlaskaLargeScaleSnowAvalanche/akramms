@@ -230,7 +230,3 @@ def parse_aval_specs(args):
     return rets
 
 # -------------------------------------------------------
-def combo_to_scene_dir(exp_mod, combo, type='x'):
-    """Returns the full pathname for a RAMMS scene, based on its experiment and combo"""
-    return os.path.join(config.roots['PRJ'], exp_mod.name,
-        exp_mod.combo_to_scene_subdir(combo, type=type))
