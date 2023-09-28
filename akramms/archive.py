@@ -4,7 +4,6 @@ from akramms import ncaval,r_ramms
 from akramms.util import avalparse
 import traceback
 
-_relRE = re.compile(r'^(.*)_rel\.shp$')
 #_out_zipRE = re.compile(r'^(.*)_(\d+)\.out\.zip$')
 # Status of each avalanche found on disk
 OK = 0                # Implies .out.zip
@@ -54,7 +53,7 @@ def getmtime(fname):
        return -1.0
 
 # -----------------------------------------------------------------
-def fetch(exp_mod, combo, ids, filter_fn=lambda x: True, ok_statuses={OK,OVERRUN}):
+def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
     """Returns the names of archive files, based on a particular combo
     and list of IDs within that combo.  Archives the avalanches if needed.
 
@@ -63,7 +62,12 @@ def fetch(exp_mod, combo, ids, filter_fn=lambda x: True, ok_statuses={OK,OVERRUN
     combo:
         Describes which RAMMS run within the experiment
     id:
-        Which avalanche within the RAMMS run
+        Which avalanche within the RAMMS run we wish to fetch
+    returns: arc_fnames, archived_out_zips
+        arc_fnames: [arc_fname, ...]
+            Names of files found
+        archived_out_zips: [xxx.out.zip, ...]
+            Original files that can be deleted now.
     """
 
     # List all the output .out.zip files in an experiment
@@ -159,7 +163,7 @@ def archive_combo(exp_mod, combo, ok_statuses={OK,OVERRUN}):
         dirs_exist_ok=True)
 
     # Make sure everything in this combo is archived.
-    shp_ids = ids_in_combo(exp_mod, combo)
+    shp_ids = exputil.release_df(exp_mod, combo, type='x').index.tolist()
     arc_fnames, archived_out_zips = fetch(exp_mod, combo, shp_ids, ok_statuses=ok_statuses)
 
     # We've successfully written the netCDF files.
@@ -188,9 +192,9 @@ def archive_combo(exp_mod, combo, ok_statuses={OK,OVERRUN}):
 
 
 def main():
-    from akramms import e_alaska
+    from akramms.experiment import ak
     
-    combo = e_alaska.Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 45)
-    fetch(e_alaska, combo, [2058])
+    combo = ak.Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 45)
+    fetch(ak, combo, [2058])
 
 #main()
