@@ -1,8 +1,30 @@
+import os,collections,re
 
 
 
-Query = collections.namedtuple('Query', ('extent', 'avals'))
 
+# -----------------------------------------------------------------
+def union_extents(extents):
+    """Finds an extent enclosing all the given extents
+    extents: [(x0,y0, x1,y1), ...]
+    """
+    z0 = extents[0]
+    for z1 in extents[1:]:
+        z0 = (
+            min(z0[0], z1[0]),
+            min(z0[1], z1[1]),
+            max(z0[0], z1[0]),
+            max(z0[1], z1[1]))
+
+    return z0
+# -----------------------------------------------------------------
+def nc_extent(nc_fname, margin=(0.,0.)):
+    with netCDF4.Dataset(arc_fname) as nc:
+        bbox = nc.variables['bounding_box'][:].reshape(-1)    # [x0,y0,x1,y1]
+    return bbox
+# -----------------------------------------------------------------
+def add_margin(bbox, marginx, marginy):
+    return [bbox[0]-marginx, bbox[1]-marginy, bbox[2]+marginx, bbox[2]+marginy]
 # -----------------------------------------------------------------
 def ids_in_combo(exp_mod, combo):
     """Read the RELEASE files to determine which avalanche IDs are
@@ -20,22 +42,7 @@ def ids_in_combo(exp_mod, combo):
 
     return shp_ids
 # ----------------------------------------------------------
-FetchSpec = collections.namedtuple('FetchSpec', ('exp_mod', 'combo', 'filter_fn', 'ids', 'nc_fnames', 'extent'))
-
-def wrap_filter_by_extent(filter_fn, extent):
-    def _filter(arc_fname):
-        # Assume avalanche has already been archived to .nc
-        # This might filter based on size, so we don't have to read it.
-        if not filter_fn(arc_fname):
-            return False
-        
-        # Filter based on extent
-        # TODO: Compute a bounding box for each avalanche when archiving, based on the gridcells it touched.
-
-    return _filter
-                
-
-def parsed_to_fetch_part1(spec, filter_in_fn=lambda x: True):
+def parsed_to_fetch_part1(spec, filter_in_fn=lambda x: True, margin=0):
     """Converts a single AvalTuple spec to args for archive.fetch()
     spec: (AvalTuple, nc_fname)
 
@@ -49,7 +56,8 @@ def parsed_to_fetch_part1(spec, filter_in_fn=lambda x: True):
     assert (aval_tupe is None) or (nc_fname is None):
 
     if nc_fname is not None:
-        extent = ...extent of the NetCDF avalanche + margin...
+        # Filter based on extent
+        extent = nc_extent(nc_fname)
         return [ (None, None, None, None, [nc_fname], extent) ]
 
     if aval_tuple is not None:
