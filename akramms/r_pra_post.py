@@ -220,8 +220,9 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
         # TODO: Discuss with Gabe.  Do we want to apply slope angle correction?
         # If yes, we can make it much simpler than what we have here.
         mean_slope_rad = df['Mean_Slope'] * degree
-        df['slopecorr'] =  0.291 / \
-            (np.sin(mean_slope_rad) - 0.202 * np.cos(mean_slope_rad))
+#        df['slopecorr'] =  0.291 / \
+#            (np.sin(mean_slope_rad) - 0.202 * np.cos(mean_slope_rad))
+        df['slopecorr'] = 1.0    # Slope angle correction was removing too much snow, not appropriate for coastal Alaska.
 
         # Wind load interpolation between 100 (0) and 200 (full wind load) elevation
         # Change max wind load dependent on scenario!!
