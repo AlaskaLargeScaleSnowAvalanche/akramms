@@ -403,14 +403,6 @@ def query(args):
     from akramms import avalquery
 
     aspecs, nc_fnames = avalparse.parse_aval_specs(args.avals)
-
-    # TEST: See that domain_extents has y0<y1
-    for extent in avalquery.domain_extents(aspecs[0].exp_mod):
-        print(extent)
-    return
-
-
-
     aspecs = avalquery.normalize(aspecs)
     nc_fnames, extent = avalquery.query(aspecs, nc_fnames)
 
