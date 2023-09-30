@@ -1,3 +1,5 @@
+import os,collections,re
+
 # -----------------------------------------------------------------
 def union_extents(extents):
     """Finds an extent enclosing all the given extents
@@ -21,20 +23,10 @@ def nc_extent(nc_fname, margin=(0.,0.)):
 def add_margin(bbox, marginx, marginy):
     return [bbox[0]-marginx, bbox[1]-marginy, bbox[2]+marginx, bbox[2]+marginy]
 # -----------------------------------------------------------------
-def nc_read_bbox(nc_fname):
-    with netCDF4.Dataset(nc_fname, 'r') as nc:
-        bbox = nc.variables['bounding_box'][:]
-    return bbox
-# ---------------------------------------------------------------------
-def normalize_nc_fnames(nc_fnames):
-    for nc_fname in nc_fnames:
-        extent = ...extent of the NetCDF avalanche + margin...
-        return [ [nc_fname], extent) ]
-
-#AvalSpec1 = collections.namedtuple('AvalSpec', ('exp_mod', 'combo', 'ids', 'extent'))
-# extent: Query within this extent (x0,y0,x1,y1)
-# ids: List of ad-hoc IDs to DEFINITELY fetch, whether or not they pass any filter
-#      (If you ONLY want these IDs, use filter_fn=lambda x: False)
+# -----------------------------------------------------------------
+# ===================================================================
+# "Normalize" means convert whatever the user provided to a list of AvalSpecs
+# that can be queried as lists of avalanche functions.
 def normalize_aval_spec(aspec0):
 
     """Remove all wildcards, makes a spec ready to turn into archive
@@ -91,8 +83,19 @@ def normalize_aval_specs(aspec0s):
         ret += normalize_aval_spec(aspec0)
 
 # ---------------------------------------------------------------------
-def query(aspecs, filter_fn=lambda x: True, ok_statuses={archive.OK, archive.OVERRIN}):
+# ==========================================================================
+# "Query" means converting whatever was normalized to:
+#     [nc_fname, ...]    Avalanche files to mosaic
+#     extent             Area to mosaic
+def query_nc_fnames(nc_fnames):
+    """Not much to "query" here, but the extent does need to be computed.
+    ALL provided NetCDF filenames should be included, so no filtering here."""
+    for nc_fname in nc_fnames:
+        extent = union_extents( (nc_extent(nc_fname) for nc_fname in nc_fnames) )
+        return nc_fnames, extent
 
+
+def query_aspecs(aspecs, filter_fn=lambda x: True, ok_statuses={archive.OK, archive.OVERRIN}):
     """Produces lists of NetCDF filenames.  Also converts to NetCDF at
     this point if needed.
 
@@ -129,7 +132,7 @@ def query(aspecs, filter_fn=lambda x: True, ok_statuses={archive.OK, archive.OVE
                 if 'bounding_box' in row:
                     bbox = row['bounding_box']
                 else:
-                    bbox = nc_read_bbox(nc_fname)
+                    bbox = nc_extent(nc_fname)
 
                 # Include for real if this intersects.
                 if intersect_extents(bbox, extent):
@@ -158,7 +161,7 @@ mosaic_query(exp_mod, query, margin=1000, filter_fn=lambda x: True, ok_statuses=
     nc_fnames = [x for x in query if not isinstance(x, AvalSpec)]
 
     # Determine extent for NetCDF queries
-    nc_extent = union_extents((nc_read_bbox(nc_fname) for nc_fname in nc_fnames))
+    nc_extent = union_extents((nc_extent(nc_fname) for nc_fname in nc_fnames))
 
     # Determine files and extent for query specs
     ncq_fnames, ncq_extent = query(aspecs, filter_fn=filter_fn, ok_statuses=ok_statuses)
