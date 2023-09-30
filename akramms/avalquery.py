@@ -109,7 +109,7 @@ def _normalize_aval_spec(aspec0):
             # Nothing user-provided, use extent of subdomain
             extent = aspec0.exp_mod.gridD.subgrid(
                 aspec0.combo.idom, aspec0.combo.jdom,
-                exp_mod.resolution, exp_mod.resolution,
+                aspec0.exp_mod.resolution, aspec0.exp_mod.resolution,
                 margin=False)
 
         # Determine IDs (depends on whether user supplied)
