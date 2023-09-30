@@ -107,10 +107,11 @@ def _normalize_aval_spec(aspec0):
             extent = union_extents(aspec0.extents)    # Our query extent
         else:
             # Nothing user-provided, use extent of subdomain
-            extent = aspec0.exp_mod.gridD.subgrid(
+            extent = aspec0.exp_mod.gridD.sub(
                 aspec0.combo.idom, aspec0.combo.jdom,
                 aspec0.exp_mod.resolution, aspec0.exp_mod.resolution,
-                margin=False)
+                margin=False).extent(order='xyxy')
+            print('xxxxxxxxxxxxxxxxxx extent ', extent)
 
         # Determine IDs (depends on whether user supplied)
         return [ AvalSpec(aspec0.exp_mod, aspec0.combo, aspec0.ids, [extent]) ]
