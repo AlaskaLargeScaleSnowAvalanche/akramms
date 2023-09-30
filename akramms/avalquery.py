@@ -1,4 +1,5 @@
 import os,collections,re,itertools,functools
+from uafgi.util import shputil
 from akramms import archive
 
 # -----------------------------------------------------------------
