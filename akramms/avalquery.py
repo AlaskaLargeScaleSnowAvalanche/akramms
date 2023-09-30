@@ -81,18 +81,18 @@ def domain_extents(exp_mod):
 
 # -----------------------------------------------------------------
 # ===================================================================
-# "Normalize" means convert whatever the user provided to a list of AvalTuples
+# "Normalize" means convert whatever the user provided to a list of AvalSpecs
 # that can be queried as lists of avalanche functions.
 def _normalize_aval_spec(aspec0):
 
     """Remove all wildcards, makes a spec ready to turn into archive
     filenames and input into query() below.
 
-    aspec0: AvalTuple
+    aspec0: AvalSpec
         * idom,jdom might be None (wildcard)
         * ids might be None (wildcard)
     Returns:
-        [AvalTuple, ...]
+        [AvalSpec, ...]
         * idom,jdom specified everywhere
         * Exactly one extent
 
@@ -114,7 +114,7 @@ def _normalize_aval_spec(aspec0):
                 margin=False).extent(order='xyxy')
 
         # Determine IDs (depends on whether user supplied)
-        return [ avalquery.AvalTuple(aspec0.exp_mod, aspec0.combo, aspec0.ids, [extent]) ]
+        return [ avalquery.AvalSpec(aspec0.exp_mod, aspec0.combo, aspec0.ids, [extent]) ]
 
 
     # --- User specified a wildcard combo, select combos by extent
@@ -137,12 +137,12 @@ def _normalize_aval_spec(aspec0):
             if extents_intersect(dom_ext, extent):
                 lcombo = list(combo[:-2]) + [idom, jdom]
                 combo = exp_mod.Combo(*lcombo)
-                aspec1s.append(avalquery.AvalTuple(aspec0.exp_mod, combo, [], [extent]))
+                aspec1s.append(avalquery.AvalSpec(aspec0.exp_mod, combo, [], [extent]))
 
         return aspec1s
 
 def normalize(aspec0s):
-    """Normalizes a collection of AvalTuples"""
+    """Normalizes a collection of AvalSpecs"""
 
     ret = list()
     for aspec0 in aspec0s:
@@ -160,8 +160,8 @@ def query(aspecs, nc_fnames0, margin=(0.,0.), filter_fn=lambda x: True, ok_statu
     extent:
         User-provided extent to include.  (Or typically comes from nc_fnames)
         This will be unioned with individual aspecs extents.
-    aspecs: [AvalTuple, ...]
-        Normalized AvalTuples
+    aspecs: [AvalSpec, ...]
+        Normalized AvalSpecs
     returns: [arc_fname, ...], extent
         [arc_fname, ...]
             Filenames of archive files to include in the mosaic]

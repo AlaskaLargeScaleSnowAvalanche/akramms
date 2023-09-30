@@ -181,6 +181,8 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
 
 
 
+
+
 def main():
     from uafgi.util import ioutil
     from akramms import experiment

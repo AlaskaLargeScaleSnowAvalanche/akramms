@@ -4,7 +4,7 @@ import re,os,collections,importlib
 from akramms import config
 
 """Parse specifications from the user (on the command line) into a
-list of either AvalTuple objects or names of archived avalanches."""
+list of either AvalSpec objects or names of archived avalanches."""
 
 
 out_zipRE = re.compile(r'[^_]+_[^_]+_(\d+[TSML])_(\d+)\.out\.zip$')
@@ -91,7 +91,7 @@ def replace_wildcards(pieces):
             ret.append(piece)
     return ret
 # -------------------------------------------------------
-AvalTuple = collections.namedtuple('AvalTuple', ('exp_mod', 'combo', 'ids', 'extents'))
+AvalSpec = collections.namedtuple('AvalSpec', ('exp_mod', 'combo', 'ids', 'extents'))
 
 
 def parse_aval_specs(args):
@@ -129,7 +129,7 @@ def parse_aval_specs(args):
                 continue
             except:
                 # It's not a parseable ID or extent, reinterpret arg in state 0
-                aspecs.append( AvalTuple(exp_mod, combo, ids, extents) )
+                aspecs.append( AvalSpec(exp_mod, combo, ids, extents) )
                 state = 0
 
         if state == 0:
@@ -158,7 +158,7 @@ def parse_aval_specs(args):
                     match = out_zipRE.match(out_zip)
                     id =int(match.group(2))
 
-                    aspecs.append( AvalTuple(exp_mod, combo, [id], []) )
+                    aspecs.append( AvalSpec(exp_mod, combo, [id], []) )
                     clear()
                     continue
 
@@ -220,7 +220,7 @@ def parse_aval_specs(args):
     # Finish up after we exit
     if state == 3:    # Looking for ID...
         # Emit any remaining ids (or floating point numbers) at end of parsing
-        aspecs.append( AvalTuple(exp_mod, combo, ids, extents) )
+        aspecs.append( AvalSpec(exp_mod, combo, ids, extents) )
     elif state == 1:    # Looking for more of the combo...
         missing_len = len(exp_mod.combo_schema.schema) - len(scombo)
         if missing_len == 2:
@@ -229,7 +229,7 @@ def parse_aval_specs(args):
             raise ValueError('Must specify full combo (except for idom / jdom)')
 
         combo = parse_combo(exp_mod, scombo)
-        aspecs.append( AvalTuple(exp_mod, combo, [], extents) )
+        aspecs.append( AvalSpec(exp_mod, combo, [], extents) )
 
     return aspecs, nc_fnames
 
