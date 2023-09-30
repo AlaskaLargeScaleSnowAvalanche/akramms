@@ -1,6 +1,7 @@
 import os,collections,re,itertools,functools
 from uafgi.util import shputil
 from akramms import archive
+from akramms import avalquery
 
 # -----------------------------------------------------------------
 def union_extents(extents):
