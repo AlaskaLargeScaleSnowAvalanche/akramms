@@ -1,4 +1,4 @@
-import os,collections,re,itertools
+import os,collections,re,itertools,functools
 
 # -----------------------------------------------------------------
 def union_extents(extents):
