@@ -141,7 +141,7 @@ def normalize(aspec0s):
 # "Query" means converting whatever was normalized to:
 #     [nc_fname, ...]    Avalanche files to mosaic
 #     extent             Area to mosaic
-def query(aspecs, nc_fnames0, margin=(0.,0.), filter_fn=lambda x: True, ok_statuses={archive.OK, archive.OVERRIN}):
+def query(aspecs, nc_fnames0, margin=(0.,0.), filter_fn=lambda x: True, ok_statuses={archive.OK, archive.OVERRUN}):
     """Produces lists of NetCDF filenames.  Also converts to NetCDF at
     this point if needed.
 
