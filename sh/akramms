@@ -400,6 +400,7 @@ def parse(args):
     argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
 def query(args):
+    from akramms import avalquery
 
     aspecs, nc_fnames = avalparse.parse_aval_specs(args.avals)
 
