@@ -90,14 +90,14 @@ def r_active_domains(exp_mod):
                     domain_margin = gridD.poly(ix, iy, margin=True)
                     rows.append((ix,iy,domain,domain_margin))
 
-        df = pd.DataFrame(rows, columns=('ix', 'iy', 'domain', 'domain_margin'))
+        df = pd.DataFrame(rows, columns=('idom', 'jdom', 'domain', 'domain_margin'))
         df.ix = df.ix.astype('int32')
         df.iy = df.iy.astype('int32')
 #        df = df.astype({'ix':'int', 'iy':'int'})
 
         os.makedirs(exp_mod.dir, exist_ok=True)
-        shputil.write_df(df[['ix', 'iy', 'domain']], 'domain', 'MultiPolygon', domains_shp, wkt=exp_mod.wkt, zip_format=True)
-        shputil.write_df(df[['ix', 'iy', 'domain_margin']], 'domain_margin', 'MultiPolygon', domains_margin_shp, wkt=exp_mod.wkt, zip_format=True)
+        shputil.write_df(df[['idom', 'jdom', 'domain']], 'domain', 'MultiPolygon', domains_shp, wkt=exp_mod.wkt, zip_format=True)
+        shputil.write_df(df[['idom', 'jdom', 'domain_margin']], 'domain_margin', 'MultiPolygon', domains_margin_shp, wkt=exp_mod.wkt, zip_format=True)
 
     return make.Rule(action, [exp_mod.experiment_region_zip],
         [domains_shp, domains_margin_shp, domains_zip, domains_margin_zip])
