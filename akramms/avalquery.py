@@ -71,7 +71,11 @@ def domain_extents(exp_mod):
         xx,yy = row['shape'].exterior.coords.xy
 #        yield row.idom,row.jdom,(xx[0],yy[0], xx[2],yy[2])    # Convert to an Extent-type list of (x0,y0,x1,y1)
         # TODO: This version is just until we rewrite the domains file
-        yield row.ix,row.iy,(xx[0],yy[0], xx[2],yy[2])    # Convert to an Extent-type list of (x0,y0,x1,y1)
+        yield row.ix,row.iy,(
+            min(xx[0],xx[2]),
+            min(yy[0],yy[2]),
+            max(xx[0],xx[2]),
+            max(yy[0],yy[2]))    # Convert to an Extent-type list of (x0,y0,x1,y1)
 
 
 # -----------------------------------------------------------------
