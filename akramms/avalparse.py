@@ -58,7 +58,7 @@ def parse_scene_dir(scene_dir):
 #    https://desktop.arcgis.com/en/arcmap/latest/tools/spatial-analyst-toolbox/extract-by-rectangle.htm
 Extent = collections.namedtuple('Extent', ('x0','y0','x1','y1'))
 
-def parse_id_or_extent(exp_mod, sids):
+def parse_id(exp_mod, sids):
     """Returns either a signal Avalanche ID, or a query Extent (region)"""
 
     # Try the wildcard
@@ -91,7 +91,7 @@ def replace_wildcards(pieces):
             ret.append(piece)
     return ret
 # -------------------------------------------------------
-AvalSpec = collections.namedtuple('AvalSpec', ('exp_mod', 'combo', 'ids', 'extents'))
+AvalTuple = collections.namedtuple('AvalTuple', ('exp_mod', 'combo', 'ids'))
 
 
 def parse_aval_specs(args):
@@ -99,36 +99,32 @@ def parse_aval_specs(args):
     1. Filename of existing arc-file: keep
     2. Filename of x-file: determine arc-dir, convert to arc-file
     3. experiment directory + combo: list all x- and arc-, then filter further
-    Returns: [avals, ...] where each avals is either:
-        * Many Avalanches: AvalSpec
-            (exp_mod, combo, ids)
-        * Single Avalance: str
-            arc_fname
+    Returns: [(exp_mod, combo, id, arc_fname), ...]
+        (Some of these may be None)
     """
 
-    rets = list()
+    aspecs = list()    # return val
+    nc_fnames = list()    # return val
     cur_tuple = list()    # Current items for a combo
 
     state = 0    # 0=initial; 1=expectign combo items; 2=expecting id
     exp_mod = None    # Most recently parsed experiment
     scombo = list()
-    ids_or_extents = list()
+    ids = list()
     def clear():
         state = 0
         exp_mod = None
         scombo = list()
         ids = list()
-        extents = list()
 
     for arg in args:
         if state == 3:
             try:
-                x = parse_id_or_extent(exp_mod, arg)
-                (extents if isinstance(x, Extent) else ids).append(x)
+                ids.append(parse_id(exp_mod, arg))
                 continue
             except:
                 # It's not a parseable ID or extent, reinterpret arg in state 0
-                rets.append(AvalSpec(exp_mod, combo, ids, extents))
+                aspecs.append( AvalTuple(exp_mod, combo, ids) )
                 state = 0
 
         if state == 0:
@@ -157,12 +153,12 @@ def parse_aval_specs(args):
                     match = out_zipRE.match(out_zip)
                     id =int(match.group(2))
 
-                    rets.append(AvalSpec(exp_mod, combo, id))
+                    aspecs.append( AvalTuple(exp_mod, combo, id) )
                     clear()
                     continue
 
                 if leaf.startswith('aval-'):
-                    rets.append(os.path.abspath(arg))
+                    nc_fnames.append( os.path.abspath(arg) )
                     clear()
                     continue
 
@@ -219,7 +215,7 @@ def parse_aval_specs(args):
     # Finish up after we exit
     if state == 3:    # Looking for ID...
         # Emit any remaining ids (or floating point numbers) at end of parsing
-        rets.append(AvalSpec(exp_mod, combo, ids, extents))
+        aspecs.append( AvalTuple(exp_mod, combo, ids) )
     elif state == 1:    # Looking for more of the combo...
         missing_len = len(exp_mod.combo_schema.schema) - len(scombo)
         if missing_len == 2:
@@ -228,12 +224,8 @@ def parse_aval_specs(args):
             raise ValueError('Must specify full combo (except for idom / jdom)')
 
         combo = parse_combo(exp_mod, scombo)
-        rets.append(AvalSpec(exp_mod, combo, None))
+        aspecs.append( AvalTuple(exp_mod, combo, []) )
 
-    return rets
+    return aspecs, nc_fnames
 
 # -------------------------------------------------------
-def combo_to_scene_dir(exp_mod, combo, type='x'):
-    """Returns the full pathname for a RAMMS scene, based on its experiment and combo"""
-    return os.path.join(config.roots['PRJ'], exp_mod.name,
-        exp_mod.combo_to_scene_subdir(combo, type=type))
