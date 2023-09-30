@@ -399,6 +399,24 @@ def parse(args):
 @subcommand([
     argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
+def query(args):
+    aspecs, nc_fnames = avalparse.parse_aval_specs(args.avals)
+    aspecs = avalquery.normalize(aspecs)
+    nc_fnames, extent = avalquery.query(aspecs, nc_fnames)
+
+    print('============ AvalTuple Specs')
+    for aspec in aspecs:
+        print(aspec)
+    print('============ nc_fnames')
+    for ncf in nc_fnames:
+        print(ncf)
+
+
+
+
+@subcommand([
+    argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),
+])
 def archive(args):
     from akramms import archive
     aspecs, nc_fnames = avalparse.parse_aval_specs(args.avals)

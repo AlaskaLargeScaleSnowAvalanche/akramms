@@ -91,7 +91,7 @@ def replace_wildcards(pieces):
             ret.append(piece)
     return ret
 # -------------------------------------------------------
-AvalTuple = collections.namedtuple('AvalTuple', ('exp_mod', 'combo', 'ids'))
+AvalTuple = collections.namedtuple('AvalTuple', ('exp_mod', 'combo', 'ids', 'extents'))
 
 
 def parse_aval_specs(args):
@@ -111,6 +111,7 @@ def parse_aval_specs(args):
     exp_mod = None    # Most recently parsed experiment
     scombo = list()
     ids = list()
+    extents = list()
     def clear():
         state = 0
         exp_mod = None
@@ -120,7 +121,11 @@ def parse_aval_specs(args):
     for arg in args:
         if state == 3:
             try:
-                ids.append(parse_id(exp_mod, arg))
+                id_or_extent = parse_id(exp_mod, arg)
+                if isinstance(id_or_extent, Extent):
+                    extents.append(id_or_extent)
+                else:
+                    ids.append()
                 continue
             except:
                 # It's not a parseable ID or extent, reinterpret arg in state 0
@@ -224,7 +229,7 @@ def parse_aval_specs(args):
             raise ValueError('Must specify full combo (except for idom / jdom)')
 
         combo = parse_combo(exp_mod, scombo)
-        aspecs.append( AvalTuple(exp_mod, combo, []) )
+        aspecs.append( AvalTuple(exp_mod, combo, [], extents) )
 
     return aspecs, nc_fnames
 
