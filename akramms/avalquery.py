@@ -67,7 +67,7 @@ def domain_extents(exp_mod):
     # Load set of extents
     domains_shp = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains.shp')
     df = shputil.read_df(domains_shp, read_shapes=True)
-    for row in df.iterrows():
+    for _,row in df.iterrows():
         xx,yy = row['shape'].exterior.coords.xy
         yield row.i,row.j,(xx[0],yy[0], xx[2],yy[2])    # Convert to an Extent-type list of (x0,y0,x1,y1)
 
