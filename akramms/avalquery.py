@@ -111,7 +111,7 @@ def _normalize_aval_spec(aspec0):
             extent = aspec0.exp_mod.gridD.sub(
                 aspec0.combo.idom, aspec0.combo.jdom,
                 aspec0.exp_mod.resolution, aspec0.exp_mod.resolution,
-                margin=False).extent(order='xyxy')
+                margin=False)#.extent(order='xyxy')
             print('xxxxxxxxxxxxxxxxxx extent ', extent)
 
         # Determine IDs (depends on whether user supplied)
