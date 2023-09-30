@@ -120,8 +120,12 @@ def _normalize_aval_spec(aspec0):
     else:
         # User should have specified at least one extent, but NO
         # individual IDs
-        assert len(aspec0.extents) > 0
-        assert len(aspec0.ids) == 0
+        if len(aspec0.extents) == 0:
+            raise ValueError('If an (idom,jdom) subdomain is not specified, the user must specify at least one extent in the query')
+
+        #if len(aspec0.ids) > 0:
+        #    raise ValueError('No specific avalanche IDs allowed without (idom,jdom) subdomain)
+        ## assert len(aspec0.ids) == 0
 
         # Get extent
         extent = union_extents(aspec0.extents)    # Our query extent
