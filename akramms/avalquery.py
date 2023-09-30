@@ -176,7 +176,7 @@ def query(aspecs, nc_fnames0, margin=(0.,0.), filter_fn=lambda x: True, ok_statu
         for (id,row),nc_fname in zip(release_df.iterrows(), nc_fnames):
 
             # Include things in the ids list, or that the filter function allows.
-            if (id in aspec_ids) or filter_in_fn(id, row, nc_fname:
+            if (id in aspec_ids) or filter_in_fn(id, row, nc_fname):
 
                 # Get the bounding box for the avalanche
                 if 'bounding_box' in row:
