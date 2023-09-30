@@ -57,7 +57,7 @@ def nc_extent(nc_fname, margin=(0.,0.)):
         bbox = nc.variables['bounding_box'][:].reshape(-1)    # [x0,y0,x1,y1]
     return bbox
 # -----------------------------------------------------------------
-def add_margin(bbox, margin)
+def add_margin(bbox, margin):
     return [bbox[0]-margin[0], bbox[1]-margin[1], bbox[2]+margin[0], bbox[2]+margin[1]]
 # -----------------------------------------------------------------
 @functools.lru_cache()
