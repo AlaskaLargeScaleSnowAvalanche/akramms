@@ -69,8 +69,8 @@ queue_idl = False
 
 # ------------------------------
 # DEBUG parameters
-allowed_pra_sizes = ['L']
-#allowed_pra_sizes = ['L', 'M', 'S', 'T']
+#allowed_pra_sizes = ['L']
+allowed_pra_sizes = ['L', 'M', 'S', 'T']
 #allowed_pra_sizes = {'M', 'S'}
 #allowed_forests = {True}
 #allowed_return_periods = {30}
