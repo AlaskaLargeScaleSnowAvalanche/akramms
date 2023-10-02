@@ -185,7 +185,7 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
             ozip_write(ozip, ofn)
             ozip_write(ozip, os.path.join(tdir.location, 'dem.tfw'))
 
-
+    # TODO: Create a RELEASE file, for avalanches with aspecs
 
 
 

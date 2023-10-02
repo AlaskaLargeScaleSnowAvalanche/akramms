@@ -181,4 +181,4 @@ def full():
 def juneau():
     # Just one combo for now
     yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 45)    # A Juneau-close box
-#    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 44)    # North of Juneau
+    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 44)    # North of Juneau
