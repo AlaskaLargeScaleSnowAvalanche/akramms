@@ -38,6 +38,12 @@ _smoother_mod = Extension('smoother',
     extra_compile_args=['-std=c++17']
 )
 
+_mosaic_mod = Extension('smoother',
+    sources=['akramms/_mosaic.cpp'],
+    include_dirs=[numpy.get_include(), '.'],
+    extra_compile_args=['-std=c++17']
+)
+
 setup(name = 'akramms',
         description='Alaska Large Scale Avalanche Simulations',
-        ext_modules = [d8graph_mod, _smoother_mod])
+        ext_modules = [d8graph_mod, _smoother_mod, _mosaic_mod])
