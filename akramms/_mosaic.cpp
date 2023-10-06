@@ -118,7 +118,7 @@ R"(_Mosaic Function Docstring
 static PyObject *mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwargs)
 {
     // Info on the gridcells within gridA represented by RAMMS
-    int ngridA;    // Number of gridcells for this avalanche
+    //int ngridA;    // Number of gridcells for this avalanche
     PyArrayObject *i_diff;    // Diff-encoded (i,j) of those gridcells
     PyArrayObject *j_diff;    // (0-based, this was determined from (x,y) values)
 
@@ -147,7 +147,7 @@ static PyObject *mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwarg
     // Parse args and kwargs
     static char const *kwlist[] = {
         // *args
-        "ngridA", "i_diff", "j_diff",
+        /*"ngridA",*/ "i_diff", "j_diff",
         "gridA_x0", "gridA_y0",
         "max_velA", "max_heightA", "depoA",
         "rho",
@@ -156,7 +156,7 @@ static PyObject *mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwarg
         "depositionM", "max_velocityM", "max_pressureM", "domain_countM", "avalanche_countM",
         // **kwargs
         NULL};
-    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "iddiddddiOOOOOdOOOOO|",
+    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!ddO!O!O!diddiddO!O!O!O!O!|",
         (char **)kwlist,
 
         &ngridA,
@@ -182,6 +182,7 @@ static PyObject *mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwarg
         )) return NULL;
 
     // -------------------------- Typecheck and Bounds Check
+    int const ngridA = PyArray_SIZE(i_diff);
     if (!check_array(i_diff, "i_diff", NPY_INT, "NPY_INT", ngridA)) return NULL;
     if (!check_array(j_diff, "j_diff", NPY_INT, "NPY_INT", ngridA)) return NULL;
 

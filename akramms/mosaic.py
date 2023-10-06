@@ -3,7 +3,7 @@ import numpy as np
 from osgeo import gdal
 import zipfile,netCDF4
 from uafgi.util import gdalutil
-from akramms import experiment
+from akramms import experiment,_mosaic
 
 # python -m cProfile -o prof -s cumtime `which akramms` mosaic juneau1-1981-1990.qy 
 
@@ -75,69 +75,33 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
         deposition=np.zeros((gridM.ny, gridM.nx), dtype='d'),
         max_velocity=np.zeros((gridM.ny, gridM.nx), dtype='d'),
         max_pressure=np.zeros((gridM.ny, gridM.nx), dtype='d'),
-        avalanche_count=np.zeros((gridM.ny, gridM.nx), dtype='i'),
-        domain_count=np.zeros((gridM.ny, gridM.nx), dtype='i'))
-
-    deposition = vals['deposition']
-    max_velocity = vals['max_velocity']
-    max_pressure = vals['max_pressure']
-    avalanche_count = vals['avalanche_count']
-    domain_count = vals['domain_count']
+        domain_count=np.zeros((gridM.ny, gridM.nx), dtype='i'),
+        avalanche_count=np.zeros((gridM.ny, gridM.nx), dtype='i'))
 
     for aval_i,fname in enumerate(avals):
         with netCDF4.Dataset(fname) as nc:
-
-            print('Processing {}: ({} of {}): {} gridcells'.format(
-                os.path.basename(fname),
-                aval_i, len(avals),
-                nc.variables['i_diff'].shape))
 
             # "gridA" = Avalanche's local grid (it will be one of the subdomains), WITH MARGIN
             # Geotransform of this avalanche's local grid
             # TODO: Store Geotransform as machine-precision doubles in the file
             gridA_gt = np.array([float(x) for x in nc.variables['grid_mapping'].GeoTransform.split(' ')])
 
-            deltai = int(-(gridM.x0 - gridA_gt[0]) / gridM.dx + 0.5)
-            deltaj = int(-(gridM.y0 - gridA_gt[3]) / gridM.dy + 0.5)
-
-            # Load (i,j) of each avalanche and convert to local mosaic-box coordinates
-            iis = np.cumsum(nc.variables['i_diff'][:]) + deltai
-            jjs = np.cumsum(nc.variables['j_diff'][:]) + deltaj
-            good_ixs = np.where(np.logical_and.reduce((iis >= 0, iis < gridM.nx, jjs >= 0, jjs < gridM.ny)))
-
-
-            print('   AA1 ', good_ixs[:5])
-            # Clip out-of-query-range gridcells
-            _iis = iis[good_ixs]
-            _jjs = jjs[good_ixs]
-
-            # Load original variables
-            print('   AA2')
-            _max_vel = nc.variables['max_vel']
-            print('   AA2.1')
-            _max_vel = _max_vel[good_ixs]
-            print('   AA2.2')
-            _max_height = nc.variables['max_height'][good_ixs]
-            _depo = nc.variables['depo'][good_ixs]
-            print('   AA3')
-
-            domain_count[_jjs,_iis] += 1    # 1 if any domain touches this
-
-            # Narrow down to ONLY cells that avalanche touched
-            nz_ixs = np.where(_max_vel > 0)
-            _iis = _iis[nz_ixs]
-            _jjs = _jjs[nz_ixs]
-            _max_vel = _max_vel[nz_ixs]
-            _max_height = _max_height[nz_ixs]
-            _depo = _depo[nz_ixs]
-            print('   AA4')
-
-            # Mosaic into final variables
-            deposition[_jjs,_iis] = np.maximum(deposition[_jjs,_iis], _depo)
-            max_velocity[_jjs,_iis] = np.maximum(max_velocity[_jjs,_iis], _max_vel)
-            max_pressure[_jjs,_iis] = np.maximum(max_pressure[_jjs,_iis], rho * _max_vel*_max_vel)
-            avalanche_count[_jjs,_iis] += 1    # 1 if it touches cell, otherwise 0
-            print('   AA5')
+            # C++ extension does the real work
+            _mosaic.mosaic(
+                nc.variables['i_diff'][:],
+                nc.variables['j_diff'][:],
+                gridA_gt[0], gridA_gt[3],
+                nc.variables['max_velA'][:],
+                nc.variables['max_heightA'][:],
+                nc.variables['depoA'][:],
+                rho,
+                gridM.nx, gridM.x0, gridM.dx,
+                gridM.ny, gridM.y0, gridM.dy,
+                vals['deposition'],
+                vals['max_velocity'],
+                vals['max_pressure'],
+                vals['domain_count'],
+                vals['avalanche_count'])                
 
     # Write output GeoTIFF and Zip it up
     with zipfile.ZipFile(ofname_zip, mode='w', compression=zipfile.ZIP_STORED) as ozip:
