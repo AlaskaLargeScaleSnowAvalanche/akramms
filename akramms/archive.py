@@ -140,6 +140,9 @@ class ArchiveFiles:
 
 
 # -----------------------------------------------------------------
+
+
+# -----------------------------------------------------------------
 def fetch(exp_mod, combo, ids):
     """Returns the names of archive files, based on a particular combo
     and list of IDs within that combo.  Archives the avalanches if needed.
@@ -150,31 +153,17 @@ def fetch(exp_mod, combo, ids):
         Describes which RAMMS run within the experiment
     id:
         Which avalanche within the RAMMS run we wish to fetch
-    returns: [id, nc_fname, out_zip]
+    returns: [(id, nc_fname, out_zip), ...]
         NetCDF files matching the query.
         if out_zip is None:
             The .out.zip file didn't exist  but NetCDF was already done.
     """
 
-    # List all the output .out.zip files in an experiment
     x_dir = exp_mod.combo_to_scene_subdir(combo, type='x')
-    out_zips = dict()    
-    for out_zip in glob.iglob(os.path.join(x_dir, 'CHUNKS', '*', '*', '*', '*', '*.out.zip')):
-        match = avalparse.out_zipRE.match(os.path.basename(out_zip))
-        sizecat = match.group(1)
-        id = int(match.group(2))
-        out_zips[id] = (out_zip, sizecat)    # full-pathname, sizecat
-
-
-    # List all the existing archive .nc files
     arc_dir = exp_mod.combo_to_scene_subdir(combo, type='arc')
-    ncs = dict()
-    if os.path.isdir(arc_dir):
-        for name in os.listdir(arc_dir):
-            match = avalparse.avalRE.match(name)
-            if match is not None:
-                ncs[int(match.group(2))] = (name, match.group(1))    # leaf-name, sizecat
 
+    out_zips = exputil.out_zips(exp_mod, combo)
+    ncs = exputil.list_archive_ncs(exp_mod, combo)
 
     # Information from the RELEASE shpaefile
     release_files,release_df = exputil.release_df(exp_mod, combo, type='x')

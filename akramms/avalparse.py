@@ -8,8 +8,6 @@ from akramms.util import exputil
 list of either AvalSpec objects or names of archived avalanches."""
 
 
-out_zipRE = re.compile(r'[^_]+_[^_]+_\d+([TSML])_(\d+)\.out\.zip$')
-avalRE = re.compile(r'aval-([TSML])-(\d+)\.nc')
 scene_dirRE = re.compile(r'(x|arc)-(\d+)-(\d+)$')
 intRE = re.compile(r'\s*(\d+)\s*')
 # -----------------------------------------------------

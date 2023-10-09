@@ -25,25 +25,6 @@ def union_extents(extents):
 
     return z0
 # -----------------------------------------------------------------
-#def extents_intersect(ext0, ext1):
-#    """
-#    ext0, ext1: [x0,y0, x1,y1]
-#
-#    See: https://stackoverflow.com/questions/20925818/algorithm-to-check-if-two-boxes-overlap
-#    """
-#    xmin = min(ext0[0], ext1[0])    # .x0
-#    ymin = min(ext0[1], ext1[1])    # .y0
-#
-#    xmax = min(ext0[2], ext1[2])    # .x1
-#    ymax = min(ext0[3], ext1[3])    # .y1
-#
-#    A = [xmin,ymin,xmax,ymax]
-#    B = [xmin,ymin,xmax,ymax]
-#
-#    return not ((A[0] > B[2]) or (A[2] < B[0]) or (A[1] > B[3]) or (A[3] < B[1]))
-
-
-
 def extents_intersect(extent0, extent1):
     """
     ext0, ext1: [x0,y0, x1,y1]
@@ -213,7 +194,6 @@ def query(aspecs, nc_fnames0, margin=(0.,0.), filter_in_fn=avalfilter.all):
         else:
             all_ids = release_df.index.to_list()
         all_ids.sort()
-
         print('len(all_ids) = ', len(all_ids))
 
         # Obtain initial list of NetCDF files to filter through
@@ -245,27 +225,3 @@ def query(aspecs, nc_fnames0, margin=(0.,0.), filter_in_fn=avalfilter.all):
 
     return nc_fnames, extent
 # ---------------------------------------------------------------
-
-
-
-#Cases:
-#
-#1. All avalanche files: avals=filter_fn(input), extent based on avals + fixed margin (500m?)
-#
-## ak-ccsm-1981-1990-lapse-For-30 113 45   (ids=[None] implied)
-## ak-ccsm-1981-1990-lapse-For-30/x-113-45  17    # Just 17
-## ak-ccsm-1981-1990-lapse-For-30/x-113-45  . 17    # filter(None) + [17]
-#2. combo with non-wildcard idom/jdom: extent = same as idom/jdom domain
-#   if None in ids, then avals <- filter_fn(all avalanches in the domain).
-#   Also add in any other SPECIFIED ids (do not filter)
-#
-## ak-ccsm-1981-1990-lapse-For-30 .. southeast
-#3. combo with wildcard idom/jdom:
-#   A region in ids is REQUIRED, wildcard ids not allowed, but individual additional avalanches can be added as needed.
-#
-#   Add in any aditional avalanche files (see 1) if specified, and expand domain as needed.
-#
-#
-#Can have combination of (1), (2), (3) above.  Set domain to superset of ALL.
-#
-#

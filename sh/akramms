@@ -437,6 +437,30 @@ def query(args):
     for ncf in nc_fnames:
         print(ncf)
 
+
+@subcommand([
+    argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),
+    argument('-f', '--filter', type=str,
+        help='Filter to apply, must return True to include, False to exclude.  See avalfilter.py'),
+])
+def rammsquery(args):
+    from akramms import avalquery,avalfilter
+
+    if args.filter is not None:
+        filter_in = avalfilter.parse(args.filter)
+    else:
+        filter_in = avalfilter.all
+
+    aspecs, nc_fnames0 = avalparse.parse_aval_specs(args.avals)
+    aspecs = avalquery.normalize(aspecs)
+
+    out_zips = list(rammsquery.query_aspecs(aspecs, filter_in_fn=filter_in))
+
+    # Display result
+    for out_zip in out_zips:
+        print(out_zip)
+
+
 @subcommand([
     argument('query', nargs=1, help='Query file generated via akramms query'),
     #argument('-o', '--output', required=False, help='Name of Mosaic output file to write'),
