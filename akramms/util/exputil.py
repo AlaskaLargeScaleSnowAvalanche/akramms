@@ -34,7 +34,7 @@ def combo_to_scene_dirs(exp_mod, combo, type='x'):
         types = [type]
 
     for type in types:
-        yield exp_mod.combo_to_scene_subdir(combo, type=type)
+        yield exp_mod.combo_to_scene_dir(combo, type=type)
 # -------------------------------------------------------
 _relRE = re.compile(r'^(.*)_rel\.shp$')
 def _release_files(scene_dir):
@@ -91,7 +91,7 @@ def release_df(exp_mod, combo, type=None):
 # ----------------------------------------------------------
 out_zipRE = re.compile(r'[^_]+_[^_]+_\d+([TSML])_(\d+)\.out\.zip$')
 def out_zips(exp_mod, combo):
-    x_dir = exp_mod.combo_to_scene_subdir(combo, type='x')
+    x_dir = exp_mod.combo_to_scene_dir(combo, type='x')
     out_zips = dict()    
     for out_zip in glob.iglob(os.path.join(x_dir, 'CHUNKS', '*', '*', '*', '*', '*.out.zip')):
         match = out_zipRE.match(os.path.basename(out_zip))
@@ -102,7 +102,7 @@ def out_zips(exp_mod, combo):
 
 avalRE = re.compile(r'aval-([TSML])-(\d+)\.nc')
 def archive_ncs(exp_mod, combo):
-    arc_dir = exp_mod.combo_to_scene_subdir(combo, type='arc')
+    arc_dir = exp_mod.combo_to_scene_dir(combo, type='arc')
     ncs = dict()
     if os.path.isdir(arc_dir):
         for name in os.listdir(arc_dir):

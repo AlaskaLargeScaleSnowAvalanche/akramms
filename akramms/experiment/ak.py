@@ -76,7 +76,7 @@ combo_keys = list(combo_schema.schema.keys())
 Combo = collections.namedtuple('Combo', combo_keys)
 
 # -------------------------------------------------------------
-def combo_to_scene_subdir(combo, type='x'):
+def combo_to_scene_dir(combo, type='x'):
     trial_name = f'{name}-{combo.snow_dataset}-{combo.year0}-{combo.year1}-{combo.downscale_algo}-{combo.forest}-{combo.return_period}'
     scene_name = f'{type}-{combo.idom:03d}-{combo.jdom:03d}'    # Underscores would confuse things
 
@@ -116,7 +116,7 @@ def add_combo(makefile, combo):
         combo.year0, combo.year1, combo.idom, combo.jdom)).outputs[0]
 
     # Convert Combo to a scene_dir / scen_args
-    scene_dir = os.path.join(exp_mod.dir, combo_to_scene_subdir(combo))
+    scene_dir = os.path.join(exp_mod.dir, combo_to_scene_dir(combo))
 
     # Determine which parts of the domain are interior (vs margin)
     # Coordinates are in (i,j) space relative to full-margin domain's origin

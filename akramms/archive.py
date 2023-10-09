@@ -159,8 +159,8 @@ def fetch(exp_mod, combo, ids):
             The .out.zip file didn't exist  but NetCDF was already done.
     """
 
-    x_dir = exp_mod.combo_to_scene_subdir(combo, type='x')
-    arc_dir = exp_mod.combo_to_scene_subdir(combo, type='arc')
+    x_dir = exp_mod.combo_to_scene_dir(combo, type='x')
+    arc_dir = exp_mod.combo_to_scene_dir(combo, type='arc')
 
     out_zips = exputil.out_zips(exp_mod, combo)
     ncs = exputil.list_archive_ncs(exp_mod, combo)
@@ -204,7 +204,7 @@ def fetch(exp_mod, combo, ids):
             nc_fnames.append((id,arc_fname, out_zip))
         elif out_zip_mtime >= 0:
             # out.zip exists but arc is not up-to-date, regenerate.
-            arc_dir = exp_mod.combo_to_scene_subdir(combo, type='arc')
+            arc_dir = exp_mod.combo_to_scene_dir(combo, type='arc')
             arc_fname = os.path.join(
                 arc_dir,
                 f'aval-{ozip_sizecat}-{id}.nc')
@@ -252,8 +252,8 @@ def archive_combo(exp_mod, combo, ids=None):
     Returns: {id: arc_fname}
     """
 
-    scene_dir = exp_mod.combo_to_scene_subdir(combo, type='x')
-    archive_dir = exp_mod.combo_to_scene_subdir(combo, type='arc')
+    scene_dir = exp_mod.combo_to_scene_dir(combo, type='x')
+    archive_dir = exp_mod.combo_to_scene_dir(combo, type='arc')
 
     # Copy a few top-level files
     os.makedirs(archive_dir, exist_ok=True)
