@@ -103,19 +103,33 @@ def submit(args):
     release_files = rammsutil.get_release_files(args.ramms)
     r_ramms.submit_jobs(release_files, ids=ids)
 
+#@subcommand([
+#    argument('ramms', help='RAMMS directory or release file to inspect'),
+#    argument('ids', type=int, nargs='*', help='ID of avalanche in run_dir to run (If not present, then enlarge all overrun avalanches)'),
+#    argument('--dry-run', action='store_true', help="Don't do anything"),
+#])
+#def enlarge(args):
+#    """Enlarges domain of jobs that overran"""
+#
+#    ids = None if len(args.ids) == 0 else args.ids
+#
+#    # Separate into numeric-only and non-numeric args in the spec
+#    release_files = rammsutil.get_release_files(args.ramms)
+#    r_ramms.enlarge_domains(release_files, ids=ids, dry_run=args.dry_run)
+
 @subcommand([
-    argument('ramms', help='RAMMS directory or release file to inspect'),
-    argument('ids', type=int, nargs='*', help='ID of avalanche in run_dir to run (If not present, then enlarge all overrun avalanches)'),
-    argument('--dry-run', action='store_true', help="Don't do anything"),
+    argument('query', nargs=1, help='Query file generated via akramms rammsquery'),
 ])
 def enlarge(args):
-    """Enlarges domain of jobs that overran"""
+    query_fname = args.query[0]
 
-    ids = None if len(args.ids) == 0 else args.ids
+    # Read release dataframe from ALL size classes
+    with open(query_fname, 'rb') as fin:
+        scene_dir = pickle.load(fin)
+        release_df = pickle.load(fin)
 
-    # Separate into numeric-only and non-numerica args in the spec
-    release_files = rammsutil.get_release_files(args.ramms)
-    r_ramms.enlarge_domains(release_files, ids=ids, dry_run=args.dry_run)
+    r_ramms.enlarge_domains(scene_dir, release_df)
+
 
 @subcommand([
     argument('ramms', help='RAMMS directory or release file to inspect'),
@@ -124,12 +138,7 @@ def info(args):
     ids = None if len(args.ids) == 0 else args.ids
     release_files = rammsutil.get_release_files(args.ramms)
     infos_df = r_ramms.infos(release_files, ids=ids)
-
-
-#    df = infos_df[infos_df['final_outflow_volume'] == 0.00]
     df = infos_df
-#    df = df[df['final_outflow_volume'] == 0]
-
     print(df)
 
 @subcommand([
@@ -459,11 +468,14 @@ def rammsquery(args):
     release_df = rq.query_aspecs(aspecs, filter_in_fn=filter_in)
     print(release_df)
 
+    scene_dir = aspecs[0].exp_mod.combo_to_scene_dir(aspecs[0].combo)
+    print('scene_dir = ', scene_dir)
 
     # Write query results to file
     if args.output is not None:
         with open(args.output, 'wb') as out:
             # Query results
+            pickle.dump(scene_dir, out)
             pickle.dump(release_df, out)
 
     # Display result

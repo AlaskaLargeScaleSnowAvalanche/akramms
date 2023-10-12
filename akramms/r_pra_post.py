@@ -78,20 +78,6 @@ _post_cat_bounds = (0.,5000.,25000.,60000.,1e10)    # Dummy value at end
 post_cat_bounds = \
     dict((pra_size, (_post_cat_bounds[ix], _post_cat_bounds[ix+1])) for ix,pra_size in enumerate(rammsutil.PRA_SIZES.keys()))
 
-def master_ramms_names(scene_args, return_period, forest):
-    """Generates list of RAMMS names of RELEASE files before they've been chopped up.
-    Yields: jb (RammsName), pra_size
-    """
-    for pra_size in rammsutil.PRA_SIZES.keys():    # T,S,M,L
-        if pra_size not in config.allowed_pra_sizes:
-            continue
-        jb = rammsutil.RammsName(
-            os.path.join(scene_args['scene_dir'], 'CHUNKS'),
-            scene_args['name'], None, forest, scene_args['resolution'],
-            return_period, pra_size, None)
-        yield jb, pra_size
-
-
 
 def in_domain(xmin,ymin,xmax,ymax, pra):
     """Returns True if the PRA is >50% in the domain"""
@@ -141,7 +127,7 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
 
     # Full pathnames of release files generated from this (scene_name, return_period, forest) combo
     outputs = list()
-    ramms_names = list(master_ramms_names(scene_args, return_period, forest))
+    ramms_names = list(rammsutil.master_ramms_names(scene_args, return_period, forest))
     for jb,_ in ramms_names:
         for dir,ext in (('RELEASE', '_rel.shp'), ('RELEASE','_chull.shp'), ('RELEASE','_dom.shp')):
             outputs.append(

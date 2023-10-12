@@ -108,37 +108,52 @@ def write_scenario_txt(jb, alt_lim_top=1500, alt_lim_low=1000, ncpu=config.ramms
             out.write(scenario_tpl.format(**kwargs))
 
 
-# def rammsdir_rule(scene_dir, release_file, oramms_name=None, **scenario_kwargs):
-# 
-#     """Generates the scenario file, which becomes key to running RAMMS.
-#     release:
-#         Release file to process
-#     oramms_name:
-#         Output RAMMS directory to create
-#     """
-#     jb = rammsutil.parse_release_file(release_file)
-#     if oramms_name is None:
-#         oramms_name = jb
-# 
-#     scene_args = params.load(scene_dir)
-#     resolution = scene_args['resolution']
-#     name = scene_args['name']
-#     scenario_txt = os.path.join(jb.ramms_dir, 'scenario.txt')
-# 
-#     links = dem_forest_links(scene_args, jb.ramms_dir, oramms_name.slope_name, forest=jb.forest)
-# 
-#     def action(tdir):
-#         # Make symlinks for DEM file, etc.
-#         for ifile,ofile in links:
-#             setlink_or_copy(ifile, ofile)
-# 
-#         # Write scenario.txt
-#         write_scenario_txt(jb, **scenario_kwargs)
-# 
-#     inputs = [d[0] for d in links]
-#     linked_files = [d[1] for d in links]
-#     outputs = [scenario_txt] + linked_files
-#     return make.Rule(action, inputs, outputs)
+def prepare_chunk(scene_args, jb1, dfc):
+    """Writes a full RAMMS run (chunk), ready for RAMMS Stage 1.
+    scene_args:
+        The overall AKRAMMS scene (combo) this chunk will be a part of
+    jb1: RammsName
+        Describes the resulting name of the chunk (including directory of the RAMMS run).
+    dfc: DataFrame describing the chunk.
+
+    """
+
+    # Make symlinks for DEM file, etc.
+    for ifile,ofile in dem_forest_links(scene_args, jb1.ramms_dir, jb1.slope_name, forest=jb1.forest):
+        setlink_or_copy(ifile, ofile)
+
+    # Write scenario.txt
+    scenario_txt = os.path.join(jb1.ramms_dir, 'scenario.txt')
+    write_scenario_txt(jb1, **scenario_kwargs)
+
+    # Write the _rel.shp file
+    ofname = os.path.join(jb1.ramms_dir, 'RELEASE', f'{jb1.ramms_name}_rel.shp')
+    os.makedirs(os.path.dirname(ofname), exist_ok=True)
+    _dfx = dfc[list(rel_df.columns)]
+    shputil.write_df(_dfx, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
+    
+    # Write the _dom.shp file 
+    ofname = os.path.join(jb1.ramms_dir, 'DOMAIN', f'{jb1.ramms_name}_dom.shp')
+    os.makedirs(os.path.dirname(ofname), exist_ok=True)
+    shputil.write_df(dfc[list(dom_df)], 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
+
+    # Write the .relp and .domp files for each avalanche
+    # (Secondary files, as written by Python)
+    os.makedirs(jb1.avalanche_dir, exist_ok=True)
+    for _,row in dfc.iterrows():
+        id = row['Id']
+        ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}_{id}.relp')
+        rammsutil.write_polygon(row['pra'], ofname)
+        ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}_{id}.domp')
+        rammsutil.write_polygon(row['dom'], ofname)
+
+    # Store chunk info
+    For = 'For' if jb1.forest else 'NoFor'
+    chunk_info += [
+        (segment, id,
+        f'{jb1.scene_name}{jb1.segment:05d}{jb1.return_period}{jb1.pra_size}{For}_{jb1.resolution}m')
+        for id in dfc['Id']]
+    #chunk_info.append(segment, list(dfc['Id']))
 
 def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
     """Generates the scenario file, which becomes key to running RAMMS.
@@ -156,27 +171,11 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
     for jb,pra_size in ramms_names:
         outputs.append(rammsutil.chunks_csv(scene_args['scene_dir'], jb.ramms_name))
 
-
     def action(tdir):
 
-        for jb,pra_size in ramms_names:
-
-            # Read _rel and _dom shapefiles
+        for jb,pra_size in ramms_names:    # see master_ramms_names() in r_pra_post, includes CHUNKS in it.
             base = os.path.join(scene_args['scene_dir'], 'RELEASE', f'{jb.ramms_name}')
-            rel_df = shputil.read_df(f'{base}_rel.shp', shape='pra').drop('fid', axis=1)
-
-            dom_df = shputil.read_df(f'{base}_dom.shp', shape='dom').drop('fid', axis=1)
-
-#            print('********* rel ')
-#            print(rel_df[['area_m2','Mean_DEM','Mean_Slope','Id','VOL_30']])
-#            print('********* dom ')
-#            print(dom_df)
-#            sys.exit(0)
-
-            df = rel_df.merge(dom_df, on='Id')
-
-            # Drop rows with missing domain
-            df = df[df['dom'].notna()]
+            df = read_reldom_df(base, jb)
 
             ofnames = list()
             chunk_info = list()
@@ -193,51 +192,8 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
                 jb1.set(segment=segment)
                 print(f'Generating CHUNK: {jb1.ramms_dir}')
 
-                # Make symlinks for DEM file, etc.
-                for ifile,ofile in dem_forest_links(scene_args, jb1.ramms_dir, jb1.slope_name, forest=jb1.forest):
-                    setlink_or_copy(ifile, ofile)
+                prepare_chunk(scene_args, jb1, )
 
-
-
-                # Write scenario.txt
-                scenario_txt = os.path.join(jb1.ramms_dir, 'scenario.txt')
-                write_scenario_txt(jb1, **scenario_kwargs)
-
-                # Write the _rel.shp file
-                ofname = os.path.join(jb1.ramms_dir, 'RELEASE', f'{jb1.ramms_name}_rel.shp')
-                #print('xxxxx writing ', ofname)
-                os.makedirs(os.path.dirname(ofname), exist_ok=True)
-                #print('rel_def ', rel_df.columns)
-                #print('dfc     ', dfc.columns)
-                #rel_cols = list(rel_df.columns)
-                #print('rel_cols ', rel_cols)
-#                print(rel_df[['fid', 'Id']])
-                _dfx = dfc[list(rel_df.columns)]
-                shputil.write_df(_dfx, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
-            
-                # Write the _dom.shp file 
-                ofname = os.path.join(jb1.ramms_dir, 'DOMAIN', f'{jb1.ramms_name}_dom.shp')
-                os.makedirs(os.path.dirname(ofname), exist_ok=True)
-                shputil.write_df(dfc[list(dom_df)], 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
-
-                # Write the .relp and .domp files for each avalanche
-                # (Secondary files, as written by Python)
-                os.makedirs(jb1.avalanche_dir, exist_ok=True)
-                for _,row in dfc.iterrows():
-                    id = row['Id']
-                    ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}_{id}.relp')
-                    rammsutil.write_polygon(row['pra'], ofname)
-                    ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}_{id}.domp')
-                    rammsutil.write_polygon(row['dom'], ofname)
-
-                # Store chunk info
-                For = 'For' if jb1.forest else 'NoFor'
-                chunk_info += [
-                    (segment, id,
-                    f'{jb1.scene_name}{jb1.segment:05d}{jb1.return_period}{jb1.pra_size}{For}_{jb1.resolution}m')
-                    for id in dfc['Id']]
-                #chunk_info.append(segment, list(dfc['Id']))
-            
             # Write names of our PRA files into the _chunks.txt output file
             chunk_index_df = pd.DataFrame(chunk_info, columns=['segment', 'Id', 'chunk_name'])
 #            with open(, 'w') as out:
@@ -692,12 +648,12 @@ def job_statuses(release_files):
 
             # Mark as NOINPUT if the .in.zip file is not there.
             if not os.path.exists(os.path.join(jb.avalanche_dir, f'{job_name}.in.zip')):
-                statuses.append((jb, id, JobStatus.NOINPUT))
+                statuses.append((release_file, jb, id, JobStatus.NOINPUT))
                 continue
 
             # See if Condor knows is what's going on with the job
             if job_name in condor_statuses:
-                statuses.append((jb, id, condor_statuses[job_name]))
+                statuses.append((release_file, jb, id, condor_statuses[job_name]))
                 continue
 
             # Not in Condor?  Either it hasn't launched, or it's finished / failed
@@ -716,7 +672,7 @@ def job_statuses(release_files):
                     if (aval_nc_tm > out_zip_tm) and (out_zip_tm > in_zip_tm):
                         # .nc files only "count" if they are newer than raw files
                         # (or those raw files don't exist)
-                        statuses.append((jb, id, JobStatus.FINISHED))
+                        statuses.append((release_file, jb, id, JobStatus.FINISHED))
                         continue
 
             # Identify avalanches that have finished: .out.zip exists and has non-zero size
@@ -731,7 +687,7 @@ def job_statuses(release_files):
                     # no sign of the HTCondor job to write it at the
                     # end.  Sounds like things were killed, send
                     # status back to TODO.
-                    statuses.append((jb, id, JobStatus.TODO))
+                    statuses.append((release_file, jb, id, JobStatus.TODO))
                     continue
 
                 # We tentatively think the job is finished.  But let's
@@ -740,21 +696,21 @@ def job_statuses(release_files):
                 with zipfile.ZipFile(out_zip, 'r') as ozip:
                     arcnames = [os.path.split(x)[1] for x in ozip.namelist()]
                 if any(x.endswith('.out.overrun') for x in arcnames):
-                    statuses.append((jb, id, JobStatus.OVERRUN))
+                    statuses.append((release_file, jb, id, JobStatus.OVERRUN))
                 else:
-                    statuses.append((jb, id, JobStatus.FINISHED))
+                    statuses.append((release_file, jb, id, JobStatus.FINISHED))
                 continue
 
             # Default to TODO
-            statuses.append((jb, id, JobStatus.TODO))
+            statuses.append((release_file, jb, id, JobStatus.TODO))
 
-    statuses = [(jb.key(), jb, id, status) for jb,id,status in statuses]
+    statuses = [(release_file, jb.key(), jb, id, status) for release_file,jb,id,status in statuses]
 #    df = pd.DataFrame(statuses, columns=('jb_key', 'id', 'job_status'))
-    df = pd.DataFrame(statuses, columns=('jb_key', 'jb', 'id', 'job_status'))
+    df = pd.DataFrame(statuses, columns=('release_file', 'jb_key', 'jb', 'id', 'job_status'))
     df = df.sort_values(by=['jb_key', 'id'])
     #df = df[['run_dir', 'id', 'job_status']]
 #    print(df)
-    return df
+    return df.set_index('id')
 # --------------------------------------------------------
 _include_statuses = {JobStatus.NOINPUT, JobStatus.INCOMPLETE, JobStatus.TODO, JobStatus.INPROCESS, JobStatus.OVERRUN, JobStatus.FAILED}
 def print_job_statuses(df):
@@ -817,17 +773,17 @@ def enlarge_domain(run_dir, job_name, enlarge_increment=5000.):
     print('Resubmitting: {}/{}'.format(run_dir, job_name))
     submit_job(run_dir, job_name)
 
-def enlarge_domains(release_files, ids=None, dry_run=False):
+def query_overruns(release_files, ids=None):
     print('Fetching job statuses...')
-    df = job_statuses(release_files)
+    df = job_statuses(release_files)    # index=id
     df = df[df.job_status == JobStatus.OVERRUN]
-    ix_vals = list()
-    for ix,row in df.iterrows():
+    all_ids = list()
+    for id,row in df.iterrows():
         jb = row.jb
         run_dir = jb.avalanche_dir
         job_name = f"{jb.ramms_name}_{row['id']}"
         if ids is None or row['id'] in ids:
-            ix_vals.append(ix)
+            all_ids.append(id)
             continue
 
         # ONLY enlarge if the .out.zip file is newer than the .in.zip file
@@ -838,14 +794,22 @@ def enlarge_domains(release_files, ids=None, dry_run=False):
         try:
             in_zip_tm = os.path.getmtime(in_zip)
             if out_zip_tm > in_zip_tm:
-                ix_vals.append(ix)
+                all_ids.append(id)
         except OSError:    # File not exist
             # This shouldn't normally happen
             in_zip_tm = -1
             print(f'Input file missing: {in_zip}')
 
+    # Cut down the query
+    return df[all_ids]
+
+
+def enlarge_domains_OLD(df, dry_run=False):
+    """
+    df:
+        Result of query_overruns() abov
+    """
     # Display what we're gonna do
-    all_ids = [df.id[ix] for ix in ix_vals]
     print(f'Enlarging domains for avalanche IDs: {all_ids}')
     if dry_run:
         print('Dry Run, doing nothing.')
@@ -859,6 +823,23 @@ def enlarge_domains(release_files, ids=None, dry_run=False):
         enlarge_domain(run_dir, job_name)
 
     return df
+
+def enlarge_domains(scene_dir, release_df)
+    """(TODO: I think this only works on ONE combo at a time)"""
+
+    scene_args = params.load(scene_dir)
+
+    # Split up by pra_size
+    for pra_size, dfc in release_df.groupby('pra_size'):
+        print('Regenerate chunk:')
+        print(dfc)
+
+        jb = rammsutil.RammsName(
+            os.path.join(scene_dir, 'CHUNKS2'),
+            scene_args['name'], 0, scene_args['forest'][0], scene_args['resolution'],
+            scene_args['return_period'[0], pra_size, None))
+#        prepare_chunk(scene_args, jb, dfc)
+
 
 # -------------------------------------------------------
 _parseRE = re.compile(

@@ -60,7 +60,11 @@ def _release_df(scene_dir):
     rfs = list()
     dfs = list()
     for fname in _release_files(scene_dir):
-        dfs.append(shputil.read_df(fname, read_shapes=False))
+        jb = parse_release_file(fname)
+        df = shputil.read_df(fname, read_shapes=False)
+        if not ('pra_size' in df):
+            df['pra_size'] = jb.pra_size
+        dfs.append(df)
         rfs.append(fname)
 
     if len(dfs) > 0:

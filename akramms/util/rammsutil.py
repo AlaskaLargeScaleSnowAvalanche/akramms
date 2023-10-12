@@ -123,7 +123,22 @@ class RammsName:
         return format.format(**dd)
 
 # -------------------------------------------------------
-release_fileRE = re.compile(r'^(.+)(\d\d\d\d\d)(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(.*)(\..*)')
+def master_ramms_names(scene_args, return_period, forest):
+    """Generates list of RAMMS names of RELEASE files before they've been chopped up.
+    Yields: jb (RammsName), pra_size
+    """
+    for pra_size in rammsutil.PRA_SIZES.keys():    # T,S,M,L
+        if pra_size not in config.allowed_pra_sizes:
+            continue
+        jb = rammsutil.RammsName(
+            os.path.join(scene_args['scene_dir'], 'CHUNKS'),
+            scene_args['name'], None, forest, scene_args['resolution'],
+            return_period, pra_size, None)
+        yield jb, pra_size
+# -------------------------------------------------------
+
+
+release_fileRE = re.compile(r'^(.+)([\dr]\d\d\d\d)(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(.*)(\..*)')
 
 @functools.lru_cache()
 def parse_release_file(release_file):
@@ -156,6 +171,28 @@ def job_ids(release_file):
     release_df = shputil.read_df(release_file, read_shapes=False)
     return sorted(list(release_df['Id']))
 # --------------------------------------------------------
+def read_reldom_df(base, jb):
+    """Reads a single _rel.shp and _dom.shp and merges them together.
+    base: filename
+        Everything but _rel.shp or _dom.shp
+        Based on jb.ramms_name
+    jb:
+        Parsed Release file.
+    Returns: df, rel_cols, dom_cols
+        rel_cols, dom_cols: [str, ...]
+            Names of columns
+    """
+    # Read _rel and _dom shapefiles
+    rel_df = shputil.read_df(f'{base}_rel.shp', shape='pra').drop('fid', axis=1)
+    dom_df = shputil.read_df(f'{base}_dom.shp', shape='dom').drop('fid', axis=1)
+    df = rel_df.merge(dom_df, on='Id')
+
+    # Drop rows with missing domain
+    df = df[df['dom'].notna()]
+    return df, rel_df.columns, dom_df.columns
+
+
+# --------------------------------------------------------
 def _ramms_to_release(ramms_dirs):
     """Given a bunch of RAMMS directories, returns the release files in them."""
     release_files = list()
@@ -179,8 +216,8 @@ def chunks_csv(scene_dir, ramms_name):
 
 
 def _get_release_files(spec):
-    """Given a directory above or below the RAMMS directory, finds a
-    "ramms dir," which is one level below RAMMS/."""
+    """Given a directory above or below the CHUNKS directory, finds a
+    "ramms dir," which is one level below CHUNKS/."""
 
     # *** The spec is a directory corresponding to a SINGLE shapefile
     # ** The spec is a SINGLE shapefile
