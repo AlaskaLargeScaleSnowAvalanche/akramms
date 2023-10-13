@@ -268,11 +268,6 @@ def step1(args):
     makefile.add(r_experiment.r_active_domains(exp_mod))
     makefile.generate(os.path.join(exp_dir, 'init_mk'), run=True, ncpu=1)
 # -----------------------------------------------------------
-experiment_specRE = re.compile(r'([^.]+)\.([^.]+)$')
-def _parse_experiment_spec(spec):
-    match = experiment_specRE.match(spec)
-    return (match.group(1), match.group(2))
-
 @subcommand([
     argument('experiment-spec', type=_parse_experiment_spec,
         help='Python module and combo function describing the experiment, eg: e_alaska.juneau'),

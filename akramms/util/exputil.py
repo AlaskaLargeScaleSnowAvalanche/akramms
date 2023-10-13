@@ -13,19 +13,6 @@ avalRE = re.compile(r'aval-([TSML])-(d+)\.nc')
 scene_dirRE = re.compile(r'(x|arc)-(\d+)-(\d+)$')
 intRE = re.compile(r'\s*(\d+)\s*')
 # -----------------------------------------------------
-@functools.lru_cache()
-def load(ename):
-    """Loads the module of an experiment based on its name."""
-
-    try:
-        exp_mod = importlib.import_module(ename)
-    except ModuleNotFoundError:
-        try:
-            exp_mod = importlib.import_module('akramms.experiment.' + ename)
-        except ModuleNotFoundError:
-            raise ModuleNotFoundError(f'Cannot load module {ename} or akramms.experiment.{ename}')# from None
-    return exp_mod
-
 # -------------------------------------------------------
 def combo_to_scene_dirs(exp_mod, combo, type='x'):
     """Returns the full pathname for a RAMMS scene, based on its experiment and combo"""

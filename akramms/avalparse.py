@@ -8,29 +8,8 @@ from akramms.util import exputil
 list of either AvalSpec objects or names of archived avalanches."""
 
 
-scene_dirRE = re.compile(r'(x|arc)-(\d+)-(\d+)$')
 intRE = re.compile(r'\s*(\d+)\s*')
 # -----------------------------------------------------
-def load(ename):
-    """Loads the module of an experiment based on its name."""
-
-    try:
-        exp_mod = importlib.import_module(ename)
-    except ModuleNotFoundError:
-        try:
-            exp_mod = importlib.import_module('akramms.experiment.' + ename)
-        except ModuleNotFoundError:
-            raise ModuleNotFoundError(f'Cannot load module {ename} or akramms.experiment.{ename}')# from None
-    return exp_mod
-
-# -------------------------------------------------------
-def parse_combo(exp_mod, scombo):
-    """Parses strings into appropriate types and returns the Combo tuple."""
-    svals = dict(zip(exp_mod.combo_schema.schema.keys(), scombo))
-    vals = exp_mod.combo_schema.validate(svals)
-    return exp_mod.Combo(**vals)
-
-# -------------------------------------------------------
 def parse_combo_dir(combo_dir, idom, jdom):
 
     # Obtain experiment name

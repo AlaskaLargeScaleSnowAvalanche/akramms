@@ -10,7 +10,7 @@ from akramms import d_ifsar, d_usgs_landcover
 
 # Root directory of studies in this experiment
 name = __name__.rsplit('.', 1)[-1]    # e_alaska
-dir = os.path.join(config.roots['PRJ'], name)
+dir = config.roots['PRJ'] / name
 
 # Map coordinate system we use
 wkt = 'PROJCS["NAD83 / Alaska Albers",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["Degree",0.017453292519943295]],PROJECTION["Albers"],PARAMETER["standard_parallel_1",55],PARAMETER["standard_parallel_2",65],PARAMETER["latitude_of_origin",50],PARAMETER["central_meridian",-154],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["Meter",1]]'
@@ -80,7 +80,7 @@ def combo_to_scene_dir(combo, type='x'):
     trial_name = f'{name}-{combo.snow_dataset}-{combo.year0}-{combo.year1}-{combo.downscale_algo}-{combo.forest}-{combo.return_period}'
     scene_name = f'{type}-{combo.idom:03d}-{combo.jdom:03d}'    # Underscores would confuse things
 
-    return os.path.join(dir, trial_name, scene_name)
+    return dir / trial_name / scene_name
 
 # -------------------------------------------------------------
 def add_dem(makefile, idom, jdom, sanity_check=True):
