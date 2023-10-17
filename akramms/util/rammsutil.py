@@ -173,26 +173,6 @@ def job_ids(release_file):
     release_df = shputil.read_df(release_file, read_shapes=False)
     return sorted(list(release_df['Id']))
 # --------------------------------------------------------
-def read_reldom_df(base, jb):
-    """Reads a single _rel.shp and _dom.shp and merges them together.
-    base: filename
-        Everything but _rel.shp or _dom.shp
-        Based on jb.ramms_name
-    jb:
-        Parsed Release file.
-    Returns: df, rel_cols, dom_cols
-        rel_cols, dom_cols: [str, ...]
-            Names of columns
-    """
-    # Read _rel and _dom shapefiles
-    rel_df = shputil.read_df(f'{base}_rel.shp', shape='pra').drop('fid', axis=1)
-    dom_df = shputil.read_df(f'{base}_dom.shp', shape='dom').drop('fid', axis=1)
-    df = rel_df.merge(dom_df, on='Id')
-
-    # Drop rows with missing domain
-    df = df[df['dom'].notna()]
-    return df, rel_df.columns, dom_df.columns
-
 
 # --------------------------------------------------------
 def _ramms_to_release(ramms_dirs):

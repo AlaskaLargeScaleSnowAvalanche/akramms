@@ -95,7 +95,7 @@ def parse_aval_specs(args):
     nc_fnames = list()    # return val
     cur_tuple = list()    # Current items for a combo
 
-    state = 0    # 0=initial; 1=expectign combo items; 2=expecting id
+    state = 0    # 0=initial; 1=expecting combo items; 2=expecting id
     exp_mod = None    # Most recently parsed experiment
     scombo = list()
     ids = list()
@@ -222,3 +222,25 @@ def parse_aval_specs(args):
     return aspecs, nc_fnames
 
 # -------------------------------------------------------
+
+
+
+Parsing can be:
+ - expset (eg: ak.juneau)
+   --> Resolves to all combos theoretically in the expset
+
+
+ - expdir (eg: .../ak)
+   --> Resolves to all trial dirs currently realized in the expdir)
+ - trial directory (eg: .../ak/ak-ccsm-1981-1990-lapse-For-30)
+   - Or wildcard Combo (semantically same as trial directory)
+ - x_dir (eg: .../ak/ak-ccsm-1981-1990-lapse-For-30/x-113-045)
+ - arc_dir (eg: .../ak/ak-ccsm-1981-1990-lapse-For-30/arc-113-045)
+ - chunk_dir  (eg: .../ak/ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/x-113-0450000230TFor_10m
+
+
+
+
+
+trial dir <--> Wildcard Combo
+scene dir <--> Combo

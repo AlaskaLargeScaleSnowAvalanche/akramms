@@ -1,8 +1,48 @@
 
 
+# =====================================================================
+# =====================================================================
+_releasefileRE = re.compile(r'(.*)([TSML])([_-])rel.shp')
+_releasefile_scenetypes = {'-': 'arc', '_': 'x'}
+def parse_releasefile(releasefile):
+    """releasefile: Eg:
+        .../x-113-045/RELEASE/x-113-045For_10m_30L_rel.shp
+        .../x-113-045/CHUNKS/x-113-0450001330MFor_10m/RELEASE/x-113-04500013For_10m_30M_rel.shp
+        .../arc-113-045/RELEASE/ak-ccsm-1981-1990-lapse-For-30-113-045-S-rel.shp
+    """
 
+    match = _releasefileRE.match(releasefile.parts[-1])
+    if match is None:
+        raise ValueError(f'Not a release file: {releasefile}')
+
+    ret = {'releasefile': releasefile}
+    try:
+        ret.update(parse_dir(releasefile.parents[1]))    # The directory above RELEASE
+    except ValueError:
+        pass    # Maybe this is a "naked" release file
+
+    ret['sizecat'] = match.group(2)
+    scenetype = _releasefile_scenetypes[match.group(3)]
+    ret['scenetype'] = scenetype
+    if scenetype == 'arc':
+        parts = match.group(1).split('-')
+        ret.update(parse_parts(parts, load=True))
+
+    return parts
+
+    
+# ----------------------------------------------------------------------
+# ----------------------------------------------------------------------
+# ----------------------------------------------------------------------
+# ----------------------------------------------------------------------
+
+
+
+
+
+# =====================================================================
 # -----------------------------------------------------------
-def theory_combos_in_set(exp_name, set_fn_name):
+def theory_expset_to_combos(exp_name, set_fn_name):
     """Lists theoretical combos in an experiment
     exp_name: str
         Name of the experiment (eg: ak)
@@ -19,23 +59,14 @@ def theory_combos_in_set(exp_name, set_fn_name):
 # -----------------------------------------------------------
 def theory_wcombo_to_trial_dir(exp_name, wcombo):
     """
+    wcombo:
+        Wildcard combo (i.e. might have null idom/jdom)
     Returns:
             Eg: /home/efischer/prj/ak/ak-ccsm-1981-1990-lapse-For-30
     """
     exp_mod = parse.exp_mod(exp_name)
     return exp_mod.combo_to_scene_dir(wcombo).parents[0]
 
-def trial_dir_to_wcombo(trial_dir, exp_mod=None):
-    trail_dir = pathlib.Path(trail_dir)
-
-    # Get the rest of the combo
-    sparts = trial_dir.parts[-1].split('-')[1:] + [None, None]
-
-    # Get the exp_mod if needed
-    if exp_mod is None:
-        exp_mod = parse.exp_mod(scene_dir.parts[-3])
-
-    return exp_mod, exp_mod.Combo(*sparts)
 
 # -----------------------------------------------------------
 def wcombo_to_combos(exp_name, wcombo, type='x'):
@@ -52,7 +83,7 @@ def wcombo_to_combos(exp_name, wcombo, type='x'):
         yield wcombo.replace(idom=idom, jdom=jdom)
 
 # -----------------------------------------------------------
-def exp_dir_to_wcombos(exp_mod):
+def expdir_to_wcombos(exp_mod):
     for name in os.listdir(exp_mod.dir):
         try:
             yield trial_dir_to_wcombo(exp_mod.dir / name)
@@ -61,7 +92,7 @@ def exp_dir_to_wcombos(exp_mod):
             pass
 # -----------------------------------------------------------
 def theory_combo_to_scene_dir(exp_name, combo, type='x'):
-    """Returns the full pathname for a RAMMS scene, based on its experiment and combo.
+    """Returns the full pathname for an AKRAMMS scene, based on its experiment and combo.
     The combo must be fully specified!!!"""
     exp_mod = parse.exp_mod(exp_name)
     if type is None:
@@ -96,7 +127,7 @@ def theory_scene_dir_to_combo(scene_dir, exp_mod=None):
     return exp_mod, exp_mod.Combo(*sparts)
 
 # -----------------------------------------------------------
-def x_dir_to_chunk_dirs(scene_dir, chunk_stage=0):
+def x_dir_to_chunkdirs(scene_dir, chunk_stage=0):
 
     # Read list of chunks
     chunk_rfs = list()    # Names of release files for each CHUNK
@@ -108,12 +139,12 @@ def x_dir_to_chunk_dirs(scene_dir, chunk_stage=0):
             df = df[df['segment'] < config.max_chunks]    # Cut down based on config
 
         for chunk_name in df['chunk_name'].unique():
-            chunk_dir = scene_dir / f'CHUNKS{chunk_stage}' / chunk_name    # <scene>/CHUNKS/x-.....For_10m
+            chunkdir = scene_dir / f'CHUNKS{chunk_stage}' / chunk_name    # <scene>/CHUNKS/x-.....For_10m
 
 
-def chunk_dir_to_release_file(chunk_dir):
-    """Given a bunch of RAMMS directories, returns the release files in them."""
-    RELEASE_dir = chunk_dir / 'RELEASE'
+def chunkdir_to_release_files(chunkdir):
+    """Given a single chunk directory, returns the (4) release files in it."""
+    RELEASE_dir = chunkdir / 'RELEASE'
     release_files = list()
     for file in os.listdir(RELEASE_dir):
         if file.endswith('_rel.shp'):
@@ -122,8 +153,10 @@ def chunk_dir_to_release_file(chunk_dir):
     # There should only be one release file per chunk!
     assert len(release_files) == 1
     return release_files[0]
+
 # -----------------------------------------------------------
 def arc_dir_to_release_files(arc_dir):
+    """Given an archive directory, returns the (4) release files in it."""
     RELEASE_dir = arc_dir / 'RELEASE'
     release_files = list()
     for file in os.listdir(RELEASE_dir):
@@ -131,7 +164,7 @@ def arc_dir_to_release_files(arc_dir):
             release_files.append(os.path.join(RELEASE_dir, file))
     return release_files
 # -----------------------------------------------------------
-def release_file_to_df(release_file):
+def read_release_file(release_file):
     """Reads a single _rel.shp and _dom.shp and merges them together.
     base: filename
         Everything but _rel.shp or _dom.shp
