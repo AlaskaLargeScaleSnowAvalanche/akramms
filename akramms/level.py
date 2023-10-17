@@ -1,37 +1,6 @@
 
 
 # =====================================================================
-# =====================================================================
-_releasefileRE = re.compile(r'(.*)([TSML])([_-])rel.shp')
-_releasefile_scenetypes = {'-': 'arc', '_': 'x'}
-def parse_releasefile(releasefile):
-    """releasefile: Eg:
-        .../x-113-045/RELEASE/x-113-045For_10m_30L_rel.shp
-        .../x-113-045/CHUNKS/x-113-0450001330MFor_10m/RELEASE/x-113-04500013For_10m_30M_rel.shp
-        .../arc-113-045/RELEASE/ak-ccsm-1981-1990-lapse-For-30-113-045-S-rel.shp
-    """
-
-    match = _releasefileRE.match(releasefile.parts[-1])
-    if match is None:
-        raise ValueError(f'Not a release file: {releasefile}')
-
-    ret = {'releasefile': releasefile}
-    try:
-        ret.update(parse_dir(releasefile.parents[1]))    # The directory above RELEASE
-    except ValueError:
-        pass    # Maybe this is a "naked" release file
-
-    ret['sizecat'] = match.group(2)
-    scenetype = _releasefile_scenetypes[match.group(3)]
-    ret['scenetype'] = scenetype
-    if scenetype == 'arc':
-        parts = match.group(1).split('-')
-        ret.update(parse_parts(parts, load=True))
-
-    return parts
-
-    
-# ----------------------------------------------------------------------
 # ----------------------------------------------------------------------
 # ----------------------------------------------------------------------
 # ----------------------------------------------------------------------

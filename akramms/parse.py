@@ -1,4 +1,4 @@
-
+import functools,re,os
 
 
 # =====================================================================
@@ -89,6 +89,8 @@ def parse_expset(expset, load=True):
         ak.juneau
     """
     match = experiment_specRE.match(spec)
+    if match is None:
+        raise ValueError(f'Not an expset: {expset}')
 
     ret = {'exp': match.group(1), 'expset': match.group(2)}
     if load:
@@ -199,4 +201,76 @@ def parse_dir(dir):
     ret = parse_expdir(dir)
     ret['dirtype'] = 'exp'
     return ret
+# =====================================================================
+_releasefileRE = re.compile(r'(.*)([TSML])([_-])rel.shp')
+_releasefile_scenetypes = {'-': 'arc', '_': 'x'}
+def parse_releasefile(releasefile):
+    """releasefile: Eg:
+        .../x-113-045/RELEASE/x-113-045For_10m_30L_rel.shp
+        .../x-113-045/CHUNKS/x-113-0450001330MFor_10m/RELEASE/x-113-04500013For_10m_30M_rel.shp
+        .../arc-113-045/RELEASE/ak-ccsm-1981-1990-lapse-For-30-113-045-S-rel.shp
+    """
+
+    match = _releasefileRE.match(releasefile.parts[-1])
+    if match is None:
+        raise ValueError(f'Not a releasefile: {releasefile}')
+
+    ret = {'releasefile': releasefile}
+    try:
+        ret.update(parse_dir(releasefile.parents[1]))    # The directory above RELEASE
+    except ValueError:
+        pass    # Maybe this is a "naked" release file
+
+    ret['sizecat'] = match.group(2)
+    scenetype = _releasefile_scenetypes[match.group(3)]
+    ret['scenetype'] = scenetype
+    if scenetype == 'arc':
+        parts = match.group(1).split('-')
+        ret.update(parse_parts(parts, load=True))
+
+    return parts
 # ----------------------------------------------------------------------
+def parse_file(file):
+    return parse_releasefile(file)
+# =============================================================
+# ----------------------------------------------------------------------
+def parse_args(args, load=True):
+    """Parses anything on the command line"""
+
+    rets = list()    # The things we parsed
+    parts = list()    # Accumulate args
+
+    # --------------------------------
+    def flush_parts():    # Parses
+        if len(parts) == 0:
+            return
+
+        if len(parts) == 1:
+            # First try parsing as an expset
+            try:
+                rets.append(parse_expset(parts[0]), load=load)
+            except ValueError:
+                # I guess it's not an expset
+                rets.append(parse_parts(parts), load=load)
+            parts = list()
+    # --------------------------------
+    for arg in args:
+        if arg == ':':    # Separator
+            flush_parts()
+        elif os.path.isdir(arg):
+            flush_parts()
+            rets.append(parse_dir(arg))
+        elif os.path.isfile(arg):
+            flush_parts()
+            rets.append(parse_file(arg))
+# -----------------------------------------------------------
+def main():
+    import sys
+    rets = parse_args[sys.argv[1:], load=False)
+    for ret in rets:
+        print('-------------------------------')
+        for k,v in ret.items():
+            print(f'{k}: {v}')
+
+main()
+
