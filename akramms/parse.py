@@ -1,10 +1,12 @@
-import functools,re,os
+import functools,re,os,itertools
+import importlib
 
 
 # =====================================================================
+_module_type = type(re)    # Any module will do here
 @functools.lru_cache()
 def load_expmod(exp_name):
-    if isinstance(exp_name, module):
+    if isinstance(exp_name, _module_type):
         return exp_name
 
     try:
@@ -24,15 +26,24 @@ def parse_parts(parts, load=False, assume_wcombo=False):
         ['ak', 'ccsm', '1981', '1990', 'lapse', 'For', '30', '113', '045']
         ['ak', 'ccsm', '1981', '1990', 'lapse', 'For', '30']
     """
+    # Process dashes
+    parts = list(itertools.chain(*(part.split('-') for part in parts)))
+
+    # Process dots
+    parts2 = list()
+    for part in parts:
+        if _all_dotsRE.match(part) is not None:    # '.' is a wildcard
+            parts2 += [None] * len(part)
+        else:
+            parts2.append(part)
+    parts = parts2
+    print('xxxxxxx ', parts)
+
     exp = parts[0]
     ret = {'exp': exp}
 
-    # Remove experiment name and process dots
-    parts2 = list()
-    for part in parts[1:]:
-        if _all_dotsRE.match(part) is not None:    # '.' is a wildcard
-            parts2 += [None] * len(part)
-    parts = parts2
+    # Remove experiment name
+    parts = parts[1:]
 
 
     if load:
@@ -40,7 +51,9 @@ def parse_parts(parts, load=False, assume_wcombo=False):
 
         expmod = None
         try:
+            print('AA1')
             expmod = load_expmod(exp)
+            print('AA2')
             ret['expmod'] = expmod
 
             if len(parts) == len(expmod.combo_keys) - 2:
@@ -88,7 +101,7 @@ def parse_expset(expset, load=True):
     expset: Eg:
         ak.juneau
     """
-    match = experiment_specRE.match(spec)
+    match = _expsetRE.match(expset)
     if match is None:
         raise ValueError(f'Not an expset: {expset}')
 
@@ -154,7 +167,7 @@ def parse_scenedir(scenedir):
 
     return ret
 # ----------------------------------------------------------------------
-_chunk_subleafRE = re.parse(r'(\d+)([TSML])(For|NoFor)_(\d+)m')
+_chunk_subleafRE = re.compile(r'(\d+)([TSML])(For|NoFor)_(\d+)m')
 #Chunk = collections.namedtuple('Chunk', ('ichunk', 'sizecat'))
 def parse_chunkdir(chunkdir):
     """
@@ -242,6 +255,8 @@ def parse_args(args, load=True):
 
     # --------------------------------
     def flush_parts():    # Parses
+        nonlocal rets, parts
+
         if len(parts) == 0:
             return
 
@@ -251,8 +266,11 @@ def parse_args(args, load=True):
                 rets.append(parse_expset(parts[0]), load=load)
             except ValueError:
                 # I guess it's not an expset
-                rets.append(parse_parts(parts), load=load)
-            parts = list()
+                rets.append(parse_parts(parts, load=load))
+
+        else:
+            rets.append(parse_parts(parts, load=load))
+
     # --------------------------------
     for arg in args:
         if arg == ':':    # Separator
@@ -263,10 +281,15 @@ def parse_args(args, load=True):
         elif os.path.isfile(arg):
             flush_parts()
             rets.append(parse_file(arg))
+        else:
+            parts.append(arg)
+    flush_parts()
+
+    return rets
 # -----------------------------------------------------------
 def main():
     import sys
-    rets = parse_args[sys.argv[1:], load=False)
+    rets = parse_args(sys.argv[1:], load=True)
     for ret in rets:
         print('-------------------------------')
         for k,v in ret.items():
