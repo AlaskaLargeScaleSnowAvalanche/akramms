@@ -94,6 +94,7 @@ def enlarge_domains(parseds):
             # Uses resulting set of avalanches to generate a chunk
             for sizecat,akdf4 in akdf3.groupby('sizecat'):
 TODO: Generate chunk in existing CHUNKS directory, based on largest existing chunk number (for this sizecat)
+TODO: Actually enlarge the domain!!!!
                 rp = scene_args['return_periods'][0]    # There is only 1
                 For = 'For' if scene_args['forests'][0] else 'NoFor'
                 res = scene_args['resolution']
