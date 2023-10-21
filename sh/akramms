@@ -11,7 +11,7 @@ from akramms import r_experiment,stages
 from akramms.util import rammsutil,exputil
 from uafgi.util import ioutil,make
 import importlib
-from akramms import r_domain_builder, r_ramms
+from akramms import r_domain_builder, r_ramms, resolve
 # ------------------------------------------------------------------------
 # https://mike.depalatis.net/blog/simplifying-argparse.html
 # https://gist.github.com/mivade/384c2c41c3a29c637cb6c603d4197f9f
@@ -107,10 +107,47 @@ def submit(args):
     release_files = rammsutil.get_release_files(args.ramms)
     r_ramms.submit_jobs(release_files, ids=ids)
 
+_chunktypeRE = re.compile('CHUNKS(\d+)?')
 @subcommand([
-    argument('query', nargs=1, help='Query file generated via akramms rammsquery'),
+    argument('query', nargs='*', help='Avalanche query, resolved to ID level'),
 ])
 def enlarge(args):
+
+    # Obtain df of relevant Avalanche IDs in original chunks
+    parseds = akramms.parse.parse_args(args.query)
+    akdf0 = resolve.resolve_to(
+        parseds, args.level, level='combo', scenetypes={'x'}, realized=True)
+
+    # Separate by experiment (usually only one)
+    for exp,akdf1 in akdf0.groupby('exp'):
+        expmod = parse.load_expmod(exp)
+
+        # Separate by combo (AKRAMMS scene)
+        for combo,akdf2 in akdf1.groupby('combo'):
+            scenedir = expmod.combo_to_scenedir(combo)
+
+            # Determine most recent chunktype, and the one we will write to
+            # (TODO: Reuse this code somewhere)
+            max_id = -1
+            for name in os.listdir(scenedir)
+                match = _chunktypeRE.match(name)
+                if match is not None:
+                    sid = matc.group(1)
+                    id = 0 if sid is None else int(sid)
+                    max_id = max(max_id, id)
+            last_chunktype = 'CHUNKS' if max_id==0 else f'CHUNKS{max_id}'
+            next_chunktype = f'CHUNKS{max_id+1}'
+
+            # Generate Avalanche IDs
+            akdf3 = resolve.resolve_releasefile(
+                akdf2, scenetypes={'x'}, chunktypes={last_chunktype})
+            akdf3 = resolve.resolve_id(akdf3, realized=True).set_index('id')
+
+            # Add a 'jobstatus' and 'jbkey' columns to the dataframe
+            akdf3 = jobolib.add_job_status(scenedir, akdf3)
+
+
+
     query_fname = args.query[0]
 
     # Read release dataframe from ALL size classes
@@ -385,7 +422,6 @@ def step4(args):
         help='Base this on the files on disk?'),
 ])
 def parse(args):
-    from akramms import resolve
 
     parseds = akramms.parse.parse_args(args.avals)
 

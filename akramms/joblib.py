@@ -124,6 +124,41 @@ def get_mtime(fname):
     else:
         return -1
 
+@functools.lru_cache()
+def query_condor():
+    # TODO: Make sure this distinguishes by experiment!!!
+
+    # Query Condor
+    schedd = htcondor.Schedd()   # get the Python representation of the scheduler
+    jobRE_str = r'^{}_([0-9]+)$'.format(jb.ramms_name)
+    jobRE = re.compile(jobRE_str)
+    ads = schedd.query(    # One Ad per job
+        constraint=f'regexp("{jobRE_str}", JobBatchName)',
+        projection=['ClusterId', 'ProcId', 'JobBatchName', 'JobPartition'])
+
+    # IDentify status coming from Condor
+    op_by_status = {
+        htcondor.JobStatus.IDLE: JobStatus.INPROCESS,
+        htcondor.JobStatus.RUNNING: JobStatus.INPROCESS,
+        htcondor.JobStatus.TRANSFERRING_OUTPUT: JobStatus.INPROCESS,
+        htcondor.JobStatus.SUSPENDED: JobStatus.FAILED,
+    }
+    condor_statuses = dict()
+    for ad in ads:
+        job_name = ad['JobBatchName']
+        if 'JobPartition' in ad:
+            jp = ad['JobPartition']
+            try:
+                condor_statuses[job_name] = op_by_status[jp]
+            except:
+                pass
+        else:
+            # It's been submitted but not yet run
+            condor_statuses[job_name] = JobStatus.INPROCESS
+
+    return condor_statuses
+
+
 
 # Categorize each job int one of four sets
 job_status_labels = ('noinput', 'incomplete', 'todo', 'inprocess', 'finished', 'overrun', 'failed')
@@ -137,135 +172,91 @@ class JobStatus:
     FAILED = 6       # The job finished but did not produce full / correct output
 
 _subsceneRE = re.compile(r'x-(\d+-\d+)')
-def job_statuses(release_files):
-    """Determines status of ALL Condor jobs for a RAMMS run."""
+def add_combo_job_status(xdir, akdf0):
+    """Determines status of ALL Condor jobs for a RAMMS run.
+    akdf0:
+        Avalanche dataframe, resolved to the ID level with scenetype='x' and index='id'
+        Must all ahve the same combo (scenedir)
+    """
 
-    # Info on each release file of the RAMMS run
-#    infos = run_infos(release_files, fetch_ids=True)
 
-    # Initialize set of IDs that we need to regenerate, and that we know are finished
-#    partition = {x:list() for x in _job_partition_labels}
+    # Corresponding archive location
+    arcdir = xdir.parents[0] / 'arc'+xdir.parts[-1][1:]
+    condor_statuses = query_condor()
 
-    # Collect together statuses based on info from directory
-    statuses = list()
-    for release_file in release_files:
+
+    for releasefile,akdf1 in akdf0.groupby('releasefile'):
         jb = rammsutil.parse_release_file(release_file)
-        ids = rammsutil.job_ids(release_file)
-
-        # Determine whether this scene is part of a large experiment
-        # If so, determine its associated archive directory
-        match = _subsceneRE.match(os.path.split(jb.scene_dir)[1])
-        if match is None:
-            archive_dir = None    # Not part of a larger experiment, not archive directory
-        else:
-            archive_dir = os.path.join(os.path.split(jb.scene_dir)[0], 'arc-{}'.format(match.group(1)))
-
-        # Query Condor
-        schedd = htcondor.Schedd()   # get the Python representation of the scheduler
-        jobRE_str = r'^{}_([0-9]+)$'.format(jb.ramms_name)
-        jobRE = re.compile(jobRE_str)
-        ads = schedd.query(    # One Ad per job
-            constraint=f'regexp("{jobRE_str}", JobBatchName)',
-            projection=['ClusterId', 'ProcId', 'JobBatchName', 'JobPartition'])
-
-        # IDentify status coming from Condor
-        op_by_status = {
-            htcondor.JobStatus.IDLE: JobStatus.INPROCESS,
-            htcondor.JobStatus.RUNNING: JobStatus.INPROCESS,
-            htcondor.JobStatus.TRANSFERRING_OUTPUT: JobStatus.INPROCESS,
-            htcondor.JobStatus.SUSPENDED: JobStatus.FAILED,
-        }
-        condor_statuses = dict()
-        for ad in ads:
-            job_name = ad['JobBatchName']
-            if 'JobPartition' in ad:
-                jp = ad['JobPartition']
-                try:
-                    condor_statuses[job_name] = op_by_status[jp]
-                except:
-                    pass
-            else:
-                # It's been submitted but not yet run
-                condor_statuses[job_name] = JobStatus.INPROCESS
-
-        # Identify avalanches that have been submitted / are still running
-
-        # List files on disk
-#        job_suffixes = dict(analyze_rundir(jb.avalanche_dir, jb.ramms_name))
-
-        # --------------------------------------------------
 
         # Consider each job in turn from our master list
-        for id in ids:
-            key = (jb.avalanche_dir, id)
+        for tup in akdf1.itertuples():
+            id = tup.id
 
-            job_name = f'{jb.ramms_name}_{id}'
+            for id in ids:
+                key = (jb.avalanche_dir, id)
+                job_name = f'{jb.ramms_name}_{id}'
 
-            # Mark as NOINPUT if the .in.zip file is not there.
-            if not os.path.exists(os.path.join(jb.avalanche_dir, f'{job_name}.in.zip')):
-                statuses.append((release_file, jb, id, JobStatus.NOINPUT))
-                continue
-
-            # See if Condor knows is what's going on with the job
-            if job_name in condor_statuses:
-                statuses.append((release_file, jb, id, condor_statuses[job_name]))
-                continue
-
-            # Not in Condor?  Either it hasn't launched, or it's finished / failed
-            # Let's look at the files on disk to decide.
-
-            in_zip = os.path.join(jb.avalanche_dir, f'{job_name}.in.zip')
-            in_zip_tm = get_mtime(in_zip)
-            out_zip = os.path.join(jb.avalanche_dir, f'{job_name}.out.zip')
-            out_zip_tm = get_mtime(out_zip)
-
-            # If an archive NetCDF file exists, then this avalanche is FINISHED.
-            if archive_dir is not None:
-                aval_nc = os.path.join(archive_dir, f'aval-{id}.nc')
-                if os.path.exists(aval_nc):
-                    aval_nc_tm = os.path.getmtime(aval_nc)
-                    if (aval_nc_tm > out_zip_tm) and (out_zip_tm > in_zip_tm):
-                        # .nc files only "count" if they are newer than raw files
-                        # (or those raw files don't exist)
-                        statuses.append((release_file, jb, id, JobStatus.FINISHED))
-                        continue
-
-            # Identify avalanches that have finished: .out.zip exists and has non-zero size
-            # (User can reset jobs by removing *.out.zip)
-            if os.path.exists(out_zip):
-
-                # Check for abandoned job
-                # TODO: Use file_is_good() instead!
-                statinfo = os.stat(out_zip)
-                if (statinfo.st_size==0):
-                    # The HTCondor output file has been created, but
-                    # no sign of the HTCondor job to write it at the
-                    # end.  Sounds like things were killed, send
-                    # status back to TODO.
-                    statuses.append((release_file, jb, id, JobStatus.TODO))
+                # Mark as NOINPUT if the .in.zip file is not there.
+                if not os.path.exists(os.path.join(jb.avalanche_dir, f'{job_name}.in.zip')):
+                    statuses.append((release_file, jb, id, JobStatus.NOINPUT))
                     continue
 
-                # We tentatively think the job is finished.  But let's
-                # look inside the zip file to make sure the domain
-                # wasn't overrun.
-                with zipfile.ZipFile(out_zip, 'r') as ozip:
-                    arcnames = [os.path.split(x)[1] for x in ozip.namelist()]
-                if any(x.endswith('.out.overrun') for x in arcnames):
-                    statuses.append((release_file, jb, id, JobStatus.OVERRUN))
-                else:
-                    statuses.append((release_file, jb, id, JobStatus.FINISHED))
+                # See if Condor knows is what's going on with the job
+                if job_name in condor_statuses:
+                    statuses.append((release_file, jb, id, condor_statuses[job_name]))
                 continue
 
-            # Default to TODO
-            statuses.append((release_file, jb, id, JobStatus.TODO))
+                # Not in Condor?  Either it hasn't launched, or it's finished / failed
+                # Let's look at the files on disk to decide.
 
-    statuses = [(release_file, jb.key(), jb, id, status) for release_file,jb,id,status in statuses]
-#    df = pd.DataFrame(statuses, columns=('jb_key', 'id', 'job_status'))
-    df = pd.DataFrame(statuses, columns=('release_file', 'jb_key', 'jb', 'id', 'job_status'))
-    df = df.sort_values(by=['jb_key', 'id'])
-    #df = df[['run_dir', 'id', 'job_status']]
-#    print(df)
-    return df.set_index('id')
+                in_zip = os.path.join(jb.avalanche_dir, f'{job_name}.in.zip')
+                in_zip_tm = get_mtime(in_zip)
+                out_zip = os.path.join(jb.avalanche_dir, f'{job_name}.out.zip')
+                out_zip_tm = get_mtime(out_zip)
+
+                # If an archive NetCDF file exists, then this avalanche is FINISHED.
+                if archive_dir is not None:
+                    aval_nc = os.path.join(archive_dir, f'aval-{id}.nc')
+                    if os.path.exists(aval_nc):
+                        aval_nc_tm = os.path.getmtime(aval_nc)
+                        if (aval_nc_tm > out_zip_tm) and (out_zip_tm > in_zip_tm):
+                            # .nc files only "count" if they are newer than raw files
+                            # (or those raw files don't exist)
+                            statuses.append((release_file, jb, id, JobStatus.FINISHED))
+                            continue
+
+                # Identify avalanches that have finished: .out.zip exists and has non-zero size
+                # (User can reset jobs by removing *.out.zip)
+                if os.path.exists(out_zip):
+
+                    # Check for abandoned job
+                    # TODO: Use file_is_good() instead!
+                    statinfo = os.stat(out_zip)
+                    if (statinfo.st_size==0):
+                        # The HTCondor output file has been created, but
+                        # no sign of the HTCondor job to write it at the
+                        # end.  Sounds like things were killed, send
+                        # status back to TODO.
+                        statuses.append((release_file, jb, id, JobStatus.TODO))
+                        continue
+
+                    # We tentatively think the job is finished.  But let's
+                    # look inside the zip file to make sure the domain
+                    # wasn't overrun.
+                    with zipfile.ZipFile(out_zip, 'r') as ozip:
+                        arcnames = [os.path.split(x)[1] for x in ozip.namelist()]
+                    if any(x.endswith('.out.overrun') for x in arcnames):
+                        statuses.append((release_file, jb, id, JobStatus.OVERRUN))
+                    else:
+                        statuses.append((release_file, jb, id, JobStatus.FINISHED))
+                    continue
+
+                # Default to TODO
+                statuses.append((release_file, jb, id, JobStatus.TODO))
+
+    statuses = [(id, status, jb.key())] for release_file,jb,id,status in statuses]
+    df = pd.DataFrame(statuses, columns=('id', 'jobstatus', 'jbkey')
+    return akdf1.merge(df, left_index=True, right_on='id').
 # --------------------------------------------------------
 _include_statuses = {JobStatus.NOINPUT, JobStatus.INCOMPLETE, JobStatus.TODO, JobStatus.INPROCESS, JobStatus.OVERRUN, JobStatus.FAILED}
 def print_job_statuses(df):

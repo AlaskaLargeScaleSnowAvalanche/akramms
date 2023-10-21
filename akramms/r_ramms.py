@@ -501,41 +501,40 @@ def query_overruns(release_files, ids=None):
     return df[all_ids]
 
 
-def enlarge_domains_OLD(df, dry_run=False):
-    """
-    df:
-        Result of query_overruns() abov
-    """
-    # Display what we're gonna do
-    print(f'Enlarging domains for avalanche IDs: {all_ids}')
-    if dry_run:
-        print('Dry Run, doing nothing.')
-        return
+def enlarge_domains(parseds):
+    akdf0 = resolve.resolve_to(
+        parseds, args.level, level='combo', scenetypes={'x'}, realized=True)
 
-    for ix in ix_vals:
-        row = df.loc[ix]
-        jb = row.jb
-        run_dir = jb.avalanche_dir
-        job_name = f"{jb.ramms_name}_{row['id']}"
-        enlarge_domain(run_dir, job_name)
+    # Separate by experiment (usually only one)
+    for exp,akdf1 in akdf0.groupby('exp'):
+        expmod = parse.load_expmod(exp)
 
-    return df
+        # Separate by combo (AKRAMMS scene)
+        for combo,akdf2 in akdf1.groupby('combo'):
+            scenedir = expmod.combo_to_scenedir(combo)
 
-def enlarge_domains(scene_dir, release_df):
-    """(TODO: I think this only works on ONE combo at a time)"""
+            # Determine most recent chunktype, and the one we will write to
+            # (TODO: Reuse this code somewhere)
+            max_id = -1
+            for name in os.listdir(scenedir)
+                match = _chunktypeRE.match(name)
+                if match is not None:
+                    sid = matc.group(1)
+                    id = 0 if sid is None else int(sid)
+                    max_id = max(max_id, id)
+            last_chunktype = 'CHUNKS' if max_id==0 else f'CHUNKS{max_id}'
+            next_chunktype = f'CHUNKS{max_id+1}'
 
-    scene_args = params.load(scene_dir)
+            # Generate Avalanche IDs
+            akdf3 = resolve.resolve_releasefile(
+                akdf2, scenetypes={'x'}, chunktypes={last_chunktype})
+            akdf3 = resolve.resolve_id(akdf3, realized=True).set_index('id')
 
-    # Split up by pra_size
-    for pra_size, dfc in release_df.groupby('pra_size'):
-        print('Regenerate chunk:')
-        print(dfc)
+            # Add a 'jobstatus' and 'jbkey' columns to the dataframe
+            akdf3 = jobolib.add_job_status(scenedir, akdf3)
 
-        jb = rammsutil.RammsName(
-            os.path.join(scene_dir, 'CHUNKS2'),
-            scene_args['name'], 0, scene_args['forest'][0], scene_args['resolution'],
-            scene_args('return_period'[0], pra_size, None))
-#        prepare_chunk(scene_args, jb, dfc)
+            # Filter out by jobstatus
+            akdf3 = akdf3[akdf3.jobstatus == joblib.JobStatus.OVERRUN]
 
 
 # -------------------------------------------------------
