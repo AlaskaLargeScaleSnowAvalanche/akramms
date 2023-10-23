@@ -291,15 +291,3 @@ def remove_duplicate_ids(akdf0):
     return pd.concat(dfs)
 
 # -------------------------------------------------------------
-def read_releasefiles(akdf0, **kwargs):
-    """Reads the releasefiles in akdf0 and returns as added columns
-    akdf0:
-        Resolved to ID level with index='id'
-    kwargs:
-        Sent to shputil.read_df()"""
-
-    dfs = list()
-    for releasefile,akdf1 in akdf0.groupby('releasefile'):
-        rdf = shputil.read_df(releasefile, **kwargs).set_index('Id')
-        dfs.append(akdf1.merge(rdf, how='left', left_index=True, right_index=True))
-    return pd.concat(dfs)

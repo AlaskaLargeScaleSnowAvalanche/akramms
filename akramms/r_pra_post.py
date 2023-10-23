@@ -73,18 +73,7 @@ class RasterLookup:
         self.centroids.append((j,i))
         return (j,i,self.value[j,i])
 # ---------------------------------------------------------------------------------
-_post_cat_bounds = (0.,5000.,25000.,60000.,1e10)    # Dummy value at end
-# {'T': (low, high), 'S': (low, high), ...}
-post_cat_bounds = \
-    dict((pra_size, (_post_cat_bounds[ix], _post_cat_bounds[ix+1])) for ix,pra_size in enumerate(rammsutil.PRA_SIZES.keys()))
-
-
-def in_domain(xmin,ymin,xmax,ymax, pra):
-    """Returns True if the PRA is >50% in the domain"""
-#    ret = domain.contains(pra.centroid)
-    centroid = pra.centroid
-    x,y = centroid.x, centroid.y
-    return (x >= xmin) and (x < xmax) and (y >= ymin) and (y < ymax)
+# ---------------------------------------------------------------------------------
 
 
 def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
@@ -246,6 +235,7 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
             # Remove PRAs of elevation <150m
             cat_df = cat_df[cat_df['Mean_DEM'] >= 150.]            
 
+<< CUT
             # Only keep PRAs that are >50% in the interior part of the domain (not margin)
             if 'domain' in scene_args:
                 domain = scene_args['domain']    # list
@@ -265,7 +255,9 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
 
             # Add size designator to the internal RELEASE file rows
             cat_df['pra_size'] = pra_size
+>> END CUT
 
+<< CUT
             # Calculate domains
             chulls = list()
             doms = list()
@@ -291,7 +283,7 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
                     # Not able to make a domain for this PRA
                     chulls.append(shapely.geometry.Polygon([]))
                     doms.append(shapely.geometry.Polygon([]))
-
+>> END CUT
 
             # Store the _rel file
             shputil.write_df(

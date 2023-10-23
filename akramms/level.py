@@ -151,29 +151,6 @@ def arcdir_to_releasefiles(arcdir):
             releasefiles.append(os.path.join(RELEASEdir, file))
     return releasefiles
 # -----------------------------------------------------------
-def read_releasefile(releasefile):
-    """Reads a single _rel.shp and _dom.shp and merges them together.
-    base: filename
-        Everything but _rel.shp or _dom.shp
-        Based on jb.ramms_name
-    jb:
-        Parsed Release file.
-    Returns: df, rel_cols, dom_cols
-        rel_cols, dom_cols: [str, ...]
-            Names of columns
-    """
-
-    base = releasefile[:-8]    # Strip off _rel.shp
-
-    # Read _rel and _dom shapefiles
-    rel_df = shputil.read_df(f'{base}_rel.shp', shape='pra').drop('fid', axis=1).set_index('Id')
-    dom_df = shputil.read_df(f'{base}_dom.shp', shape='dom').drop('fid', axis=1).set_index('Id')
-    df = rel_df.merge(dom_df[['dom']], left_index=True, right_index=True)
-
-    # Drop rows with missing domain
-    df = df[df['dom'].notna()]
-    return df
-# -----------------------------------------------------------
 # ============================================================================
 def _pr_parts_to_combos(pr, realized=True):
     if 'ijdom' in pr:    # Combo is fully specified
