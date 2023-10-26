@@ -97,6 +97,51 @@ def theory_scenedir_to_combo(scenedir, exp_mod=None):
         exp_mod = parse.exp_mod(scenedir.parts[-3])
 
     return exp_mod, exp_mod.Combo(*sparts)
+# -----------------------------------------------------------
+def commonprefix(ini_strlist):
+    from itertools import takewhile
+ 
+    ## Initialising string
+    #ini_strlist = ['akshat', 'akash', 'akshay', 'akshita']
+ 
+    # Finding common prefix using Naive Approach
+    res = ''.join(c[0] for c in takewhile(lambda x:
+            all(x[0] == y for y in x), zip(*ini_strlist)))
+    return str(res)
+
+
+def commonsuffix(strs):
+    return commonprefix((x[::-1] for x in strs))[::-1]
+
+chunknameRE = re.compile(r'([^_]+)([TSML])(For|NoFor)_(\d+m)'.format(return_period))
+def scenedir_to_chunknames(scenedir):
+    """Generator yields the chunks inside a scene
+    Yields: (sizecat, chunkid, pathname)
+    """
+
+    # Partially parse the chunk directories.
+    names = list()
+    for name in os.listdir(scenedir / 'CHUNKS'):
+        match = chunknameRE.match(name)
+        if match is None:
+            continue
+        names.append((name, match.group(1), match.group(2)))    # Eg: (x-113-0450001430, S)
+
+    if len(names) == 0:
+        return
+
+    # Discern where the base ends and the return period begins
+    prefix = commonprefix(names)    # Eg: x-113-045000
+    suffix = commonsuffix(names)    # Return period
+
+    # Go through the names again
+    lprefix = len(prefix)
+    lsuffix = len(suffix)
+    for name,subname,sizecat in names:
+        chunkid = int(subname[lprefix:-lsuffix])
+        rows.append((sizecat, chunkid, name))
+
+    return pd.DataFrame(rows, columns=('sizecat', 'chunkid', 'name'))
 
 # -----------------------------------------------------------
 def trialdir_to_scenedirs(trialdir, scenetype='x'):

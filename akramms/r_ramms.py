@@ -108,53 +108,6 @@ def write_scenario_txt(jb, alt_lim_top=1500, alt_lim_low=1000, ncpu=config.ramms
             out.write(scenario_tpl.format(**kwargs))
 
 
-def prepare_chunk(scene_args, jb1, dfc):
-    """Writes a full RAMMS run (chunk), ready for RAMMS Stage 1.
-    scene_args:
-        The overall AKRAMMS scene (combo) this chunk will be a part of
-    jb1: RammsName
-        Describes the resulting name of the chunk (including directory of the RAMMS run).
-    dfc: DataFrame describing the chunk.
-
-    """
-
-    # Make symlinks for DEM file, etc.
-    for ifile,ofile in dem_forest_links(scene_args, jb1.ramms_dir, jb1.slope_name, forest=jb1.forest):
-        setlink_or_copy(ifile, ofile)
-
-    # Write scenario.txt
-    scenario_txt = os.path.join(jb1.ramms_dir, 'scenario.txt')
-    write_scenario_txt(jb1, **scenario_kwargs)
-
-    # Write the _rel.shp file
-    ofname = os.path.join(jb1.ramms_dir, 'RELEASE', f'{jb1.ramms_name}_rel.shp')
-    os.makedirs(os.path.dirname(ofname), exist_ok=True)
-    _dfx = dfc[list(rel_df.columns)]
-    shputil.write_df(_dfx, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
-    
-    # Write the _dom.shp file 
-    ofname = os.path.join(jb1.ramms_dir, 'DOMAIN', f'{jb1.ramms_name}_dom.shp')
-    os.makedirs(os.path.dirname(ofname), exist_ok=True)
-    shputil.write_df(dfc[list(dom_df)], 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
-
-    # Write the .relp and .domp files for each avalanche
-    # (Secondary files, as written by Python)
-    os.makedirs(jb1.avalanche_dir, exist_ok=True)
-    for _,row in dfc.iterrows():
-        id = row['Id']
-        ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}_{id}.relp')
-        rammsutil.write_polygon(row['pra'], ofname)
-        ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}_{id}.domp')
-        rammsutil.write_polygon(row['dom'], ofname)
-
-    # Store chunk info
-    For = 'For' if jb1.forest else 'NoFor'
-    chunk_info += [
-        (segment, id,
-        f'{jb1.scene_name}{jb1.segment:05d}{jb1.return_period}{jb1.pra_size}{For}_{jb1.resolution}m')
-        for id in dfc['Id']]
-    #chunk_info.append(segment, list(dfc['Id']))
-
 def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
     """Generates the scenario file, which becomes key to running RAMMS.
     Also split into chunks.

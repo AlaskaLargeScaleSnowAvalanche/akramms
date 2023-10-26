@@ -123,19 +123,6 @@ class RammsName:
         return format.format(**dd)
 
 # -------------------------------------------------------
-def master_ramms_names(scene_args, return_period, forest):
-    """Generates list of RAMMS names of RELEASE files before they've been chopped up.
-    Yields: jb (RammsName), pra_size
-    """
-    for pra_size in rammsutil.PRA_SIZES.keys():    # T,S,M,L
-        if pra_size not in config.allowed_pra_sizes:
-            continue
-        jb = rammsutil.RammsName(
-            os.path.join(scene_args['scene_dir'], 'CHUNKS'),
-            scene_args['name'], None, forest, scene_args['resolution'],
-            return_period, pra_size, None)
-        yield jb, pra_size
-# -------------------------------------------------------
 
 
 release_fileRE = re.compile(r'^(.+)(\d\d\d\d\d)?(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(.*)(\..*)')
