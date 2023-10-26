@@ -69,101 +69,41 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
 
     def action(tdir):
 
-        # Create lookup for snow depth in WRF output file
-#        snow_lookup = WrfLookup(
-#            scene_args['coordinate_system'], scene_args['snowdepth_file'],
-#            'sx3', scene_args['snowdepth_geo'], units='m')
-        snow_lookup = RasterLookup(snowI_tif)
-
         degree = np.pi / 180.
         name = scene_args['name']
         resolution = scene_args['resolution']
 
-        # Load the polygons
+        # Load the polygons (output of eCognition)
+        # Reads columns: area_m2 Mean_DEM Mean_Slope Scene_reso
         print('======== Reading {}'.format(inputs[0]))
         df = shputil.read_df(inputs[0], shape='pra')
         df = df.rename(columns={'fid': 'Id'})    # RAMMS etc. want it named "Id"
-        jisx3 = df['pra'].map(snow_lookup.value_at_centroid)    # j,i,Raw snow amount [kg m-2]
-        df['j'] = jisx3.map(lambda x: x[0])
-        df['i'] = jisx3.map(lambda x: x[1])
-        sx3_mm_swe = jisx3.map(lambda x: x[2])
 
-        by_SNOW_DENSITY = 1. / 200.    # [m^3 kg-1]   (Wolken; based on data we have on field work in these areas).
-        # Typical values: 1m
-        df['sx3'] = sx3_mm_swe * by_SNOW_DENSITY    # Depth of SNOW [m]
+        # Adds columns: j,i,sx3
+        df = chunk.add_snow(df, snowI_tif, snow_density=200.)
 
+        # Adds columns: d0star, slopecorr, Wind, d0_{return_period}, VOL_{return_period}
+        df = chunk.add_corrections(df, return_period)
 
-        # --- Elevation correction Reduces amount of snow with
-        # steepness.  All traditional.  We measure 3-day snow depth
-        # increase in flat field at a station.  But PRAs are very
-        # different.  So they're putting it from flat to 28 degrees.
-        # Then they add the lapse rate.  Then they do a second slope
-        # angle correction for steeper terrain.  In the end, add
-        # windblown snow parameter.  This is how every PRA gets its
-        # own d0 dependent on slope angle and elevation.
-
-        # GW: In SE Alaska, steep terrain can hold several meters of
-        # snow in something almost 70 degrees from time to time.
-# gradient_snowdepth needs to be based on precip. lapse rates around Juneau; Gabe will get back on that.
-# Yves: reference_elevation should be elveation value from Rick's raster.
-# If PRA is above DEM gridcell then must inflate reanalysis snow volume.  If PRA is below DEM, then defalte it.
-        # def['Mean_DEM'] is mean elevation of the PRA
-
-# No lapse rate or smoothing for now
-#        gradient_snowdepth_si_units = .01 * scene_args['gradient_snowdepth'] # gradient_snowdepth parameter is in m/100m, translate to unitless
-#
-#        snowdepth_correction = \
-#            (df['Mean_DEM'] - scene_args['reference_elevation']) \
-#            * gradient_snowdepth_si_units
-#        sx3_corrected = (df['sx3'] + snowdepth_correction)
-        sx3_corrected = df['sx3']    # [m]
-
-        # TODO: Why are we multiplying by cos(28) = .883?
-
-        # Very old rule developed 30-40 years ago: the steeper the
-        # slope, the less snow that can accumulate.  Very
-        # traditional from SLF.  DO NOT use for Alaska.
-
-        # (BUT... the steeper a release point is, the less snow it
-        # has, MIGHT be useful for Alaska.  TODO: Discuss with
-        # Gabe).  If snow is very moist...???
-        if False:
-            df['d0star'] = sx3_corrected * np.cos(28. * degree)    # [m]
-        else:
-            df['d0star'] = sx3_corrected    # [m]
-
-
-        # --- Slope angle correction (slopecorr)
-        # TODO: Discuss with Gabe.  Do we want to apply slope angle correction?
-        # If yes, we can make it much simpler than what we have here.
-        mean_slope_rad = df['Mean_Slope'] * degree
-#        df['slopecorr'] =  0.291 / \
-#            (np.sin(mean_slope_rad) - 0.202 * np.cos(mean_slope_rad))
-        df['slopecorr'] = 1.0    # Slope angle correction was removing too much snow, not appropriate for coastal Alaska.
-
-        # Wind load interpolation between 100 (0) and 200 (full wind load) elevation
-        # Change max wind load dependent on scenario!!
-        # TODO: Discuss with Gabe, how we do the wind load.
-#        df['Wind'] = np.clip((df['Mean_DEM'] - 1000.) * .0001, 0., 0.1)
-        df['Wind'] = 0    # Wind loading doesn't make sense without downscaling.
-
-        # Calculate final d0: d0_10, d0_30, d0_100, d0_300
-        d0_vname = f'd0_{return_period}'
-        df[d0_vname] = ((df['d0star'] + df['Wind']) * df['slopecorr'])    # [m]
-#        df[d0_vname] = 0.5    # DEBUG: d0_30 is unrealistically low.
-
-        # Calculate volume (VOL_returnperiod)
-        VOL_vname = f'VOL_{return_period}'
-        # df[VOL_vname] = df['area_m2'] / np.cos(df['Mean_Slope']*degree) * df[d0_vname]
-        df[VOL_vname] = (df['area_m2'] * df[d0_vname]) / np.cos(df['Mean_Slope']*degree)
-
-        # Calculate domains
         # (grind_info includes the domain margin)
         grid_info, dem_filled, dem_nodata = gdalutil.read_raster(dem_filled_file)
 
-
         # ---------------------------------------------------------------
         # Split into segments based on PRA size, and save
+
+        # Remove PRAs of elevation <150m
+        df =  df[df['Mean_DEM'] >= 150.]            
+
+        # Clip to the non-margin part of the local grid (subdomain)
+        df = chunk.clip(df, scene_args['domain'])
+
+        # Compute the avalanche domains (domain finder algo)
+        df = chunk.add_dom(df, grid_info)
+
+
+
+
+
         ioutil.mkdirs_for_files(outputs)
         for jb,pra_size in ramms_names:
             print('--- p_pra_post.rule() pra_size = ', pra_size)

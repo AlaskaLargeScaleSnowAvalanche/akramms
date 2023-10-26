@@ -138,13 +138,16 @@ def add_sizecat(reldf):
     """
     reldf['sizecat'] = reldf['aream2'].map(
         lambda x: _pra_sizes[bisect.bisect(_post_cat_bounds, x) - 1])
+    return reldf
 # -----------------------------------------------------------
-def add_snow(df, snow_density=200.):
+def add_snow(df, snowI_tif, snow_density=200.):
     """
     snow_lokoup:
         See snow.RasterLookup
     """
-    # This is a tuple (j, i, sx3)
+    snow_lookup = RasterLookup(snowI_tif)
+
+    # This is a Series of tuple (j, i, sx3)
     jisx3 = df['pra'].map(snow_lookup.value_at_centroid)    # j,i,Raw snow amount [kg m-2]
 
     # Pick apart the tuple into separate columns
@@ -159,6 +162,73 @@ def add_snow(df, snow_density=200.):
 
     return df
 
+# -----------------------------------------------------------
+def add_corrections(df, return_period):
+        # --- Elevation correction Reduces amount of snow with
+        # steepness.  All traditional.  We measure 3-day snow depth
+        # increase in flat field at a station.  But PRAs are very
+        # different.  So they're putting it from flat to 28 degrees.
+        # Then they add the lapse rate.  Then they do a second slope
+        # angle correction for steeper terrain.  In the end, add
+        # windblown snow parameter.  This is how every PRA gets its
+        # own d0 dependent on slope angle and elevation.
+
+        # GW: In SE Alaska, steep terrain can hold several meters of
+        # snow in something almost 70 degrees from time to time.
+# gradient_snowdepth needs to be based on precip. lapse rates around Juneau; Gabe will get back on that.
+# Yves: reference_elevation should be elveation value from Rick's raster.
+# If PRA is above DEM gridcell then must inflate reanalysis snow volume.  If PRA is below DEM, then defalte it.
+        # def['Mean_DEM'] is mean elevation of the PRA
+
+# No lapse rate or smoothing for now
+#        gradient_snowdepth_si_units = .01 * scene_args['gradient_snowdepth'] # gradient_snowdepth parameter is in m/100m, translate to unitless
+#
+#        snowdepth_correction = \
+#            (df['Mean_DEM'] - scene_args['reference_elevation']) \
+#            * gradient_snowdepth_si_units
+#        sx3_corrected = (df['sx3'] + snowdepth_correction)
+        sx3_corrected = df['sx3']    # [m]
+
+        # TODO: Why are we multiplying by cos(28) = .883?
+
+        # Very old rule developed 30-40 years ago: the steeper the
+        # slope, the less snow that can accumulate.  Very
+        # traditional from SLF.  DO NOT use for Alaska.
+
+        # (BUT... the steeper a release point is, the less snow it
+        # has, MIGHT be useful for Alaska.  TODO: Discuss with
+        # Gabe).  If snow is very moist...???
+        if False:
+            df['d0star'] = sx3_corrected * np.cos(28. * degree)    # [m]
+        else:
+            df['d0star'] = sx3_corrected    # [m]
+
+
+        # --- Slope angle correction (slopecorr)
+        # TODO: Discuss with Gabe.  Do we want to apply slope angle correction?
+        # If yes, we can make it much simpler than what we have here.
+        mean_slope_rad = df['Mean_Slope'] * degree
+#        df['slopecorr'] =  0.291 / \
+#            (np.sin(mean_slope_rad) - 0.202 * np.cos(mean_slope_rad))
+        df['slopecorr'] = 1.0    # Slope angle correction was removing too much snow, not appropriate for coastal Alaska.
+
+        # Wind load interpolation between 100 (0) and 200 (full wind load) elevation
+        # Change max wind load dependent on scenario!!
+        # TODO: Discuss with Gabe, how we do the wind load.
+#        df['Wind'] = np.clip((df['Mean_DEM'] - 1000.) * .0001, 0., 0.1)
+        df['Wind'] = 0    # Wind loading doesn't make sense without downscaling.
+
+        # Calculate final d0: d0_10, d0_30, d0_100, d0_300
+        d0_vname = f'd0_{return_period}'
+        df[d0_vname] = ((df['d0star'] + df['Wind']) * df['slopecorr'])    # [m]
+#        df[d0_vname] = 0.5    # DEBUG: d0_30 is unrealistically low.
+
+        # Calculate volume (VOL_returnperiod)
+        VOL_vname = f'VOL_{return_period}'
+        # df[VOL_vname] = df['area_m2'] / np.cos(df['Mean_Slope']*degree) * df[d0_vname]
+        df[VOL_vname] = (df['area_m2'] * df[d0_vname]) / np.cos(df['Mean_Slope']*degree)
+
+        return df
 # -----------------------------------------------------------
 def _in_domain(xmin,ymin,xmax,ymax, pra):
     """Returns True if the PRA is >50% in the domain"""
@@ -231,8 +301,8 @@ def add_dom(rdf, grid_info):
         chulls.append(shapely.geometry.Polygon(chull_list))
         doms.append(shapely.geometry.Polygon(domain_list))
 
-    rdf['chull'] = chull
-    rdf['doms'] = doms
+    rdf['chull'] = chulls
+    rdf['dom'] = doms
 
     return rdf
 # -----------------------------------------------------------
@@ -286,20 +356,20 @@ def add_chunkname(rdf, scene_args, append=False):
     for jb,df in rdf.groupby('master_rammsname'):
        base = scenedir / 'RELEASE' / jb.ramms_name
 
-            ofnames = list()
-            chunk_info = list()
-            for segment,chunkix0 in enumerate(range(0,df.shape[0],config.max_ramms_pras)):
-                chunkix = chunkix0 + max_chunkids.get(jb.pra_size,0)
+       ofnames = list()
+       chunk_info = list()
+       for segment,chunkix0 in enumerate(range(0,df.shape[0],config.max_ramms_pras)):
+           chunkix = chunkix0 + max_chunkids.get(jb.pra_size,0)
 
-                # Select out chunk
-                dfc = df[chunkix:chunkix+config.max_ramms_pras]
+           # Select out chunk
+           dfc = df[chunkix:chunkix+config.max_ramms_pras]
 
-                # Add the chunk number to the name
-                jb1 = copy.copy(jb)
-                jb1.set(segment=segment)
-                dfc['chunkname'] = jb1.rammsdir_name
+           # Add the chunk number to the name
+           jb1 = copy.copy(jb)
+           jb1.set(segment=segment)
+           dfc['chunkname'] = jb1
 
-                dfs.append(dfc)
+           dfs.append(dfc)
 
     return pd.concat(dfs)
 
@@ -316,7 +386,7 @@ def write_rel(rdf, wkt, return_period, ofname, **kwargs):
     """
 
     # Select columns to write
-    df = rdf.reset_index()[['area_m2', 'Mean_DEM', 'Mean_Slope', 'Scene_reso', 'Id', 'i', 'j', 'sx3', 'd0star', 'slopecorr', 'Wind', 'd0_{return_period}', 'VOL_{return_period}', 'pra']]
+    df = rdf.reset_index()[['area_m2', 'Mean_DEM', 'Mean_Slope', 'Scene_reso', 'Id', 'i', 'j', 'sx3', 'd0star', 'slopecorr', 'Wind', f'd0_{return_period}', f'VOL_{return_period}', 'pra']]
 
     shputil.write_df(df, 'pra', 'Polygon', ofname, wkt=wkt, **kwargs)
 
@@ -336,7 +406,7 @@ def write_chull(rdf, wkt, ofname, **kwargs):
     """
     Writes the _rel.shp shapefile
     rdf:
-        Release file(s) as dataframe
+        Release file(s) loaded into dataframe
         MUST CONTAIN: pra
     """
 
@@ -391,6 +461,12 @@ def prepare_chunk(scene_args, jb1, dfc):
         f'{jb1.scene_name}{jb1.segment:05d}{jb1.return_period}{jb1.pra_size}{For}_{jb1.resolution}m')
         for id in dfc['Id']]
     #chunk_info.append(segment, list(dfc['Id']))
+# -----------------------------------------------------------
+def prepare_chunks(scene_args, rdf):
+
+    for jb1,df in rdf.groupby('chunkname'):
+        prepare_chunk(scene-args, jb1, df)
+
 # -----------------------------------------------------------
 # -----------------------------------------------------------
 # -----------------------------------------------------------
