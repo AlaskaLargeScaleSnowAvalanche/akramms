@@ -11,6 +11,11 @@ PRA_SIZES = {
     'M' : 'medium',
     'L' : 'large'}
 # ---------------------------------------------------------------
+# ---------------------------------------------------------------
+
+
+
+
 class RammsName:
     all_cols = ['ramms_harness', 'scene_name', 'segment', 'forest', 'resolution', 'return_period', 'pra_size', 'id']
 
@@ -22,7 +27,7 @@ class RammsName:
         """
         ramms_harness: REQUIRED
             Directory containing RAMMS directories
-            Eg: ~/prj/juneau1/RAMMS
+            Eg: ~/prj/juneau1/CHUNKS
         scene_name: REQUIRED
             Overall name of scene in top-level project (eg: juneau1)
         segment: int OPTIONAL (None = not set)
@@ -173,10 +178,10 @@ def _ramms_to_release(ramms_dirs):
 
     return release_files
 
-def chunks_csv(scene_dir, ramms_name):
-    """Returns name of the _chunks.csv control file for top-level (non-split) shapefiles."""
-    #return os.path.join(scene_dir, 'RELEASE', f'{ramms_name}_chunks.csv')
-    return os.path.join(scene_dir, 'stage0', f'{ramms_name}_chunks.csv')
+#def chunks_csv(scene_dir, ramms_name):
+#    """Returns name of the _chunks.csv control file for top-level (non-split) shapefiles."""
+#    #return os.path.join(scene_dir, 'RELEASE', f'{ramms_name}_chunks.csv')
+#    return os.path.join(scene_dir, 'stage0', f'{ramms_name}_chunks.csv')
 
 #def release_csv(scene_dir, ramms_name):
 #    """Returns name of the _release.csv for top-level (non-split) shapefiles."""

@@ -317,7 +317,20 @@ def add_dom(rdf, dem_filled, dem_nodata, grid_info, **kwargs):
 
     return rdf
 # -----------------------------------------------------------
-def add_master_rammsname(df, scene_args):
+class ChunkInfo(typing.NamedTuple):
+    """Describes one chunk."""
+
+    # Eg: /home/efischer/prj/ak/bak/ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/x-113-0450000030SFor_10m
+    #dir: pathutil.Path
+
+    scene_name: str        # Eg: x-113-045
+    chunkid: int                # Eg: 17
+    For: str            # For / NoFor
+    resolution: int    # 10
+    return_period: int
+    pra_size: str    # TSML
+
+def add_chunkinfo(df, scene_args):
     """Adds a master_rammsname (type rammsutil.RammsName) column.
     This is useed to set CHUNK names.
 
@@ -330,56 +343,71 @@ def add_master_rammsname(df, scene_args):
         AKRAMMS parameters for that combo"""
       
 
+
+    resolution = scene_args['resolution']
+    scene_name = scene_args['name']
+
     # Pull out return_period and forest (which we will call "rpfor")
     df['rpfor'] = pd.map(df.combo, lambda x: (x.return_period, x.forest))
 
     dfs = list()
-    for ((return_period,forest), pra_size),dfg in df.groupby(['rpfor', 'pra_size']):
-        dfg['master_rammsname'] = rammsutil.RammsName(
-            os.path.join(scene_args['scene_dir'], 'CHUNKS'),
-            scene_args['name'], None, forest, scene_args['resolution'],
-            return_period, pra_size, None)
+    for ((return_period,For), pra_size),dfg in df.groupby(['rpfor', 'pra_size']):
+
+        dfg['chunkinfo'] = ChunkInfo(
+            scene_args['name'], -1, For, resolution, return_period, pra_size)
+
+
+#        jb = rammsutil.RammsName(
+#            scene_args['scene_dir'] / 'CHUNKS',
+#            scene_args['name'], 0, For, scene_args['resolution'],
+#            return_period, pra_size, None)
+#        dfg['jb'] = jb    # Prototype
+
+#        dfg['scene_name'] = scene_name
+#        dfg['For'] = For
+#        dfg['return_period'] = return_period
+#        dfg['rn'] = f'{For}_{resolution}m{return_period}'
+#        dfg['pra_size'] = pra_size
         dfg = dfg.drop('rpfor', axis=1)
         dfs.append(dfg)
 
     return pd.concat(dfs)
 # --------------------------------------------------------------
-def add_chunkname(rdf, scene_args, append=False):
+def get_max_chunkids(scenedir):
+    cdf = level.scenedir_to_chunknames(scenedir)
+    max_chunkids = cdf[['pra_size','chunkid']].groupby('pra_size').max()['chunkid'].to_dict()
+    return max_chunkids
+
+# --------------------------------------------------------------
+def add_chunkid(rdf, scenedir, append=False):
     """Divides avalanches into chunks.
     rdf:
-        Must have master_rammsname column.
+        Must have chunkinfo column.
     append:
         If True, add chunk numbers to the latest.
-        Otherwise, start over.
-    """
+        Otherwise, start over. """
 
     #scene_args = params.load(scenedir)
-    scenedir = scene_args['scene_dir']
+    #scenedir = scene_args['scene_dir']
 
     # Determine max. chunkid for each pra_size  max_chunkid[pra_size]...
     if append:
-        cdf = level.scenedir_to_chunknames(scenedir)
-        max_chunkids = cdf[['pra_size','chunkid']].groupby('pra_size').max()['chunkid'].to_dict()
+        max_chunkds = get_max_chunkids(scenedir)
     else:
         max_chunkids = dict()
 
     # Assign chunk IDs differently for each different kind of thing
     dfs = list()
-    for jb,df in rdf.groupby('master_rammsname'):
-       base = scenedir / 'RELEASE' / jb.ramms_name
+    for (rn,pra_size),df in rdf.groupby(['rn', 'pra_size']):
 
-       ofnames = list()
-       chunk_info = list()
-       for segment,chunkix0 in enumerate(range(0,df.shape[0],config.max_ramms_pras)):
-           chunkix = chunkix0 + max_chunkids.get(jb.pra_size,0)
+       for segment,chunkid0 in enumerate(range(0,df.shape[0],config.max_ramms_pras)):
+           chunkid = chunkid0 + max_chunkids.get(pra_size,0)
 
            # Select out chunk
-           dfc = df[chunkix:chunkix+config.max_ramms_pras]
+           dfc = df[chunkid:chunkid+config.max_ramms_pras]
 
            # Add the chunk number to the name
-           jb1 = copy.copy(jb)
-           jb1.set(segment=segment)
-           dfc['chunkname'] = jb1
+           dfc['chunkid'] = chunkid
 
            dfs.append(dfc)
 
@@ -429,60 +457,123 @@ def write_chull(rdf, wkt, ofname, **kwargs):
     shputil.write_df(df, 'chull', 'Polygon', ofname, wkt=wkt, **kwargs)
 
 # -----------------------------------------------------------
-def prepare_chunk(scene_args, jb1, dfc):
+def dem_forest_links(scene_args, chunk_dir, oslope_name, For):
+    """
+    chunk_dir:        RAMMS directory where FOREST and DEM files are being created
+    """
+
+    # ---- DEM File
+    idem_dir,idem_tif = os.path.split(scene_args['dem_file'])
+    idem_stub = idem_tif[:-4]
+    links = [
+        (os.path.join(idem_dir, f'{idem_stub}.tif'),
+            os.path.join(chunk_dir, 'DEM', f'{oslope_name}_DEM.tif')),
+        (os.path.join(idem_dir, f'{idem_stub}.tfw'),
+            os.path.join(chunk_dir, 'DEM', f'{oslope_name}_DEM.tfw')),
+    ]
+
+
+    # ---- Forest File
+    if For == 'For':
+        iforest_dir,iforest_tif = os.path.split(scene_args['forest_file'])
+        iforest_stub = iforest_tif[:-4]
+        links += [
+            (os.path.join(iforest_dir, f'{iforest_stub}.tif'),
+                os.path.join(chunk_dir, 'FOREST', f'{oslope_name}_forest.tif')),
+            (os.path.join(iforest_dir, f'{iforest_stub}.tfw'),
+                os.path.join(chunk_dir, 'FOREST', f'{oslope_name}_forest.tfw')),
+        ]
+
+    return links
+
+
+def write_scenario_txt(chunk_dir, alt_lim_top=1500, alt_lim_low=1000, ncpu=config.ramms_ncpu, ncpu_preprocess=config.ramms_ncpu_preprocess, cohesion=50):
+    """ci: ChunkInfo
+    """
+
+        chunk_name = chunk_dir.parts[-1]
+
+        # Create the scenario file
+        kwargs = dict()
+        kwargs['scenario_name'] = chunk_name
+        kwargs['remote_ramms_dir'] = config.roots.convert_to(chunk_dir, config.roots_w)
+        kwargs['ncpu'] = str(ncpu)
+        kwargs['ncpu_preprocess'] = str(ncpu_preprocess)
+        kwargs['cohesion'] = str(cohesion)
+        if config.debug:
+            kwargs['debug'] = '1'
+            kwargs['keep_data'] = '1'
+            kwargs['test_nr_tpl'] = "TEST_NR    20\n"
+        else:
+            kwargs['debug'] = '0'
+            kwargs['keep_data'] = '1'
+            kwargs['test_nr_tpl'] = ""
+        kwargs['alt_lim_top'] = str(alt_lim_top)
+        kwargs['alt_lim_low'] = str(alt_lim_low)
+
+        scenario_txt = os.path.join(chunk_dir, 'scenario.txt')
+        os.makedirs(chunk_dir, exist_ok=True)
+        with open(scenario_txt, 'w') as out:
+            out.write(scenario_tpl.format(**kwargs))
+
+
+def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
     """Writes a full RAMMS run (chunk), ready for RAMMS Stage 1.
     scene_args:
         The overall AKRAMMS scene (combo) this chunk will be a part of
-    jb1: RammsName
-        Describes the resulting name of the chunk (including directory of the RAMMS run).
+    chunk_dir:
+        RAMMS directory for this chunk
+        Eg: /home/efischer/prj/ak/bak/ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/x-113-0450000030SFor_10m
+    slope_name:
+        Alternate arrangement of details
     dfc: DataFrame describing the chunk.
+
+    NOTE:
+        chunk_name = f'{scene_name}{chunkid:05d}{return_period}{pra_size}{For}_{resolution}'
+        slope_name = f'{scene_name}{chunkid:05d}{For}_{resolution}'    # Used for DEM / Forest files
+        chunk_dir = scene_dir / 'CHUNKS' / chunk_name
+
+
 
     """
 
+    ci = chunk_info
+    chunk_name = f'{ci.scene_name}{ci.chunkid:05d}{ci.return_period}{ci.pra_size}{ci.For}_{ci.resolution}'
+    slope_name = f'{ci.scene_name}{ci.chunkid:05d}{ci.For}_{ci.resolution}'    # Used for DEM / Forest files
+    chunk_dir = scene_dir / 'CHUNKS' / chunk_name
+    slope_dir = chunk_dir / 'RESULTS' / slope_name
+    avalanche_dir = slope_dir / f'{ci.return_period}{ci.pra_size}'
+
+
     # Make symlinks for DEM file, etc.
-    for ifile,ofile in dem_forest_links(scene_args, jb1.ramms_dir, jb1.slope_name, forest=jb1.forest):
+    for ifile,ofile in dem_forest_links(scene_args, chunk_dir, slope_name, ci.For):
         setlink_or_copy(ifile, ofile)
 
     # Write scenario.txt
-    scenario_txt = os.path.join(jb1.ramms_dir, 'scenario.txt')
-    write_scenario_txt(jb1, **scenario_kwargs)
+    scenario_txt = os.path.join(chunk_dir, 'scenario.txt')
+    write_scenario_txt(chunk_dir, **scenario_kwargs)
 
     # Write the _rel.shp file
-    ofname = os.path.join(jb1.ramms_dir, 'RELEASE', f'{jb1.ramms_name}_rel.shp')
-    os.makedirs(os.path.dirname(ofname), exist_ok=True)
+    os.makedirs(chunk_dir / 'RELEASE', exist_ok=True)
+    ofname = chunk_dir / 'RELEASE' / f'{chunk_name}_rel.shp'
     _dfx = dfc[list(rel_df.columns)]
     shputil.write_df(_dfx, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
     
     # Write the _dom.shp file 
-    ofname = os.path.join(jb1.ramms_dir, 'DOMAIN', f'{jb1.ramms_name}_dom.shp')
-    os.makedirs(os.path.dirname(ofname), exist_ok=True)
+    os.makedirs(chunk_dir / 'DOMAIN', exist_ok=True)
+    ofname = chunk_dir / 'DOMAIN' / f'{chunk_name}_dom.shp'
     shputil.write_df(dfc[list(dom_df)], 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
 
-    # Write the .relp and .domp files for each avalanche
-    # (Secondary files, as written by Python)
-    os.makedirs(jb1.avalanche_dir, exist_ok=True)
-    for _,row in dfc.iterrows():
-        id = row['Id']
-        ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}_{id}.relp')
-        rammsutil.write_polygon(row['pra'], ofname)
-        ofname = os.path.join(jb1.avalanche_dir, f'{jb1.ramms_name}_{id}.domp')
-        rammsutil.write_polygon(row['dom'], ofname)
+# Commented out because these files differ from the (by definition
+# correct) versions created by RAMMS.
+#    # Write the .relp and .domp files for each avalanche
+#    # (Secondary files, as written by Python)
+#    os.makedirs(avalanche_dir, exist_ok=True)
+#    for _,row in dfc.iterrows():
+#        id = row['Id']
+#        ofname = os.path.join(avalanche_dir, f'{chunk_name}_{id}.relp')
+#        rammsutil.write_polygon(row['pra'], ofname)
+#        ofname = os.path.join(avalanche_dir, f'{chunk_name}_{id}.domp')
+#        rammsutil.write_polygon(row['dom'], ofname)
 
-    # Store chunk info
-    For = 'For' if jb1.forest else 'NoFor'
-    chunk_info += [
-        (segment, id,
-        f'{jb1.scene_name}{jb1.segment:05d}{jb1.return_period}{jb1.pra_size}{For}_{jb1.resolution}m')
-        for id in dfc['Id']]
-    #chunk_info.append(segment, list(dfc['Id']))
-# -----------------------------------------------------------
-def prepare_chunks(scene_args, rdf):
-
-    for jb1,df in rdf.groupby('chunkname'):
-        prepare_chunk(scene-args, jb1, df)
-
-# -----------------------------------------------------------
-# -----------------------------------------------------------
-# -----------------------------------------------------------
-# -----------------------------------------------------------
 # -----------------------------------------------------------

@@ -65,7 +65,11 @@ def rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **kwargs):
         # Copied from rammsutil.RammsName
         ramms_name = (scene_name, rn, pra_size)
         ramms_names.append(ramms_name)
-        for ext in ('_rel.shp', '_chull.shp', '_dom.shp'):
+
+        rel_shp = scene_dir / 'RELEASE' / f'{scene_name}{rn}{pra_size}_rel.shp'
+        release_files.append(rel_shp)
+        outputs.append(rel_shp)
+        for ext in ('_chull.shp', '_dom.shp'):
             outputs.append(scene_dir / 'RELEASE' / f'{scene_name}{rn}{pra_size}{ext}')
 
     # Add one-off input files
@@ -82,7 +86,6 @@ def rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **kwargs):
         print('======== Reading {}'.format(inputs[0]))
         df = shputil.read_df(inputs[0], shape='pra')
         df = df.rename(columns={'fid': 'Id'})    # RAMMS etc. want it named "Id"
-        print('aa1 ', df)
 
         # Adds columns: j,i,sx3
         df = chunk.add_snow(df, snowI_tif, snow_density=200.)
@@ -90,7 +93,7 @@ def rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **kwargs):
         # Adds columns: d0star, slopecorr, Wind, d0_{return_period}, VOL_{return_period}
         df = chunk.add_corrections(df, return_period)
 
-        # (grind_info includes the domain margin)
+        # (grid_info includes the domain margin)
         grid_info, dem_filled, dem_nodata = gdalutil.read_raster(dem_filled_file)
 
         # ---------------------------------------------------------------
@@ -129,42 +132,53 @@ def rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **kwargs):
 
 
     rule = make.Rule(action, inputs, outputs)
-    return rule, ramms_names
+    rule.ramms_names = ramms_names
+    rule.release_files = release_files
+    return rule
 
 
+# -----------------------------------------------------------------
+def chunk_rule(scene_dir, For, resolution, return_period, pra_size):
+    """Generates the scenario file, which becomes key to running RAMMS.
+    Also split into chunks.
 
-# -------------------------------------------------------
-#            # Split df for this category (size) PRAs into bite-size chunks
-#            df_chunks = [df_cat[i:i+config.max_ramms_pras] for i in range(0,df_cat.shape[0],config.max_ramms_pras)]
-#            ofnames = list()
-#            for segment,dfc in enumerate(df_chunks):
-#                jb.set(segment=segment)
-#                ofname = os.path.join(jb.ramms_dir, 'RELEASE', f'{jb.ramms_name}_rel.shp')
-#                ofnames.append(ofname)
-#                os.makedirs(os.path.split(ofname)[0], exist_ok=True)
-#                shputil.write_df(dfc, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
+    rn = f'{For}_{resolution}m{return_period}'
 
-#            # Write names of our PRA files into the final output file.
-#            with open(output, 'w') as out:
-#                for ofname in ofnames:
-#                    out.write('{}\n'.format(config.roots.relpath(ofname)))
-#
-#                
-#    return make.Rule(action, inputs, outputs)
-# --------------------------------------------------------------------
-#
-#
-#
-#
-#    # Full pathnames of release files generated from this (scene_name, return_period, forest) combo
-#    outputs = list()
-#    ramms_names = list()
-#    for pra_size in rammsutil.PRA_SIZES.keys():    # T,S,M,L
-#        # DEBUG: Only do 'L' for now
-#        if pra_size not in config.allowed_pra_sizes:
-#            continue
-#        jb = rammsutil.RammsName(os.path.join(scene_dir, 'CHUNKS'), scene_name, None, forest, resolution, return_period, pra_size, None)
-#        ramms_names.append((jb,pra_size))
-#        # This filename does NOT have any segment numbers.
-#        outputs.append(os.path.join(scene_dir, 'CHUNKS', f'{jb.ramms_name}_rel.shplist'))
-#
+    release_file:
+        Name of a release file after pra_post rule above (but before
+        being split into chunks)
+    """
+
+    scene_args = params.load(scene_dir)
+    scene_name = scene_dir.parts[-1]    # Eg: x-113-045
+
+    # Just include overall output files
+
+    base = f'{scene_name}{For}_{resolution}m{return_period}{pra_size}'
+    inputs = [
+        scene_dir / 'RELEASE' / f'{base}_rel.shp',
+        scene_args['dem_file'],
+        scene_args['forest_file']]
+    outputs = [
+        scene_dir / 'RELEASE' / f'{base}_chunks.csv']
+
+    def action(tdir):
+
+        # Read the output from r_pra_post (above)
+        rdf = shputil.read_df(inputs[0], shape='pra').set_index('Id')
+
+        # Assign a chunkid to each avalanche
+        rdf['combo'] = level.theory_scenedir_to_combo(scene_dir)
+        rdf['pra_size'] = pra_size
+        rdf = chunk.add_chunkinfo(rdf, scene_args)
+        rdf = chunk.add_chunkid(rdf, scene_dir, append=False)
+
+        # Create the chunks
+        for chunkid,dfc in rdf.groupby('chunkid'):
+            chunk_info = chunk.ChunkInfo(scene_name, chunkid, For, resolution, return_period, pra_size)
+            chunk.write_chunk(scene_args, chunk_info, dfc)
+
+        # Create the _chunks.csv control file showing the chunks have all been created
+        rdf.to_csv(outputs[0])
+
+    return make.Rule(action, inputs, outputs)

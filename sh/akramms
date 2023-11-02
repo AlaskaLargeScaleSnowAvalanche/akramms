@@ -331,14 +331,16 @@ def step3(args):
             makefile.add(r_ecog.rule(scenedir, prepare_outputs, combo.return_period, combo.forest))
 
             # Post-Process eCognition Output (the pra_file)
-            # and also split into chunks.
             # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
-            pra_post_rule, ramms_names = r_pra_post.rule(
-                scenedir, dem_filled_file, combo.return_period, combo.forest, scene_args['snow_file'])
-            release_shplists = makefile.add(pra_post_rule).outputs
+            makefile.add(r_pra_post.rule(
+                scenedir, dem_filled_file, combo.return_period,
+                combo.forest, scene_args['snow_file']))
 
-# COMMENTED OUT TO DEBUG
-#            makefile.add(r_ramms.chunk_rule(scenedir, ramms_names))
+            # and also split into chunks.
+            for pra_size in config.allowed_pra_sizes:
+                makefile.add(r_pra_post.chunk_rule(
+                    scenedir, combo.forest, expmod.resolution,
+                    combo.return_period, pra_size))
 
 
             # RAMMS Stage 1...
