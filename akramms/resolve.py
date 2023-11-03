@@ -5,7 +5,7 @@ from uafgi.util import shputil
 from akramms import level,parse
 
 # Levels:
-#   exp - combo - (sizecat) releasefile - (sizecat) - aval
+#   exp - combo - (pra_size) releasefile - (pra_size) - aval
 
 def initial(parseds):
     orows = list()
@@ -117,6 +117,7 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
 _chunk_subleafRE = re.compile(r'(\d+)([TSML])(For|NoFor)_(\d+)m')
 _releasefileRE = re.compile(r'(.*)([TSML])([_-])rel.shp')
 def resolve_releasefile(akdf, scenetypes=['x'], chunktypes=['CHUNKS'], realized=True):
+    """These are CHUNK releasefiles."""
 
     # Only does realized option
     assert realized
@@ -131,8 +132,8 @@ def resolve_releasefile(akdf, scenetypes=['x'], chunktypes=['CHUNKS'], realized=
         for name in os.listdir(releasedir):
             match = _releasefileRE.match(name)
             if match is not None:
-                sizecat = match.group(2)
-                orows.append(itertools.chain(tup, [scenetype, sizecat, releasedir / name]))
+                pra_size = match.group(2)
+                orows.append(itertools.chain(tup, [scenetype, pra_size, releasedir / name]))
     # -----------------------------
 
     # Base releasefile on **what we see on disk**
@@ -144,10 +145,10 @@ def resolve_releasefile(akdf, scenetypes=['x'], chunktypes=['CHUNKS'], realized=
             if parsed['type'] == 'releasefile':
                 # The releasefile is just given to us!
                 orows.append(itertools.chain(tup,
-                    [parsed['scenetype'], parsed['sizecat'], parsed['releasefile']]))
+                    [parsed['scenetype'], parsed['pra_size'], parsed['releasefile']]))
             elif parsed['type'] == 'arcfile':
                 orows.append(itertools.chain(tup,
-                    ['arc', parsed['sizecat'], None]))
+                    ['arc', parsed['pra_size'], None]))
             else:
                 # We need to list releasefiles from a higher level
                 expmod = parse.load_expmod(tup.exp)
@@ -155,18 +156,17 @@ def resolve_releasefile(akdf, scenetypes=['x'], chunktypes=['CHUNKS'], realized=
                 scenedir = expmod.combo_to_scenedir(combo, scenetype=scenetype)
                 if scenetype == 'x':
                     sceneleaf = scenedir.parts[-1]    # Eg: x-113-045
-                    for chunktype in chunktypes:
-                        for name in os.listdir(scenedir / chunktype):
-                            chunk_subleaf = name[len(sceneleaf):]    # Eg: 0000230TFor_10m
-                            match = _chunk_subleafRE.match(chunk_subleaf)
-                            if match is not None:
-                                # We found a valid chunk dir!  Remember its associated RELEASE dir.
-                                process_releasedir(tup, 'x', scenedir / 'CHUNKS' / name / 'RELEASE')
+                    for name in os.listdir(scenedir / 'CHUNKS'):
+                        chunk_subleaf = name[len(sceneleaf):]    # Eg: 0000230TFor_10m
+                        match = _chunk_subleafRE.match(chunk_subleaf)
+                        if match is not None:
+                            # We found a valid chunk dir!  Remember its associated RELEASE dir.
+                            process_releasedir(tup, 'x', scenedir / 'CHUNKS' / name / 'RELEASE')
                 elif scenetype == 'arc':
                     process_releasedir(tup, 'arc', scenedir / 'RELEASE')
 
     return pd.DataFrame(orows, columns=tuple(
-        itertools.chain(type(tup)._fields, ['scenetype', 'sizecat', 'releasefile'])))
+        itertools.chain(type(tup)._fields, ['scenetype', 'pra_size', 'releasefile'])))
 # ------------------------------------------------------------
 @functools.lru_cache()
 def _realized_ids(scenetype, releasefile):

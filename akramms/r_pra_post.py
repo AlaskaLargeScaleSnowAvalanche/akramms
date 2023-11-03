@@ -107,7 +107,6 @@ def rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **kwargs):
         # Adds columns: chull, dom
         df = chunk.add_dom(df, dem_filled, dem_nodata, grid_info, **kwargs)
 
-
         # Add PRA size designation of T,S,M,L
         # Adds column: pra_size
         df = chunk.add_pra_size(df)

@@ -570,12 +570,13 @@ def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
         Alternate arrangement of details
     dfc: DataFrame describing the chunk.
 
+    Returns:
+        chunk_dir
+
     NOTE:
         chunk_name = f'{scene_name}{chunkid:05d}{return_period}{pra_size}{For}_{resolution}'
         slope_name = f'{scene_name}{chunkid:05d}{For}_{resolution}'    # Used for DEM / Forest files
         chunk_dir = scene_dir / 'CHUNKS' / chunk_name
-
-
 
     """
 
@@ -607,6 +608,7 @@ def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
     _dfx = dfc.reset_index()[['Id', 'dom']]
     shputil.write_df(_dfx, 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
 
+    return chunk_dir
 # Commented out because these files differ from the (by definition
 # correct) versions created by RAMMS.
 #    # Write the .relp and .domp files for each avalanche

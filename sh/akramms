@@ -342,15 +342,43 @@ def step3(args):
                     scenedir, combo.forest, expmod.resolution,
                     combo.return_period, pra_size))
 
+    makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
+
+# --------------------------------------------------------------------------------------
+@subcommand([
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+])
+def step4(args):
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf0 = resolve.resolve_to(parseds, 'releasefile', realized=False)
+
+    makefile = make.Makefile()
+
+    for exp,akdf1 in akdf0.groupby('exp'):
+        expmod = akramms.parse.load_expmod(exp)
+        for releasefile in akdf1.releasefile.tolist():
+$$$$$
+            dem_file = scene_args['dem_file']
+
+            # RAMMS Stage 1: IDL Prep
+#           ramms_files = shputil.expand_list([release_file, domain_file]) + rammsdir_files
+            stage1_outputs = makefile.add(r_ramms.ramms_stage1_rule(
+                release_file, dem_file,
+                [release_file, dem_file, domain_file],
+                dry_run=True, submit=config.auto_submit)).outputs
+
+
+
+    makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
+
 
             # RAMMS Stage 1...
+
 # TODO: REfactor this to use releasefile, relized=True level
 #           ramms_dirs_release_files = add_stage1_rules(makefile, scene_dir)
 
-        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
 
 # ------------------------------------------------------------------
-
 @subcommand([argument('ramms', help='RAMMS directory or release file to inspect')])
 def ramms(args):
     """Run RAMMS Stage 1 and prerequisites on (possibly) a single release file.  Used for debugging."""
