@@ -116,7 +116,7 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
 # ------------------------------------------------------------
 _chunk_subleafRE = re.compile(r'(\d+)([TSML])(For|NoFor)_(\d+)m')
 _releasefileRE = re.compile(r'(.*)([TSML])([_-])rel.shp')
-def resolve_releasefile(akdf, scenetypes=['x'], chunktypes=['CHUNKS'], realized=True):
+def resolve_releasefile(akdf, scenetypes=['x'], realized=True):
     """These are CHUNK releasefiles."""
 
     # Only does realized option
@@ -248,7 +248,7 @@ def resolve_id(akdf, realized=True):
         itertools.chain(type(tup)._fields, ['id', 'avalfile'])))
 
 # ------------------------------------------------------------
-def resolve_to(parseds, level, realized=True, scenetypes={'x'}, chunktypes=['CHUNKS']):
+def resolve_to(parseds, level, realized=True, scenetypes={'x'}):
     """level: exp|combo|releasefile|id
         Which level of detail to generate for this query.
         NOTE: level='id' is only used for QUERYING results, not for
@@ -268,7 +268,7 @@ def resolve_to(parseds, level, realized=True, scenetypes={'x'}, chunktypes=['CHU
     if level == 'combo':
         return akdf
 
-    akdf = resolve_releasefile(akdf, scenetypes=scenetypes, chunktypes=chunktypes)
+    akdf = resolve_releasefile(akdf, scenetypes=scenetypes)
     if level == 'rf':
         return akdf
 

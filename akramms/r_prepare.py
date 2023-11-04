@@ -10,14 +10,15 @@ from akramms import params
 # TODO: Tar up
 # tar cvfz scene3.tar.gz $(find scene3 -name '*' -and -type f | grep -v eCog)
 
-
+__all__ = ('prepare_scene_rule', 'data_prep_PRA_rule', 'prepare_data')
 
 # -----------------------------------------------------------------------
 # ---------------------------------------------------------------------------
-def r_prepare_scene(xscene_dir, defaults=dict(), **kwargs):
+def prepare_scene_rule(xscene_dir, defaults=dict(), **kwargs):
 
     """Sets up a new scene by creating a directory with all
     parameters required for processing.
+    Called from experiment/ak.py
 
     scene_dir:
         Top-level directory for all project files.
@@ -262,7 +263,7 @@ def prepare_data(scene_dir):
 
 # ---------------------------------------------------------------------------
 
-def rule(scene_dir):
+def data_prep_PRA_rule(scene_dir):
     """Runs the data_prep_PRA.py script on a scene
     TO RERUN:
         Delete arcgis_stage0.txt

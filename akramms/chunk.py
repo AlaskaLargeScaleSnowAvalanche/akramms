@@ -276,15 +276,28 @@ def clip(rdf, clip_domain):
 
 # -----------------------------------------------------------
 _empty_list = []
-def add_dom(rdf, dem_filled, dem_nodata, grid_info, **kwargs):
+def add_dom(rdf, dem_filled, dem_nodata, grid_info, margins, **kwargs):
     """Does the domain finder algo.
 
     Runs the domain finder code
     rdf: (MODIFIES INPLACE)
         Release file(s) as dataframe
         REQUIRED cols: pra
-    kwargs:
+
+    margins: {'T': float, 'M': float, ...}
+        Margin to use for each PRA size
+
+    Optional kwargs
         Forwarded to d8graph.find_domain()
+        margin: float
+            Margin to add around the avalanche when computing domain
+        debug: int
+            Set to 1 to put d8graph CPP code in debug mode
+        min_alpha: (default 18.0 degrees)
+            Minimum "alpha" angle at which avalanche expected to continue
+        max_runout: (default 10000.)
+            Maximum distance avalanche can go [m]
+
     """
 
     # Calculate domains
@@ -300,9 +313,10 @@ def add_dom(rdf, dem_filled, dem_nodata, grid_info, **kwargs):
 
         # Get the domain from the PRA burn
         args = ()
+        margin = row['pra_size']
         ret = d8graph.find_domain(
             dem_filled, dem_nodata, grid_info.geotransform, pra_burn,
-            debug=1, **kwargs)
+            debug=1, margin=margin, **kwargs)
 
         if ret is None:
             chull_list = _empty_list

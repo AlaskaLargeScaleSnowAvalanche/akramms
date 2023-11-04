@@ -14,11 +14,14 @@ import netCDF4
 import numpy as np
 import d8graph
 
+"""Rules from just-after-eCognition to just-before-RAMMS Stage 1"""
+
+__all__ = ('pra_post_rule', 'chunk_rule')
 
 # ---------------------------------------------------------------------------------
 
 
-def rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **kwargs):
+def pra_post_rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **kwargs):
     """
     scene_dir:
         Uses params: name ("site"), resample_cell_size ("res")
@@ -103,9 +106,12 @@ def rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **kwargs):
         # Clip to the non-margin part of the local grid (subdomain)
         df = chunk.clip(df, scene_args['domain'])
 
-        # Compute the avalanche domains (domain finder algo)
+        # Compute the avalanche domains (domain builder algo)
         # Adds columns: chull, dom
-        df = chunk.add_dom(df, dem_filled, dem_nodata, grid_info, **kwargs)
+        df = chunk.add_dom(
+            df, dem_filled, dem_nodata, grid_info,
+            margins=config.initial_margins,
+            **kwargs)
 
         # Add PRA size designation of T,S,M,L
         # Adds column: pra_size
@@ -184,3 +190,4 @@ def chunk_rule(scene_dir, For, resolution, return_period, pra_size):
         rdf.to_csv(outputs[0])
 
     return make.Rule(action, inputs, outputs)
+# -----------------------------------------------------------------

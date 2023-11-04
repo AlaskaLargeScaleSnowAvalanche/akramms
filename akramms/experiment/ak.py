@@ -142,7 +142,7 @@ def add_combo(makefile, combo):
     print(f'   scene_dir: {scene_dir}')
     for k,v in kwargs.items():
         print(f'   {k}: {v}')
-    rule = r_prepare.r_prepare_scene(
+    rule = r_prepare.prepare_scene_rule(
         scene_dir, defaults='alaska', **kwargs)
     makefile.add(rule)
 

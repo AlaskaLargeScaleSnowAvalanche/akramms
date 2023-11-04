@@ -7,6 +7,8 @@ from akramms.util import paramutil,harnutil,arcgisutil
 from uafgi.util import make
 from akramms import process_tree,params
 
+__all__ = ('rule',)
+
 # ---------------------------------------------------------------------------
 _dia_cmd_engine_usage = """
 Usage: 
