@@ -443,7 +443,9 @@ def write_rel(rdf, wkt, return_period, ofname, **kwargs):
     """
 
     # Select columns to write
-    df = rdf.reset_index()[['area_m2', 'Mean_DEM', 'Mean_Slope', 'Scene_reso', 'Id', 'i', 'j', 'sx3', 'd0star', 'slopecorr', 'Wind', f'd0_{return_period}', f'VOL_{return_period}', 'pra']]
+    cols = ['area_m2', 'Mean_DEM', 'Mean_Slope', 'Scene_reso', 'Id', 'i', 'j', 'sx3', 'd0star', 'slopecorr', 'Wind', f'd0_{return_period}', f'VOL_{return_period}', 'pra']
+    cols += [name for name in ('chunkid', 'pra_size') if name in df]
+    df = rdf.reset_index()[cols]
 
 #    ofname.parents[0].mkdir(parents=True, exist_ok=True)
     os.makedirs(ofname.parents[0], exist_ok=True)
