@@ -364,7 +364,7 @@ def step4(args):
             domainfile = chunkdir / 'DOMAIN' / f'{chunkname}_dom.shp'
 
             makefile.add(r_ramms1.rule(
-                releasefile, demfile,
+                scenedir, releasefile, demfile,
                 [releasefile, demfile, domainfile],
                 dry_run=False, submit=config.auto_submit))
 

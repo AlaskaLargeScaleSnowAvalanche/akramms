@@ -173,7 +173,7 @@ def parse_scenedir(scenedir):
     return ret
 # ----------------------------------------------------------------------
 _chunk_subleafRE = re.compile(r'(\d+)([TSML])(For|NoFor)_(\d+)m')
-#Chunk = collections.namedtuple('Chunk', ('ichunk', 'sizecat'))
+#Chunk = collections.namedtuple('Chunk', ('ichunk', 'pra_size'))
 def parse_chunkdir(chunkdir):
     """
     chunkdir:
@@ -190,7 +190,7 @@ def parse_chunkdir(chunkdir):
     chunk_subleaf = chunk_leaf[len(x_leaf):]    # Eg: 0000230TFor_10m
     match = _chunk_subleafRE.match(chunk_subleaf)
     ret['ichunk'] = int(match.group(1))
-    ret['sizecat'] = match.group(2)
+    ret['pra_size'] = match.group(2)
 
     return ret
 # ----------------------------------------------------------------------
@@ -220,10 +220,15 @@ def parse_dir(dir):
     ret['dirtype'] = 'exp'
     return ret
 # =====================================================================
+
+# -------------------------------------------------------
 _releasefileRE = re.compile(r'(.*)([TSML])([_-])rel.shp')
 _releasefile_scenetypes = {'-': 'arc', '_': 'x'}
 def parse_releasefile(releasefile):
-    """releasefile: Eg:
+    """Parses names of top-level (non-CHUNK) release files
+    TODO: The format here is wrong, MUST be fixed!
+
+    releasefile: Eg:
         .../x-113-045/RELEASE/x-113-045For_10m_30L_rel.shp
         .../x-113-045/CHUNKS/x-113-0450001330MFor_10m/RELEASE/x-113-04500013For_10m_30M_rel.shp
         .../arc-113-045/RELEASE/ak-ccsm-1981-1990-lapse-For-30-113-045-S-rel.shp
@@ -240,7 +245,7 @@ def parse_releasefile(releasefile):
         pass    # Maybe this is a "naked" release file
     ret['type'] = 'releasefile'
 
-    ret['sizecat'] = match.group(2)
+    ret['pra_size'] = match.group(2)
     scenetype = _releasefile_scenetypes[match.group(3)]
     ret['scenetype'] = scenetype
     if scenetype == 'arc':
@@ -256,7 +261,7 @@ def parse_arcfile(arcfile):
     if match is None:
         raise ValueError(f'Not an archived avalanche file: {arcfile}')
 
-    sizecat = match.group(1)
+    pra_size = match.group(1)
 
     with netCDF4.Dataset(arcfile) as nc:
         statusv = nc.variables['status']
@@ -264,7 +269,7 @@ def parse_arcfile(arcfile):
         exp = statusv.getncattr('exp_mod')
 
 
-    ret = {'exp': exp, 'type': 'arcfile', 'sizecat': sizecat, 'arcfile': arcfile, 'id': int(match.group(2)) }
+    ret = {'exp': exp, 'type': 'arcfile', 'pra_size': pra_size, 'arcfile': arcfile, 'id': int(match.group(2)) }
     return ret
 # ----------------------------------------------------------------------
 def parse_file(file):

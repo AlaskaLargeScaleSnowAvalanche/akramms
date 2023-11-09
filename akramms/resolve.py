@@ -2,7 +2,7 @@ import itertools,re,os,functools,glob
 import netCDF4
 import pandas as pd
 from uafgi.util import shputil
-from akramms import level,parse
+from akramms import level,parse,file_info
 
 # Levels:
 #   exp - combo - (pra_size) releasefile - (pra_size) - aval
@@ -116,7 +116,6 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
 # ------------------------------------------------------------
 #_chunk_subleafRE = re.compile(r'(\d\d\d\d\d)(\d+)([TSML])(For|NoFor)_(\d+)')
 _chunkRE = re.compile(r'c-([TSML])-(\d\d\d\d\d)')
-_releasefileRE = re.compile(r'c-([TSML])-(\d\d\d\d\d)(For|NoFor)_(\d+)m_rel.shp')
 def resolve_releasefile(akdf, scenetypes=['x'], realized=True):
     """These are CHUNK releasefiles."""
 
@@ -132,7 +131,7 @@ def resolve_releasefile(akdf, scenetypes=['x'], realized=True):
     def process_releasedir(tup, scenetype, releasedir):
         print(f'process_releasedir({releasedir}')
         for name in os.listdir(releasedir):
-            match = _releasefileRE.match(name)
+            match = file_info.chunk_release_fileRE.match(name)
             print('match2 ', name, match)
             if match is not None:
                 pra_size = match.group(2)

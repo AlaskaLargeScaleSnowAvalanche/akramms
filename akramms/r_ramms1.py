@@ -1,5 +1,5 @@
 from uafgi.util import make,shputil
-from akramms import config,params,process_tree,joblib
+from akramms import config,params,process_tree,joblib,parse,file_info
 from akramms import r_prepare, r_ecog, r_pra_post, r_domain_builder, r_ramms
 from akramms.util import paramutil,harnutil,rammsutil
 import os,sys
@@ -11,14 +11,14 @@ import pandas as pd
 __all__ = ('rule',)
 
 # -------------------------------------------------------------
-def tiffmap(jb1):
+def tiffmap(crf):
 
     """Returns a mapping between a parsed RAMMS dir vs. "permanent"
     names for .tif files that can be reused for different chunks in
     RAMMS Stage 1.  After RAMMS stage 1, files will be copied from the
     chunk to their general location, as appropriate.
 
-    jb1:
+    crf:
         Parsed release file name of one chunk
     Returns: [(fname_chunk, fname_general), ...]
 
@@ -26,61 +26,48 @@ def tiffmap(jb1):
 
     # Parsed release file name of the dummy overall run used to create
     # reusable names for the TIF files.
-    jb0 = jb1.copy(segment=None)
-    scene_dir = os.path.dirname(jb1.ramms_harness)
-    scene_args = params.load(scene_dir)
+    scene_args = params.load(crf.scene_dir)
 
-    results_dir1 = os.path.join(jb1.ramms_dir, 'RESULTS', jb1.rammsdir_name)
+    results_dir1 = crf.chunk_dir / 'RESULTS' / crf.name
+    #results_dir1 = os.path.join(crf._dir, 'RESULTS', crf.rammsdir_name)
 
     map = [
-#        # ./juneau10000030MFor_5m/DEM/juneau100000For_5m_dem.tif
-#        (f'{jb1.ramms_dir}/DEM/{jb1.ramms_name}_dem.tif', scene_args['dem_file']),
-
-#        # ./juneau10000030MFor_5m/FOREST/juneau100000For_5m_forest.tif
-#        (f'{jb1.ramms_dir}/FOREST/{jb1.ramms_name}_forest.tif', scene_args['forest_file']),
-
         # -------------- Items for all sub-directories of the slope_dir
         # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/slope.tif
-        (f'{jb1.slope_dir}/slope.tif',
-            f'SLOPE_TIF/{jb0.slope_name}/slope.tif'),
+        (crf.slope_dir / 'slope.tif',
+            crf.scene_dir / 'SLOPE_TIF' / crf.slope_name / 'slope.tif'),
+
         # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/curvidl.tif
-        (f'{jb1.slope_dir}/curvidl.tif',
-            f'SLOPE_TIF/{jb0.slope_name}/curvidl.tif'),
+        (crf.slope_dir / 'curvidl.tif',
+            crf.scene_dir / 'SLOPE_TIF' / crf.slope_name / 'curvidl.tif'),
 
         # -------------- Items for each subdir
         # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/juneau100000For_5m_M30_xi.tif
-        (f'{jb1.slope_dir}/{jb1.slope_name}_{jb0.pra_size}{jb1.return_period}_xi.tif',
-            f'SLOPE_TIF/{jb0.slope_name}/{jb0.slope_name}_{jb0.pra_size}{jb0.return_period}_xi.tif'),
+        (crf.slope_dir / f'{crf.slope_name}_{crf.pra_size}{crf.return_period}_xi.tif',
+            crf.scene_dir / 'SLOPE_TIF' / crf.slope_name / f'{crf.slope_name}_{crf.pra_size}{crf.return_period}_xi.tif'),
 
         # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/juneau100000For_5m_M30_mu.tif
-        (f'{jb1.slope_dir}/{jb1.slope_name}_{jb0.pra_size}{jb1.return_period}_mu.tif',
-            f'SLOPE_TIF/{jb0.slope_name}/{jb0.slope_name}_{jb0.pra_size}{jb0.return_period}_mu.tif'),
-
-        # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/logfiles/muxi_class.tif
+        (crf.slope_dir} / d'{crf.slope_name}_{crf.pra_size}{crf.return_period}_mu.tif',
+            crf.scene_dir / 'SLOPE_TIF' / crf.slope_name / f'{crf.slope_name}_{crf.pra_size}{crf.return_period}_mu.tif'),
     ]
-
-    map = [
-        (os.path.join(jb0.ramms_harness, x), os.path.join(scene_dir, y))
-        for x,y in map]
 
     return map
 
 _izip_exts = ['.relp', '.domp', '.xyz', '.xy-coord', '.var', '.rel', '.dom']  # .dom MUST be last
-def compress_avalanche_inputs(jb, gridI, ids):
+def compress_avalanche_inputs(crf, gridI, ids):
     """Puts all avalanche inputs into a single Zip file."""
-#    jb = rammsutil.parse_release_file(release_file)
-    jb = jb.copy()
     gridI_pik = pickle.dumps(gridI)
     for id in ids:
-        jb.set(id=id)
-        base = os.path.join(jb.avalanche_dir, f'{jb.ramms_name}')
-        zip_file = f'{base}.in.zip'
+        base = f'{crf.slope_name}_{crf_avalanche_name}_{id}'
 
-        files = [f'{base}{ext}' for ext in _izip_exts]
-        arcnames = [f'{jb.ramms_name}{ext}' for ext in _izip_exts]
-        arcnames[-1] = f'{jb.ramms_name}.v1.dom'    # First of many .dom files
+#        base = os.path.join(crf.avalanche_dir, f'{crf.ramms_name}')
+        zip_file = crf.avlanche_dir / f'{base}.in.zip'
 
-        if (not os.path.exists(f'{base}.in.zip')) and \
+        files = [crf.avlanche_dir / f'{base}{ext}' for ext in _izip_exts]
+        arcnames = [f'{crf.ramms_name}{ext}' for ext in _izip_exts]
+        arcnames[-1] = f'{crf.ramms_name}.v1.dom'    # First of many .dom files
+
+        if (not os.path.exists(crf.avlanche_dir / f'{base}.in.zip')) and \
             all(file_is_good(x) for x in files):
 
             print(f'Compressing {zip_file}')
@@ -98,8 +85,8 @@ def compress_avalanche_inputs(jb, gridI, ids):
                     izip.write(file, arcname=arcname)
 
                 # Write the .av3 files based on the .av2 file
-                arcname = f'{jb.ramms_name}.av3'
-                av2_file = f'{base}.av2'
+                arcname = f'{crf.ramms_name}.av3'
+                av2_file = crf.avlanche_dir / f'{base}.av2'
                 files.append(av2_file)
                 with open(av2_file, 'r') as fin:
                     av3_str = av2_to_av3(fin.read())
@@ -130,12 +117,8 @@ def rule(release_file, dem_file, inputs, dry_run=False, submit=False):
         All input files for the RAMMS run (superset of release_files)
     """
 
-    jb = rammsutil.parse_release_file(release_file)
-    #logfile = os.path.join(jb.ramms_dir, 'RESULTS', 'lshm_rock.log')
-
-    # Write extra output files to show we finished stage1 for a particular release file
-#    done_output = os.path.join(jb.ramms_dir, 'RESULTS', f'{jb.ramms_name}_stage1.txt')
-    done_output = os.path.join(jb.scene_dir, 'stage1', f'{jb.ramms_name}.txt')
+    crf = file_info.parse_chunk_release_file(release_file)
+    done_output = crf.scene_dir / 'ramms_stage1' / f'{crf.name}.txt'
 
     def action(tdir):
         # ---------------------------------------------------------
@@ -144,18 +127,18 @@ def rule(release_file, dem_file, inputs, dry_run=False, submit=False):
         # ---------------------------------------------------------
 
         # Copy files from previous RAMMS Stage 1, to speed things up
-        tmap = tiffmap(jb)
+        tmap = tiffmap(crf)
         for fname0,fname1 in tmap:
             if (not os.path.exists(fname0)) and os.path.exists(fname1):
                 dir0 = os.path.dirname(fname0)
                 os.makedirs(dir0, exist_ok=True)
                 shutil.copy(fname1, fname0)
 
-        ramms_dir_rel = config.roots.relpath(jb.ramms_dir)
+        chunk_dir_rel = config.roots.relpath(crf.chunk_dir)
         cmd = ['sh', 
             config.roots_w.join('HARNESS', 'akramms', 'sh', 'run_ramms.sh', bash=True),
             '--ramms-version', config.ramms_version,
-            config.roots_w.syspath(ramms_dir_rel, bash=True), '1']    # '1'=stage 1
+            config.roots_w.syspath(chunk_dir_rel, bash=True), '1']    # '1'=stage 1
 
         # RAMMS Stage 1 accepts inputs on stdin
         # rammsdist.run_on_windows_stage() calls read_inputs()
@@ -184,7 +167,7 @@ def rule(release_file, dem_file, inputs, dry_run=False, submit=False):
         procs = list()
         for ids in striped_chunks(all_ids, config.ncpu_compress):
             proc = multiprocessing.Process(
-                target=lambda: compress_avalanche_inputs(jb, gridI, ids))
+                target=lambda: compress_avalanche_inputs(crf, gridI, ids))
             proc.start()
             procs.append(proc)
         for proc in procs:
@@ -192,11 +175,10 @@ def rule(release_file, dem_file, inputs, dry_run=False, submit=False):
 
         # Check final outputs
         missing = list()
-        jb1 = jb.copy()
-        for id in all_ids:
-            jb1.set(id=id)
-            base = os.path.join(jb.avalanche_dir, f'{jb1.ramms_name}')
-            in_zip = f'{base}.in.zip'
+        avalanche_dir = crf.avalanche_dir
+        for id in all_ids:    # Avalanche ID
+            in_zip = crf.avalanche_dir / f'{crf.slope_name}_{crf_avalanche_name}_{id}.in.zip'
+
             if not os.path.exists(in_zip):
                 missing.append(in_zip)
         if len(missing) > 0:

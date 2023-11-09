@@ -5,7 +5,7 @@ import shapely
 from uafgi.util import rasterize,shputil
 import d8graph
 from akramms.util import rammsutil
-from akramms import snow,config
+from akramms import snow,config,file_info
 
 """Everything to do with reading, rearranging and writing release files and chunks.
 
@@ -66,6 +66,9 @@ OGRFeature(x-113-04500005For_10m_30L_rel):0
 
 """
 
+
+
+# ===============================================================================
 # -----------------------------------------------------------
 def read_rel(relfname, **kwargs):
     """Reads a single _rel.shp and _dom.shp and merges them together.
@@ -330,33 +333,6 @@ def add_dom(rdf, dem_filled, dem_nodata, grid_info, margins, **kwargs):
 
     return rdf
 # -----------------------------------------------------------
-class ChunkInfo(typing.NamedTuple):
-    """Describes one chunk."""
-
-    # Eg: /home/efischer/prj/ak/bak/ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/x-113-0450000030SFor_10m
-    #dir: pathutil.Path
-
-    scene_name: str        # Eg: x-113-045
-    chunkid: int                # Eg: 17
-    For: str            # For / NoFor
-    resolution: int    # 10
-    return_period: int
-    pra_size: str    # TSML
-
-    @property
-    def chunk_name(self):
-        """{scene_dir}/CHUNKS/{chunk_name}"""
-        return f'c-{self.pra_size}-{self.chunkid:05}'
-
-    @property
-    def slope_name(self):
-        """{scene_dir}/CHUNKS/{chunk_name}/RESULTS/{slope_name}/{return_period}{pra_size}"""
-        return f'{self.chunk_name}{self.For}_{self.resolution}m'    # Used for DEM / Forest files
-
-    @property
-    def avalanche_name(self):
-        return f'{self.return_period}{self.pra_size}'
-
 def add_chunkinfo(df, scene_args):
     """Adds a master_rammsname (type rammsutil.RammsName) column.
     This is useed to set CHUNK names.
@@ -381,7 +357,7 @@ def add_chunkinfo(df, scene_args):
     for ((return_period,For), pra_size),dfg in df.groupby(['rpfor', 'pra_size']):
 
         dfg['chunkinfo'] = \
-            [ChunkInfo(scene_args['name'], -1, For, resolution, return_period, pra_size)] * len(dfg.index)
+            [file_info.ChunkInfo(scene_args['scene_dir'], scene_args['name'], -1, For, resolution, return_period, pra_size)] * len(dfg.index)
 
 
 #        jb = rammsutil.RammsName(

@@ -130,7 +130,7 @@ class RammsName:
 # -------------------------------------------------------
 
 
-release_fileRE = re.compile(r'^(.+)(\d\d\d\d\d)?(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(.*)(\..*)')
+release_fileRE = re.compile(r'^(.+)(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(.*)(\..*)')
 
 @functools.lru_cache()
 def parse_release_file(release_file):
@@ -148,7 +148,7 @@ def parse_release_file(release_file):
     if match is None:
         raise ValueError('Cannot parse RELEASE file: {}'.format(release_file))
 
-    scene_name = match.group(1)
+    ramms_name = match.group(1)
     segment = None if match.group(2) is None else int(match.group(2))    # Works for CHUNKS/ or RELEASE/ release files.
     forest = True if match.group(3) == 'For' else False
     resolution = int(match.group(4))
