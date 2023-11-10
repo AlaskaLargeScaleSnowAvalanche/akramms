@@ -1,7 +1,7 @@
 import os,subprocess,functools,re
 import htcondor
 import pandas as pd
-from akramms import config
+from akramms import config,file_info
 
 # =========================================================================================
 # ===== RAMMS Stage 2: Manage avalanche jobs
@@ -277,25 +277,32 @@ def print_job_statuses(df):
 
 
 # --------------------------------------------------------------------
-def submit_jobs(release_files, ids=None):
+def submit_jobs(akdf, ids=None):
     """Does an initial (or subsequent) submit of jobs for a set of
     release files.  Submits jobs that can be submitted, and that have
     not yet been.
+
+    akdf:
+        resolved to avalanche id
+        Needs columns: releasefile, id
 
     Returns:
         df:
             Job statuses BEFORE submissions were made
     """
 
-    df = job_statuses(release_files)
-    df = df[df.job_status.isin({JobStatus.TODO, JobStatus.OVERRUN})]
-#    print('df = ',df)
-    for _,row in df.iterrows():
+    for _,row in akdf.iterrows():
         if ids is None or row['id'] in ids:
-            run_dir = row['jb'].avalanche_dir
-            parts = run_dir.split(os.sep)
-            job_name = '{}_{}_{}'.format(parts[-2], parts[-1], row['id'])
-            print('submit ', run_dir, job_name)
-            submit_job(run_dir, job_name)
+            crf = file_info.parse_chunk_release_file(row['releasefile'])
+            # Eg: .../ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/c-L-00000/RESULTS/c-L-00000For_10m/30
+            avalanche_dir = crf.avalanche_dir
+
+            wcombo_name = crf.scene_dir.parts[-2]
+            ij_name = crf.scene_dir.parts[-1]
+            id = row['id']
+            job_name = f'{wcombo_name}-{ij_name}-{crf.chunkid:05}-{id}'
+
+            print('submit ', avalanche_dir, job_name)
+            submit_job(avalanche_dir, job_name)
 
     return df

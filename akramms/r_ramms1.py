@@ -219,7 +219,13 @@ def rule(release_file, dem_file, inputs, dry_run=False, submit=False):
         # Submit the individual avalanche runs immediately so we can
         # get going while preparing more RAMMS directories.
         if submit:
-            joblib.submit_jobs([release_file])
+            akdf = pd.DataFrame( [[release_file]], columns=['releasefile'] )
+            akdf = resolve.resolve_id(akdf, realized=True)
+            akdf = joblib.add_combo_job_status(scene_dir, akdf)
+
+            print('About to submit:')
+            print(akdf)
+#            joblib.submit_jobs(akdf)
 
         # Write output files
         os.makedirs(os.path.dirname(done_output), exist_ok=True)
