@@ -277,7 +277,7 @@ def print_job_statuses(df):
 
 
 # --------------------------------------------------------------------
-def submit_jobs(akdf, ids=None):
+def submit_jobs(akdf):
     """Does an initial (or subsequent) submit of jobs for a set of
     release files.  Submits jobs that can be submitted, and that have
     not yet been.
@@ -292,17 +292,16 @@ def submit_jobs(akdf, ids=None):
     """
 
     for _,row in akdf.iterrows():
-        if ids is None or row['id'] in ids:
-            crf = file_info.parse_chunk_release_file(row['releasefile'])
-            # Eg: .../ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/c-L-00000/RESULTS/c-L-00000For_10m/30
-            avalanche_dir = crf.avalanche_dir
+        crf = file_info.parse_chunk_release_file(row['releasefile'])
+        # Eg: .../ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/c-L-00000/RESULTS/c-L-00000For_10m/30
+        avalanche_dir = crf.avalanche_dir
 
-            wcombo_name = crf.scene_dir.parts[-2]
-            ij_name = crf.scene_dir.parts[-1]
-            id = row['id']
-            job_name = f'{wcombo_name}-{ij_name}-{crf.chunkid:05}-{id}'
+        wcombo_name = crf.scene_dir.parts[-2]
+        ij_name = crf.scene_dir.parts[-1]
+        id = row['id']
+        job_name = f'{wcombo_name}-{ij_name}-{crf.chunkid:05}-{id}'
 
-            print('submit ', avalanche_dir, job_name)
-            submit_job(avalanche_dir, job_name)
+        print('submit ', avalanche_dir, job_name)
+        submit_job(avalanche_dir, job_name)
 
     return df

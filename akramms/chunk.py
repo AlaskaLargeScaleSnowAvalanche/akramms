@@ -333,9 +333,10 @@ def add_dom(rdf, dem_filled, dem_nodata, grid_info, margins, **kwargs):
 
     return rdf
 # -----------------------------------------------------------
-def add_chunkinfo(df, scene_args):
-    """Adds a master_rammsname (type rammsutil.RammsName) column.
+def add_new_chunkinfo(df, scene_args, realized=False):
+    """Adds a chunkinfo column to avalanches not currently assigned to a chhnk.
     This is useed to set CHUNK names.
+    Avalanche ID is set to -1
 
     rdf:
         Dataframe of avalanches FOR ONE COMBO (see chunk.read_reldom())
@@ -346,6 +347,7 @@ def add_chunkinfo(df, scene_args):
         AKRAMMS parameters for that combo"""
       
 
+    assert realized == False
 
     resolution = scene_args['resolution']
     scene_name = scene_args['name']
@@ -360,17 +362,6 @@ def add_chunkinfo(df, scene_args):
             [file_info.ChunkInfo(scene_args['scene_dir'], scene_args['name'], -1, For, resolution, return_period, pra_size)] * len(dfg.index)
 
 
-#        jb = rammsutil.RammsName(
-#            scene_args['scene_dir'] / 'CHUNKS',
-#            scene_args['name'], 0, For, scene_args['resolution'],
-#            return_period, pra_size, None)
-#        dfg['jb'] = jb    # Prototype
-
-#        dfg['scene_name'] = scene_name
-#        dfg['For'] = For
-#        dfg['return_period'] = return_period
-#        dfg['rn'] = f'{For}_{resolution}m{return_period}'
-#        dfg['pra_size'] = pra_size
         dfg = dfg.drop('rpfor', axis=1)
         dfs.append(dfg)
 
