@@ -3,7 +3,6 @@ import setuptools.sandbox
 import pandas as pd
 from uafgi.util import make,shputil,gdalutil
 from akramms import config,params,process_tree,joblib,parse,file_info
-from akramms import r_prepare, r_ecog, r_pra_post, r_domain_builder, r_ramms
 from akramms.util import paramutil,harnutil,rammsutil
 
 """Rules for RAMMS Stage 1 (with auto submit to Stage 2)"""
@@ -11,15 +10,6 @@ from akramms.util import paramutil,harnutil,rammsutil
 __all__ = ('rule',)
 
 # -------------------------------------------------------------
-def file_is_good(fname):
-    # Make sure file exists in non-zero length
-    if not os.path.exists(fname):
-        return False
-    if os.path.getsize(fname) == 0:
-        return False
-    return True
-    
-# --------------------------------------------------------------------
 def tiffmap(crf):
 
     """Returns a mapping between a parsed RAMMS dir vs. "permanent"
@@ -97,7 +87,7 @@ def compress_avalanche_inputs(crf, gridI, ids):
         arcnames[-1] = f'{base}.v1.dom'    # First of many .dom files
 
         if (not os.path.exists(crf.avalanche_dir / f'{base}.in.zip')) and \
-            all(file_is_good(x) for x in files):
+            all(file_info.file_is_good(x) for x in files):
 
             print(f'Compressing {zip_file}')
 

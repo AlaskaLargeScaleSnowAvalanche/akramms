@@ -201,6 +201,8 @@ def _realized_ids(scenetype, releasefile, stage):
         resultsdir = releasefile.parents[1] / 'RESULTS'
 #        print('resultsdir ', resultsdir)
         for out_zip in glob.iglob(str(resultsdir / '*' / '*' / f'*.{stage}.zip')):
+            if not file_info.file_is_good(out_zip):
+                continue
             match = stage_zipRE.match(os.path.split(out_zip)[1])
             id = int(match.group(2))
             avalfiles[id] = out_zip

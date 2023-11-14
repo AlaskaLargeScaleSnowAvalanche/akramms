@@ -1,5 +1,15 @@
-import typing,re
+import typing,re,os
+
 # ---------------------------------------------------------------------
+def file_is_good(fname):
+    # Make sure file exists in non-zero length
+    if not os.path.exists(fname):
+        return False
+    if os.path.getsize(fname) == 0:
+        return False
+    return True
+    
+# --------------------------------------------------------------------
 # ---------------------------------------------------------------------
 class ChunkInfo(typing.NamedTuple):
     """Describe<s one chunk."""

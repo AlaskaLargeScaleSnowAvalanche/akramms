@@ -208,6 +208,8 @@ def query_condor(expmod):
 
 
 
+# --------------------------------------------------------------------
+
 def inout_name(jb, chunkid, id):
     return f'c-{jb.pra_size}-{chunkid:05d}{jb.For}_{jb.resolution}m_{jb.return_period}{jb.pra_size}_{id}'
 

@@ -66,25 +66,12 @@ _init_files = [
     argument('dir0', help='Source run dir'),
     argument('dir1', help='Destination run dir')])
 def initcopy(args):
-    """Runs a single RAMMS avalanche on the local machine, via Docker"""
 
     dir0 = os.path.abspath(args.dir0)
     dir1 = os.path.abspath(args.dir1)
     ioutil.sync_files(dir0, _init_files, dir1)
 
 # ------------------------------------------------------------------------
-
-@subcommand([
-    argument('run_dir', help='Run directory to use'),
-    argument('id', type=int, help='ID of avalanche in run_dir to run')])
-def run(args):
-    """Runs a single RAMMS avalanche on the local machine, via Docker"""
-
-    run_dir = os.path.abspath(args.run_dir)
-    parts = run_dir.split(os.sep)
-    job_name = '{}_{}_{}'.format(parts[-2], parts[-1], args.id)
-
-    r_ramms.submit_job(run_dir, job_name)
 
 _chunktypeRE = re.compile('CHUNKS(\d+)?')
 @subcommand([
@@ -148,19 +135,6 @@ def ls(args):
         sdt = '{:04d}-{:02d}-{:02d} {:02d}:{:02d}:{:02d}'.format(*info.date_time)
         print(f'{info.file_size: >11,} {sdt:19} {info.filename}')
 
-@subcommand([
-    argument('ramms', help='RAMMS directory or release file to inspect'),
-])
-def spec(args):
-    release_files = rammsutil.get_release_files(args.ramms)
-    for fname in release_files:
-        print(fname)
-#        print('---- tiffmap:')
-#        jb = rammsutil.parse_release_file(fname)
-#        map = r_ramms.tiffmap(jb)
-#        for x in map:
-#            print('    ',x)
-
 
 
 
@@ -218,11 +192,19 @@ def export(args):
     argument('--to', help='What to resolve to', default='releasefile'),
 ])
 def parse(args):
+    """Test out parsing and resolving to different levels"""
 
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, args.to, realized=False)
-
     print(akdf0)
+
+@subcommand([
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+    argument('--to', help='What to resolve to', default='releasefile'),
+])
+def parse(args):
+    """Query avalanches for mosaic"""
+
 # ---------------------------------------------------------------------
 def get_exp_dir(exp_mod):
     return config.roots.join('PRJ', exp_mod.name)
@@ -395,11 +377,38 @@ def ps(args):
 #    print(akdf[['combo', 'chunkid', 'id', 'jobstatus']])
     joblib.print_job_statuses(akdf)
 # ------------------------------------------------------------------
+@subcommand([
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+    argument('--rm', action='store_true',
+        help='Delete original avalanches after finished archiving?')
+])
+def archive(args):
+    parseds = akramms.parse.parse_args(args.spec)
+
+    # Identify avalanches ready to be archived that have not yet been archived
+#    akdf0 = resolve.resolve_to(parseds, 'combo', realized=True, sce
+    akdf_x = \
+        resolve.resolve_to(parseds, 'id', realized=True, stage='out', scenetypes={'x'}) \
+        .set_index(['combo', 'id'])
+    akdf_arc = \
+        resolve.resolve_to(parseds, 'id', realized=True, scenetypes={'arc'}) \
+        .set_index(['combo', 'id'])
+
+    # Find rows in the 'x' directory but no the 'arc' directory
+    x_only = akdf_x.index.difference(akdf_arc.index)
+
+    # Select only those rows to archive
+    akdf = akdf_x.loc(x_only)
+
+    print(akdf)
+    
+
+# ------------------------------------------------------------------
 
 
 
 @subcommand([
-    argument('query', nargs=1, help='Query file generated via akramms query'),
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
     #argument('-o', '--output', required=False, help='Name of Mosaic output file to write'),
     argument('--limit', type=int, help='Limit number of avalanches processed (for DEBUGGING)')
 ])
@@ -439,16 +448,6 @@ def mosaic(args):
 
 
 
-
-@subcommand([
-    argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),
-])
-def archive(args):
-    from akramms import archive
-    aspecs, nc_fnames = avalparse.parse_aval_specs(args.avals)
-    for aspec in aspecs:
-        print(aspec)
-        archive.archive_combo(aspec.exp_mod, aspec.combo, aspec.ids)
 
 def main():
     args = cli.parse_args()
