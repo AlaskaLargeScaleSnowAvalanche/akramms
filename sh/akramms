@@ -401,13 +401,14 @@ def archive(args):
     akdf = akdf_x.loc[x_only]
 
 
-    for tup in akdf.itertuples():
-        expmod = parse.load_expmod(tup.exp)
-        arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
+#    for tup in akdf.itertuples():
+#        expmod = parse.load_expmod(tup.exp)
+#        arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
 
-        print(tup)
+#        print(tup)
     print(akdf)
     
+    ncaval.archive(akdf)
 
 # ------------------------------------------------------------------
 

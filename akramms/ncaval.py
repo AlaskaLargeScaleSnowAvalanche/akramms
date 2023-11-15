@@ -6,6 +6,7 @@ from uafgi.util import gdalutil
 
 # Convert Avalanche outputs to NetCDF
 
+__all__ = ('archive',)
 
 # ------------------------------------------------------------------
 # NOTE: Similar to rammsutil.read_polygon_from_zip()
@@ -324,18 +325,10 @@ def ramms_to_nc0(out_zip, ncout):
 
 
 # ----------------------------------------------------------
-class ArchiveAvalanche:
-    @methodtools.lru_cache()
-    def rdf(self, releasefile):
-        return 
-
-
-
-
 def _archive_single_threaded(akdf0, debug):
     """Archives a bunch of work on a single thread
     akdf0:
-        Must contain releasefile, id, out_zip, arc_fname
+        Must contain cols: exp, combo, releasefile, chunkid, ic
     """
 
     for (exp, combo,releasefile),akdf1 in akdf0.groupby(['exp', 'combo', 'releasefile']):
@@ -344,13 +337,20 @@ def _archive_single_threaded(akdf0, debug):
 
         jb = file_info.parse_chunk_release_file(releasefile)
         arc_dir = jb.scene_dir
-        rdf = shputil.read_df(releasefile, read_shapes=False)
+
+        # Read the shapefile this avalanche came from, so we can copy
+        # info into the NetCDF file.
+        rdf = shputil.read_df(releasefile, read_shapes=False).set_index('id')
 
         for tup in akdf1.itertuples():
 
             inout = joblib.inout_name(jb, tup.chunkid, tup.id)
             out_zip = jb.avalanche_dir / f'{inout}.out.zip'
             arc_fname = arc_dir / f'aval-{jb.pra_size}-{tup.id}'
+
+
+            print(f'Archive {out_zip} -> {arc_fname}')
+            continue
 
             # -------- Convert to NetCDF
 
@@ -359,17 +359,18 @@ def _archive_single_threaded(akdf0, debug):
                 print('.', end='')
                 sys.stdout.flush()
 
-            os.makedirs(tup.arc_fname.parents[0], exist_ok=True)
+            os.makedirs(arc_fname.parents[0], exist_ok=True)
 
             # Write the full NetCDF file
-            tmp_fname = tup.arc_fname.parents[0] /
-                os.path.splitext(tup.arc_fname.parts[-1])[0] + '-tmp.nc'    # Write atomically
+            tmp_fname = arc_fname.parents[0] /
+                os.path.splitext(arc_fname.parts[-1])[0] + '-tmp.nc'    # Write atomically
 
             try:
                 with netCDF4.Dataset(tmp_fname, 'w') as ncout:
                     # Add info from the RELEASE file
                     ncv = ncout.createVariable('pra_attributes', 'i')
                     ncv.description = 'Attributes from the RELEASE shapefile used to set up this avalanche'
+                    # Copy info from the RELEASE file into the NetCDF output.
                     row = rdf.loc[id]
                     for aname,val in row.items():
                         setattr(ncv, aname, val)
@@ -378,9 +379,9 @@ def _archive_single_threaded(akdf0, debug):
                     ncv = ncout.createVariable('status', 'i')
                     for k,v in self.status_attrs.items():
                         setattr(ncv, k, v)
-                    out_zip_mtime = os.path.getmtime(tup.out_zip)
+                    out_zip_mtime = os.path.getmtime(out_zip)
                     ncv.avalanche_timestamp = datetime.datetime.fromtimestamp(out_zip_mtime).isoformat()
-                    ncaval.ramms_to_nc0(tup.out_zip, ncout)
+                    ncaval.ramms_to_nc0(out_zip, ncout)
 
                     # Add info from scene that created this avalanche
                     with netCDF4.Dataset(os.path.join(x_dir, 'scene.nc')) as ncin:
@@ -389,7 +390,7 @@ def _archive_single_threaded(akdf0, debug):
                         schema.create(grp)
                         schema.copy(ncin, grp)
 
-                os.rename(tmp_fname, tup.arc_fname)
+                os.rename(tmp_fname, arc_fname)
             except Exception:
                 # Remove candidate output file, if it exists
                 try:
@@ -405,7 +406,7 @@ def archive(akdf):
 
     with concurrent.futures.ProcessPoolExecutor(ncpu) as ex:
         futures = [ex.submit(_archivesingle_threaded, (akdfs[0], True), {})]
-        futures += [ex.submit(_archivesingle_threaded, (akdf, False), {}) for akdf in akdfs[1:]]
+        futures += [ex.submit(_archive_single_threaded, (akdf, False), {}) for akdf in akdfs[1:]]
         for future in futures:
             archived_out_zips += future.result()
 
