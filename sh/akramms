@@ -427,8 +427,10 @@ def archive(args):
     archive.archive(akdf, debug=args.debug, dry_run=args.dry_run, archive_overrun=args.overrun)
 
 # ------------------------------------------------------------------
-
-
+# https://stackoverflow.com/questions/3844801/check-if-all-elements-in-a-list-are-identical
+def all_equal(iterable):
+    g = groupby(iterable)
+    return next(g, True) and not next(g, False)
 
 @subcommand([
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
@@ -436,30 +438,64 @@ def archive(args):
     argument('--limit', type=int, help='Limit number of avalanches processed (for DEBUGGING)'),
     argument('--overrun', action='store_true',
         help="Mosaic archived overrun avalanches?"),
+    argument('--extent', '-e',
+        help="Designation of extent of final mosiac"),
 ])
 def mosaic(args):
     run_setup_py()
+
+    # See what, if anything, the user told us for extent
+    extent = parse_extent(args.extent)
+
 #    from akramms import avalquery,mosaic
 
     # Identify archived avalanches for use in the mosaic
     parseds = akramms.parse.parse_args(args.spec)
-    akdf = \
-        resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'}, include_overruns=args.overrun)
+    akdf0 = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'}, include_overruns=args.overrun)
 
-# \
-#        .set_index(['combo', 'id'])
+    # Make sure they all use the same experiment
+    # (Because extents are queried from the experiment definition file)
+    assert all(x == akdf0.exp[0] for x in akdf0.exp)
 
-    print(akdf)
-    return
+    # ---------------- Parse the spatial query extent; and limit combos by (idom,jdom) if needed.
+    exp = akdf0.exp[0]
+    expmod = parse.load_expmod(exp)
+    extent = parse.parse_extent(expmod, args.extent)    # (x0,y0,x1,y1)
+    
+    if not isinstance(extent, str):
+        # --- A numeric extent is provided: filter (idom,jdom) based on it.
+        # tiles is the set of (idom,jdom) we are happy to keep
+        tiles_in_extent = {(idom,jdom)
+            for idom,jdom,dom_ext in mosaic.domain_extents(expmod)
+            if mosaic.extents_intersect(dom_ext, extent)}
 
-#    nc_fnames = akdf.
+        # Filter by tiles_in_extent (i.e. only keep combos on tiles that intersect extent)
+        ijdom = akdf0.combo.map(lambda x: (x[-2],x[-1]) )    # (idom,jdom)
+        akdf0 = akdf0[ijdom.isin(tiles_in_extent)]
+    elif extent == 'tile':
+        # User wants extent to be same as a subdomain tile.
+        # Get union of all the subdomain tiles
+        ijdoms = {(x.idom, x.jdom) for x in akdf0.combo}
+        tile_extents = [
+            expmod.gridD.sub(
+                idom,jdom, expmod.resolution, expmod.resolution, margin=False) \
+                .extent(order='xyxy')
+            for idom,jdom in ijdoms]
+        extent = mosaic.union_extents(tile_extents)
+    # ---------------------------------------------
 
-    ## Do query
-    #aspecs0, nc_fnames = avalparse.parse_aval_specs(args.avals)
-    #aspecs = avalquery.normalize(aspecs0)
-    #nc_fnames, extent = avalquery.query(aspecs, nc_fnames)
+    # Resolve from combos to avalanche ids
+    resolve.resolve_id(akdf0, include_overruns=args.overrun)
 
-    print('query returned ', len(nc_fnames))
+    # Add extent of each avalanche
+    akdf0['extent'] = akdf0['avalfile'].map(mosaic.nc_extent)
+
+    # Filter between avalanche and query extent
+    if extent == 'dyanmic'
+        extent = mosaic.union_extents(akdf0['extent'].tolist())
+    else:
+        keep = akdf0['extent'].map(lambda ext: mosaic.extents_intersect(ext, extent))
+        akdf0 = akdf0[keep]
 
 
     # Do mosaic

@@ -378,3 +378,37 @@ def new_combo(expmod, scombo):
 #main()
 # ==============================================================
 
+_extent_strings = {'title', 'dynamic'}
+def parse_extent(expmod, sextent):
+    """
+    sextent:
+        Extent designator from command line
+    Returns:
+        (x0,y0,x1,y1)
+            or
+        'tile': Use the extent of an (idom,jdom) subdomain tile
+            or
+        'dynamic': Use extent determined by the avalanches
+    """
+
+    # See if it's a special string
+    if sextent is None:
+        return 'dynamic'
+    try:
+        return _extent_strings[sextent]
+    except KeyError:
+        pass
+
+    # See if it's a named extent
+    try:
+        return expmod.extents[sextent]
+    except KeyError:
+        pass
+
+    # Try to parse a numeric extent (x0,y0,x1,y1)
+    parts = [x.strip() for x in sextent.split(',')]
+    if parts != 4:
+        raise ValueError(f"Numeric extent requires four values x0,y0,x1,y1: {sextent}")
+    return tuple(float(x) for x in parts)
+
+# ------------------------------------------------------------------
