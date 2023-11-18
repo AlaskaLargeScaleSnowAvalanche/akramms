@@ -60,7 +60,7 @@ def add_margin(extent, margin):
     return [extent[0]-margin[0], extent[1]-margin[1], extent[2]+margin[0], extent[3]+margin[1]]
 # -----------------------------------------------------------------
 @functools.lru_cache()
-def domain_extents(exp_mod):
+def tile_extents(exp_mod):
     """Loads the extents of the sub-domains defined for an experiment.
     (RAMMS is run separately on each subdomain)
     Yields: (idom, jdom, (x0y0,x1,y1))"""
@@ -80,7 +80,6 @@ def domain_extents(exp_mod):
 
 
 # -----------------------------------------------------------------
-
 def tile_extent(expmod, idom, jdom):
     """Returns extent of the (idom,jdom) experiment tile."""
 
@@ -97,18 +96,149 @@ def check_extent_sign(extent):
     x0,y0,x1,y1 = extent
     assert x1>=x0
     assert y1>=y0
-# ---------------------------------------------------------------------
-def query(akdf, extent):
+# =====================================================================
+def filter_combos_by_extent(expmod, akdf, extent):
     """
+    expmod:
+        Overall experiment
     akdf:
-        Resolved to the combo level
+        Resolved to combo level
+        All combos in expmod
+    extent: (x0,y0,x1,y1)
+    """
+
+    # --- A numeric extent is provided: filter (idom,jdom) based on it.
+    # tiles is the set of (idom,jdom) we are happy to keep
+    tiles_in_extent = {(idom,jdom)
+        for idom,jdom,dom_ext in domain_extents(expmod)
+        if extents_intersect(dom_ext, extent)}
+
+    # Filter by tiles_in_extent (i.e. only keep combos on tiles that intersect extent)
+    ijdom = akdf.combo.map(lambda x: (x[-2],x[-1]) )    # (idom,jdom)
+    akdf = akdf[ijdom.isin(tiles_in_extent)]
+
+    return akdf
+# ---------------------------------------------------------------------
+def extent_by_tiles(expmod, akdf):
+    """Produces the extent that is the union of the tiles covered by
+    combos in akdf
+
+    akdf:
+        At either combo or avalanche level"""
+
+    # User wants extent to be same as a subdomain tile.
+    # Get union of all the subdomain tiles
+    ijdoms = {(x.idom, x.jdom) for x in akdf.combo}
+    tile_extents = [
+        expmod.gridD.sub(
+            idom,jdom, expmod.resolution, expmod.resolution, margin=False) \
+            .extent(order='xyxy')
+        for idom,jdom in ijdoms]
+    extent = mosaic.union_extents(tile_extents)
+
+# ---------------------------------------------------------------------
+def filter_avalanches_by_extent(expmod, adkf, extent):
+    """
+    expmod:
+        Overall experiment
+    akdf:
+        Resolved to avalanche id level
+        All avalnches in expmod
+    extent: (x0,y0,x1,y1)
+    """
+
+    avlanche_extents = akdf['avalfile'].map(nc_extent)
+    keep = avlanche_extents.map(lambda ext: mosaic.extents_intersect(ext, extent))
+    akdf = akdf[keep]
+    return akdf
+# ---------------------------------------------------------------------
+def extent_by_avalanches(expmod, akdf):
+    """Produces the extent that is the union of the avalanche extents in akdf
+    akdf:
+        """
+
+    extents = akdf0['avalfile'].map(nc_extent)
+    extent = mosaic.union_extents(extents.tolist())
+    return extent
+
+# ---------------------------------------------------------------------
+def query(akdf0, sextent, include_overruns=False):
+
+    """akdf:
+        Resolved to the combo level (or should work at id level too)
+        (If it contains specific IDs, that will be in the `parsed`
+        column, and will come out later in this function as we resolve
+        to ID level)
     extent: One of...
         (x0,y0,x1,y1)
             or
+        experiment-specific extent label
+            or
         'tile': Use the extent of an (idom,jdom) subdomain tile
             or
-        'dynamic': Use extent determined by the avalanches
+        'avlanche': Use avlanches to determine overall extent
+    include_overruns:
+        Should overrun avalanches be included when resolving avalanches
+
+    Returns: akdf, extent
+        akdf:
+            Exact set of avalanches resulting from the query
+            Contains column: 'id'
+        extent: (x0,y0,x1,y1)
+            Extent resulting from the query
 
     """
+
+    ret_dfs = list()
+    ret_extents = list()
+    for exp,akdf1 in akdf0.groupby('exp'):
+
+        # Make sure they all use the same experiment
+        # (Because extents are queried from the experiment definition file)
+        expmod = parse.load_expmod(exp)
+        extent = parse.parse_extent(expmod, sextent)    # (x0,y0,x1,y1)
+
+        extent_is_numeric = (not isinstance(extent, str))
+
+        if extent_is_numeric:
+            # --- A numeric extent is provided: filter (idom,jdom) based on it.
+            # tiles is the set of (idom,jdom) we are happy to keep
+            akdf1 = filter_combos_by_extent(expmod, akdf1, extent)
+            need_aval_filter = True
+        elif extent == 'tile':
+            # User wants extent to be same as a subdomain tile.
+            # Get union of all the subdomain tiles
+            extent = extent_by_tiles(expmod, akdf1)
+
+            # No need to further filter avalanches, the selected
+            # avalanches will fit in the extent.
+            need_aval_filter = False
+
+        # --------- Move to the avalanche (id) level
+        # Resolve to individual avalanches
+        akdf1 = resolve.resolve_id(akdf1, include_overruns)
+
+        # Resovle the extent to numeric
+        if extent == 'tile':
+            extent = extent_by_tiles(expmod, akdf1)
+            need_aval_filter = False
+
+        elif extent == 'aval':
+            # extent='aval' means the avalanches define the extent.
+            # So no need to ever filter out avalanches.
+            need_aval_filter = False
+            extent = extent_by_avalanches(expmod, akdf1)
+
+        # Finally, filter avalanches to the extent, if needed
+        if need_aval_filter:
+            akdf1 = filter_avalanches_by_extent(expmod, akdf1, extent)
+
+        ret_dfs.append(akdf1)
+        ret_extents.append(extent)
+
+    # Make final extent and avalanche list, across experiments even!
+    # (IF that makes sense, i.e. the two experiements are in the same projection)
+    return pd.merge(ret_dfs), union_extents(ret_extents)
+
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------

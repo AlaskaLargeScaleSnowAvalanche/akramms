@@ -378,7 +378,7 @@ def new_combo(expmod, scombo):
 #main()
 # ==============================================================
 
-_extent_strings = {'title', 'dynamic'}
+_extent_strings = {'tile', 'aval'}
 def parse_extent(expmod, sextent):
     """
     sextent:
@@ -393,7 +393,7 @@ def parse_extent(expmod, sextent):
 
     # See if it's a special string
     if sextent is None:
-        return 'dynamic'
+        return 'aval'
     try:
         return _extent_strings[sextent]
     except KeyError:
