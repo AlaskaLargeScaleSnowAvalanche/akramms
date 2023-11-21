@@ -209,6 +209,13 @@ def query_condor(expmod):
 
 
 # --------------------------------------------------------------------
+def is_overrun(out_zip):
+    """Determines whether a RAMMS result is overrun"""
+    with zipfile.ZipFile(out_zip, 'r') as ozip:
+        arcnames = [os.path.split(x)[1] for x in ozip.namelist()]
+    return any(x.endswith('.out.overrun') for x in arcnames)
+
+# --------------------------------------------------------------------
 
 def inout_name(jb, chunkid, id):
     return f'c-{jb.pra_size}-{chunkid:05d}{jb.For}_{jb.resolution}m_{jb.return_period}{jb.pra_size}_{id}'
@@ -297,12 +304,9 @@ def add_jobstatus(akdf0):
                         # We tentatively think the job is finished.  But let's
                         # look inside the zip file to make sure the domain
                         # wasn't overrun.
-                        with zipfile.ZipFile(out_zip, 'r') as ozip:
-                            arcnames = [os.path.split(x)[1] for x in ozip.namelist()]
-                        if any(x.endswith('.out.overrun') for x in arcnames):
-                            statuses.append((tup.combo, tup.id, JobStatus.OVERRUN))
-                        else:
-                            statuses.append((tup.combo, tup.id, JobStatus.FINISHED))
+                        statuses.append(
+                            (tup.combo, tup.id,
+                            JobStatus.OVERRUN if is_overrun(out_zip) else JobStatus.FINISHED) )
                         continue
 
                     # Default to TODO

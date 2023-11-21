@@ -381,6 +381,24 @@ def ps(args):
 # ------------------------------------------------------------------
 @subcommand([
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+])
+def overrun(args):
+    """Provides status of RAMMS avalanches"""
+
+    # Find the overruns
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf = resolve.resolve_to(parseds, 'id', realized=True, stage='out', include_overruns=True)
+    akdf['overrun'] = akdf['avalfile'].map(joblib.is_overrun)
+    akdf = akdf[ akdf['overrun'] ]
+
+    print(akdf)
+#    print('akdf1 ', akdf)
+
+#    print(akdf[['combo', 'chunkid', 'id', 'jobstatus']])
+#    joblib.print_job_statuses(akdf)
+# ------------------------------------------------------------------
+@subcommand([
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
     argument('--rm', action='store_true',
         help='Delete original avalanches after finished archiving?'),
     argument('--debug', action='store_true',

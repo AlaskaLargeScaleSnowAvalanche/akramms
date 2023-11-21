@@ -199,8 +199,16 @@ def _realized_ids(scenetype, releasefile, stage, include_overruns=False):
     """Find IDs that exist on disk.
     (Cached separate function)
 
+    include_overruns:
+        Only makes sense with scenetype='arc'
+
     Returns: {id: filename}
     """
+
+    # include_overruns only makes sense for scenetype='arc'
+    # To tell overruns with 'x', we have to look inside the files.
+    if scenetype == 'x':
+        assert not include_overruns
 
 #    print('realized_ids ', scenetype, stage, releasefile)
 
@@ -273,7 +281,7 @@ def resolve_id(akdf, realized=True, stage='out', include_overruns=False):
 
         # Add those IDs
         if realized:
-            # Match those IDs against what was requested in the releasefile
+            # Match releasefile against what's on disk
             avalfiles = _realized_ids(tup.scenetype, tup.releasefile, stage, include_overruns=include_overruns)
 #            print('avalfiles ', avalfiles)
 
