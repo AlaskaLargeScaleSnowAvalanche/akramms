@@ -27,24 +27,27 @@ def tiffmap(crf):
     # reusable names for the TIF files.
     scene_args = params.load(crf.scene_dir)
 
+    # Used to determine which chunks should re-use with files
+    sceneslope = f'{crf.scene_name}-{crf.For}-{crf.resolution}m'
+
     map = [
         # -------------- Items for all sub-directories of the slope_dir
         # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/slope.tif
         (crf.slope_dir / 'slope.tif',
-            crf.scene_dir / 'SLOPE_TIF' / crf.slope_name / 'slope.tif'),
+            crf.scene_dir / 'SLOPE_TIF' / sceneslope / 'slope.tif'),
 
         # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/curvidl.tif
         (crf.slope_dir / 'curvidl.tif',
-            crf.scene_dir / 'SLOPE_TIF' / crf.slope_name / 'curvidl.tif'),
+            crf.scene_dir / 'SLOPE_TIF' / sceneslope / 'curvidl.tif'),
 
         # -------------- Items for each subdir
         # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/juneau100000For_5m_M30_xi.tif
         (crf.slope_dir / f'{crf.slope_name}_{crf.pra_size}{crf.return_period}_xi.tif',
-            crf.scene_dir / 'SLOPE_TIF' / crf.slope_name / f'{crf.slope_name}_{crf.pra_size}{crf.return_period}_xi.tif'),
+            crf.scene_dir / 'SLOPE_TIF' / sceneslope / f'{sceneslope}_{crf.pra_size}{crf.return_period}_xi.tif'),
 
         # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/juneau100000For_5m_M30_mu.tif
         (crf.slope_dir / f'{crf.slope_name}_{crf.pra_size}{crf.return_period}_mu.tif',
-            crf.scene_dir / 'SLOPE_TIF' / crf.slope_name / f'{crf.slope_name}_{crf.pra_size}{crf.return_period}_mu.tif'),
+            crf.scene_dir / 'SLOPE_TIF' / sceneslope / f'{sceneslope}_{crf.pra_size}{crf.return_period}_mu.tif'),
     ]
 
     return map

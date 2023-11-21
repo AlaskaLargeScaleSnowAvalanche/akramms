@@ -180,8 +180,8 @@ def full():
 
 # -----------------------------------------------------------------
 def juneau():
-#    for year0,year1 in [(1981,1990), (2051,2060)]:
-    for year0,year1 in [(2051,2060)]:
+    for year0,year1 in [(1981,1990), (2051,2060)]:
+#    for year0,year1 in [(2051,2060)]:
 
         # Just one combo for now
         yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 113, 45)    # A Juneau-close box
