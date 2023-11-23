@@ -476,10 +476,19 @@ def run(args):
 
             makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
 
+# ------------------------------------------------------------------
+# def overrun(...):
 
 
+            # -----------------
+            # TODO: Wait until .out.zip files are all complete.
 
+            # ----------------- Step 5
+            # (a) Identify and re-submit overruns
+            # Use the redis queue here to interleave with original submissions in other combos
 
+            # -----------------
+            # TODO: Wait until resubmit .out.zip files are all complete.
 # ------------------------------------------------------------------
 @subcommand([
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
