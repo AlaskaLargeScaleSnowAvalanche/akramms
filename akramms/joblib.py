@@ -247,7 +247,7 @@ def add_jobstatus(akdf0):
 
 #            print('xdir ', xdir)
 
-            for releasefile,akdf3 in akdf2.groupby('releasefile'):
+            for (chunkid,releasefile),akdf3 in akdf2.groupby(['chunkid', 'releasefile']):
 #                print('releasefile ', releasefile)
                 jb = file_info.parse_chunk_release_file(releasefile)
 
@@ -260,12 +260,12 @@ def add_jobstatus(akdf0):
 
                     # Mark as NOINPUT if the .in.zip file is not there.
                     if not os.path.exists(in_zip):
-                        statuses.append((tup.combo, tup.id, JobStatus.NOINPUT))
+                        statuses.append((tup.combo, chunkid, tup.id, JobStatus.NOINPUT))
                         continue
 
                     # See if Condor knows is what's going on with the job
                     if job_info in condor_statuses:
-                        statuses.append((tup.combo, tup.id, condor_statuses[job_info]))
+                        statuses.append((tup.combo, chunkid, tup.id, condor_statuses[job_info]))
                         continue
 
                     # Not in Condor?  Either it hasn't launched, or it's finished / failed
@@ -283,7 +283,7 @@ def add_jobstatus(akdf0):
                             if (aval_nc_tm > out_zip_tm) and (out_zip_tm > in_zip_tm):
                                 # .nc files only "count" if they are newer than raw files
                                 # (or those raw files don't exist)
-                                statuses.append((tup.combo, tup.id, JobStatus.FINISHED))
+                                statuses.append((tup.combo, chunkid, tup.id, JobStatus.FINISHED))
                                 continue
 
                     # Identify avalanches that have finished: .out.zip exists and has non-zero size
@@ -298,22 +298,28 @@ def add_jobstatus(akdf0):
                             # no sign of the HTCondor job to write it at the
                             # end.  Sounds like things were killed, send
                             # status back to TODO.
-                            statuses.append((tup.combo, tup.id, JobStatus.TODO))
+                            statuses.append((tup.combo, chunkid, tup.id, JobStatus.TODO))
                             continue
 
                         # We tentatively think the job is finished.  But let's
                         # look inside the zip file to make sure the domain
                         # wasn't overrun.
                         statuses.append(
-                            (tup.combo, tup.id,
+                            (combo, chunkid, tup.id,
                             JobStatus.OVERRUN if is_overrun(out_zip) else JobStatus.FINISHED) )
                         continue
 
                     # Default to TODO
-                    statuses.append((tup.combo, tup.id, JobStatus.TODO))
+                    statuses.append((tup.combo, chunkid, tup.id, JobStatus.TODO))
 
-    df = pd.DataFrame(statuses, columns=('combo', 'id', 'jobstatus'))
-    return akdf0.merge(df.reset_index(), how='left', left_on=['combo', 'id'], right_on=['combo', 'id'])
+
+    df = pd.DataFrame(statuses, columns=('combo', 'chunkid', 'id', 'jobstatus'))
+
+    # Keep only the avalanche from the most recent chunk
+    # df = df.sort_values(['combo', 'id', 'chunkid'])    # Not needed
+#    df.drop_duplicates(['combo', 'id'], keep='last', inplace=True)
+
+    return akdf0.merge(df.reset_index(), how='left', left_on=['combo', 'chunkid', 'id'], right_on=['combo', 'chunkid', 'id'])
 # --------------------------------------------------------
 _include_statuses = {JobStatus.NOINPUT, JobStatus.INCOMPLETE, JobStatus.TODO, JobStatus.INPROCESS, JobStatus.OVERRUN, JobStatus.FAILED}
 def print_job_statuses(akdf0):
@@ -372,7 +378,7 @@ def _submit_jobs(akdf):
         wcombo_name = jb.scene_dir.parts[-2]
         ij_name = jb.scene_dir.parts[-1][2:]
         id = row['id']
-        job_name = f'{wcombo_name}-{ij_name}-{id}-{jb.chunkid:05}'
+        job_name = f'{wcombo_name}-{ij_name}-{id}-{jb.pra_size}-{jb.chunkid:05}'
         inout = inout_name(jb, jb.chunkid, id)
 
         print('submit ', jb.avalanche_dir, job_name, inout)

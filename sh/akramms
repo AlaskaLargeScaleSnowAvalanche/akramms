@@ -445,6 +445,7 @@ def overrun(args):
 
             # Run RAMMS Stage 1 (and auto-submit)
             chunk_dir = scene_args['scene_dir'] / 'CHUNKS' / jb.chunk_name
+            assert not os.path.exists(chunk_dir)    # Sanity / Safety Check
             releasefile = chunk_dir / 'RELEASE' / f'{jb.slope_name}_{jb.avalanche_name}_rel.shp'
             rule = r_ramms1.rule(releasefile, scene_args['dem_file'], [releasefile], submit=True)
             rule()
