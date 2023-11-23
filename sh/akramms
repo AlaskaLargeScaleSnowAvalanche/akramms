@@ -363,88 +363,93 @@ def run(args):
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
 
-    for exp,akdf1 in akdf0.groupby('exp'):
+    for exp,akdf0b in akdf0.groupby('exp'):
         expmod = akramms.parse.load_expmod(exp)
+        for combo,akdf1 in akdf0b.groupby('combo'):
+            # NOTE: akdf1 will have just one row in it, a single combo
+            assert len(akdf1) == 1
 
-        # -------------------- Step 2:
-        # (a) Prepare DEM files, forest files
-        # (d) Set up tile directories (AKRAMMS scenes)
-        makefile = make.Makefile()
+            # -------------------- Step 2:
+            # (a) Prepare DEM files, forest files
+            # (d) Set up tile directories (AKRAMMS scenes)
+            makefile = make.Makefile()
 
-        # Add the experiment and combos
-        # This calls through to r_prepare.prepare_scene_rule()
-        getattr(expmod, 'add_experiment')(makefile, akdf1.combo.tolist())
-        makefile.generate(expmod.dir / 'init_mk', run=True, ncpu=config.setup_ncpu)
-
-
-        # -------------------- Step 3
-        # (a) ArcGIS prep
-        # (b) eCognition
-        # (c) PRA-Post ArcGIS script
-        # (d) Split releasefiles and generate chunks
-        makefile = make.Makefile()
-
-        for combo in akdf1.combo.tolist():
-            scenedir = expmod.combo_to_scenedir(combo)
-            scene_args = params.load(scenedir)
-
-            print(f'----- Adding Scene: {scenedir}')
-
-            # Run ArcGIS script to prepare files for eCognition
-            prepare_outputs = makefile.add(r_prepare.data_prep_PRA_rule(scenedir)).outputs
-
-            # Obtain name of neighbor1 graph file for DEM routing network
-            # (created above in add_experiment_fn())
-            dem_file = scene_args['dem_file']
-            dem_filled_file = f'{dem_file[:-4]}_filled.tif'
-
-            # Run eCognition
-            makefile.add(r_ecog.rule(scenedir, prepare_outputs, combo.return_period, combo.forest))
-
-            # Post-Process eCognition Output (the pra_file)
-            # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
-            makefile.add(r_pra_post.pra_post_rule(
-                scenedir, dem_filled_file, combo.return_period,
-                combo.forest, scene_args['snow_file']))
-
-            # and also split into chunks.
-            for pra_size in config.allowed_pra_sizes:
-                makefile.add(r_pra_post.chunk_rule(
-                    scenedir, combo.forest, expmod.resolution,
-                    combo.return_period, pra_size))
-
-        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
+            # Add the experiment and combos
+            # This calls through to r_prepare.prepare_scene_rule()
+#            getattr(expmod, 'add_experiment')(makefile, akdf1.combo.tolist())
+            getattr(expmod, 'add_experiment')(makefile, [combo])
+            makefile.generate(expmod.dir / 'init_mk', run=True, ncpu=config.setup_ncpu)
 
 
-        # -------------------- Step 4
-        # (a) RAMMS Stage 1
-        # (b) RAMMS Stage 1 post-processing to generate .in.zip files
-        # (c) Auto-submit avalanches
-        makefile = make.Makefile()
+            # -------------------- Step 3
+            # (a) ArcGIS prep
+            # (b) eCognition
+            # (c) PRA-Post ArcGIS script
+            # (d) Split releasefiles and generate chunks
+            makefile = make.Makefile()
 
-        akdf1 = resolve.resolve_releasefile(akdf1, scenetypes={'x'}, realized=True)
+#            for combo in akdf1.combo.tolist():
+            if True:
+                scenedir = expmod.combo_to_scenedir(combo)
+                scene_args = params.load(scenedir)
 
-        for releasefile in akdf1.releasefile.tolist():
+                print(f'----- Adding Scene: {scenedir}')
 
-            print('------ releasefile ', releasefile)
+                # Run ArcGIS script to prepare files for eCognition
+                prepare_outputs = makefile.add(r_prepare.data_prep_PRA_rule(scenedir)).outputs
 
-            # Identify the scene this is part of and find the DEM file
-            chunkdir = releasefile.parents[1]
-            scenedir = chunkdir.parents[1]
-            print('ax chunkdir ', chunkdir)
-            print('ax scenedir ', scenedir)
-            scene_args = params.load(scenedir)
-            demfile = scene_args['dem_file']
+                # Obtain name of neighbor1 graph file for DEM routing network
+                # (created above in add_experiment_fn())
+                dem_file = scene_args['dem_file']
+                dem_filled_file = f'{dem_file[:-4]}_filled.tif'
 
-            chunkname = releasefile.parts[-1][:-8]
-            domainfile = chunkdir / 'DOMAIN' / f'{chunkname}_dom.shp'
+                # Run eCognition
+                makefile.add(r_ecog.rule(scenedir, prepare_outputs, combo.return_period, combo.forest))
 
-            makefile.add(r_ramms1.rule(
-                releasefile, demfile,
-                [releasefile, demfile, domainfile],
-                dry_run=False, submit=config.auto_submit))
+                # Post-Process eCognition Output (the pra_file)
+                # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
+                makefile.add(r_pra_post.pra_post_rule(
+                    scenedir, dem_filled_file, combo.return_period,
+                    combo.forest, scene_args['snow_file']))
 
-        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
+                # and also split into chunks.
+                for pra_size in config.allowed_pra_sizes:
+                    makefile.add(r_pra_post.chunk_rule(
+                        scenedir, combo.forest, expmod.resolution,
+                        combo.return_period, pra_size))
+
+            makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
+
+
+            # -------------------- Step 4
+            # (a) RAMMS Stage 1
+            # (b) RAMMS Stage 1 post-processing to generate .in.zip files
+            # (c) Auto-submit avalanches
+            makefile = make.Makefile()
+
+            akdf1 = resolve.resolve_releasefile(akdf1, scenetypes={'x'}, realized=True)
+
+            for releasefile in akdf1.releasefile.tolist():
+
+                print('------ releasefile ', releasefile)
+
+                # Identify the scene this is part of and find the DEM file
+                chunkdir = releasefile.parents[1]
+                scenedir = chunkdir.parents[1]
+                print('ax chunkdir ', chunkdir)
+                print('ax scenedir ', scenedir)
+                scene_args = params.load(scenedir)
+                demfile = scene_args['dem_file']
+
+                chunkname = releasefile.parts[-1][:-8]
+                domainfile = chunkdir / 'DOMAIN' / f'{chunkname}_dom.shp'
+
+                makefile.add(r_ramms1.rule(
+                    releasefile, demfile,
+                    [releasefile, demfile, domainfile],
+                    dry_run=False, submit=config.auto_submit))
+
+            makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
 
 
 
