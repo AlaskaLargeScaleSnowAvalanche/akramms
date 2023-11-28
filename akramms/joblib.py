@@ -291,7 +291,7 @@ def add_jobstatus(akdf0):
                     if os.path.exists(out_zip):
 
                         # Check for abandoned job
-                        # TODO: Use file_is_good() instead!
+                        # TODO: Use is_file_good() instead!
                         statinfo = os.stat(out_zip)
                         if (statinfo.st_size==0):
                             # The HTCondor output file has been created, but

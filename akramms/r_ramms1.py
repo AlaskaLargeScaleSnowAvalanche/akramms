@@ -90,7 +90,7 @@ def compress_avalanche_inputs(crf, gridI, ids):
         arcnames[-1] = f'{base}.v1.dom'    # First of many .dom files
 
         if (not os.path.exists(crf.avalanche_dir / f'{base}.in.zip')) and \
-            all(file_info.file_is_good(x) for x in files):
+            all(file_info.is_file_good(x) for x in files):
 
             print(f'Compressing {zip_file}')
 
