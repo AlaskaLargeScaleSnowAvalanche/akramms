@@ -235,20 +235,13 @@ def add_jobstatus(akdf0):
 
         # Pick up what info we can from HTCondor
         condor_statuses = query_condor(expmod)
-#        print('condor_statuses ', exp, condor_statuses)
 
         for combo,akdf2 in akdf1.groupby('combo'):
-            print('fffg combo ', type(combo), repr(combo))
             xdir = expmod.combo_to_scenedir(combo, 'x')
             # Corresponding archive location
-#            print('xdir1 ', xdir)
-#            print('xdir2 ', type(xdir.parts[-1]), xdir.parts[-1])
             arcdir = xdir.parents[0] / ('arc' + xdir.parts[-1][1:])
 
-#            print('xdir ', xdir)
-
             for (chunkid,releasefile),akdf3 in akdf2.groupby(['chunkid', 'releasefile']):
-#                print('releasefile ', releasefile)
                 jb = file_info.parse_chunk_release_file(releasefile)
 
                 for tup in akdf3.itertuples():

@@ -1,7 +1,7 @@
 import typing,re,os
 
 # ---------------------------------------------------------------------
-def file_is_good(fname):
+def is_file_good(fname):
     # Make sure file exists in non-zero length
     if not os.path.exists(fname):
         return False
