@@ -8,7 +8,7 @@ from uafgi.util import shapelyutil
 """Handle avalanches that overrun"""
 
 
-def resubmit(akdf0):
+def resubmit(akdf0, dry_run=False):
     """Creates new chunks for avalanches that have overrun.
     akdf:
         Resolved to id
@@ -68,7 +68,7 @@ def resubmit(akdf0):
             chunk_dir = scene_args['scene_dir'] / 'CHUNKS' / jb.chunk_name
             assert not os.path.exists(chunk_dir)    # Sanity / Safety Check
             releasefile = chunk_dir / 'RELEASE' / f'{jb.slope_name}_{jb.avalanche_name}_rel.shp'
-            rule = r_ramms1.rule(releasefile, scene_args['dem_file'], [releasefile], submit=True)
+            rule = r_ramms1.rule(releasefile, scene_args['dem_file'], [releasefile], dry_run=dry_run, submit=True)
             rule()
 
             #parseds = [parse.parse_chunk_releasefile(release_file)]

@@ -129,7 +129,7 @@ def rule(release_file, dem_file, inputs, dry_run=False, submit=False):
     (IDL code prepares individual avalanche runs)
 
     dem_file:
-        The name of ANY DEM file pertaining to this chunk.    
+        The name of ANY DEM file pertaining to this chunk.
         It could be the copy (or symlink) of the DEM file inside the chunk dir.
         Alternately, it can just be the DEM file for the AKRAMMS scene overall.
     release_file:

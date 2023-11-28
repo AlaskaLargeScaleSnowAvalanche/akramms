@@ -347,6 +347,10 @@ def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out', inc
 
     raise ValueError(f'Illegal level="{level}"')
 # ------------------------------------------------------------
+def add_chunkname(akdf1):
+    akdf1['chunkname'] = akdf1.releasefile.map(lambda x: x.parents[1].parts[-1])
+    return akdf1
+# ------------------------------------------------------------
 def remove_duplicate_ids(akdf0):
     """Removes duplicate IDs (within the same combo).
     Chooses the ID from with the largest (most recent) CHUNK.
@@ -358,7 +362,8 @@ def remove_duplicate_ids(akdf0):
     for combo,akdf1 in akdf0.groupby('combo'):
 
         # Obtain chunkname from releasefile
-        akdf1['chunkname'] = akdf1.releasefile.map(lambda x: x.parents[1].parts[-1])
+        #akdf1['chunkname'] = akdf1.releasefile.map(lambda x: x.parents[1].parts[-1])
+        akdf1 = akdf1.add_chunkname(akdf1)
 
         # Keep only the ID with the largest (newest) chunkname
         akdf1 = akdf1.sort_values(['id', 'chunkname'])

@@ -518,14 +518,16 @@ def ps(args):
 # ------------------------------------------------------------------
 @subcommand(name='overrun', args=[
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+    argument('--dry-run', action='store_true',
+        help="Don't actually do the work"),
 ])
 def xoverrun(args):
-    """Provides status of RAMMS avalanches"""
+    """Resubmits overruns"""
 
     # Find the overruns
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'id', realized=True, stage='out', scenetypes={'x'})
-    overrun.resubmit(akdf0)
+    overrun.resubmit(akdf0, dry_run=args.dry_run)
 # ------------------------------------------------------------------
 @subcommand([
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
