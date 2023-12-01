@@ -370,6 +370,9 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
             out_zip = jb.avalanche_dir / f'{inout}.out.zip'
             arc_leafbase = f'aval-{jb.pra_size}-{tup.id}'
 
+            # Skip if already archived
+            if file_info.is_file_good(out_zip):
+                continue
 
             # Avoid archiving overrun files
             with zipfile.ZipFile(out_zip, 'r') as ozip:
@@ -442,8 +445,10 @@ def _git_commit(dir):
     return proc.stdout.readline().strip()    # We just want head -1
 
 # -----------------------------------------------------------------
-def archive(akdf, debug=False, dry_run=False, archive_overrun=False):
+def archive_ids(akdf, debug=False, dry_run=False, archive_overrun=False):
     """Archives in multi-thread
+    akdf:
+        Resolved to id leavel
     archive_overrun:
         Should we archive overrun avalanches?
     """
@@ -484,6 +489,23 @@ def archive(akdf, debug=False, dry_run=False, archive_overrun=False):
             archived_out_zips += future.result()
 
     return archived_out_zips
+# ----------------------------------------------------------
+def archive_combos(akdf_combo, debug=False, dry_run=False, archive_overrun=False):
+    """
+    akdf:
+        Resolved to combo level
+    """
+    akdf = resolve.resolve_releasefile(akdf_combo, scenetypes='x')
+    akdf = resolve.resolve_id(realized=True, stage='out', include_overruns=False)
+    akdf = overrun.drop_duplicates(akdf)    # Remove overruns that were re-done
+
+    archive_ids(akdf, debug=debug, dry_run=dry_run)
+
+    for tup in akdf_combo.reset_index().itertuples():
+        arcdir = expmod.combo_to_scenedir(scenetype='arc')
+        with open(arcdir / 'archived.txt', 'w') as out:
+            out.write('Combo archived\n')
+
 # ----------------------------------------------------------
 #def main():
 #    out_zip = '/home/efischer/prj/ak/ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/x-113-0450000230MFor_10m/RESULTS/x-113-04500002For_10m/30M/x-113-04500002For_10m_30M_3200.out.zip'

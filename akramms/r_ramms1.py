@@ -227,4 +227,39 @@ def rule(release_file, dem_file, inputs, dry_run=False, submit=False):
 
     return make.Rule(action, inputs, [done_output])
 
+# --------------------------------------------------------
+def run(akdf0):
+    """Runs RAMM Stage 1 on a bunch of releasefiles.
+    Cheks the cache file <x_dir>/ramms_stage1/c-L-xxxx.txt to see if it was already run."""
+
+    akdf0 = add_chunk_complete_cached(akdf0, ramms_stage=1)
+    akdf0 = akdf[~akdf['chunk_complete_stage1_cached']]
+
+    makefile = make.Makefile()
+
+    for exp,akdf1 in akdf0.groupby('exp'):
+        expmod = akramms.parse.load_expmod(exp)
+        for releasefile in akdf1.releasefile.tolist():
+
+            print('------ releasefile ', releasefile)
+
+            # Identify the scene this is part of and find the DEM file
+            chunkdir = releasefile.parents[1]
+            scenedir = chunkdir.parents[1]
+            print('ax chunkdir ', chunkdir)
+            print('ax scenedir ', scenedir)
+            scene_args = params.load(scenedir)
+            demfile = scene_args['dem_file']
+
+            chunkname = releasefile.parts[-1][:-8]
+            domainfile = chunkdir / 'DOMAIN' / f'{chunkname}_dom.shp'
+
+            makefile.add(rule(
+                releasefile, demfile,
+                [releasefile, demfile, domainfile],
+                dry_run=False, submit=config.auto_submit))
+
+        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
+
+    return akdf0
 

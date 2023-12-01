@@ -327,31 +327,6 @@ def step4(args):
     akdf0 = resolve.resolve_to(parseds, 'releasefile', realized=True)
 
     print('akdf0 ', akdf0)
-    makefile = make.Makefile()
-
-    for exp,akdf1 in akdf0.groupby('exp'):
-        expmod = akramms.parse.load_expmod(exp)
-        for releasefile in akdf1.releasefile.tolist():
-
-            print('------ releasefile ', releasefile)
-
-            # Identify the scene this is part of and find the DEM file
-            chunkdir = releasefile.parents[1]
-            scenedir = chunkdir.parents[1]
-            print('ax chunkdir ', chunkdir)
-            print('ax scenedir ', scenedir)
-            scene_args = params.load(scenedir)
-            demfile = scene_args['dem_file']
-
-            chunkname = releasefile.parts[-1][:-8]
-            domainfile = chunkdir / 'DOMAIN' / f'{chunkname}_dom.shp'
-
-            makefile.add(r_ramms1.rule(
-                releasefile, demfile,
-                [releasefile, demfile, domainfile],
-                dry_run=False, submit=config.auto_submit))
-
-        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
 
 # ------------------------------------------------------------------
 @subcommand([
@@ -454,27 +429,69 @@ def run(args):
             akdf2 = pd.DataFrame([row1.to_dict()])
             akdf2 = resolve.resolve_releasefile(akdf1, scenetypes={'x'}, realized=True)
 
-            for releasefile in akdf2.releasefile.tolist():
+            r_ramms1.run(akdf2)
+# ------------------------------------------------------------------
+@subcommand([
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+])
+def submit(args):
+    """Standalone submission of avalanches.
+    (Run if jobs submitted by akramms run failed somehow)"""
 
-                print('------ releasefile ', releasefile)
+    parseds = akramms.parse.parse_args(args.spec)
 
-                # Identify the scene this is part of and find the DEM file
-                chunkdir = releasefile.parents[1]
-                scenedir = chunkdir.parents[1]
-                print('ax chunkdir ', chunkdir)
-                print('ax scenedir ', scenedir)
-                scene_args = params.load(scenedir)
-                demfile = scene_args['dem_file']
+    akdf = resolve.resolve_to(parseds, 'id', realized=True, stage='in')
+    akdf = joblib.submit_jobs(akdf)    # Only submits jobs that need submitting
 
-                chunkname = releasefile.parts[-1][:-8]
-                domainfile = chunkdir / 'DOMAIN' / f'{chunkname}_dom.shp'
+    print(f'{len(akdf)} jobs submitted')
+# ------------------------------------------------------------------
+@subcommand([
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+    argument('--realized', action='store_true',
+        help='Only check avalanches with .in.zip / .out.zip files'),
+])
+def finish_chunks(args):
+    """Mark chunks as finished if all avalanches are complete."""
 
-                makefile.add(r_ramms1.rule(
-                    releasefile, demfile,
-                    [releasefile, demfile, domainfile],
-                    dry_run=False, submit=config.auto_submit))
+    parseds = akramms.parse.parse_args(args.spec)
 
-            makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
+    # Original set of combos --- only look at combos NOT YET archived.
+    akdf = resolve.resolve_to(parseds, 'combo')
+    akdf = complete.add_combo_archived_cached(akdf)
+    akdf = akdf[~akdf['combo_archived_cached']]
+
+    # -----------------------------------------------------------------
+    # Move to releasefile level
+    akdf = resolve.resolve_releasefile(akdf, 'releasefile', realized=True, stage='in')
+
+    # Get releasefiles (chunks) that are not yet complete (as per cache)
+    akdf = akdf.add_chunk_complete_cached(akdf, 2)    # chunk_complete_stage2_cached
+    noncached = akdf[~akdf['chunk_complete_stage2_cached']]
+
+    # Get releasefiles that are complete in practice but not cached; or ACTUALLY incomplete
+    noncached = complete.add_chunk_complete_stage2(noncached, realized=args.realized)
+    mask = noncached['chunk_complete_stage2']
+    complete_df0 = noncached[mask]
+    incomplete_df = noncached[~mask]
+
+    # For chunks that are complete in practice but not cached:
+    #     --> Write out the "complete" cache entry
+    for (exp,combo),complete_df1 in complete_df0.groupby(['exp', 'combo']):
+        expmod = parse.load_expmod(exp)
+        xdir = expmod.comb_to_scenedir(combo, 'x')
+
+        for tup in complete_df1.reset_index().itertuples():
+            fname = xdir / 'ramms_stage2' / f'{tup.chunkname}.txt'
+            with open(fname, w) as out:
+                out.write(fname, 'complete.txt\n')
+
+    # For chunks that are not yet complete:
+    # Explain they are not yet complete and recommend running `akramms submit`
+    if len(incomplete_df) > 0:
+        print('The following chunks are not yet complete, try `akramms submit`')
+        print(incomplete_df1)
+
+        raise ValueError('Not all chunks complete')
 
 # ------------------------------------------------------------------
 # def overrun(...):
@@ -489,17 +506,14 @@ def run(args):
 
             # -----------------
             # TODO: Wait until resubmit .out.zip files are all complete.
+
+
+
 # ------------------------------------------------------------------
-@subcommand([
-    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
-])
-def submit(args):
-    """Standalone submission of avalanches"""
-
-    parseds = akramms.parse.parse_args(args.spec)
-
-    akdf = resolve.resolve_to(parseds, 'id', realized=True, stage='in')
-    joblib.submit_jobs(akdf)
+def archive(args):
+    # -------------------------------------------------------------------
+    # All chunks are complete, now we can archive combos
+    # Go back to combo level (akdf)
 
 # ------------------------------------------------------------------
 @subcommand([
@@ -555,16 +569,10 @@ def archive(args):
     # enlargements)
 
 
-
     # Identify archived avalanches
     akdf_arc = \
         resolve.resolve_to(parseds, 'id', realized=True, scenetypes={'arc'}, include_overruns=args.overrun) \
         .set_index(['combo', 'id'])
-
-#    print('akdf_x ', akdf_x.avalfile.tolist())
-#    print('akdf_arc ', akdf_arc.avalfile.tolist())
-##    return
-
 
     # Find rows in the 'x' directory but no the 'arc' directory
     # That is, avalanches ready to be archived but not yet archived.
@@ -575,14 +583,8 @@ def archive(args):
         .sort_values(['combo', 'releasefile', 'id'])
 
 
-#    for tup in akdf.itertuples():
-#        expmod = parse.load_expmod(tup.exp)
-#        arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
-
-#        print(tup)
-    print(akdf)
-    
-    archive.archive(akdf, debug=args.debug, dry_run=args.dry_run, archive_overrun=args.overrun)
+   
+    archive.archive_ids(akdf, debug=args.debug, dry_run=args.dry_run, archive_overrun=args.overrun)
 
 # ------------------------------------------------------------------
 # https://stackoverflow.com/questions/3844801/check-if-all-elements-in-a-list-are-identical

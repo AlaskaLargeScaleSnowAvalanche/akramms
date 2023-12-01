@@ -10,10 +10,11 @@ class JobStatus(enum.IntEnum):
     INCOMPLETE = 1   # Some but not all RAMMS input files exist
     TODO = 2         # Ready to submit to HTCondor but no evidence that has been done
     INPROCESS = 3    # HTCondor is dealing with it
-    FINISHED = 4     # The avalanche has finished, and it's successful
+    FAILED = 4       # The job finished but did not produce full / correct output
     OVERRUN = 5      # Avalanche overran the boundary; auto-resubmit
-    FAILED = 6       # The job finished but did not produce full / correct output
-
+    FINISHED = 6     # The avalanche (or chunk or combo) has finished, and it's successful
+    MARKED_FINISHED = 7       # Chunk or combo has finished, and has been marked as such (shortcut)
+    ARCHIVED = 7    # For combos: It's been fully archived to an arc directory
 
 # =========================================================================================
 # ===== RAMMS Stage 2: Manage avalanche jobs
@@ -221,11 +222,11 @@ def inout_name(jb, chunkid, id):
     return f'c-{jb.pra_size}-{chunkid:05d}{jb.For}_{jb.resolution}m_{jb.return_period}{jb.pra_size}_{id}'
 
 _subsceneRE = re.compile(r'x-(\d+-\d+)')
-def add_jobstatus(akdf0):
+def add_id_status(akdf0):
     """Determines status of ALL Condor jobs for a RAMMS run.
     akdf0:
         Avalanche dataframe, resolved to the ID level with scenetype='x' and index='id'
-        Must all ahve the same combo (scenedir)
+        Must all have the same combo (scenedir)
     """
 
     statuses = list()
@@ -306,7 +307,7 @@ def add_jobstatus(akdf0):
                     statuses.append((tup.combo, chunkid, tup.id, JobStatus.TODO))
 
 
-    df = pd.DataFrame(statuses, columns=('combo', 'chunkid', 'id', 'jobstatus'))
+    df = pd.DataFrame(statuses, columns=('combo', 'chunkid', 'id', 'id_status'))
 
     # Keep only the avalanche from the most recent chunk
     # df = df.sort_values(['combo', 'id', 'chunkid'])    # Not needed
@@ -327,7 +328,7 @@ def print_job_statuses(akdf0):
             jb = file_info.parse_chunk_release_file(releasefile)
             print(f"----- {jb.avalanche_dir}")
 
-            for jobstatus,akdf3 in akdf2.groupby('jobstatus'):
+            for jobstatus,akdf3 in akdf2.groupby('id_status'):
                 if showall or (jobstatus in _include_statuses):
                     print('{}: {}'.format(repr(JobStatus(jobstatus)), sorted(akdf3.id.tolist())))
 
@@ -360,10 +361,7 @@ def _submit_jobs(akdf):
             Job statuses BEFORE submissions were made
     """
 
-
-# TODO: add job status and filter before submtting...
-
-    for _,row in akdf.iterrows():
+   for _,row in akdf.iterrows():
         jb = file_info.parse_chunk_release_file(row['releasefile'])
 
         # Eg: .../ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/c-L-00000/RESULTS/c-L-00000For_10m/30
@@ -378,7 +376,7 @@ def _submit_jobs(akdf):
         submit_job(jb.avalanche_dir, job_name, inout)
 
 def submit_jobs(akdf):
-    akdf = add_jobstatus(akdf)
+    akdf = add_id_status(akdf)
 
     # Only submit jobs that are ready to go and not in process or completed or something.
     akdf = akdf[akdf.jobstatus == JobStatus.TODO]
@@ -386,3 +384,112 @@ def submit_jobs(akdf):
     print('==================== Submitting:')
     print(akdf[['combo', 'chunkid', 'id']])
     _submit_jobs(akdf)
+
+    return akdf
+# ------------------------------------------------------------
+def add_releasefile_status(akdf, realized=True):
+    """Determins a status for each releasefile (chunk)
+
+    akdf:
+        Resolved to releasefile
+        Columns: chunkid, pra_size
+    realized:
+        if True:
+            Check that all EXISTING avalanches are complete
+            (i.e. there's an .out.zip for every .in.zip)
+        if False:
+            Check that ALL avalanches in the releasefile have been
+            completed.
+    """
+
+    dfs = list()
+    for (exp,combo),akdf1 in akdf0.reset_index().groupby(['exp', 'combo']):
+        expmod = parse.load_expmod(exp)
+        xdir = expmod.comb_to_scenedir(combo, 'x')
+
+        ## Resolve combo -> releasefile
+        #rfdf1 = resolve.resolve_releasefile(akdf1, scenetypes={'x'})
+
+        # Get releasefiles (chunks) that are not yet complete (as per cache)
+        akdf1 = akdf1.add_chunk_complete_cached(akdf1, 2)    # chunk_complete_stage2_cached
+        mask = akdf1['chunk_complete_stage2_cached']
+        rf_complete_cached = akdf1[mask]
+        rf_complete_cached[status] = JobStatus.MARKED_FINISHED
+        dfs.append(rf_complete_cached)
+
+        # Go on with releasefiles not marked as cached
+        akdf1 = akdf1[~mask]
+
+        # ------------------------------------------
+        # Get jobstatus at id level
+        # Pick up job statuses
+        iddf1 = resolve.resolve_id(rfdf1, realized=realized)
+        iddf1 = add_id_status(iddf1)
+
+        # Aggregate id status back to releasefile level and add to akdf1
+        chunk_status = \
+            iddf1[['releasefile','id_status']].groupby('releasefile').min() \
+            .rename(columns={'id_status': 'chunk_status'})
+        akdf1 = rfdf1.merge(chunk_status, how='left', left_on='releasefile', right_index=True)
+
+        # Mark chunks as finished if they have in fact finished
+        mask = (akdf1.chunk_status == JobStatus.FINISHED)
+        finished_df = akdf1[mask]
+        for chunkname in finished_df.chunkname:
+            fname = xdir / 'ramms_stage2' / f'{chunkname}.txt'
+            with open(fname, 'w') as out:
+                out.write('RAMMS Stage 2 complete\n')
+        finished_df['chunk_status'] = JobStatus.MARKED_FINISHED
+        dfs.append(finished_df)
+
+        # Append the rest of the chunk status rows as-is
+        akdf1 = akdf1[~mask]
+        dfs.append(akdf1)
+
+    return pd.concat(dfs)
+
+# ------------------------------------------------------------
+def add_combo_status(akdf_exp, realized=True, update=True):
+    """akdf:
+        Resolved to exp level (theoretical, i.e. realized=False)
+    """
+    dfs = list()
+
+    for exp,akdf1 in akdf0.reset_index().groupby('exp'):
+        expmod = parse.load_expmod(exp)
+
+        akdf1['combo_status'] = JobStatus.NOINPUT    # The Combo doesn't exist yet
+
+        # Take care of combos we know are archived
+        is_archived = akdf1.combo.apply(lambda combo: 
+            os.path.isfile(expmod.combo_to_scenedir(combo, 'arc') / 'archived.txt') )
+        df = akdf1[is_archived]
+        df['combo_status'] = JobStatus.MARKED_FINISHED
+        dfs.append(df)
+
+        # ------------------------------------------
+        # Get jobstatus at releasefile level
+        rfdf1 = resolve.resolve_releasefile(akdf1)
+        rfdf1 = add_releasefile_status(rfdf1, realized=realized)
+
+        # Aggregate id status back to combo level and add to akdf1
+        combo_status = \
+            rfdf1[['combo','chunk_status']].groupby('combo').min() \
+            .rename(columns={'chunk_status': 'combo_status'})
+        akdf1 = rfdf1.merge(combo_status, how='left', left_on='releasefile', right_index=True)
+        # -------------------------------------------------
+
+        # Archive combos if they have in fact finsihed
+        if update:
+            mask = (akdf1.combo_status == JobStatus.FINISHED)
+            dfs.append(akdf1[~mask])
+
+            finished_combo_df = akdf1[mask]
+            archive.archive_combos(finished_combo_df)
+            finished_combo_df.combo_status = JobStatus.ARCHIVED
+            dfs.append(finished_combo_df)
+        else:
+            dfs.append(akdf1)
+
+    return pd.merge(dfs)
+# ------------------------------------------------------------
