@@ -234,7 +234,7 @@ def parse_dir(dir):
 #        .../arc-113-045/RELEASE/ak-ccsm-1981-1990-lapse-For-30-113-045-S-rel.shp
 #    """
 #
-#    raise ValueError("This needs to be fixed to parse CHUNK or non-CHUNK releasefiles.  See use of parsed['chunkid'] in resolve.py/resolve_releasefile().  I don't think parsing by individual resleasefiles will be important going forward...")
+#    raise ValueError("This needs to be fixed to parse CHUNK or non-CHUNK releasefiles.  See use of parsed['chunkid'] in resolve.py/resolve_chunk().  I don't think parsing by individual resleasefiles will be important going forward...")
 #
 #    match = _releasefileRE.match(releasefile.parts[-1])
 #    if match is None:

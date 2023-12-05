@@ -104,7 +104,7 @@ def add_combo_archived_cached(akdf0):
 #    for (exp,combo),akdf1 in akdf0.reset_index().groupby(['exp', 'combo']):
 #
 #        iddf1 = resolve_id(
-#            resolve.resolve_releasefile(akdf1, scenetypes={'x'}),
+#            resolve.resolve_chunk(akdf1, scenetypes={'x'}),
 #            realized=False)
 #        iddf1 = add_id_complete_stage2(iddf1)
 #        complete = iddf1['id_complete_stage2'].all()
@@ -135,7 +135,7 @@ def add_combo_complete_stage2(akdf0, realized=True):
     for (exp,combo),akdf1 in akdf0.reset_index().groupby(['exp', 'combo']):
 
         iddf1 = resolve_id(
-            resolve.resolve_releasefile(akdf1, scenetypes={'x'}),
+            resolve.resolve_chunk(akdf1, scenetypes={'x'}),
             realized=False)
         iddf1 = add_id_complete_stage2(iddf1)
         complete = iddf1['id_complete_stage2'].all()

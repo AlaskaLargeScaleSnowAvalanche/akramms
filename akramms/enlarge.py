@@ -76,7 +76,7 @@ def enlarge_domains(parseds):
             #next_chunktype = f'CHUNKS{max_id+1}'
 
             # Generate Avalanche IDs
-            akdf3 = resolve.resolve_releasefile(
+            akdf3 = resolve.resolve_chunk(
                 akdf2, scenetypes={'x'}, chunktypes={last_chunktype})
             akdf3 = resolve.resolve_id(akdf3, realized=True)
             akdf3 = resolve.remove_overrun_dups(akdf3)

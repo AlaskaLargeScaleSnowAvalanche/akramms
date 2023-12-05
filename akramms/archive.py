@@ -495,7 +495,7 @@ def archive_combos(akdf_combo, debug=False, dry_run=False, archive_overrun=False
     akdf:
         Resolved to combo level
     """
-    akdf = resolve.resolve_releasefile(akdf_combo, scenetypes='x')
+    akdf = resolve.resolve_chunk(akdf_combo, scenetypes='x')
     akdf = resolve.resolve_id(realized=True, stage='out', include_overruns=False)
     akdf = overrun.drop_duplicates(akdf)    # Remove overruns that were re-done
 

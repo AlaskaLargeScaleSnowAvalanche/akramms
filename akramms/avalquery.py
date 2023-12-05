@@ -218,7 +218,7 @@ def query(akdf0, sextent, include_overruns=False, scenetypes={'x', 'arc'}, margi
 
         # --------- Move to the avalanche (id) level
         # Resolve to individual avalanches
-        akdf1 = resolve.resolve_releasefile(akdf1, scenetypes=scenetypes)
+        akdf1 = resolve.resolve_chunk(akdf1, scenetypes=scenetypes)
         akdf1 = resolve.resolve_id(akdf1, include_overruns=include_overruns, realized=True)
 
 
