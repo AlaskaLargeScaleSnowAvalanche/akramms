@@ -366,7 +366,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
 
         for tup in akdf1.reset_index().itertuples(index=False):
 
-            inout = joblib.inout_name(jb, tup.chunkid, tup.id)
+            inout = file_info.inout_name(jb, tup.chunkid, tup.id)
             out_zip = jb.avalanche_dir / f'{inout}.out.zip'
             arc_leafbase = f'aval-{jb.pra_size}-{tup.id}'
 

@@ -113,48 +113,6 @@ class JobInfo(typing.NamedTuple):
     chunkid: int
     id: int    # Avalanche ID
 
-def xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxquery_condor(expmod, job_base):
-    """
-    job_base:
-        Base name of jobs we are querying for.
-    Returns: {JobInfo: status}
-
-        status: int
-            Status of job.  See enumeration htcondor.JobStatus:
-                https://htcondor.readthedocs.io/en/latest/apis/python-bindings/api/htcondor.html?highlight=jobstatus#htcondor.JobStatus
-            JobStatus codes:
-                 1 I IDLE
-                 2 R RUNNING
-                 3 X REMOVED
-                 4 C COMPLETED
-                 5 H HELD
-                 6 > TRANSFERRING_OUTPUT
-                 7 S SUSPENDED
-
-    """
-
-    # See submit_jobs(), Additional fields for ChunkID and AvalancheID
-    nfields = len(expmod.combo_keys) + 2
-    jobRE_str = '-'.join(r'([^-]*)')
-
-    # Query Condor
-    schedd = htcondor.Schedd()   # get the Python representation of the scheduler
-    ads = schedd.query(    # One Ad per job
-        constraint=f'regexp("{jobRE_str}", JobBatchName)',
-        projection=['ClusterId', 'ProcId', 'JobBatchName', 'JobPartition'])
-
-    # job_name == f'{wcombo_name}-{ij_name}-{crf.chunkid:05}-{id}'
-    condor_statuses = dict()
-    for ad in ads:
-        job_name = ad['JobBatchName']
-        expmod = parse.load_expmod(job_name[0])
-        combo = parse.new_combo(expmod, job_name[1:-2])
-        chunkid = int(job_name[-2])
-        id = int(job_name[-1])
-        condor_statuses[JobInfo(combo, chunkid, id)] = ad['JobPartition']
-
-    return condor_statuses
-
 def get_mtime(fname):
     if os.path.exists(fname):
         return os.path.getmtime(fname)
@@ -218,9 +176,6 @@ def is_overrun(out_zip):
 
 # --------------------------------------------------------------------
 
-def inout_name(jb, chunkid, id):
-    return f'c-{jb.pra_size}-{chunkid:05d}{jb.For}_{jb.resolution}m_{jb.return_period}{jb.pra_size}_{id}'
-
 _subsceneRE = re.compile(r'x-(\d+-\d+)')
 def add_id_status(akdf0):
     """Determines status of ALL Condor jobs for a RAMMS run.
@@ -256,7 +211,7 @@ def add_id_status(akdf0):
                     job_info = JobInfo(combo, tup.chunkid, tup.id)
 
                     #job_name = f'{jb.slope_name}_{jb.avalanche_name}_{id}'
-                    inout = inout_name(jb, tup.chunkid, tup.id)
+                    inout = file_info.inout_name(jb, tup.chunkid, tup.id)
                     in_zip = jb.avalanche_dir / f'{inout}.in.zip'
 
                     # Mark as NOINPUT if the .in.zip file is not there.
@@ -377,7 +332,7 @@ def _submit_jobs(akdf):
         ij_name = jb.scene_dir.parts[-1][2:]
         id = row['id']
         job_name = f'{wcombo_name}-{ij_name}-{id}-{jb.pra_size}-{jb.chunkid:05}'
-        inout = inout_name(jb, jb.chunkid, id)
+        inout = file_info.inout_name(jb, jb.chunkid, id)
 
         print('submit ', jb.avalanche_dir, job_name, inout)
         submit_job(jb.avalanche_dir, job_name, inout)

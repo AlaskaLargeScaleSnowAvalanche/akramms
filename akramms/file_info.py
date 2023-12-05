@@ -51,6 +51,10 @@ class ChunkInfo(typing.NamedTuple):
     def avalanche_dir(self):
         return self.slope_dir / self.avalanche_name
 
+def inout_name(jb, chunkid, id):
+    """Helper function used in a few places"""
+    return f'c-{jb.pra_size}-{chunkid:05d}{jb.For}_{jb.resolution}m_{jb.return_period}{jb.pra_size}_{id}'
+
 def chunk_info(scene_args, pra_size, chunkid):
     return ChunkInfo(
         scene_args['scene_dir'],
