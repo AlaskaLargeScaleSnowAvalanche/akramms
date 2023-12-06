@@ -1,4 +1,4 @@
-import typing
+import typing,re
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 class ChunkInfo(typing.NamedTuple):
@@ -21,13 +21,17 @@ class ChunkInfo(typing.NamedTuple):
         return f'c-{self.pra_size}-{self.chunkid:05}'
 
     @property
+    def chunk_dir(self):
+        return self.scene_dir / 'CHUNKS' / self.chunk_name
+
+    @property
     def slope_name(self):
         """{scene_dir}/CHUNKS/{chunk_name}/RESULTS/{slope_name}/{return_period}{pra_size}"""
         return f'{self.chunk_name}{self.For}_{self.resolution}m'    # Used for DEM / Forest files
 
     @property
     def slope_dir(self):
-        return self.scene_dir / self.chunk_name / 'RESULTS' / self.slope_name
+        return self.chunk_dir / 'RESULTS' / self.slope_name
 
     @property
     def avalanche_name(self):
@@ -47,7 +51,7 @@ def chunk_info(scene_args, pra_size, chunkid):
         pra_size)
 
 # ---------------------------------------------------------------------
-chunk_release_fileRE = re.compile(r'c-([TSML])-(\d\d\d\d\d)(For|NoFor)_(\d+)m_rel.shp')
+chunk_release_fileRE = re.compile(r'c-([TSML])-(\d\d\d\d\d)(For|NoFor)_(\d+)m_(\d+)([TSML])_rel.shp')
 def parse_chunk_release_file(release_file):
     leaf = release_file.parts[-1]
     match = chunk_release_fileRE.match(leaf)
@@ -56,12 +60,12 @@ def parse_chunk_release_file(release_file):
         return None
 
     scene_dir = release_file.parents[3]
-    scene_args = params.load(scene_dir)
+#    scene_args = params.load(scene_dir)
     return ChunkInfo(
         scene_dir,
         scene_dir.parts[-1], #scene_name
         int(match.group(2)),    # chunkid
         match.group(3),        # For
         int(match.group(4)),    # resolution
-        scene_args['return_period'],
+        int(match.group(5)),    # return_period
         match.group(1))        # pra_size

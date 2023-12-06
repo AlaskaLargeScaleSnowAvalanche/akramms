@@ -1,16 +1,25 @@
-from uafgi.util import make,shputil
+import os,sys,shutil,multiprocessing,pickle,zipfile,re
+import setuptools.sandbox
+import pandas as pd
+from uafgi.util import make,shputil,gdalutil
 from akramms import config,params,process_tree,joblib,parse,file_info
 from akramms import r_prepare, r_ecog, r_pra_post, r_domain_builder, r_ramms
 from akramms.util import paramutil,harnutil,rammsutil
-import os,sys
-import setuptools.sandbox
-import pandas as pd
 
 """Rules for RAMMS Stage 1 (with auto submit to Stage 2)"""
 
 __all__ = ('rule',)
 
 # -------------------------------------------------------------
+def file_is_good(fname):
+    # Make sure file exists in non-zero length
+    if not os.path.exists(fname):
+        return False
+    if os.path.getsize(fname) == 0:
+        return False
+    return True
+    
+# --------------------------------------------------------------------
 def tiffmap(crf):
 
     """Returns a mapping between a parsed RAMMS dir vs. "permanent"
@@ -28,9 +37,6 @@ def tiffmap(crf):
     # reusable names for the TIF files.
     scene_args = params.load(crf.scene_dir)
 
-    results_dir1 = crf.chunk_dir / 'RESULTS' / crf.name
-    #results_dir1 = os.path.join(crf._dir, 'RESULTS', crf.rammsdir_name)
-
     map = [
         # -------------- Items for all sub-directories of the slope_dir
         # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/slope.tif
@@ -47,27 +53,50 @@ def tiffmap(crf):
             crf.scene_dir / 'SLOPE_TIF' / crf.slope_name / f'{crf.slope_name}_{crf.pra_size}{crf.return_period}_xi.tif'),
 
         # ./juneau10000030MFor_5m/RESULTS/juneau100000For_5m/juneau100000For_5m_M30_mu.tif
-        (crf.slope_dir} / d'{crf.slope_name}_{crf.pra_size}{crf.return_period}_mu.tif',
+        (crf.slope_dir / f'{crf.slope_name}_{crf.pra_size}{crf.return_period}_mu.tif',
             crf.scene_dir / 'SLOPE_TIF' / crf.slope_name / f'{crf.slope_name}_{crf.pra_size}{crf.return_period}_mu.tif'),
     ]
 
     return map
 
-_izip_exts = ['.relp', '.domp', '.xyz', '.xy-coord', '.var', '.rel', '.dom']  # .dom MUST be last
+# ----------------------------------------
+pathRE = re.compile(r'Domain\s+[^\s]*\s+([^\s]*)\s*', re.MULTILINE)
+def av2_to_av3(av2_str):
+    """Rewrite .av2 file to avoid absolute paths, and convert to
+    forward slash.  This prepares it to run in a Docker container."""
+
+    # Figure out directory to blank out (as a string)
+    match = pathRE.search(av2_str)
+    dom_file = match.group(1)
+    dir = dom_file[:dom_file.rindex('\\')+1]
+
+    # Blank out all occurrences of that dir
+    av3_str = av2_str.replace(dir, '')
+
+    # Go one dir up
+    dir = dir[:-1]    # Remove trailing backslash
+    dir = dir[:dir.rindex('\\')]
+    print(f'dir "{dir}"')
+    av3_str = av3_str.replace(dir, '..')
+
+    return av3_str
+# ----------------------------------------
+
+_izip_exts = ['.xyz', '.xy-coord', '.var', '.rel', '.dom']  # .dom MUST be last
 def compress_avalanche_inputs(crf, gridI, ids):
     """Puts all avalanche inputs into a single Zip file."""
     gridI_pik = pickle.dumps(gridI)
     for id in ids:
-        base = f'{crf.slope_name}_{crf_avalanche_name}_{id}'
-
 #        base = os.path.join(crf.avalanche_dir, f'{crf.ramms_name}')
-        zip_file = crf.avlanche_dir / f'{base}.in.zip'
+        base = f'{crf.slope_name}_{crf.avalanche_name}_{id}'
 
-        files = [crf.avlanche_dir / f'{base}{ext}' for ext in _izip_exts]
-        arcnames = [f'{crf.ramms_name}{ext}' for ext in _izip_exts]
-        arcnames[-1] = f'{crf.ramms_name}.v1.dom'    # First of many .dom files
+        zip_file = crf.avalanche_dir / f'{base}.in.zip'
 
-        if (not os.path.exists(crf.avlanche_dir / f'{base}.in.zip')) and \
+        files = [crf.avalanche_dir / f'{base}{ext}' for ext in _izip_exts]
+        arcnames = [f'{base}{ext}' for ext in _izip_exts]
+        arcnames[-1] = f'{base}.v1.dom'    # First of many .dom files
+
+        if (not os.path.exists(crf.avalanche_dir / f'{base}.in.zip')) and \
             all(file_is_good(x) for x in files):
 
             print(f'Compressing {zip_file}')
@@ -85,8 +114,8 @@ def compress_avalanche_inputs(crf, gridI, ids):
                     izip.write(file, arcname=arcname)
 
                 # Write the .av3 files based on the .av2 file
-                arcname = f'{crf.ramms_name}.av3'
-                av2_file = crf.avlanche_dir / f'{base}.av2'
+                arcname = f'{base}.av3'
+                av2_file = crf.avalanche_dir / f'{base}.av2'
                 files.append(av2_file)
                 with open(av2_file, 'r') as fin:
                     av3_str = av2_to_av3(fin.read())
@@ -118,7 +147,7 @@ def rule(release_file, dem_file, inputs, dry_run=False, submit=False):
     """
 
     crf = file_info.parse_chunk_release_file(release_file)
-    done_output = crf.scene_dir / 'ramms_stage1' / f'{crf.name}.txt'
+    done_output = crf.scene_dir / 'ramms_stage1' / f'{crf.chunk_name}.txt'
 
     def action(tdir):
         # ---------------------------------------------------------
@@ -143,10 +172,10 @@ def rule(release_file, dem_file, inputs, dry_run=False, submit=False):
         # RAMMS Stage 1 accepts inputs on stdin
         # rammsdist.run_on_windows_stage() calls read_inputs()
         dynamic_outputs = list()
-        if config.queue_idl:
-            dynamic_outputs = harnutil.run_remote_queued(inputs, cmd, tdir, write_inputs=True)
-        else:
-            dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=True)
+#        if config.queue_idl:
+#            dynamic_outputs = harnutil.run_remote_queued(inputs, cmd, tdir, write_inputs=True)
+#        else:
+#            dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=True)
 
         # Copy .tif files to be reused by later RAMMS Stage 1
         for fname0,fname1 in tmap:
@@ -177,7 +206,7 @@ def rule(release_file, dem_file, inputs, dry_run=False, submit=False):
         missing = list()
         avalanche_dir = crf.avalanche_dir
         for id in all_ids:    # Avalanche ID
-            in_zip = crf.avalanche_dir / f'{crf.slope_name}_{crf_avalanche_name}_{id}.in.zip'
+            in_zip = crf.avalanche_dir / f'{crf.slope_name}_{crf.avalanche_name}_{id}.in.zip'
 
             if not os.path.exists(in_zip):
                 missing.append(in_zip)

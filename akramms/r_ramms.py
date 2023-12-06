@@ -15,36 +15,6 @@ import pandas as pd
 
 # --------------------------------------------------------------------
 
-pathRE = re.compile(r'Domain\s+[^\s]*\s+([^\s]*)\s*', re.MULTILINE)
-def av2_to_av3(av2_str):
-    """Rewrite .av2 file to avoid absolute paths, and convert to
-    forward slash.  This prepares it to run in a Docker container."""
-
-    # Figure out directory to blank out (as a string)
-    match = pathRE.search(av2_str)
-    dom_file = match.group(1)
-    dir = dom_file[:dom_file.rindex('\\')+1]
-
-    # Blank out all occurrences of that dir
-    av3_str = av2_str.replace(dir, '')
-
-    # Go one dir up
-    dir = dir[:-1]    # Remove trailing backslash
-    dir = dir[:dir.rindex('\\')]
-    print(f'dir "{dir}"')
-    av3_str = av3_str.replace(dir, '..')
-
-    return av3_str
-# ----------------------------------------
-def file_is_good(fname):
-    # Make sure file exists in non-zero length
-    if not os.path.exists(fname):
-        return False
-    if os.path.getsize(fname) == 0:
-        return False
-    return True
-    
-# --------------------------------------------------------------------
 
 
 
@@ -90,6 +60,11 @@ def parse_aval_log(log_in):
         return _parse_aval_log(fin)
 
 # -------------------------------------------------------
+def job_ids(release_file):
+    """Reads a release file, and returns a (sorted) list of PRA IDs in that file."""
+    release_df = shputil.read_df(release_file, read_shapes=False)
+    return sorted(list(release_df['Id']))
+# --------------------------------------------------------
 
 def ramms_iter(ramms_spec, ids=list()):
     """Iterates through a set of avalanches by spec
@@ -105,7 +80,7 @@ def ramms_iter(ramms_spec, ids=list()):
     rf_by_id = dict()
     for release_file in release_files:
         jb = rammsutil.parse_release_file(release_file)
-        for id in rammsutil.job_ids(release_file):
+        for id in job_ids(release_file):
             rf_by_id[id] = jb
 
     for id in ids:
@@ -173,7 +148,7 @@ def infos(release_files, ids=None):
     infos = list()
     for release_file in release_files:
         jb = rammsutil.parse_release_file(release_file)
-        exist_ids = rammsutil.job_ids(release_file)
+        exist_ids = job_ids(release_file)
 
         # Get list of ids to inspect
         if len(ids) == 0:

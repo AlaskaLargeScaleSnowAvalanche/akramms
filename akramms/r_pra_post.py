@@ -2,7 +2,7 @@ import scipy.spatial
 import pandas as pd
 import shapely
 from osgeo import gdal
-from akramms import params,process_tree,chunk,level
+from akramms import params,process_tree,chunk,level,file_info
 from akramms.util import rammsutil
 from uafgi.util import shputil,gdalutil,wrfutil,make,cfutil,ioutil,rasterize
 import os,sys
@@ -61,18 +61,19 @@ def pra_post_rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **k
 
     # Full pathnames of initial release files generated from this (scene_name, return_period, forest) combo
     # Initial release files are in the top-level RELEASE/ directory, before chopping into chunks.
-    ramms_names = list()
+#    ramms_names = list()
     outputs = list()
     # See email from Marc Christen 2023-01-23
-    rn = f'{For}_{resolution}m{return_period}'
+#    rn = f'{For}_{resolution}m_{return_period}'
     for pra_size in config.allowed_pra_sizes:
         # Copied from rammsutil.RammsName
-        ramms_name = (scene_name, rn, pra_size)
-        ramms_names.append(ramms_name)
+#        ramms_name = (scene_name, rn, pra_size)
+#        ramms_names.append(ramms_name)
 
-        outputs.append(scene_dir / 'RELEASE' / f'{scene_name}{rn}{pra_size}_rel.shp')
-        outputs.append(scene_dir / 'RELEASE' / f'{scene_name}{rn}{pra_size}_chull.shp')
-        outputs.append(scene_dir / 'DOMAIN' / f'{scene_name}{rn}{pra_size}_dom.shp')
+        root = f'{scene_name}{For}_{resolution}m_{return_period}{pra_size}'
+        outputs.append(scene_dir / 'RELEASE' / f'{root}_rel.shp')
+        outputs.append(scene_dir / 'RELEASE' / f'{root}_chull.shp')
+        outputs.append(scene_dir / 'DOMAIN' / f'{root}_dom.shp')
 
     # Add one-off input files
     inputs.append(snowI_tif)
@@ -124,7 +125,7 @@ def pra_post_rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **k
 
         wkt = scene_args['coordinate_system']
         for pra_size,cat_df in df.groupby('pra_size'):
-            root = f'{scene_name}{For}_{resolution}m{return_period}{pra_size}'
+            root = f'{scene_name}{For}_{resolution}m_{return_period}{pra_size}'
             chunk.write_rel(
                 cat_df, wkt, return_period,
                 scene_dir / 'RELEASE' / f'{root}_rel.shp')
@@ -162,7 +163,7 @@ def chunk_rule(scene_dir, For, resolution, return_period, pra_size):
     # Just include overall output files
 
     # See email from Marc Christen 2023-01-23
-    base = f'{scene_name}{For}_{resolution}m{return_period}{pra_size}'
+    base = f'{scene_name}{For}_{resolution}m_{return_period}{pra_size}'
 #    base = f'r-{pra_size}'
     inputs = [
         scene_dir / 'RELEASE' / f'{base}_rel.shp',
@@ -186,7 +187,7 @@ def chunk_rule(scene_dir, For, resolution, return_period, pra_size):
 
         # Create the chunks
         for chunkid,dfc in rdf.groupby('chunkid'):
-            chunk_info = chunk.ChunkInfo(scene_name, chunkid, For, resolution, return_period, pra_size)
+            chunk_info = file_info.ChunkInfo(scene_dir, scene_name, chunkid, For, resolution, return_period, pra_size)
             chunk.write_chunk(scene_args, chunk_info, dfc, {})
 
         # Create the _chunks.csv control file showing the chunks have all been created

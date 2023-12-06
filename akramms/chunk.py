@@ -606,13 +606,13 @@ def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
 
     # Write the _rel.shp file
     os.makedirs(chunk_dir / 'RELEASE', exist_ok=True)
-    ofname = chunk_dir / 'RELEASE' / f'{ci.slope_name}_rel.shp'
+    ofname = chunk_dir / 'RELEASE' / f'{ci.slope_name}_{ci.avalanche_name}_rel.shp'
     _dfx = dfc.reset_index()[['area_m2', 'Mean_DEM', 'Mean_Slope', 'Scene_reso', 'Id', 'i', 'j', 'sx3', 'd0star', 'slopecorr', 'Wind', f'd0_{ci.return_period}', f'VOL_{ci.return_period}', 'pra']]
     shputil.write_df(_dfx, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
     
     # Write the _dom.shp file 
     os.makedirs(chunk_dir / 'DOMAIN', exist_ok=True)
-    ofname = chunk_dir / 'DOMAIN' / f'{ci.slope_name}_dom.shp'
+    ofname = chunk_dir / 'DOMAIN' / f'{ci.slope_name}_{ci.avalanche_name}_dom.shp'
     _dfx = dfc.reset_index()[['Id', 'dom']]
     shputil.write_df(_dfx, 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
 

@@ -1,5 +1,4 @@
-from akramms import config
-from akramms.util import rammsutil
+from akramms import config,file_info
 import gzip,time,traceback
 import os,subprocess,re,sys,itertools,collections,shutil,zipfile
 from uafgi.util import ioutil
@@ -401,8 +400,8 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
     release_files_rel = [x for x in inputs_rel if x.endswith('_rel.shp')]
     print('release_files_rel ', release_files_rel)
     release_files = [config.roots.syspath(x_rel) for x_rel in release_files_rel]
-    jbs = [rammsutil.parse_release_file(x) for x in release_files]
-    avalanche_dirs = set(jb.avalanche_dir for jb in jbs)
+    crfs = [file_info.parse_chunk_release_file(x) for x in release_files]
+    avalanche_dirs = set(crf.avalanche_dir for crf in crfs)
 
     # Collect output files, to be be transferred back to Linux
     outputs = list()
@@ -436,12 +435,12 @@ def run_on_windows_stage1(idlrt_exe, ramms_version, ramms_dir):
     for release_file in release_files:
         # Identify our list of avalanche directories based release files listed as inputs
         # Turn release file name into directory of avalanche simulations
-        jb = rammsutil.parse_release_file(release_file)
+        crf = file_info.parse_chunk_release_file(release_file)
 
         # Look at files inside avalanche directory
-        for f in os.listdir(jb.avalanche_dir):
+        for f in os.listdir(crf.avalanche_dir):
             if outRE.match(f) is not None:
-                ofname = os.path.join(jb.avalanche_dir, f)
+                ofname = os.path.join(crf.avalanche_dir, f)
                 outputs.append(ofname)
 
     # Tell calling process on Linux what the output files are
