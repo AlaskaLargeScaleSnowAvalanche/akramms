@@ -606,10 +606,6 @@ def query_condor(job_base):
         projection=['ClusterId', 'ProcId', 'JobBatchName', 'JobPartition'])
     condor_statuses = {ad['JobBatchName']: ad['JobPartition'] for ad in ads}
 
-def get_job_ids(release_file):
-    """Reads a release file, and returns a (sorted) list of PRA IDs in that file."""
-    release_df = shputil.read_df(release_file, read_shapes=False)
-    return sorted(list(release_df['Id']))
 
 def get_mtime(fname):
     if os.path.exists(fname):
@@ -643,7 +639,7 @@ def job_statuses(release_files):
     statuses = list()
     for release_file in release_files:
         jb = rammsutil.parse_release_file(release_file)
-        ids = get_job_ids(release_file)
+        ids = rammsutil.job_ids(release_file)
 
         # Determine whether this scene is part of a large experiment
         # If so, determine its associated archive directory
@@ -912,7 +908,7 @@ def ramms_iter(ramms_spec, ids=list()):
     rf_by_id = dict()
     for release_file in release_files:
         jb = rammsutil.parse_release_file(release_file)
-        for id in get_job_ids(release_file):
+        for id in rammsutil.job_ids(release_file):
             rf_by_id[id] = jb
 
     for id in ids:
@@ -980,7 +976,7 @@ def infos(release_files, ids=None):
     infos = list()
     for release_file in release_files:
         jb = rammsutil.parse_release_file(release_file)
-        exist_ids = get_job_ids(release_file)
+        exist_ids = rammsutil.job_ids(release_file)
 
         # Get list of ids to inspect
         if len(ids) == 0:
@@ -1199,7 +1195,7 @@ def assemble_stage3(oramms_name, release_files):
 
         jb = rammsutil.parse_release_file(release_file)
         ojb = oramms_name.copy(pra_size=jb.pra_size)
-        ids = get_job_ids(release_file)
+        ids = rammsutil.job_ids(release_file)
 
 
         # Decide on what the _rel.shp and _dom.shp files should be called

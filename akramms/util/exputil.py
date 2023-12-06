@@ -26,9 +26,7 @@ def load(ename):
     return exp_mod
 
 # -------------------------------------------------------
-
-# -------------------------------------------------------
-def combo_to_scene_dir(exp_mod, combo, type='x'):
+def combo_to_scene_dirs(exp_mod, combo, type='x'):
     """Returns the full pathname for a RAMMS scene, based on its experiment and combo"""
     if type is None:
         types = ['x','arc']
@@ -36,8 +34,7 @@ def combo_to_scene_dir(exp_mod, combo, type='x'):
         types = [type]
 
     for type in types:
-        yield os.path.join(exp_mod.dir,
-            exp_mod.combo_to_scene_subdir(combo, type=type))
+        yield exp_mod.combo_to_scene_subdir(combo, type=type)
 # -------------------------------------------------------
 _relRE = re.compile(r'^(.*)_rel\.shp$')
 def _release_files(scene_dir):
@@ -49,8 +46,9 @@ def _release_files(scene_dir):
 
 def release_files(exp_mod, combo, type=None):
     """Lists release files by combo."""
-    scene_dir = combo_to_scene_dir(exp_mod, combo, type='x')
-    return _release_files(scene_dir)
+    for scene_dir in combo_to_scene_dirs(exp_mod, combo, type='x'):
+        for x in _release_files(scene_dir):
+            yield x
 # ----------------------------------------------------------
 @functools.lru_cache()
 def _release_df(scene_dir):
@@ -84,7 +82,7 @@ def release_df(exp_mod, combo, type=None):
     """
 
     # Determine whether we look at original, archived or both
-    for scene_dir in combo_to_scene_dir(exp_mod, combo, type=type):
+    for scene_dir in combo_to_scene_dirs(exp_mod, combo, type=type):
         ret = _release_df(scene_dir)
         if ret is not None:
             return ret

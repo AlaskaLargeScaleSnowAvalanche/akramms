@@ -445,6 +445,7 @@ def query(args):
 ])
 def rammsquery(args):
     from akramms import avalquery,avalfilter
+    from akramms import rammsquery as rq
 
     if args.filter is not None:
         filter_in = avalfilter.parse(args.filter)
@@ -454,7 +455,7 @@ def rammsquery(args):
     aspecs, nc_fnames0 = avalparse.parse_aval_specs(args.avals)
     aspecs = avalquery.normalize(aspecs)
 
-    out_zips = list(rammsquery.query_aspecs(aspecs, filter_in_fn=filter_in))
+    out_zips = list(rq.query_aspecs(aspecs, filter_in_fn=filter_in))
 
     # Display result
     for out_zip in out_zips:

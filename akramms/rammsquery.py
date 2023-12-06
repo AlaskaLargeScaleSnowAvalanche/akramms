@@ -1,3 +1,6 @@
+import os
+from akramms import rammsfilter
+from akramms.util import exputil
 
 
 # Queries avalanches in their RAMMS form, without archiving.
@@ -6,7 +9,7 @@ def query_release_files(release_files, filter_in_fn=rammsfilter.all):
 
     for release_file in release_files:
         jb = rammsutil.parse_release_file(release_file)
-        ids = get_job_ids(release_file)
+        ids = rammsutil.job_ids(release_file)
 
         for id in ids:
             out_zip = os.path.join(jb.avalanche_dir, f'{job_name}.out.zip')
@@ -19,9 +22,8 @@ def query_release_files(release_files, filter_in_fn=rammsfilter.all):
             if filter_in_fn(jb, id):
                 yield out_zip
 
-def query_aspecs(aspecs, filter_in_fn=ramsfilter.all):
+def query_aspecs(aspecs, filter_in_fn=rammsfilter.all):
     for aspec in aspecs:
-        return query_release_files(
-            exputil.release_files(aspec.exp_mod, apsec.combo),
+        release_files = list(exputil.release_files(aspec.exp_mod, aspec.combo))
+        return query_release_files(release_files,
             filter_in_fn=filter_in_fn)
-

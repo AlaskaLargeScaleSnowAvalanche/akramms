@@ -1,5 +1,5 @@
 import re,sys
-import zip
+import zipfile
 
 """Construct filter_in functions for Avalanche queries"""
 

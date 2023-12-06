@@ -145,6 +145,11 @@ def parse_release_file(release_file):
     return RammsName(ramms_harness, scene_name, segment, forest, resolution, return_period, pra_size, None)
 
 # --------------------------------------------------------
+def job_ids(release_file):
+    """Reads a release file, and returns a (sorted) list of PRA IDs in that file."""
+    release_df = shputil.read_df(release_file, read_shapes=False)
+    return sorted(list(release_df['Id']))
+# --------------------------------------------------------
 def _ramms_to_release(ramms_dirs):
     """Given a bunch of RAMMS directories, returns the release files in them."""
     release_files = list()
