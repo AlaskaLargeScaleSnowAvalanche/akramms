@@ -111,29 +111,29 @@ def x_dir_to_chunkdirs(scene_dir, chunk_stage=0):
             chunkdir = scene_dir / f'CHUNKS{chunk_stage}' / chunk_name    # <scene>/CHUNKS/x-.....For_10m
 
 
-def chunkdir_to_release_files(chunkdir):
+def chunkdir_to_releasefiles(chunkdir):
     """Given a single chunk directory, returns the (4) release files in it."""
     RELEASE_dir = chunkdir / 'RELEASE'
-    release_files = list()
+    releasefiles = list()
     for file in os.listdir(RELEASE_dir):
         if file.endswith('_rel.shp'):
-            release_files.append(os.path.join(RELEASE_dir, file))
+            releasefiles.append(os.path.join(RELEASE_dir, file))
 
     # There should only be one release file per chunk!
-    assert len(release_files) == 1
-    return release_files[0]
+    assert len(releasefiles) == 1
+    return releasefiles[0]
 
 # -----------------------------------------------------------
-def arc_dir_to_release_files(arc_dir):
+def arc_dir_to_releasefiles(arc_dir):
     """Given an archive directory, returns the (4) release files in it."""
     RELEASE_dir = arc_dir / 'RELEASE'
-    release_files = list()
+    releasefiles = list()
     for file in os.listdir(RELEASE_dir):
         if file.endswith('_rel.shp'):
-            release_files.append(os.path.join(RELEASE_dir, file))
-    return release_files
+            releasefiles.append(os.path.join(RELEASE_dir, file))
+    return releasefiles
 # -----------------------------------------------------------
-def read_release_file(release_file):
+def read_releasefile(releasefile):
     """Reads a single _rel.shp and _dom.shp and merges them together.
     base: filename
         Everything but _rel.shp or _dom.shp
@@ -145,7 +145,7 @@ def read_release_file(release_file):
             Names of columns
     """
 
-    base = release_file[:-8]    # Strip off _rel.shp
+    base = releasefile[:-8]    # Strip off _rel.shp
 
     # Read _rel and _dom shapefiles
     rel_df = shputil.read_df(f'{base}_rel.shp', shape='pra').drop('fid', axis=1).set_index('Id')
@@ -156,3 +156,9 @@ def read_release_file(release_file):
     df = df[df['dom'].notna()]
     return df
 # -----------------------------------------------------------
+# ============================================================================
+def releasefile_list(parsed):
+    """
+    parsed:
+        Result of akramms.parse.parase_args()
+    """

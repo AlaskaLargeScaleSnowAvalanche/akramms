@@ -1,4 +1,4 @@
-import functools,re,os,itertools
+import functools,re,os,itertools,pathlib
 import importlib
 
 
@@ -37,10 +37,9 @@ def parse_parts(parts, load=False, assume_wcombo=False):
         else:
             parts2.append(part)
     parts = parts2
-    print('xxxxxxx ', parts)
 
     exp = parts[0]
-    ret = {'exp': exp}
+    ret = {'type': 'parts', 'exp': exp}
 
     # Remove experiment name
     parts = parts[1:]
@@ -51,9 +50,7 @@ def parse_parts(parts, load=False, assume_wcombo=False):
 
         expmod = None
         try:
-            print('AA1')
             expmod = load_expmod(exp)
-            print('AA2')
             ret['expmod'] = expmod
 
             if len(parts) == len(expmod.combo_keys) - 2:
@@ -105,7 +102,7 @@ def parse_expset(expset, load=True):
     if match is None:
         raise ValueError(f'Not an expset: {expset}')
 
-    ret = {'exp': match.group(1), 'expset': match.group(2)}
+    ret = {'type': 'expset', 'exp': match.group(1), 'expset': match.group(2)}
     if load:
         try:
             ret['expmod'] = load_expmod(exp)
@@ -123,13 +120,14 @@ def parse_expdir(expdir, load=False):
     expdir:
         Eg: .../ak
     """
-    exp = parts[-1]
+    exp = expdir.parts[-1]
     ret = {'expdir': expdir, 'exp': exp}
     if load:
         try:
             ret['expmod'] = load_expmod(exp)
         except ModuleNotFoundError:
             pass    # Maybe the Python file for this experiment isn't available
+    ret['type'] = 'expdir'
     return ret
 # ----------------------------------------------------------------------
 #Trial = collections.namedtuple('Trial'
@@ -147,6 +145,8 @@ def parse_trialdir(trialdir):
         raise ValueError(f'Not a trialdir: {trialdir}')
     ret = parse_parts(parts, load=False, assume_wcombo=True)
     ret['trialdir'] = trialdir
+    ret['type'] = 'trialdir'
+    return ret
 # ----------------------------------------------------------------------
 _scenedirRE = re.compile(r'(x|arc)-(\d+)-(\d+)$')
 def parse_scenedir(scenedir):
@@ -165,6 +165,7 @@ def parse_scenedir(scenedir):
     ret['scenetype'] = match.group(1)
     ret['ijdom'] = (int(match.group(2)), int(match.group(3)))
 
+    ret['type'] = 'scenedir'
     return ret
 # ----------------------------------------------------------------------
 _chunk_subleafRE = re.compile(r'(\d+)([TSML])(For|NoFor)_(\d+)m')
@@ -233,6 +234,7 @@ def parse_releasefile(releasefile):
         ret.update(parse_dir(releasefile.parents[1]))    # The directory above RELEASE
     except ValueError:
         pass    # Maybe this is a "naked" release file
+    ret['type'] = 'releasefile'
 
     ret['sizecat'] = match.group(2)
     scenetype = _releasefile_scenetypes[match.group(3)]
@@ -241,12 +243,13 @@ def parse_releasefile(releasefile):
         parts = match.group(1).split('-')
         ret.update(parse_parts(parts, load=True))
 
-    return parts
+    return ret
 # ----------------------------------------------------------------------
 def parse_file(file):
     return parse_releasefile(file)
 # =============================================================
 # ----------------------------------------------------------------------
+_exclude_dirs = {'.', '..'}
 def parse_args(args, load=True):
     """Parses anything on the command line"""
 
@@ -270,30 +273,32 @@ def parse_args(args, load=True):
 
         else:
             rets.append(parse_parts(parts, load=load))
+        parts.clear()
 
     # --------------------------------
     for arg in args:
         if arg == ':':    # Separator
             flush_parts()
-        elif os.path.isdir(arg):
+        elif os.path.isdir(arg) and len(parts) > 0:  # If it's '.', it might be an actual directory
             flush_parts()
-            rets.append(parse_dir(arg))
+            rets.append(parse_dir(pathlib.Path(arg)))
         elif os.path.isfile(arg):
             flush_parts()
-            rets.append(parse_file(arg))
+            rets.append(parse_file(pathlib.Path(arg)))
         else:
             parts.append(arg)
     flush_parts()
 
     return rets
 # -----------------------------------------------------------
-def main():
-    import sys
-    rets = parse_args(sys.argv[1:], load=True)
-    for ret in rets:
-        print('-------------------------------')
-        for k,v in ret.items():
-            print(f'{k}: {v}')
-
-main()
+#def main():
+#    import sys
+#    rets = parse_args(sys.argv[1:], load=True)
+#    for ret in rets:
+#        print('-------------------------------')
+#        for k,v in ret.items():
+#            print(f'{k}: {v}')
+#
+#main()
+# ==============================================================
 

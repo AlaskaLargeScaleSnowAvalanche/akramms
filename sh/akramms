@@ -4,13 +4,13 @@
 #import cProfile
 import netCDF4
 from akramms import config,params
+import akramms.parse
 import argparse,itertools,os,subprocess,sys,io,codecs,re,pickle
-from akramms import r_experiment,stages,avalparse
+from akramms import r_experiment,stages
 from akramms.util import rammsutil,exputil
 from uafgi.util import ioutil,make
 import importlib
 from akramms import r_domain_builder, r_ramms
-
 # ------------------------------------------------------------------------
 # https://mike.depalatis.net/blog/simplifying-argparse.html
 # https://gist.github.com/mivade/384c2c41c3a29c637cb6c603d4197f9f
@@ -26,7 +26,10 @@ def argument(*name_or_flags, **kwargs):
 
 def subcommand(args=[], parent=subparsers):
     def decorator(func):
-        parser = parent.add_parser(func.__name__, description=func.__doc__)
+#        if command == '':
+#            command = func.__name__
+        name = func.__name__
+        parser = parent.add_parser(name, description=func.__doc__)
         for arg in args:
             parser.add_argument(*arg[0], **arg[1])
         parser.set_defaults(func=func)
@@ -268,6 +271,10 @@ def step1(args):
     makefile.add(r_experiment.r_active_domains(exp_mod))
     makefile.generate(os.path.join(exp_dir, 'init_mk'), run=True, ncpu=1)
 # -----------------------------------------------------------
+def _parse_experiment_spec():    # DUMMY; should this be avalparse.parse_aval_specs??
+    pass
+
+# -----------------------------------------------------------
 @subcommand([
     argument('experiment-spec', type=_parse_experiment_spec,
         help='Python module and combo function describing the experiment, eg: e_alaska.juneau'),
@@ -385,14 +392,11 @@ def step4(args):
     argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
 def parse(args):
-    aspecs, nc_fnames = avalparse.parse_aval_specs(args.avals)
-    print('============ AvalTuple Specs')
-    for aspec in aspecs:
-        print(aspec)
-    print('============ nc_fnames')
-    for ncf in nc_fnames:
-        print(ncf)
-
+    prs = akramms.parse.parse_args(args.avals)
+    for pr in prs:
+        print('-------------------------------')
+        for k,v in pr.items():
+            print(f'{k}: {v}')
 
 @subcommand([
     argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),

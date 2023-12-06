@@ -197,6 +197,7 @@ def chunks_csv(scene_dir, ramms_name):
 #    return os.path.join(scene_dir, 'stage0', f'{ramms_name}_release.csv')
 
 
+### DEPRECATED!!!!!!!!!
 def _get_release_files(spec):
     """Given a directory above or below the CHUNKS directory, finds a
     "ramms dir," which is one level below CHUNKS/."""
