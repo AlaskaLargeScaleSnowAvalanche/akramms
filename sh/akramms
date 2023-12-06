@@ -11,7 +11,7 @@ from akramms import r_experiment
 from akramms.util import rammsutil,exputil
 from uafgi.util import ioutil,make
 import importlib
-from akramms import r_domain_builder, r_ramms1, resolve
+from akramms import r_domain_builder, r_ramms1, resolve,joblib
 # ------------------------------------------------------------------------
 # https://mike.depalatis.net/blog/simplifying-argparse.html
 # https://gist.github.com/mivade/384c2c41c3a29c637cb6c603d4197f9f
@@ -74,15 +74,6 @@ def initcopy(args):
 
 # ------------------------------------------------------------------------
 
-@subcommand([argument('ramms', help='RAMMS directory or release file to inspect')])
-def ps(args):
-    """Provides status of RAMMS avalanches"""
-    release_files = rammsutil.get_release_files(args.ramms)
-    #print(release_files)
-
-    df = r_ramms.job_statuses(release_files)
-    r_ramms.print_job_statuses(df)
-
 @subcommand([
     argument('run_dir', help='Run directory to use'),
     argument('id', type=int, help='ID of avalanche in run_dir to run')])
@@ -94,18 +85,6 @@ def run(args):
     job_name = '{}_{}_{}'.format(parts[-2], parts[-1], args.id)
 
     r_ramms.submit_job(run_dir, job_name)
-
-@subcommand([
-    argument('ramms', help='RAMMS directory or release file to inspect'),
-    argument('ids', type=int, nargs='*', help='ID of avalanche in run_dir to run')])
-def submit(args):
-    """Runs RAMMS for many avalanches"""
-
-    ids = None if len(args.ids) == 0 else args.ids
-
-    # Separate into numeric-only and non-numerica args in the spec
-    release_files = rammsutil.get_release_files(args.ramms)
-    r_ramms.submit_jobs(release_files, ids=ids)
 
 _chunktypeRE = re.compile('CHUNKS(\d+)?')
 @subcommand([
@@ -233,6 +212,17 @@ def export(args):
             relfiles, tdir)
 
 
+# ---------------------------------------------------------------------
+@subcommand([
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+    argument('--to', help='What to resolve to', default='releasefile'),
+])
+def parse(args):
+
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf0 = resolve.resolve_to(parseds, args.to, realized=False)
+
+    print(akdf0)
 # ---------------------------------------------------------------------
 def get_exp_dir(exp_mod):
     return config.roots.join('PRJ', exp_mod.name)
@@ -371,7 +361,40 @@ def step4(args):
         makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
 
 # ------------------------------------------------------------------
+@subcommand([
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+])
+def submit(args):
+    """Standalone submission of avalanches"""
 
+    parseds = akramms.parse.parse_args(args.spec)
+
+    akdf = resolve.resolve_to(parseds, 'id', realized=True, stage='in')
+    akdf = joblib.add_jobstatus(akdf)
+
+    # Only submit jobs that are ready to go and not in process or completed or something.
+    akdf = akdf[akdf.jobstatus == joblib.JobStatus.TODO]
+
+    print('==================== Submitting:')
+    print(akdf[['combo', 'chunkid', 'id']])
+    joblib.submit_jobs(akdf)
+
+
+# ------------------------------------------------------------------
+@subcommand([
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+])
+def ps(args):
+    """Provides status of RAMMS avalanches"""
+
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf = resolve.resolve_to(parseds, 'id', realized=True, stage='in')
+    akdf = joblib.add_jobstatus(akdf)
+#    print('akdf1 ', akdf)
+
+#    print(akdf[['combo', 'chunkid', 'id', 'jobstatus']])
+    joblib.print_job_statuses(akdf)
+# ------------------------------------------------------------------
 
 
 

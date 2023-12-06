@@ -50,7 +50,7 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
     orows = list()
 
     # ----------------------------
-    def process_trialdir(trialdir, wcombo):
+    def process_trialdir(expmod, trialdir, wcombo):
         ijdoms = set()
         for scenetype in scenetypes:
             scenedirs = level.trialdir_to_scenedirs(trialdir, scenetype=scenetype)
@@ -59,12 +59,13 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
 
         # Add rows to the dataframe now
         for ijdom in sorted(ijdoms):
-            combo = tuple(itertools.chain(wcombo, ijdom))
+            combo = parse.new_combo(expmod, (itertools.chain(wcombo, ijdom)))
             orows.append(itertools.chain(tup, [combo]))
     # ----------------------------
 
 
     for tup in akdf.itertuples():
+        expmod = parse.load_expmod(tup.exp)
 #        print('tup ', type(tup), tup)
         parsed = tup.parsed
 
@@ -75,23 +76,23 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
         if 'wcombo' in parsed:
             wcombo = parsed['wcombo']
             if 'ijdom' in parsed:
-                combo = tuple(itertools.chain(wcombo, parsed['ijdom']))
+                combo = parse.new_combo(expmod, itertools.chain(wcombo, parsed['ijdom']))
                 orows.append(itertools.chain(tup, [combo]))
             elif realized:
                 # It's a wildcard combo, list the full combos there on disk
                 trialdir = level.theory_wcombo_to_trialdir(tup.exp, wcombo)
-                process_trialdir(trialdir, wcombo)
+                process_trialdir(expmod, trialdir, wcombo)
 
         elif 'expset_fn' in parsed:
             # User asked for a list of combos...
-            for combo in parsed['expset_fn']():
-                orows.append(itertools.chain(tup, [combo]))
+            for tcombo in parsed['expset_fn']():
+                orows.append(itertools.chain(tup, [parse.new_combo(expmod, tcombo)]))
 
         elif realized:
             # No combo info given, our only clue is the experiment itself.
             # Let's list ALL the combos in this experiment
 
-            expmod = parse.load_expmod(tup.exp)
+            #expmod = parse.load_expmod(tup.exp)
             if 'expdir' in parsed:
                 expdir = parsed['expdir']
             else:
@@ -99,14 +100,12 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
             nwcombo = len(expmod.combo_keys)-2
             xre = [parsed['exp']] + [r'([^-]*)'] * nwcombo
             sre = '-'.join(xre)
-#            print('sre ', sre)
             trialRE = re.compile(sre)
             for name in os.listdir(expdir):
                 match = trialRE.match(name)
                 if match is not None:
                     wcombo = tuple(match.group(i) for i in range(1,nwcombo+1))
-#                    print('wcombo ', wcombo)
-                    process_trialdir(expdir / name, wcombo)
+                    process_trialdir(expmod, expdir / name, wcombo)
         else:
             raise ValueError('Not able to determine combos for: {}'.format(tup))
 
@@ -122,61 +121,77 @@ def resolve_releasefile(akdf, scenetypes=['x'], realized=True):
     # Only does realized option
     assert realized
 
+    # Make sure input is non-empty
+    assert len(akdf.index) > 0
+
     # Ensure this is idempotent
     if 'releasefile' in akdf:
         return akdf
 
     # -----------------------------
     orows = list()
-    def process_releasedir(tup, scenetype, releasedir):
-        print(f'process_releasedir({releasedir}')
+    def process_releasedir(tup, scenetype, chunkid, releasedir):
+#        print(f'process_releasedir({releasedir}')
         for name in os.listdir(releasedir):
             match = file_info.chunk_release_fileRE.match(name)
-            print('match2 ', name, match)
+#            print('    match2 ', name, match)
             if match is not None:
                 pra_size = match.group(2)
-                orows.append(itertools.chain(tup, [scenetype, pra_size, releasedir / name]))
+                orows.append(itertools.chain(tup, [scenetype, pra_size, chunkid, releasedir / name]))
     # -----------------------------
 
     # Base releasefile on **what we see on disk**
     for scenetype in scenetypes:
         # First find directories containing RELEASE files
         for tup in akdf.itertuples():
-#            print('BB1 tup ', tup)
             parsed = tup.parsed
 
             if parsed['type'] == 'releasefile':
                 # The releasefile is just given to us!
                 orows.append(itertools.chain(tup,
-                    [parsed['scenetype'], parsed['pra_size'], parsed['releasefile']]))
+                    [parsed['scenetype'], parsed['pra_size'], int(parsed['chunkid']), parsed['releasefile']]))
             elif parsed['type'] == 'arcfile':
+                # arcfile does not have any chunkid, so set to -1
                 orows.append(itertools.chain(tup,
-                    ['arc', parsed['pra_size'], None]))
+                    ['arc', parsed['pra_size'], -1, None]))
             else:
                 # We need to list releasefiles from a higher level
                 expmod = parse.load_expmod(tup.exp)
-                combo = expmod.Combo(*tup.combo)
+                # combo = expmod.Combo(*tup.combo)
+                combo = parse.new_combo(expmod, tup.combo)
+                print('*********** Made combo ', combo)
                 scenedir = expmod.combo_to_scenedir(combo, scenetype=scenetype)
                 if scenetype == 'x':
-                    for name in sorted(os.listdir(scenedir / 'CHUNKS')):
-                        match = _chunkRE.match(name)
-#                        print('    match = ', match)
-                        if match is not None:
-                            # We found a valid chunk dir!  Remember its associated RELEASE dir.
-                            process_releasedir(tup, 'x', scenedir / 'CHUNKS' / name / 'RELEASE')
+                    chunkdir = scenedir / 'CHUNKS'
+                    if os.path.isdir(chunkdir):
+                        for name in sorted(os.listdir(chunkdir)):
+                            match = _chunkRE.match(name)
+#                           print('    match = ', match)
+                            if match is not None:
+                                # We found a valid chunk dir!  Remember its associated RELEASE dir.
+                                chunkid = int(match.group(2))
+                                process_releasedir(tup, 'x', chunkid, scenedir / 'CHUNKS' / name / 'RELEASE')
                 elif scenetype == 'arc':
                     process_releasedir(tup, 'arc', scenedir / 'RELEASE')
 
-    return pd.DataFrame(orows, columns=tuple(
-        itertools.chain(type(tup)._fields, ['scenetype', 'pra_size', 'releasefile'])))
+    df = pd.DataFrame(orows, columns=tuple(
+        itertools.chain(type(tup)._fields, ['scenetype', 'pra_size', 'chunkid', 'releasefile'])))
+    #df['chunkinfo'] = df.map('releasefile', file_info.parse_chunk_release_file)
+    return df
+
 # ------------------------------------------------------------
+_avalRE = re.compile(r'aval-([TSML])-(\d+)')
+#_out_zipRE = re.compile(r'(.*)_(\d+)\.out\.zip$')
+
 @functools.lru_cache()
-def _realized_ids(scenetype, releasefile):
+def _realized_ids(scenetype, releasefile, stage):
     """Find IDs that exist on disk.
     (Cached separate function)
 
     Returns: {id: filename}
     """
+
+    stage_zipRE = re.compile(r'(.*)_(\d+)\.' + stage + r'\.zip$')
 
     avalfiles = dict()
 
@@ -185,8 +200,8 @@ def _realized_ids(scenetype, releasefile):
 #TODO: Apply proper comparisons to avoid race conditions
         resultsdir = releasefile.parents[1] / 'RESULTS'
 #        print('resultsdir ', resultsdir)
-        for out_zip in glob.iglob(str(resultsdir / '*' / '*' / '*.out.zip')):
-            match = _out_zipRE.match(os.path.split(out_zip)[1])
+        for out_zip in glob.iglob(str(resultsdir / '*' / '*' / f'*.{stage}.zip')):
+            match = stage_zipRE.match(os.path.split(out_zip)[1])
             id = int(match.group(2))
             avalfiles[id] = out_zip
     elif scenetype == 'arc':
@@ -201,9 +216,12 @@ def _realized_ids(scenetype, releasefile):
 
     return avalfiles
 
-_avalRE = re.compile(r'aval-([TSML])-(\d+)')
-_out_zipRE = re.compile(r'(.*)_(\d+)\.out\.zip$')
-def resolve_id(akdf, realized=True):
+def resolve_id(akdf, realized=True, stage='out'):
+    """
+    stage:
+        If realized, are we looking for avalanche IDs with .in.zip or .out.zip?
+    """
+
     # Ensure this is idempotent
     if 'id' in akdf:
         return akdf
@@ -227,12 +245,13 @@ def resolve_id(akdf, realized=True):
             # Read the releasefile
             df = shputil.read_df(tup.releasefile, read_shapes=False)
             ids = df['Id'].tolist()
+            #print(f'Reading releasefile {tup.releasefile}: {ids}')
 
         # Add those IDs
         if realized:
             # Match those IDs against what was requested in the releasefile
-            avalfiles = _realized_ids(tup.scenetype, tup.releasefile)
-#            print('avalfiles ', tup.combo, len(avalfiles), len(ids))
+            avalfiles = _realized_ids(tup.scenetype, tup.releasefile, stage)
+            #print('avalfiles ', tup.combo, len(avalfiles), len(ids))
             for id in ids:
                 try:
                     orows.append(itertools.chain(tup, (id, avalfiles[id])))
@@ -250,7 +269,7 @@ def resolve_id(akdf, realized=True):
         itertools.chain(type(tup)._fields, ['id', 'avalfile'])))
 
 # ------------------------------------------------------------
-def resolve_to(parseds, level, realized=True, scenetypes={'x'}):
+def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out'):
     """level: exp|combo|releasefile|id
         Which level of detail to generate for this query.
         NOTE: level='id' is only used for QUERYING results, not for
@@ -267,14 +286,17 @@ def resolve_to(parseds, level, realized=True, scenetypes={'x'}):
         return akdf
 
     akdf = resolve_combo(akdf, realized=realized, scenetypes=scenetypes)
+#    print('resolve_combo ', akdf)
     if level == 'combo':
         return akdf
 
     akdf = resolve_releasefile(akdf, scenetypes=scenetypes)
+#    print('resolve_releasefile ', akdf)
     if level == 'releasefile':
         return akdf
 
-    akdf = resolve_id(akdf, realized=realized)
+    akdf = resolve_id(akdf, realized=realized, stage=stage)
+#    print('resolve_id ', akdf)
     if level == 'id':
         return akdf
 

@@ -179,6 +179,7 @@ def parse_chunkdir(chunkdir):
     chunkdir:
         Eg: .../ak/ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/x-113-0450000230TFor_10m
     """
+    print('chunkdir ', type(chunkdir), chunkdir)
     if chunkdir.parents[0].parts[-1] != 'CHUNKS':
         raise ValueError(f'Not a chunkdir: {chunkdir}')
 
@@ -233,6 +234,8 @@ def parse_releasefile(releasefile):
         .../x-113-045/CHUNKS/x-113-0450001330MFor_10m/RELEASE/x-113-04500013For_10m_30M_rel.shp
         .../arc-113-045/RELEASE/ak-ccsm-1981-1990-lapse-For-30-113-045-S-rel.shp
     """
+
+    raise ValueError("This needs to be fixed to parse CHUNK or non-CHUNK releasefiles.  See use of parsed['chunkid'] in resolve.py/resolve_releasefile().  I don't think parsing by individual resleasefiles will be important going forward...")
 
     match = _releasefileRE.match(releasefile.parts[-1])
     if match is None:
@@ -326,7 +329,8 @@ def parse_args(args, load=True):
                 if arg == ':':    # Separate parts from avalanche IDs
                     state = 'i'
                     ids.clear()
-                elif os.path.isdir(arg) and (arg != '.') and (arg != '..'):  # If it's '.', it might be an actual directory
+                elif (os.sep in arg) and os.path.isdir(arg) and (arg != '.') and (arg != '..'):  # If it's '.', it might be an actual directory
+                    print('aaaaaaaarg ', type(arg), arg)
                     flush_parts()
                     rets.append(parse_dir(pathlib.Path(arg)))
                 elif os.path.isfile(arg):
@@ -355,6 +359,13 @@ def parse_args(args, load=True):
             else:
                 last_dict['ids'] = ret
     return rets2
+# -----------------------------------------------------------
+def new_combo(expmod, scombo):
+    """Given individual parts of Combo as strings, creates a fully
+    typed Combo object."""
+    dcombo = {key:val for key,val in zip(expmod.combo_keys, scombo)}
+    return expmod.Combo(**expmod.combo_schema.validate(dcombo))
+
 # -----------------------------------------------------------
 #def main():
 #    import sys

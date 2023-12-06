@@ -182,7 +182,7 @@ def chunk_rule(scene_dir, For, resolution, return_period, pra_size):
         # Assign a chunkid to each avalanche
         rdf['combo'] = [level.theory_scenedir_to_combo(scene_dir)] * len(rdf.index)
         rdf['pra_size'] = pra_size
-        rdf = chunk.add_new_chunkinfo(rdf, scene_args)
+        rdf = chunk.set_new_chunkinfo(rdf, scene_args)
         rdf = chunk.add_chunkid(rdf, scene_dir, append=False)
 
         # Create the chunks

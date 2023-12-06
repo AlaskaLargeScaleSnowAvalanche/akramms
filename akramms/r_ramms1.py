@@ -172,10 +172,10 @@ def rule(release_file, dem_file, inputs, dry_run=False, submit=False):
         # RAMMS Stage 1 accepts inputs on stdin
         # rammsdist.run_on_windows_stage() calls read_inputs()
         dynamic_outputs = list()
-#        if config.queue_idl:
-#            dynamic_outputs = harnutil.run_remote_queued(inputs, cmd, tdir, write_inputs=True)
-#        else:
-#            dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=True)
+        if config.queue_idl:
+            dynamic_outputs = harnutil.run_remote_queued(inputs, cmd, tdir, write_inputs=True)
+        else:
+            dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=True)
 
         # Copy .tif files to be reused by later RAMMS Stage 1
         for fname0,fname1 in tmap:
@@ -221,9 +221,9 @@ def rule(release_file, dem_file, inputs, dry_run=False, submit=False):
         if submit:
             akdf = pd.DataFrame( [[release_file]], columns=['releasefile'] )
             akdf = resolve.resolve_id(akdf, realized=True)
-            akdf = joblib.add_combo_job_status(scene_dir, akdf)
+            akdf = joblib.add_jobstatus(scene_dir, akdf)
 
-            print('About to submit:')
+            print('About to submit (TODO, uncomment joblib.submit_jobs():')
             print(akdf)
 #            joblib.submit_jobs(akdf)
 

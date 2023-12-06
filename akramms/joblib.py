@@ -1,7 +1,19 @@
-import os,subprocess,functools,re
+import os,subprocess,functools,re,typing,zipfile,enum
 import htcondor
 import pandas as pd
-from akramms import config,file_info
+from akramms import config,file_info,parse,level
+
+# Categorize each job int one of four sets
+#job_status_labels = ('noinput', 'incomplete', 'todo', 'inprocess', 'finished', 'overrun', 'failed')
+class JobStatus(enum.IntEnum):
+    NOINPUT = 0         # No RAMMS input files exist
+    INCOMPLETE = 1   # Some but not all RAMMS input files exist
+    TODO = 2         # Ready to submit to HTCondor but no evidence that has been done
+    INPROCESS = 3    # HTCondor is dealing with it
+    FINISHED = 4     # The avalanche has finished, and it's successful
+    OVERRUN = 5      # Avalanche overran the boundary; auto-resubmit
+    FAILED = 6       # The job finished but did not produce full / correct output
+
 
 # =========================================================================================
 # ===== RAMMS Stage 2: Manage avalanche jobs
@@ -17,25 +29,25 @@ submit_tpl = \
 """universe                = docker
 docker_image            = {DOCKER_TAG}
 executable              = /usr/bin/python
-arguments               = /opt/runaval.py {job_name}
+arguments               = /opt/runaval.py {inout_name}
 
 initialdir              = {run_dir}
-transfer_input_files    = {job_name}.in.zip
-transfer_output_files   = {job_name}.out.zip
+transfer_input_files    = {inout_name}.in.zip
+transfer_output_files   = {inout_name}.out.zip
 should_transfer_files   = YES
 when_to_transfer_output = ON_EXIT
 on_exit_hold            = False
 on_exit_remove          = True
 
-output                  = {job_name}.job.out
-error                   = {job_name}.job.err
-log                     = {job_name}.job.log
+output                  = {inout_name}.job.out
+error                   = {inout_name}.job.err
+log                     = {inout_name}.job.log
 request_cpus            = 1
 request_memory          = 1000M
 queue 1
 """
 
-def submit_job(run_dir, job_name):#, local=False):
+def submit_job(run_dir, job_name, inout_name):#, local=False):
     """Submits an individual avalanche simulation to HTCondor, after
     RAMMS top-level IDL has run.
 
@@ -58,7 +70,7 @@ def submit_job(run_dir, job_name):#, local=False):
 
 
     print('Submitting job: {}'.format(job_name))
-    submit_txt = submit_tpl.format(job_name=job_name, run_dir=run_dir, DOCKER_TAG=DOCKER_TAG)
+    submit_txt = submit_tpl.format(job_name=job_name, inout_name=inout_name, run_dir=run_dir, DOCKER_TAG=DOCKER_TAG)
 
     cmd = ['condor_submit', '-batch-name', job_name]
     print(' '.join(cmd) + '<<EOF')
@@ -95,11 +107,17 @@ def submit_job(run_dir, job_name):#, local=False):
 #        for id,tuples in itertools.groupby(id_suffixes, lambda x: x[0]))
 
 
-def query_condor(job_base):
+class JobInfo(typing.NamedTuple):
+    combo: object
+    chunkid: int
+    id: int    # Avalanche ID
+
+def xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxquery_condor(expmod, job_base):
     """
     job_base:
         Base name of jobs we are querying for.
-    Returns: {job_name: status}
+    Returns: {JobInfo: status}
+
         status: int
             Status of job.  See enumeration htcondor.JobStatus:
                 https://htcondor.readthedocs.io/en/latest/apis/python-bindings/api/htcondor.html?highlight=jobstatus#htcondor.JobStatus
@@ -113,15 +131,28 @@ def query_condor(job_base):
                  7 S SUSPENDED
 
     """
+
+    # See submit_jobs(), Additional fields for ChunkID and AvalancheID
+    nfields = len(expmod.combo_keys) + 2
+    jobRE_str = '-'.join(r'([^-]*)')
+
     # Query Condor
     schedd = htcondor.Schedd()   # get the Python representation of the scheduler
-    jobRE_str = r'^{}_([0-9]+)$'.format(jb.ramms_name)
-    jobRE = re.compile(jobRE_str)
     ads = schedd.query(    # One Ad per job
         constraint=f'regexp("{jobRE_str}", JobBatchName)',
         projection=['ClusterId', 'ProcId', 'JobBatchName', 'JobPartition'])
-    condor_statuses = {ad['JobBatchName']: ad['JobPartition'] for ad in ads}
 
+    # job_name == f'{wcombo_name}-{ij_name}-{crf.chunkid:05}-{id}'
+    condor_statuses = dict()
+    for ad in ads:
+        job_name = ad['JobBatchName']
+        expmod = parse.load_expmod(job_name[0])
+        combo = parse.new_combo(expmod, job_name[1:-2])
+        chunkid = int(job_name[-2])
+        id = int(job_name[-1])
+        condor_statuses[JobInfo(combo, chunkid, id)] = ad['JobPartition']
+
+    return condor_statuses
 
 def get_mtime(fname):
     if os.path.exists(fname):
@@ -130,13 +161,15 @@ def get_mtime(fname):
         return -1
 
 @functools.lru_cache()
-def query_condor():
+def query_condor(expmod):
     # TODO: Make sure this distinguishes by experiment!!!
 
     # Query Condor
     schedd = htcondor.Schedd()   # get the Python representation of the scheduler
-    jobRE_str = r'^{}_([0-9]+)$'.format(jb.ramms_name)
-    jobRE = re.compile(jobRE_str)
+    #nfields = len(expmod.combo_keys) + 1
+    jobRE_str = expmod.name + r'-([^-]*)' * (len(expmod.combo_keys) + 2 - 1)
+    #jobRE_str = r'^{}_([0-9]+)$'.format(jb.ramms_name)
+    jobRE = re.compile(jobRE_str)    # Compile to make sure the RE works
     ads = schedd.query(    # One Ad per job
         constraint=f'regexp("{jobRE_str}", JobBatchName)',
         projection=['ClusterId', 'ProcId', 'JobBatchName', 'JobPartition'])
@@ -151,129 +184,160 @@ def query_condor():
     condor_statuses = dict()
     for ad in ads:
         job_name = ad['JobBatchName']
+        parts= job_name.split('-')
+        #expmod = parse.load_expmod(parts[0])
+#        print('parts ', parts)
+        combo = parse.new_combo(expmod, parts[1:-2])
+        id = int(parts[-2])
+        chunkid = int(parts[-1])
+
+        job_info = JobInfo(combo, chunkid, id)
+
+       
         if 'JobPartition' in ad:
             jp = ad['JobPartition']
             try:
-                condor_statuses[job_name] = op_by_status[jp]
+                condor_statuses[job_info] = op_by_status[jp]
             except:
                 pass
         else:
             # It's been submitted but not yet run
-            condor_statuses[job_name] = JobStatus.INPROCESS
+            condor_statuses[job_info] = JobStatus.INPROCESS
 
     return condor_statuses
 
 
 
-# Categorize each job int one of four sets
-job_status_labels = ('noinput', 'incomplete', 'todo', 'inprocess', 'finished', 'overrun', 'failed')
-class JobStatus:
-    NOINPUT = 0         # No RAMMS input files exist
-    INCOMPLETE = 1   # Some but not all RAMMS input files exist
-    TODO = 2         # Ready to submit to HTCondor but no evidence that has been done
-    INPROCESS = 3    # HTCondor is dealing with it
-    FINISHED = 4     # The avalanche has finished, and it's successful
-    OVERRUN = 5      # Avalanche overran the boundary; auto-resubmit
-    FAILED = 6       # The job finished but did not produce full / correct output
+def inout_name(jb, chunkid, id):
+    return f'c-{jb.pra_size}-{chunkid:05d}{jb.For}_{jb.resolution}m_{jb.return_period}{jb.pra_size}_{id}'
 
 _subsceneRE = re.compile(r'x-(\d+-\d+)')
-def add_combo_job_status(xdir, akdf0):
+def add_jobstatus(akdf0):
     """Determines status of ALL Condor jobs for a RAMMS run.
     akdf0:
         Avalanche dataframe, resolved to the ID level with scenetype='x' and index='id'
         Must all ahve the same combo (scenedir)
     """
 
+    statuses = list()
 
-    # Corresponding archive location
-    arcdir = xdir.parents[0] / 'arc'+xdir.parts[-1][1:]
-    condor_statuses = query_condor()
+    for exp,akdf1 in akdf0.reset_index().groupby('exp'):
+        expmod = parse.load_expmod(exp)
 
+        # Pick up what info we can from HTCondor
+        condor_statuses = query_condor(expmod)
+#        print('condor_statuses ', exp, condor_statuses)
 
-    for releasefile,akdf1 in akdf0.groupby('releasefile'):
-        jb = rammsutil.parse_release_file(release_file)
+        for combo,akdf2 in akdf1.groupby('combo'):
+            print('fffg combo ', type(combo), repr(combo))
+            xdir = expmod.combo_to_scenedir(combo, 'x')
+            # Corresponding archive location
+#            print('xdir1 ', xdir)
+#            print('xdir2 ', type(xdir.parts[-1]), xdir.parts[-1])
+            arcdir = xdir.parents[0] / ('arc' + xdir.parts[-1][1:])
 
-        # Consider each job in turn from our master list
-        for tup in akdf1.itertuples():
-            id = tup.id
+#            print('xdir ', xdir)
 
-            for id in ids:
-                key = (jb.avalanche_dir, id)
-                job_name = f'{jb.ramms_name}_{id}'
+            for releasefile,akdf3 in akdf2.groupby('releasefile'):
+#                print('releasefile ', releasefile)
+                jb = file_info.parse_chunk_release_file(releasefile)
 
-                # Mark as NOINPUT if the .in.zip file is not there.
-                if not os.path.exists(os.path.join(jb.avalanche_dir, f'{job_name}.in.zip')):
-                    statuses.append((release_file, jb, id, JobStatus.NOINPUT))
-                    continue
+                for tup in akdf3.itertuples():
+                    job_info = JobInfo(combo, tup.chunkid, tup.id)
 
-                # See if Condor knows is what's going on with the job
-                if job_name in condor_statuses:
-                    statuses.append((release_file, jb, id, condor_statuses[job_name]))
-                continue
+                    #job_name = f'{jb.slope_name}_{jb.avalanche_name}_{id}'
+                    inout = inout_name(jb, tup.chunkid, tup.id)
+                    in_zip = jb.avalanche_dir / f'{inout}.in.zip'
 
-                # Not in Condor?  Either it hasn't launched, or it's finished / failed
-                # Let's look at the files on disk to decide.
-
-                in_zip = os.path.join(jb.avalanche_dir, f'{job_name}.in.zip')
-                in_zip_tm = get_mtime(in_zip)
-                out_zip = os.path.join(jb.avalanche_dir, f'{job_name}.out.zip')
-                out_zip_tm = get_mtime(out_zip)
-
-                # If an archive NetCDF file exists, then this avalanche is FINISHED.
-                if archive_dir is not None:
-                    aval_nc = os.path.join(archive_dir, f'aval-{id}.nc')
-                    if os.path.exists(aval_nc):
-                        aval_nc_tm = os.path.getmtime(aval_nc)
-                        if (aval_nc_tm > out_zip_tm) and (out_zip_tm > in_zip_tm):
-                            # .nc files only "count" if they are newer than raw files
-                            # (or those raw files don't exist)
-                            statuses.append((release_file, jb, id, JobStatus.FINISHED))
-                            continue
-
-                # Identify avalanches that have finished: .out.zip exists and has non-zero size
-                # (User can reset jobs by removing *.out.zip)
-                if os.path.exists(out_zip):
-
-                    # Check for abandoned job
-                    # TODO: Use file_is_good() instead!
-                    statinfo = os.stat(out_zip)
-                    if (statinfo.st_size==0):
-                        # The HTCondor output file has been created, but
-                        # no sign of the HTCondor job to write it at the
-                        # end.  Sounds like things were killed, send
-                        # status back to TODO.
-                        statuses.append((release_file, jb, id, JobStatus.TODO))
+                    # Mark as NOINPUT if the .in.zip file is not there.
+                    if not os.path.exists(in_zip):
+                        statuses.append((tup.combo, tup.id, JobStatus.NOINPUT))
                         continue
 
-                    # We tentatively think the job is finished.  But let's
-                    # look inside the zip file to make sure the domain
-                    # wasn't overrun.
-                    with zipfile.ZipFile(out_zip, 'r') as ozip:
-                        arcnames = [os.path.split(x)[1] for x in ozip.namelist()]
-                    if any(x.endswith('.out.overrun') for x in arcnames):
-                        statuses.append((release_file, jb, id, JobStatus.OVERRUN))
-                    else:
-                        statuses.append((release_file, jb, id, JobStatus.FINISHED))
-                    continue
+                    # See if Condor knows is what's going on with the job
+                    if job_info in condor_statuses:
+                        statuses.append((tup.combo, tup.id, condor_statuses[job_info]))
+                        continue
 
-                # Default to TODO
-                statuses.append((release_file, jb, id, JobStatus.TODO))
+                    # Not in Condor?  Either it hasn't launched, or it's finished / failed
+                    # Let's look at the files on disk to decide.
 
-    statuses = [(id, status, jb.key()) for release_file,jb,id,status in statuses]
-    df = pd.DataFrame(statuses, columns=('id', 'jobstatus', 'jbkey'))
-    return akdf1.merge(df, left_index=True, right_on='id')
+                    in_zip_tm = get_mtime(in_zip)
+                    out_zip = jb.avalanche_dir / f'{inout}.out.zip'
+                    out_zip_tm = get_mtime(out_zip)
+
+                    # If an archive NetCDF file exists, then this avalanche is FINISHED.
+                    if arcdir is not None:
+                        aval_nc = os.path.join(arcdir, f'aval-{id}.nc')
+                        if os.path.exists(aval_nc):
+                            aval_nc_tm = os.path.getmtime(aval_nc)
+                            if (aval_nc_tm > out_zip_tm) and (out_zip_tm > in_zip_tm):
+                                # .nc files only "count" if they are newer than raw files
+                                # (or those raw files don't exist)
+                                statuses.append((tup.combo, tup.id, JobStatus.FINISHED))
+                                continue
+
+                    # Identify avalanches that have finished: .out.zip exists and has non-zero size
+                    # (User can reset jobs by removing *.out.zip)
+                    if os.path.exists(out_zip):
+
+                        # Check for abandoned job
+                        # TODO: Use file_is_good() instead!
+                        statinfo = os.stat(out_zip)
+                        if (statinfo.st_size==0):
+                            # The HTCondor output file has been created, but
+                            # no sign of the HTCondor job to write it at the
+                            # end.  Sounds like things were killed, send
+                            # status back to TODO.
+                            statuses.append((tup.combo, tup.id, JobStatus.TODO))
+                            continue
+
+                        # We tentatively think the job is finished.  But let's
+                        # look inside the zip file to make sure the domain
+                        # wasn't overrun.
+                        with zipfile.ZipFile(out_zip, 'r') as ozip:
+                            arcnames = [os.path.split(x)[1] for x in ozip.namelist()]
+                        if any(x.endswith('.out.overrun') for x in arcnames):
+                            statuses.append((tup.combo, tup.id, JobStatus.OVERRUN))
+                        else:
+                            statuses.append((tup.combo, tup.id, JobStatus.FINISHED))
+                        continue
+
+                    # Default to TODO
+                    statuses.append((tup.combo, tup.id, JobStatus.TODO))
+
+    df = pd.DataFrame(statuses, columns=('combo', 'id', 'jobstatus'))
+    return akdf0.merge(df.reset_index(), how='left', left_on=['combo', 'id'], right_on=['combo', 'id'])
 # --------------------------------------------------------
 _include_statuses = {JobStatus.NOINPUT, JobStatus.INCOMPLETE, JobStatus.TODO, JobStatus.INPROCESS, JobStatus.OVERRUN, JobStatus.FAILED}
-def print_job_statuses(df):
-#    for (run_dir, job_status), group in df.groupby(['run_dir', 'job_status']):
-    for (jb_key, job_status), group in df.groupby(['jb_key', 'job_status']):
-        if job_status not in _include_statuses:
-            continue
-        jb = jb_key[-1]
+def print_job_statuses(akdf0):
 
-        print('=========== {} {}:'.format(job_status_labels[job_status], jb.avalanche_dir))
-        print(sorted(group.index.tolist()))
-#        print(sorted(group['id'].tolist()))
+    showall = (len(akdf0.index) <= 100)
+
+    for (exp,combo),akdf1 in akdf0.reset_index().groupby(['exp','combo']):
+        scombo = '-'.join((str(x) for x in combo))
+        print(f"=============== {exp}-{scombo}")
+
+        for releasefile,akdf2 in akdf1.groupby('releasefile'):
+            jb = file_info.parse_chunk_release_file(releasefile)
+            print(f"----- {jb.avalanche_dir}")
+
+            for jobstatus,akdf3 in akdf2.groupby('jobstatus'):
+                if showall or (jobstatus in _include_statuses):
+                    print('{}: {}'.format(repr(JobStatus(jobstatus)), sorted(akdf3.id.tolist())))
+
+
+
+
+##    for (run_dir, job_status), group in df.groupby(['run_dir', 'job_status']):
+#    for (jb_key, job_status), group in df.groupby(['jb_key', 'job_status']):
+#        if job_status not in _include_statuses:
+#            continue
+#        jb = jb_key[-1]
+#
+#        print('=========== {} {}:'.format(job_status_labels[job_status], jb.avalanche_dir))
+#        print(sorted(group.index.tolist()))
+##        print(sorted(group['id'].tolist()))
 
 
 # --------------------------------------------------------------------
@@ -291,17 +355,19 @@ def submit_jobs(akdf):
             Job statuses BEFORE submissions were made
     """
 
+
+# TODO: add job status and filter before submtting...
+
     for _,row in akdf.iterrows():
-        crf = file_info.parse_chunk_release_file(row['releasefile'])
+        jb = file_info.parse_chunk_release_file(row['releasefile'])
+
         # Eg: .../ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/c-L-00000/RESULTS/c-L-00000For_10m/30
-        avalanche_dir = crf.avalanche_dir
 
-        wcombo_name = crf.scene_dir.parts[-2]
-        ij_name = crf.scene_dir.parts[-1]
+        wcombo_name = jb.scene_dir.parts[-2]
+        ij_name = jb.scene_dir.parts[-1][2:]
         id = row['id']
-        job_name = f'{wcombo_name}-{ij_name}-{crf.chunkid:05}-{id}'
+        job_name = f'{wcombo_name}-{ij_name}-{id}-{jb.chunkid:05}'
+        inout = inout_name(jb, jb.chunkid, id)
 
-        print('submit ', avalanche_dir, job_name)
-        submit_job(avalanche_dir, job_name)
-
-    return df
+        print('submit ', jb.avalanche_dir, job_name, inout)
+        submit_job(jb.avalanche_dir, job_name, inout)

@@ -333,7 +333,7 @@ def add_dom(rdf, dem_filled, dem_nodata, grid_info, margins, **kwargs):
 
     return rdf
 # -----------------------------------------------------------
-def add_new_chunkinfo(df, scene_args, realized=False):
+def set_new_chunkinfo(df, scene_args, realized=False):
     """Adds a chunkinfo column to avalanches not currently assigned to a chhnk.
     This is useed to set CHUNK names.
     Avalanche ID is set to -1
