@@ -1,5 +1,6 @@
-import os,subprocess,re,sys
+import os,subprocess,re,sys,contextlib
 import functools
+import redis,rq
 from akramms import config
 
 HARNESS = config.HARNESS    # Alias
@@ -157,6 +158,53 @@ def run_remote(inputs, cmd, tdir, write_inputs=False):
     outputs = [config.roots.syspath(x) for x in outputs_rel]
     return outputs
 
+class QueueRunner:
+    def __init__(self, **kwargs):
+        self.redis = redis.Redis()
+        self.queue = rq.Queue(connection=self.redis, **kwargs)
+
+    # Timeout includes time waiting in the queue; so it needs to be as long as the longest job we MIGHT run.
+    def run(self, func, *args, timeout=3*3600, at_front=False, **kwargs):
+        print('func = ', func)
+#        kw = dict(kwargs)
+#        kw['timeout'] = timeout
+        job = rq.job.Job.create(func, connection=self.redis, timeout=timeout, args=args, kwargs=kwargs)
+        #job = self.queue.enqueue(*args, **kwargs)
+        self.queue.enqueue_job(job, at_front=at_front)
+        try:
+            result = rq.results.Result.fetch_latest(job, serializer=job.serializer, timeout=timeout)
+            if result.type == result.Type.SUCCESSFUL: 
+                ret = result.return_value
+                print('Success ', ret)
+                return ret
+            else: 
+                print('Failure ', result.exc_string)
+                raise RuntimeError(result.exc_string)
+
+        except:
+            print('Canceling...')
+            try:
+                rq.command.send_stop_job_command(self.redis, job.id)
+            except Exception as e:
+                print('Exception stopping job ', e)
+                # Job is not currently executing, No such job
+                pass
+            try:
+                job.cancel()
+            except Exception as e:
+                print('Exception canceling job ', e)
+
+            try:
+                job.delete()
+            except Exception as e:
+                print('Exception deleting job ', e)
+
+            raise
+
+queue_runner = QueueRunner()
+
+def run_remote_queued(*args, **kwargs):
+    return queue_runner.run(run_remote, *args, **kwargs)
 
 def print_outputs(outputs):
     """Helper function"""
