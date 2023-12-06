@@ -120,10 +120,9 @@ def add_combo(makefile, combo):
     kwargs = dict(
         resolution=resolution,
         # Bounds of interior, in the (i,j) space of the full-with-margin domain
-        interior_bounds_i = (
+        interior_bounds = (
             domain_interior.i0 - domain_margin.i0,
-            (domain_interior.i0 + domain_interior.nx) - domain_margin.i0),
-        interior_bounds_j = (
+            (domain_interior.i0 + domain_interior.nx) - domain_margin.i0,
             domain_interior.j0 - domain_margin.j0,
             (domain_interior.j0 + domain_interior.ny) - domain_margin.j0),
         return_periods=(combo.return_period,),
@@ -134,7 +133,7 @@ def add_combo(makefile, combo):
         kwargs['forest_file'] = forest_tif
 
     # Print out what we've got!
-    print('------ Preparing Scene:')
+    print('------ Rules to Prepare Scene:')
     print(f'   scene_dir: {scene_dir}')
     for k,v in kwargs.items():
         print(f'   {k}: {v}')
