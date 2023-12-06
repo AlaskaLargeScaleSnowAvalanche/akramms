@@ -80,7 +80,7 @@ def combo_to_scene_subdir(combo, type='x'):
     trial_name = f'{name}-{combo.snow_dataset}-{combo.year0}-{combo.year1}-{combo.downscale_algo}-{combo.forest}-{combo.return_period}'
     scene_name = f'{type}-{combo.idom:03d}-{combo.jdom:03d}'    # Underscores would confuse things
 
-    return os.path.join(trial_name, scene_name)
+    return os.path.join(dir, trial_name, scene_name)
 
 # -------------------------------------------------------------
 def add_dem(makefile, idom, jdom, sanity_check=True):

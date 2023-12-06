@@ -3,8 +3,8 @@
 
 from akramms import config,params
 import argparse,itertools,os,subprocess,sys,io,codecs,re
-from akramms import r_experiment,stages
-from akramms.util import rammsutil,avalparse
+from akramms import r_experiment,stages,avalparse
+from akramms.util import rammsutil
 from uafgi.util import ioutil,make
 import importlib
 from akramms import r_domain_builder, r_ramms
@@ -387,10 +387,24 @@ def step4(args):
     argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
 def parse(args):
-    avals = avalparse.parse_avals(args.avals)
-    for aval in avals:
-        print(aval)
+    aspecs, nc_fnames = avalparse.parse_aval_specs(args.avals)
+    print('============ AvalTuple Specs')
+    for aspec in aspecs:
+        print(aspec)
+    print('============ nc_fnames')
+    for ncf in nc_fnames:
+        print(ncf)
 
+
+@subcommand([
+    argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),
+])
+def archive(args):
+    from akramms import archive
+    aspecs, nc_fnames = avalparse.parse_aval_specs(args.avals)
+    for aspec in aspecs:
+        print(aspec)
+        archive.archive_combo(aspec.exp_mod, aspec.combo, aspec.ids, ok_statuses={archive.OK})
 
 def main():
     args = cli.parse_args()

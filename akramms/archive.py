@@ -1,7 +1,9 @@
-import shutil,os,re,zipfile,glob
-from uafgi.util import shputil
-from akramms import ncaval,r_ramms
-from akramms.util import avalparse
+import shutil,os,re,zipfile,glob,datetime,time,subprocess
+import netCDF4
+from uafgi.util import shputil,ncutil
+from akramms import ncaval,r_ramms,config
+from akramms import avalparse
+from akramms.util import exputil
 import traceback
 
 #_out_zipRE = re.compile(r'^(.*)_(\d+)\.out\.zip$')
@@ -53,6 +55,12 @@ def getmtime(fname):
        return -1.0
 
 # -----------------------------------------------------------------
+def _git_commit(dir):
+    cmd = ['git', 'log']
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, cwd=dir)
+    return proc.stdout.readline().strip()    # We just want head -1
+
+# -----------------------------------------------------------------
 def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
     """Returns the names of archive files, based on a particular combo
     and list of IDs within that combo.  Archives the avalanches if needed.
@@ -74,7 +82,7 @@ def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
     x_dir = exp_mod.combo_to_scene_subdir(combo, type='x')
     out_zips = dict()    
     for out_zip in glob.iglob(os.path.join(x_dir, 'CHUNKS', '*', '*', '*', '*', '*.out.zip')):
-        match = avalparse.out_zipRE.match(out_zip)
+        match = avalparse.out_zipRE.match(os.path.basename(out_zip))
         sizecat = match.group(1)
         id = int(match.group(2))
         out_zips[id] = (out_zip, sizecat)    # full-pathname, sizecat
@@ -89,7 +97,11 @@ def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
             ncs[int(match.group(2))] = (name, match.group(1))    # leaf-name, sizecat
 
 
+    # Information from the RELEASE shpaefile
+    release_file,release_df = exputil.release_df(exp_mod, combo)
+
     arc_fnames = list()
+    archived_out_zips = list()
     first = True
     for id in ids:
         # -------- Get name and modification time of original .out.zip file
@@ -110,11 +122,12 @@ def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
             name,arc_sizecat = ncs[id]
             arc_fname = os.path.join(arc_dir, name)
             arc_mtime = os.path.getmtime(arc_fname)
+
+            # Reported sizecats must be the same
+            assert arc_sizecat == ozip_sizecat
         else:
             arc_mtime = -1.0
 
-        # ------- Reported sizecats must be the same
-        assert arc_sizecat == ozip_sizecat
 
         # -------- Decide whether we need to regenerate
         if arc_mtime > out_zip_mtime:
@@ -126,14 +139,48 @@ def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
         elif out_zip_mtime > 0:
             # .out.zip file is OK, so let's regenerate
 
+            arc_dir = exp_mod.combo_to_scene_subdir(combo, type='arc')
             arc_fname = os.path.join(
-                exp_mod.combo_to_scene_subdir(combo, type='arc'),
+                arc_dir,
                 f'aval-{ozip_sizecat}-{id}.nc')
 
             if first:
-                os.makedirs(archive_dir, exist_ok=True)
+                os.makedirs(arc_dir, exist_ok=True)
                 first = False
-            ramms_to_nc0(out_zip, arc_fname)
+
+            # --------- Write the full NetCDF file
+            with netCDF4.Dataset(arc_fname, 'w') as ncout:
+                ncaval.ramms_to_nc0(out_zip, ncout)
+
+                # Add info from the RELEASE file
+                ncv = ncout.createVariable('release_shp', 'i')
+                ncv.description = 'Attributes from the RELEASE shapefile used to set up this avalanche'
+                row = release_df.loc[id]
+                for aname,val in row.items():
+                    setattr(ncv, aname, val)
+
+                # Add provenance info
+                ncv = ncout.createVariable('provenance', 'i')
+                ncv.created_by = os.getlogin()
+                ncv.release_timestamp = datetime.datetime.fromtimestamp(os.path.getmtime(release_file)).isoformat()
+                ncv.avalanche_timestamp = datetime.datetime.fromtimestamp(out_zip_mtime).isoformat()
+                ncv.archive_timestamp = datetime.datetime.now().isoformat()
+                ncv.akramms_commit = _git_commit(os.path.join(config.HARNESS, 'akramms'))
+                ncv.uafgi_commit = _git_commit(os.path.join(config.HARNESS, 'uafgi'))
+
+                # Add info from scene that created this avalanche
+                with netCDF4.Dataset(os.path.join(x_dir, 'scene.nc')) as ncin:
+                    schema = ncutil.Schema(ncin)
+                    grp = ncout.createGroup('scene_nc')
+                    schema.create(grp)
+                    schema.copy(ncin, grp)
+
+    
+
+
+            # ----------------------------------------
+
+
             arc_fnames.append(arc_fname)
             archived_out_zips.append(out_zip)
         else:
@@ -143,7 +190,7 @@ def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
     return arc_fnames, archived_out_zips
 
 # -----------------------------------------------------------------
-def archive_combo(exp_mod, combo, ok_statuses={OK,OVERRUN}):
+def archive_combo(exp_mod, combo, ids=None, ok_statuses={OK,OVERRUN}):
     """Archives all IDs in a combo.
     Returns: {id: arc_fname}
     """
@@ -154,7 +201,8 @@ def archive_combo(exp_mod, combo, ok_statuses={OK,OVERRUN}):
     # Copy a few top-level files
     os.makedirs(archive_dir, exist_ok=True)
     for leaf in ('scene.nc', 'scene.cdl', 'crs.prj'):
-        shutil.copy2(os.path.join(scene_dir, leaf), archive_dir)
+        src = os.path.join(scene_dir, leaf)
+        shutil.copy2(src, archive_dir)
 
     # Copy the lists PRA polygons
     shutil.copytree(
@@ -163,8 +211,10 @@ def archive_combo(exp_mod, combo, ok_statuses={OK,OVERRUN}):
         dirs_exist_ok=True)
 
     # Make sure everything in this combo is archived.
-    shp_ids = exputil.release_df(exp_mod, combo, type='x').index.tolist()
-    arc_fnames, archived_out_zips = fetch(exp_mod, combo, shp_ids, ok_statuses=ok_statuses)
+    if (ids is None) or (len(ids) == 0):
+        _,release_df = exputil.release_df(exp_mod, combo, type='x')
+        ids = release_df.index.tolist()
+    arc_fnames, archived_out_zips = fetch(exp_mod, combo, ids, ok_statuses=ok_statuses)
 
     # We've successfully written the netCDF files.
     # Delete the originals (if they exist to begin with)
@@ -179,10 +229,10 @@ def archive_combo(exp_mod, combo, ok_statuses={OK,OVERRUN}):
                 except FileNotFoundError:
                     pass
 
-    # Print the errors
-    for status,ids in errors_by_status.items():
-        if len(ids) > 0:
-            print(error_msgs[status].format(ids=ids))
+#    # Print the errors
+#    for status,ids in errors_by_status.items():
+#        if len(ids) > 0:
+#            print(error_msgs[status].format(ids=ids))
 
 
 #def main():

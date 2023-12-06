@@ -103,7 +103,8 @@ def parse_aval_specs(args):
         (Some of these may be None)
     """
 
-    rets = list()
+    aspecs = list()    # return val
+    nc_fnames = list()    # return val
     cur_tuple = list()    # Current items for a combo
 
     state = 0    # 0=initial; 1=expectign combo items; 2=expecting id
@@ -123,7 +124,7 @@ def parse_aval_specs(args):
                 continue
             except:
                 # It's not a parseable ID or extent, reinterpret arg in state 0
-                rets.append( (AvalTuple(exp_mod, combo, ids), None) )
+                aspecs.append( AvalTuple(exp_mod, combo, ids) )
                 state = 0
 
         if state == 0:
@@ -152,12 +153,12 @@ def parse_aval_specs(args):
                     match = out_zipRE.match(out_zip)
                     id =int(match.group(2))
 
-                    rets.append( (AvalTuple(exp_mod, combo, id), None) )
+                    aspecs.append( AvalTuple(exp_mod, combo, id) )
                     clear()
                     continue
 
                 if leaf.startswith('aval-'):
-                    rets.append( (None, os.path.abspath(arg)) )
+                    nc_fnames.append( os.path.abspath(arg) )
                     clear()
                     continue
 
@@ -214,9 +215,7 @@ def parse_aval_specs(args):
     # Finish up after we exit
     if state == 3:    # Looking for ID...
         # Emit any remaining ids (or floating point numbers) at end of parsing
-        if len(ids) == 0:
-            ids = [None]    # Wildcard, meaning no IDs given...
-        rets.append( (AvalTuple(exp_mod, combo, ids), None) )
+        aspecs.append( AvalTuple(exp_mod, combo, ids) )
     elif state == 1:    # Looking for more of the combo...
         missing_len = len(exp_mod.combo_schema.schema) - len(scombo)
         if missing_len == 2:
@@ -225,8 +224,8 @@ def parse_aval_specs(args):
             raise ValueError('Must specify full combo (except for idom / jdom)')
 
         combo = parse_combo(exp_mod, scombo)
-        rets.append( (AvalTuple(exp_mod, combo, [None]), None) )
+        aspecs.append( AvalTuple(exp_mod, combo, []) )
 
-    return rets
+    return aspecs, nc_fnames
 
 # -------------------------------------------------------

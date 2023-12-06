@@ -41,8 +41,8 @@ def nc_poly(ncout, izip, arcname, vname, coord_attrs, attrs={}, required=True):
         return None
 
     poly = _read_polygon(izip, arcname)
-    ncout.createDimension(f'{vname}_len', len(poly)//2)
-    ncv = ncout.createVariable(vname, 'd', (f'{vname}_len', 'two'), compression='zlib')
+    ncout.createDimension(vname, len(poly)//2)
+    ncv = ncout.createVariable(vname, 'd', (vname, 'two'), compression='zlib')
     for attr,val in attrs.items():
         setattr(ncv, attr, val)
 
@@ -116,6 +116,8 @@ def nc_xy_coord(ncout, gridI, coord_attrs, izip, arcname):
     """
     izip, arcname:
         File .xy-coord file to read (from inside a zip)
+    Returns: ivec,jvec
+        Coordinates of gridcells in the local subdomain grid
     """
 
     # Read the original file
@@ -142,6 +144,8 @@ def nc_xy_coord(ncout, gridI, coord_attrs, izip, arcname):
     ncvi[:] = divec
     ncvj[:] = djvec
 
+    return ivec,jvec
+
 # --------------------------------------------------------------
 
 def parse_out(fin):
@@ -167,6 +171,11 @@ def parse_out(fin):
         ('depo', depo,  {'units': 'm'}))
 
 def nc_out(ncout, izip, arcname, attrs={}):
+    """
+    Returns: {name: val}
+        Value of variables read
+        (max_vel, max_height, depo)
+    """
     # Read the values from the .out file
 #    with open(fname, 'rb') as fin:
     with izip.open(arcname, 'r') as fin:
@@ -181,12 +190,16 @@ def nc_out(ncout, izip, arcname, attrs={}):
         for k,v in vattrs.items():
             setattr(ncv, k, v)
         ncvs.append(ncv)
-    for (_, val,_),ncv in zip(namevals, ncvs):
+    ret = dict()
+    for (name, val,_),ncv in zip(namevals, ncvs):
         ncv[:] = val
+        ret[name] = val
+
+    return ret
 
 
 # ----------------------------------------------------------
-def ramms_to_nc0(out_zip, ofname):
+def ramms_to_nc0(out_zip, ncout):
     """
     base:
         Base name of avalanche, including full pathname.
@@ -209,11 +222,10 @@ def ramms_to_nc0(out_zip, ofname):
 
 
     """
-    base = out_zip[:-1]    # Remove .out.zip
+    base = out_zip[:-8]    # Remove .out.zip
     leaf = os.path.split(base)[1]
     with zipfile.ZipFile(f'{base}.in.zip', 'r') as in_zip:
      with zipfile.ZipFile(f'{base}.out.zip', 'r') as out_zip:
-      with netCDF4.Dataset(ofname, 'w') as ncout:
 
         in_infos = in_zip.infolist()
         out_infos = out_zip.infolist()
@@ -268,11 +280,39 @@ def ramms_to_nc0(out_zip, ofname):
         # The .xyz file (SKIP)
 
         # The .xy-coord file
-        nc_xy_coord(ncout, gridI, coord_attrs, in_zip, f'{leaf}.xy-coord')
+        ivec,jvec = nc_xy_coord(ncout, gridI, coord_attrs, in_zip, f'{leaf}.xy-coord')
 
         # The .out file
-        nc_out(ncout, out_zip, f'{leaf}.out',
+        vars = nc_out(ncout, out_zip, f'{leaf}.out',
             attrs={'grid_mapping': 'grid_mapping'})
+        max_height = vars['max_height']
+
+        # -----------------------------------
+        # Determine bounding box
+        nz = (max_height != 0)
+        ivec_nz = ivec[nz]
+        jvec_nz = jvec[nz]
+
+        i0 = np.min(ivec_nz)
+        i1 = np.max(ivec_nz)
+        j0 = np.min(jvec_nz)
+        j1 = np.max(jvec_nz)
+
+        x0,y0 = gridI.to_xy(i0,j0)
+        x1,y1 = gridI.to_xy(i1,j1)
+
+        # Store the bounding box
+        ncout.createDimension('lowhigh', 2)
+        ncv = ncout.createVariable('bounding_box', 'd', ('lowhigh', 'two'))
+        ncv.description = 'Oriented bounding box of region occupied by avalanche.'
+        ncv.grid_mapping = 'grid_mapping'
+#        for attr,val in coord_attrs.items():
+#            setattr(ncv, attr, val)
+        ncv[:] = np.array([
+            [min(x0,x1), min(y0,y1)],
+            [max(x0,x1) + gridI.dx*np.sign(gridI.dx), max(y0,y1) + gridI.dy*np.sign(gridI.dy) ]])
+        
+
 
 # ----------------------------------------------------------
 # ----------------------------------------------------------
