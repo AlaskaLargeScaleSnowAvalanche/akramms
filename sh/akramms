@@ -380,9 +380,13 @@ def ps(args):
 @subcommand([
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
     argument('--rm', action='store_true',
-        help='Delete original avalanches after finished archiving?')
+        help='Delete original avalanches after finished archiving?'),
+    argument('--debug', action='store_true',
+        help='Run in debug mode, single threaded, for better catching exceptions'),
 ])
 def archive(args):
+    from akramms import archive
+
     parseds = akramms.parse.parse_args(args.spec)
 
     # Identify avalanches ready to be archived that have not yet been archived
@@ -398,7 +402,8 @@ def archive(args):
     x_only = akdf_x.index.difference(akdf_arc.index)
 
     # Select only those rows to archive
-    akdf = akdf_x.loc[x_only]
+    akdf = akdf_x.loc[x_only] \
+        .sort_values(['combo', 'releasefile', 'id'])
 
 
 #    for tup in akdf.itertuples():
@@ -408,7 +413,7 @@ def archive(args):
 #        print(tup)
     print(akdf)
     
-    ncaval.archive(akdf)
+    archive.archive(akdf, debug=args.debug)
 
 # ------------------------------------------------------------------
 
