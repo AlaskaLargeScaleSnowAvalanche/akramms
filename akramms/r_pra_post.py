@@ -277,6 +277,9 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
                 in_domain_fn = lambda pra: in_domain(xmin,ymin,xmax,ymax, pra)
                 cat_df = cat_df[cat_df['pra'].map(in_domain_fn)]
 
+            # Add size designator to the internal RELEASE file rows
+            cat_df['pra_size'] = pra_size
+
             # Calculate domains
             chulls = list()
             doms = list()

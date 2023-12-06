@@ -2,6 +2,7 @@ import os,re,typing,functools,copy,glob,io,struct
 import numpy as np
 import shapely
 import pandas as pd
+from uafgi.util import shputil
 from akramms import config
 
 PRA_SIZES = {
@@ -126,7 +127,12 @@ release_fileRE = re.compile(r'^(.+)(\d\d\d\d\d)(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)
 
 @functools.lru_cache()
 def parse_release_file(release_file):
-    """Parses the full name of a release file into a RammsName."""
+    """Parses the full name of a release file into a RammsName.
+
+    NOTE: This is only good for release files in CHUNK/ directories,
+          not the original release files they were made from.
+    """
+
 
     RELEASE_dir,leaf = os.path.split(release_file)
     ramms_dir = os.path.split(RELEASE_dir)[0]

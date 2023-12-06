@@ -1,29 +1,30 @@
 import os
+import pandas as pd
 from akramms import rammsfilter
-from akramms.util import exputil
+from akramms.util import exputil,rammsutil
 
 
 # Queries avalanches in their RAMMS form, without archiving.
 
-def query_release_files(release_files, filter_in_fn=rammsfilter.all):
+def query_aspecs(aspecs, filter_in_fn=rammsfilter.all):
+    ret = list()
+    for aspec in aspecs:
+        release_files, release_df = exputil.release_df(aspec.exp_mod, aspec.combo, type='x')
+        #print('release_df ', release_df)
 
-    for release_file in release_files:
-        jb = rammsutil.parse_release_file(release_file)
-        ids = rammsutil.job_ids(release_file)
+        out_zips = exputil.out_zips(aspec.exp_mod, aspec.combo)
 
-        for id in ids:
-            out_zip = os.path.join(jb.avalanche_dir, f'{job_name}.out.zip')
-
-            # Only process if the avalanche has run
-            if not os.path.exists(out_zip):
+        for id,row in release_df.iterrows():
+            # Only pay attention to avalanches that have already run
+            if id not in out_zips:
                 continue
 
             # Apply user filter
-            if filter_in_fn(jb, id):
-                yield out_zip
+            out_zip,sizecat = out_zips[id]
+            if filter_in_fn(id, row, sizecat, out_zip):
+                ret.append((id,sizecat,out_zip))
 
-def query_aspecs(aspecs, filter_in_fn=rammsfilter.all):
-    for aspec in aspecs:
-        release_files = list(exputil.release_files(aspec.exp_mod, aspec.combo))
-        return query_release_files(release_files,
-            filter_in_fn=filter_in_fn)
+    df = pd.DataFrame(ret, columns=['id', 'sizecat', 'out_zip']).set_index('id')
+    df = release_df.merge(df, left_index=True, right_index=True)
+
+    return df

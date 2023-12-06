@@ -1,4 +1,4 @@
-import re,sys
+import re,sys,os
 import zipfile
 
 """Construct filter_in functions for Avalanche queries"""
@@ -6,18 +6,23 @@ import zipfile
 this_module = sys.modules[__name__]
 
 # ------------------------------------------------------
-def all(id, row, nc_fname):
+def all(id, row, sizecat, out_zip):
     return True
 
-def none(id, row, nc_fname):
+
+def none(id, row, sizecat, out_zip):
     return False
 # ------------------------------------------------------
-#def overrun(val):
-#    """Includes or excludes overruns."""
-#    def _filter(id, id, out_zip):
-#        in_zip = out_zip[:-8] + '.in.zip'
-#
-#        with netCDF4.Dataset(nc_fname) as nc:
-#            overrun = (nc.variables['status'].overrun == 'True')
-#        return overrun == val
-#    return _filter
+def resubmitted(id, row, sizecat, out_zip):
+    """Finds avalanches that were resubmitted after an overrun."""
+
+    in_zip = out_zip[:-8] + '.in.zip'
+
+    # We tentatively think the job is finished.  But let's
+    # look inside the zip file to make sure the domain
+    # wasn't overrun.
+    with zipfile.ZipFile(in_zip, 'r') as ozip:
+        arcnames = [os.path.split(x)[1] for x in ozip.namelist()]
+    if any(x.endswith('.v2.dom') for x in arcnames):
+        return True
+    return False

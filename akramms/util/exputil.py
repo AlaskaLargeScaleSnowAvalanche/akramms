@@ -1,6 +1,6 @@
 # Fundamental stuff needed to run an experiment.
 
-import functools
+import functools,glob
 import re,os,collections,importlib
 import pandas as pd
 from uafgi.util import shputil
@@ -46,9 +46,9 @@ def _release_files(scene_dir):
 
 def release_files(exp_mod, combo, type=None):
     """Lists release files by combo."""
-    for scene_dir in combo_to_scene_dirs(exp_mod, combo, type='x'):
-        for x in _release_files(scene_dir):
-            yield x
+    scene_dir = exp_mod.combo_to_scene_dir(combo, type='x')
+    for x in _release_files(scene_dir):
+        yield x
 # ----------------------------------------------------------
 @functools.lru_cache()
 def _release_df(scene_dir):
@@ -91,6 +91,10 @@ def release_df(exp_mod, combo, type=None):
 # ----------------------------------------------------------
 out_zipRE = re.compile(r'[^_]+_[^_]+_\d+([TSML])_(\d+)\.out\.zip$')
 def out_zips(exp_mod, combo):
+    """
+    Returns: [(out_zip_filename, sizecat), ...]
+    """
+
     x_dir = exp_mod.combo_to_scene_dir(combo, type='x')
     out_zips = dict()    
     for out_zip in glob.iglob(os.path.join(x_dir, 'CHUNKS', '*', '*', '*', '*', '*.out.zip')):
@@ -109,3 +113,32 @@ def archive_ncs(exp_mod, combo):
             match = avalRE.match(name)
             if match is not None:
                 ncs[int(match.group(2))] = (name, match.group(1))    # leaf-name, sizecat
+# ---------------------------------------------------------------
+sfilterRE = re.compile(r'^\s*([^()\s]+)(\(([^)]*)\))?\s*$')
+def parse_filter(sfilter, default_module):
+    match = sfilterRE.match(sfilter)
+    sfn = match.group(1)
+    sargs = match.group(3)    # Excludes parentheses
+
+    # Get the filter function
+    parts = sfn.rsplit('.',1)
+    if len(parts) == 1:
+        # No module included; use avalfilter
+        #mod = this_module
+        mod = importlib.import_module(default_module)
+        filter_fn = getattr(mod, sfn)
+    else:
+        # A module was included; use it
+        mod = importlib.import_module('.'.join(parts[:-1]))
+        filter_fn = getattr(mod, parts[-1])
+
+    # See if arguments were provided.
+    if sargs is None:
+        # No parentheses or arguments provided: the provided filter_fn
+        # is the final filter_in_fn to be used by archive.fetch().
+        return filter_fn
+    else:
+        # Arguments were provided: Run the provided filter_fn to
+        # generate the final filter.
+        args = eval(f'[{sargs}]')
+        return filter_fn(*args)

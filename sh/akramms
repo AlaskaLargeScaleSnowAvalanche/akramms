@@ -401,7 +401,7 @@ def query(args):
     from akramms import avalquery,avalfilter
 
     if args.filter is not None:
-        filter_in = avalfilter.parse(args.filter)
+        filter_in = exputil.parse_filter(args.filter, 'akramms.avalfilter')
     else:
         filter_in = avalfilter.all
 
@@ -442,24 +442,33 @@ def query(args):
     argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),
     argument('-f', '--filter', type=str,
         help='Filter to apply, must return True to include, False to exclude.  See avalfilter.py'),
+    argument('-o', '--output', required=False, help='Name of query output file to write.'),
 ])
 def rammsquery(args):
-    from akramms import avalquery,avalfilter
+    from akramms import rammsfilter,avalquery
     from akramms import rammsquery as rq
 
     if args.filter is not None:
-        filter_in = avalfilter.parse(args.filter)
+        filter_in = exputil.parse_filter(args.filter, 'akramms.rammsfilter')
     else:
-        filter_in = avalfilter.all
+        filter_in = rammsfilter.all
 
     aspecs, nc_fnames0 = avalparse.parse_aval_specs(args.avals)
     aspecs = avalquery.normalize(aspecs)
 
-    out_zips = list(rq.query_aspecs(aspecs, filter_in_fn=filter_in))
+    release_df = rq.query_aspecs(aspecs, filter_in_fn=filter_in)
+    print(release_df)
+
+
+    # Write query results to file
+    if args.output is not None:
+        with open(args.output, 'wb') as out:
+            # Query results
+            pickle.dump(release_df, out)
 
     # Display result
-    for out_zip in out_zips:
-        print(out_zip)
+    for id,row in release_df.iterrows():
+        print(f'rm {row.out_zip}')
 
 
 @subcommand([
