@@ -721,7 +721,8 @@ def print_job_statuses(df):
         jb = jb_key[-1]
 
         print('=========== {} {}:'.format(job_status_labels[job_status], jb.avalanche_dir))
-        print(sorted(group['id'].tolist()))
+        print(sorted(group.index.tolist()))
+#        print(sorted(group['id'].tolist()))
 
 
 # --------------------------------------------------------------------
@@ -824,7 +825,7 @@ def enlarge_domains_OLD(df, dry_run=False):
 
     return df
 
-def enlarge_domains(scene_dir, release_df)
+def enlarge_domains(scene_dir, release_df):
     """(TODO: I think this only works on ONE combo at a time)"""
 
     scene_args = params.load(scene_dir)
@@ -837,7 +838,7 @@ def enlarge_domains(scene_dir, release_df)
         jb = rammsutil.RammsName(
             os.path.join(scene_dir, 'CHUNKS2'),
             scene_args['name'], 0, scene_args['forest'][0], scene_args['resolution'],
-            scene_args['return_period'[0], pra_size, None))
+            scene_args('return_period'[0], pra_size, None))
 #        prepare_chunk(scene_args, jb, dfc)
 
 

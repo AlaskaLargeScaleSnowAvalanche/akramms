@@ -138,7 +138,7 @@ def master_ramms_names(scene_args, return_period, forest):
 # -------------------------------------------------------
 
 
-release_fileRE = re.compile(r'^(.+)([\dr]\d\d\d\d)(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(.*)(\..*)')
+release_fileRE = re.compile(r'^(.+)(\d\d\d\d\d)?(NoFor|For)_(\d+)m_(\d+)(T|S|M|L)_(.*)(\..*)')
 
 @functools.lru_cache()
 def parse_release_file(release_file):
@@ -148,14 +148,16 @@ def parse_release_file(release_file):
           not the original release files they were made from.
     """
 
-
     RELEASE_dir,leaf = os.path.split(release_file)
     ramms_dir = os.path.split(RELEASE_dir)[0]
     ramms_harness = os.path.abspath(os.path.split(ramms_dir)[0])
     match = release_fileRE.match(leaf)
 
+    if match is None:
+        raise ValueError('Cannot parse RELEASE file: {}'.format(release_file))
+
     scene_name = match.group(1)
-    segment = int(match.group(2))
+    segment = None if match.group(2) is None else int(match.group(2))    # Works for CHUNKS/ or RELEASE/ release files.
     forest = True if match.group(3) == 'For' else False
     resolution = int(match.group(4))
     return_period = int(match.group(5))

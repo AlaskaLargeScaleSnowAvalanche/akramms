@@ -5,6 +5,7 @@ import re,os,collections,importlib
 import pandas as pd
 from uafgi.util import shputil
 from akramms import config
+from akramms.util import rammsutil
 
 
 out_zipRE = re.compile(r'[^_]+_[^_]+_(\d+[TSML])_(\d+)\.out\.zip$')
@@ -60,10 +61,11 @@ def _release_df(scene_dir):
     rfs = list()
     dfs = list()
     for fname in _release_files(scene_dir):
-        jb = parse_release_file(fname)
+        #jb = rammsutil.parse_release_file(fname)
         df = shputil.read_df(fname, read_shapes=False)
         if not ('pra_size' in df):
-            df['pra_size'] = jb.pra_size
+            pra_size = fname[-9]    # Ends in X_rel.shp
+            df['pra_size'] = pra_size
         dfs.append(df)
         rfs.append(fname)
 
@@ -73,7 +75,7 @@ def _release_df(scene_dir):
         return None
 # ----------------------------------------------------------------
 def release_df(exp_mod, combo, type=None):
-    """Read the RELEASE files to determine which avalanche IDs are
+    """Read the CHUNKS/RELEASE files to determine which avalanche IDs are
     involved in a combo.
 
     type:  'x' or 'arc'.

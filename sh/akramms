@@ -466,6 +466,7 @@ def rammsquery(args):
     aspecs = avalquery.normalize(aspecs)
 
     release_df = rq.query_aspecs(aspecs, filter_in_fn=filter_in)
+    print('*********** Query Results:')
     print(release_df)
 
     scene_dir = aspecs[0].exp_mod.combo_to_scene_dir(aspecs[0].combo)
