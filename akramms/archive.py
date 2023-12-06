@@ -62,18 +62,22 @@ def _git_commit(dir):
 # -----------------------------------------------------------------
 
 class ArchiveFiles:
-    def __init__(self, ithread, exp_mod, release_df, x_dir, status_attrs):
+    def __init__(self, ithread, exp, release_df, x_dir, status_attrs):
         self.ithread = ithread
-        self.sexp_mod = exp_mod.name    # Make it picklable
-        self.release_df = release_df
+        self.exp = exp    # Must be picklable
+        self.akdf = akdf
         self.x_dir = x_dir
         self.status_attrs = status_attrs
 
     def __call__(self, to_archive):
+        """
+        to_archive: [(id,arc_fname,out_zip), ...]
+        """
+
         from akramms.util import exputil
         ithread = self.ithread
-        exp_mod = exputil.load(self.sexp_mod)
-        release_df = self.release_df
+        exp_mod = exputil.load(self.exp)
+        akdf = self.akdf
         x_dir = self.x_dir
 
         archived_out_zips = list()
@@ -84,44 +88,9 @@ class ArchiveFiles:
             if ithread == 0 and ix % 50 == 0:
                 print(f'\n{ix:5} ', end='')
 
-            # -------- Convert to NetCDF
-            # .out.zip file is OK, so let's regenerate
-            if ithread == 0:
-                print('.', end='')
-                sys.stdout.flush()
-
-            arc_dir = os.path.dirname(arc_fname)
-            os.makedirs(arc_dir, exist_ok=True)
-
-            # Write the full NetCDF file
-            tmp_fname = os.path.splitext(arc_fname)[0] + '-tmp.nc'    # Write atomically
+            ncaval.archive_avalanche(out_zip, arc_fname, debug=(ithread==0))
+            #arc_fnames.append(arc_fname)
             try:
-                with netCDF4.Dataset(tmp_fname, 'w') as ncout:
-                    # Add info from the RELEASE file
-                    ncv = ncout.createVariable('pra_attributes', 'i')
-                    ncv.description = 'Attributes from the RELEASE shapefile used to set up this avalanche'
-                    row = release_df.loc[id]
-                    for aname,val in row.items():
-                        setattr(ncv, aname, val)
-
-                    # Add provenance info
-                    ncv = ncout.createVariable('status', 'i')
-                    for k,v in self.status_attrs.items():
-                        setattr(ncv, k, v)
-                    out_zip_mtime = os.path.getmtime(out_zip)
-                    ncv.avalanche_timestamp = datetime.datetime.fromtimestamp(out_zip_mtime).isoformat()
-                    ncaval.ramms_to_nc0(out_zip, ncout)
-
-                    # Add info from scene that created this avalanche
-                    with netCDF4.Dataset(os.path.join(x_dir, 'scene.nc')) as ncin:
-                        schema = ncutil.Schema(ncin)
-                        grp = ncout.createGroup('scene_nc')
-                        schema.create(grp)
-                        schema.copy(ncin, grp)
-
-                os.rename(tmp_fname, arc_fname)
-
-                #arc_fnames.append(arc_fname)
                 archived_out_zips.append(out_zip)
             except ValueError as err:
                 if 'shape mismatch' in str(err):

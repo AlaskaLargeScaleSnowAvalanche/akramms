@@ -131,6 +131,11 @@ def resolve_releasefile(akdf, scenetypes=['x'], realized=True):
     # -----------------------------
     orows = list()
     def process_releasedir(tup, scenetype, chunkid, releasedir):
+
+        # If the arc directory doesn't yet exist...
+        if not os.path.exists(releasedir):
+            return
+
 #        print(f'process_releasedir({releasedir}')
         for name in os.listdir(releasedir):
             match = file_info.chunk_release_fileRE.match(name)
@@ -172,7 +177,7 @@ def resolve_releasefile(akdf, scenetypes=['x'], realized=True):
                                 chunkid = int(match.group(2))
                                 process_releasedir(tup, 'x', chunkid, scenedir / 'CHUNKS' / name / 'RELEASE')
                 elif scenetype == 'arc':
-                    process_releasedir(tup, 'arc', scenedir / 'RELEASE')
+                    process_releasedir(tup, 'arc', -1, scenedir / 'RELEASE')
 
     df = pd.DataFrame(orows, columns=tuple(
         itertools.chain(type(tup)._fields, ['scenetype', 'pra_size', 'chunkid', 'releasefile'])))
@@ -268,7 +273,8 @@ def resolve_id(akdf, realized=True, stage='out'):
 
 
     return pd.DataFrame(orows, columns=tuple(
-        itertools.chain(type(tup)._fields, ['id', 'avalfile'])))
+        itertools.chain(akdf.reset_index().columns, ['id', 'avalfile'])))
+#        itertools.chain(type(tup)._fields, ['id', 'avalfile'])))
 
 # ------------------------------------------------------------
 def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out'):

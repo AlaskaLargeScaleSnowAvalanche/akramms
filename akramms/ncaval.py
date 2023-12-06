@@ -1,4 +1,4 @@
-import os,re,itertools,struct,pickle,zipfile,io
+import os,re,itertools,struct,pickle,zipfile,io,methodtools
 import numpy as np
 import netCDF4
 import pyproj
@@ -324,6 +324,92 @@ def ramms_to_nc0(out_zip, ncout):
 
 
 # ----------------------------------------------------------
+class ArchiveAvalanche:
+    @methodtools.lru_cache()
+    def rdf(self, releasefile):
+        return 
+
+
+
+
+def _archive_single_threaded(akdf0, debug):
+    """Archives a bunch of work on a single thread
+    akdf0:
+        Must contain releasefile, id, out_zip, arc_fname
+    """
+
+    for (exp, combo,releasefile),akdf1 in akdf0.groupby(['exp', 'combo', 'releasefile']):
+        expmod = parse.load_expmod(exp)
+        arc_dir = expmod.combo_to_scenedir(combo, scenetype='arc')
+
+        jb = file_info.parse_chunk_release_file(releasefile)
+        arc_dir = jb.scene_dir
+        rdf = shputil.read_df(releasefile, read_shapes=False)
+
+        for tup in akdf1.itertuples():
+
+            inout = joblib.inout_name(jb, tup.chunkid, tup.id)
+            out_zip = jb.avalanche_dir / f'{inout}.out.zip'
+            arc_fname = arc_dir / f'aval-{jb.pra_size}-{tup.id}'
+
+            # -------- Convert to NetCDF
+
+            # .out.zip file is OK, so let's regenerate
+            if debug:
+                print('.', end='')
+                sys.stdout.flush()
+
+            os.makedirs(tup.arc_fname.parents[0], exist_ok=True)
+
+            # Write the full NetCDF file
+            tmp_fname = tup.arc_fname.parents[0] /
+                os.path.splitext(tup.arc_fname.parts[-1])[0] + '-tmp.nc'    # Write atomically
+
+            try:
+                with netCDF4.Dataset(tmp_fname, 'w') as ncout:
+                    # Add info from the RELEASE file
+                    ncv = ncout.createVariable('pra_attributes', 'i')
+                    ncv.description = 'Attributes from the RELEASE shapefile used to set up this avalanche'
+                    row = rdf.loc[id]
+                    for aname,val in row.items():
+                        setattr(ncv, aname, val)
+
+                    # Add provenance info
+                    ncv = ncout.createVariable('status', 'i')
+                    for k,v in self.status_attrs.items():
+                        setattr(ncv, k, v)
+                    out_zip_mtime = os.path.getmtime(tup.out_zip)
+                    ncv.avalanche_timestamp = datetime.datetime.fromtimestamp(out_zip_mtime).isoformat()
+                    ncaval.ramms_to_nc0(tup.out_zip, ncout)
+
+                    # Add info from scene that created this avalanche
+                    with netCDF4.Dataset(os.path.join(x_dir, 'scene.nc')) as ncin:
+                        schema = ncutil.Schema(ncin)
+                        grp = ncout.createGroup('scene_nc')
+                        schema.create(grp)
+                        schema.copy(ncin, grp)
+
+                os.rename(tmp_fname, tup.arc_fname)
+            except Exception:
+                # Remove candidate output file, if it exists
+                try:
+                    os.remove(tmp_fname)
+                except FileNotFoundError:
+                    pass
+                raise
+
+# ----------------------------------------------------------
+def archive(akdf):
+    """Archives in multi-thread"""
+    akdfs = np.array_split(akdf, config.ncpu_compress)
+
+    with concurrent.futures.ProcessPoolExecutor(ncpu) as ex:
+        futures = [ex.submit(_archivesingle_threaded, (akdfs[0], True), {})]
+        futures += [ex.submit(_archivesingle_threaded, (akdf, False), {}) for akdf in akdfs[1:]]
+        for future in futures:
+            archived_out_zips += future.result()
+
+    return archived_out_zips
 # ----------------------------------------------------------
 #def main():
 #    out_zip = '/home/efischer/prj/ak/ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/x-113-0450000230MFor_10m/RESULTS/x-113-04500002For_10m/30M/x-113-04500002For_10m_30M_3200.out.zip'

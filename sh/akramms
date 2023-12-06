@@ -398,8 +398,14 @@ def archive(args):
     x_only = akdf_x.index.difference(akdf_arc.index)
 
     # Select only those rows to archive
-    akdf = akdf_x.loc(x_only)
+    akdf = akdf_x.loc[x_only]
 
+
+    for tup in akdf.itertuples():
+        expmod = parse.load_expmod(tup.exp)
+        arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
+
+        print(tup)
     print(akdf)
     
 
