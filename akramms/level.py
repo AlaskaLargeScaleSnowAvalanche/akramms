@@ -166,13 +166,13 @@ def xdir_to_chunkdirs(scenedir, chunk_stage=0):
             chunkdir = scenedir / f'CHUNKS{chunk_stage}' / chunk_name    # <scene>/CHUNKS/x-.....For_10m
 
 
-def chunkdir_to_releasefiles(chunkdir):
+def chunkdir_to_releasefile(chunkdir):
     """Given a single chunk directory, returns the (4) release files in it."""
     RELEASEdir = chunkdir / 'RELEASE'
     releasefiles = list()
     for file in os.listdir(RELEASEdir):
         if file.endswith('_rel.shp'):
-            releasefiles.append(os.path.join(RELEASEdir, file))
+            releasefiles.append(RELEASEdir / file)
 
     # There should only be one release file per chunk!
     assert len(releasefiles) == 1

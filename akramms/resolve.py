@@ -155,6 +155,10 @@ def resolve_releasefile(akdf, scenetypes={'x'}, realized=True):
             # The releasefile is just given to us!
             orows.append(itertools.chain(tup,
                 [parsed['scenetype'], parsed['pra_size'], int(parsed['chunkid']), parsed['releasefile']]))
+        elif parsed['type'] == 'chunkdir':
+            releasefile = level.chunkdir_to_releasefile(parsed['chunkdir'])
+            orows.append(itertools.chain(tup,
+                [parsed['scenetype'], parsed['pra_size'], int(parsed['chunkid']), releasefile]))
         elif parsed['type'] == 'arcfile':
             # arcfile does not have any chunkid, so set to -1
             orows.append(itertools.chain(tup,

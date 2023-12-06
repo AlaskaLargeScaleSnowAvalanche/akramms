@@ -173,14 +173,13 @@ def parse_scenedir(scenedir):
     ret['type'] = 'scenedir'
     return ret
 # ----------------------------------------------------------------------
-_chunk_subleafRE = re.compile(r'(\d+)([TSML])(For|NoFor)_(\d+)m')
+_chunk_leafRE = re.compile(r'c-([TSML])-(\d+)')
 #Chunk = collections.namedtuple('Chunk', ('chunkid', 'pra_size'))
 def parse_chunkdir(chunkdir):
     """
     chunkdir:
         Eg: .../ak/ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/x-113-0450000230TFor_10m
     """
-    print('chunkdir ', type(chunkdir), chunkdir)
     if chunkdir.parents[0].parts[-1] != 'CHUNKS':
         raise ValueError(f'Not a chunkdir: {chunkdir}')
 
@@ -188,12 +187,11 @@ def parse_chunkdir(chunkdir):
     ret['chunkdir'] = chunkdir
 
     chunk_leaf = chunkdir.parts[-1]    # Eg: x-113-0450000230TFor_10m
-    x_leaf = chunkdir.parents[1].parts[-1]    # Eg: x-113-045
-    chunk_subleaf = chunk_leaf[len(x_leaf):]    # Eg: 0000230TFor_10m
-    match = _chunk_subleafRE.match(chunk_subleaf)
-    ret['chunkid'] = int(match.group(1))
-    ret['pra_size'] = match.group(2)
+    match = _chunk_leafRE.match(chunk_leaf)
+    ret['pra_size'] = match.group(1)
+    ret['chunkid'] = int(match.group(2))
 
+    ret['type'] = 'chunkdir'
     return ret
 # ----------------------------------------------------------------------
 def parse_dir(dir):
