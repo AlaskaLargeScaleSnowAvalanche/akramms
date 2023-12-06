@@ -1,0 +1,200 @@
+import itertools,re,os,functools,glob
+import pandas as pd
+from uafgi.util import shputil
+from akramms import level,parse
+
+# Levels:
+#   exp - combo - (sizecat) releasefile - (sizecat) - aval
+
+def initial(parseds):
+    orows = list()
+    for parsed in parseds:
+        orows.append({'parsed': parsed})
+    return pd.DataFrame(orows)
+
+#    print('parseds ', parseds)
+#    akdf = pd.DataFrame(parseds, columns=['parsed'])
+#    return akdf
+
+
+def add_exp(akdf):
+    """
+    parsed:
+        Result of 
+    """
+    for tup in akdf.itertuples():
+        parsed = tup.parsed
+#        if 'expmod' not in parsed:
+#            parsed['expmod'] = 
+    akdf['exp'] = akdf['parsed'].map(lambda parsed: parsed['exp'])
+    return akdf
+
+def add_combo(akdf, realized=True, scenetypes={'x','arc'}):
+    #akdf = akdf.add_exp(akdf)
+
+    orows = list()
+    for tup in akdf.itertuples():
+#        print('tup ', type(tup), tup)
+        parsed = tup.parsed
+
+        if parsed['type'] == 'arcfile':
+            orows.append(itertools.chain(tup, [None]))
+
+        if 'wcombo' in parsed:
+            wcombo = parsed['wcombo']
+            if 'ijdom' in parsed:
+                combo = tuple(itertools.chain(wcombo, parsed['ijdom']))
+                orows.append(itertools.chain(tup, [combo]))
+            elif realized:
+                # It's a wildcard combo, list the full combos there on disk
+                trialdir = level.theory_wcombo_to_trialdir(tup.exp, wcombo)
+                ijdoms = set()
+                for scenetype in scenetypes:
+                    scenedirs = level.trialdir_to_scenedirs(trialdir, scenetype=scenetype)
+                    for ijdom,_,_ in scenedirs:
+                        ijdoms.add(ijdom)
+
+                # Add rows to the dataframe now
+                for ijdom in sorted(ijdoms):
+                    combo = tuple(itertools.chain(wcombo, ijdom))
+
+                    orows.append(itertools.chain(tup, [combo]))
+
+        elif 'expset_fn' in parsed:
+            # User asked for a list of combos...
+            for combo in parsed['expset_fn']():
+                orows.append(itertools.chain(tup, [combo]))
+
+        elif realized:
+            # No combo info given, our only clue is the experiment itself.
+            # Let's list ALL the combos in this experiment
+            print('TODO: List all combos in experiment')
+            pass
+        else:
+            raise ValueError('Not able to determine combos for: {}'.format(tup))
+
+    return pd.DataFrame(orows, columns=tuple(
+        itertools.chain(type(tup)._fields, ['combo'])))
+
+# ------------------------------------------------------------
+_chunk_subleafRE = re.compile(r'(\d+)([TSML])(For|NoFor)_(\d+)m')
+_releasefileRE = re.compile(r'(.*)([TSML])([_-])rel.shp')
+def add_releasefile(akdf, scenetypes=['x']):
+
+    # -----------------------------
+    orows = list()
+    def process_releasedir(tup, scenetype, releasedir):
+        for name in os.listdir(releasedir):
+            match = _releasefileRE.match(name)
+            if match is not None:
+                sizecat = match.group(2)
+                orows.append(itertools.chain(tup, [scenetype, sizecat, releasedir / name]))
+    # -----------------------------
+
+    for scenetype in scenetypes:
+        # First find directories containing RELEASE files
+        for tup in akdf.itertuples():
+            parsed = tup.parsed
+
+            if parsed['type'] == 'releasefile':
+                # The releasefile is just given to us!
+                orows.append(itertools.chain(tup,
+                    [parsed['scenetype'], parsed['sizecat'], parsed['releasefile']]))
+            elif parsed['type'] == 'arcfile':
+                orows.append(itertools.chain(tup,
+                    ['arc', parsed['sizecat'], None]))
+            else:
+                # We need to list releasefiles from a higher level
+                expmod = parse.load_expmod(tup.exp)
+                combo = expmod.Combo(*tup.combo)
+                scenedir = expmod.combo_to_scenedir(combo, scenetype=scenetype)
+                if scenetype == 'x':
+                    sceneleaf = scenedir.parts[-1]    # Eg: x-113-045
+                    for name in os.listdir(scenedir / 'CHUNKS'):
+                        chunk_subleaf = name[len(sceneleaf):]    # Eg: 0000230TFor_10m
+                        match = _chunk_subleafRE.match(chunk_subleaf)
+                        if match is not None:
+                            # We found a valid chunk dir!  Remember its associated RELEASE dir.
+                            process_releasedir(tup, 'x', scenedir / 'CHUNKS' / name / 'RELEASE')
+                elif scenetype == 'arc':
+                    process_releasedir(tup, 'arc', scenedir / 'RELEASE')
+
+    return pd.DataFrame(orows, columns=tuple(
+        itertools.chain(type(tup)._fields, ['scenetype', 'sizecat', 'releasefile'])))
+# ------------------------------------------------------------
+@functools.lru_cache()
+def _realized_ids(scenetype, releasefile):
+    """Find IDs that exist on disk.
+    (Cached separate function)
+
+    Returns: {id: filename}
+    """
+
+    avalfiles = dict()
+
+    # Find the IDs that exist on disk
+    if scenetype == 'x':
+#TODO: Apply proper comparisons to avoid race conditions
+        resultsdir = releasefile.parents[1] / 'RESULTS'
+#        print('resultsdir ', resultsdir)
+        for out_zip in glob.iglob(str(resultsdir / '*' / '*' / '*.out.zip')):
+            match = _out_zipRE.match(os.path.split(out_zip)[1])
+            id = int(match.group(2))
+            avalfiles[id] = out_zip
+    elif scenetype == 'arc':
+        avaldir = releasefile.parents[1]
+        avalfiles = dict()
+        for name in os.listdir(avaldir):
+            match = avalRE.match(name)
+            if match is not None:
+                avalfiles[int(match.group(2))] = avaldir / name
+    else:
+        assert False
+
+    return avalfiles
+
+_avalRE = re.compile(r'aval-([TSML])-(\d+)')
+_out_zipRE = re.compile(r'(.*)_(\d+)\.out\.zip$')
+def add_id(akdf, realized=True):
+    orows = list()
+
+    for tup in akdf.itertuples():
+        parsed = tup.parsed
+
+        # See if a single avalanche ID was already specified
+        if parsed['type'] == 'arcfile':
+            orows.append(itertools.chain(tup,
+                [ parsed['id'], parsed['arcfile'] ]))
+            continue
+
+        # Get list of IDs to include
+        if 'ids' in parsed:
+            # The user provided a list of IDs in the query
+            ids = parsed['ids']
+        else:
+            # Read the releasefile
+            df = shputil.read_df(tup.releasefile, read_shapes=False)
+            ids = df['Id'].tolist()
+
+        # Add those IDs
+        if realized:
+            # Match those IDs against what was requested in the releasefile
+            avalfiles = _realized_ids(tup.scenetype, tup.releasefile)
+#            print('avalfiles ', tup.combo, len(avalfiles), len(ids))
+            for id in ids:
+                try:
+                    orows.append(itertools.chain(tup, (id, avalfiles[id])))
+                except KeyError:
+                    # ID from releasefile was not realized, ignore it
+                    pass
+        else:
+            # Just include the IDs, no avalfiles
+            # User can fill in avalfile column later if desired.
+            for id in ids:
+                orows.append(itertools.chain(tup, (id, None)))
+
+
+    return pd.DataFrame(orows, columns=tuple(
+        itertools.chain(type(tup)._fields, ['id', 'avalfile'])))
+
+

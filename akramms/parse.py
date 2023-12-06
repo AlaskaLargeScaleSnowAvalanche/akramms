@@ -1,6 +1,6 @@
 import functools,re,os,itertools,pathlib
 import importlib
-
+import netCDF4
 
 # =====================================================================
 _module_type = type(re)    # Any module will do here
@@ -26,8 +26,10 @@ def parse_parts(parts, load=False, assume_wcombo=False):
         ['ak', 'ccsm', '1981', '1990', 'lapse', 'For', '30', '113', '045']
         ['ak', 'ccsm', '1981', '1990', 'lapse', 'For', '30']
     """
+
     # Process dashes
     parts = list(itertools.chain(*(part.split('-') for part in parts)))
+
 
     # Process dots
     parts2 = list()
@@ -102,14 +104,16 @@ def parse_expset(expset, load=True):
     if match is None:
         raise ValueError(f'Not an expset: {expset}')
 
-    ret = {'type': 'expset', 'exp': match.group(1), 'expset': match.group(2)}
+    exp = match.group(1)
+    expset = match.group(2)
+    ret = {'type': 'expset', 'exp': exp, 'expset': expset}
     if load:
         try:
             ret['expmod'] = load_expmod(exp)
         except ModuleNotFoundError:
             pass    # Maybe the Python file for this experiment isn't available
 
-        ret['expset_fn'] = getattr(ret['expmod'], ret['expset'])
+        ret['expset_fn'] = getattr(ret['expmod'], expset)
     return ret
 
 
@@ -148,7 +152,7 @@ def parse_trialdir(trialdir):
     ret['type'] = 'trialdir'
     return ret
 # ----------------------------------------------------------------------
-_scenedirRE = re.compile(r'(x|arc)-(\d+)-(\d+)$')
+scenedirRE = re.compile(r'(x|arc)-(\d+)-(\d+)$')
 def parse_scenedir(scenedir):
     """
     scenedir: Eg:
@@ -159,7 +163,7 @@ def parse_scenedir(scenedir):
     ret['scenedir'] = scenedir
 
     # Get idom, jdom
-    match = _scenedirRE.match(scenedir.parts[-1])
+    match = scenedirRE.match(scenedir.parts[-1])
     if match is None:
         raise ValueError(f'Not a scenedir: {scenedir}')
     ret['scenetype'] = match.group(1)
@@ -245,8 +249,35 @@ def parse_releasefile(releasefile):
 
     return ret
 # ----------------------------------------------------------------------
+# TODO: Read all info from INSIDE the arcfile, allowing it to be named anything.  We can tell it's an arcfile because it ends in .nc
+_avalRE = re.compile(r'aval-([TSML])-(\d+)')
+def parse_arcfile(arcfile):
+    match = _avalRE.match(arcfile.parts[-1])
+    if match is None:
+        raise ValueError(f'Not an archived avalanche file: {arcfile}')
+
+    sizecat = match.group(1)
+
+    with netCDF4.Dataset(arcfile) as nc:
+        statusv = nc.variables['status']
+        # TODO: Change to exp in the NetCDF file
+        exp = statusv.getncattr('exp_mod')
+
+
+    ret = {'exp': exp, 'type': 'arcfile', 'sizecat': sizecat, 'arcfile': arcfile, 'id': int(match.group(2)) }
+    return ret
+# ----------------------------------------------------------------------
 def parse_file(file):
-    return parse_releasefile(file)
+
+    """Can specify release files or individual avalanche files (in
+    archive form)
+    """
+
+    try:
+        return parse_releasefile(file)
+    except:
+        pass
+    return parse_arcfile(file)
 # =============================================================
 # ----------------------------------------------------------------------
 _exclude_dirs = {'.', '..'}
@@ -255,6 +286,7 @@ def parse_args(args, load=True):
 
     rets = list()    # The things we parsed
     parts = list()    # Accumulate args
+    ids = list()
 
     # --------------------------------
     def flush_parts():    # Parses
@@ -266,27 +298,42 @@ def parse_args(args, load=True):
         if len(parts) == 1:
             # First try parsing as an expset
             try:
-                rets.append(parse_expset(parts[0]), load=load)
+                parsed = parse_expset(parts[0], load=load)
             except ValueError:
                 # I guess it's not an expset
-                rets.append(parse_parts(parts, load=load))
+                parsed = parse_parts(parts, load=load)
 
         else:
-            rets.append(parse_parts(parts, load=load))
+            parsed = parse_parts(parts, load=load)
+
+        # Add any Avalanche IDs we accumulated.
+        if len(ids) > 0:
+            parsed['ids'] = ids
+
+        rets.append(parsed)
         parts.clear()
+        ids.clear()
 
     # --------------------------------
+    state = 'p'
     for arg in args:
-        if arg == ':':    # Separator
+        if arg == '::':    # Separate one parse-thing from the next
             flush_parts()
-        elif os.path.isdir(arg) and len(parts) > 0:  # If it's '.', it might be an actual directory
-            flush_parts()
-            rets.append(parse_dir(pathlib.Path(arg)))
-        elif os.path.isfile(arg):
-            flush_parts()
-            rets.append(parse_file(pathlib.Path(arg)))
         else:
-            parts.append(arg)
+            if state == 'p':    # Parsing parts
+                if arg == ':':    # Separate parts from avalanche IDs
+                    state = 'i'
+                    ids.clear()
+                elif os.path.isdir(arg) and (arg != '.') and (arg != '..'):  # If it's '.', it might be an actual directory
+                    flush_parts()
+                    rets.append(parse_dir(pathlib.Path(arg)))
+                elif os.path.isfile(arg):
+                    flush_parts()
+                    rets.append(parse_file(pathlib.Path(arg)))
+                else:
+                    parts.append(arg)
+            elif state == 'i':
+                ids.append(int(arg))
     flush_parts()
 
     return rets

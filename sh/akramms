@@ -3,6 +3,7 @@
 
 #import cProfile
 import netCDF4
+import pandas as pd
 from akramms import config,params
 import akramms.parse
 import argparse,itertools,os,subprocess,sys,io,codecs,re,pickle
@@ -392,11 +393,24 @@ def step4(args):
     argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
 def parse(args):
-    prs = akramms.parse.parse_args(args.avals)
-    for pr in prs:
+    from akramms import resolve
+
+    parseds = akramms.parse.parse_args(args.avals)
+    for pr in parseds:
         print('-------------------------------')
         for k,v in pr.items():
             print(f'{k}: {v}')
+
+
+    akdf = resolve.initial(parseds)
+    akdf = resolve.add_exp(akdf)
+    akdf = resolve.add_combo(akdf, scenetypes={'x'})
+    akdf = resolve.add_releasefile(akdf, scenetypes={'x'})
+    akdf = resolve.add_id(akdf, realized=True)
+    akdf = akdf.drop('parsed', axis=1)
+    print(akdf)
+
+
 
 @subcommand([
     argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),

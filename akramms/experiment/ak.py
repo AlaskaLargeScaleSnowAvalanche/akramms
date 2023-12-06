@@ -76,9 +76,9 @@ combo_keys = list(combo_schema.schema.keys())
 Combo = collections.namedtuple('Combo', combo_keys)
 
 # -------------------------------------------------------------
-def combo_to_scene_dir(combo, type='x'):
+def combo_to_scenedir(combo, scenetype='x'):
     trial_name = f'{name}-{combo.snow_dataset}-{combo.year0}-{combo.year1}-{combo.downscale_algo}-{combo.forest}-{combo.return_period}'
-    scene_name = f'{type}-{combo.idom:03d}-{combo.jdom:03d}'    # Underscores would confuse things
+    scene_name = f'{scenetype}-{combo.idom:03d}-{combo.jdom:03d}'    # Underscores would confuse things
 
     return dir / trial_name / scene_name
 
