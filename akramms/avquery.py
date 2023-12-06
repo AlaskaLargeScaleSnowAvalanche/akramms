@@ -3,73 +3,6 @@
 #3. experiment directory + combo: list all x- and arc-, then filter further
 
 
-# -----------------------------------------------------------------
-def getmtime(fname):
-    """Returns modification time of a file; or -1 if it doesn't exist."""
-    if os.path.exists(fname):
-        return os.path.getmtime(fname)
-    else:
-       return -1.0
-
-idRE = re.compile(r'.*_(\d+)\.out\.zip$')
-def extract_id(out_zip):
-    """Returns the avalanche ID from a .out.zip filename"""
-    return int(idRE.match(out_zip).group(1))
-
-# -----------------------------------------------------------------
-def get_arcs_by_id(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
-    """Returns the arc file
-
-    exp_mod:
-        Main experiment info
-    combo:
-        Describes which RAMMS run within the experiment
-    id:
-        Which avalanche within the RAMMS run
-    """
-
-
-    # List all the output files in an experiment
-    x_dir = exp_mod.combo_to_scene_subdir(combo, type='x')
-    out_zips = {extract_id(x) : x
-        for x in glob.iglob(os.path.join(x_dir, 'CHUNKS', '*', '*', '*', '*', '*.out.zip'))}
-
-    arc_fnames = list()
-    for id in ids:
-        # ------- Get name and modification time of archive .nc file
-        arc_fname = os.path.join(
-            exp_mod.combo_to_scene_subdir(combo, type='arc'),
-            f'aval-{id}.nc')
-        if os.path.exists(arc_fname):
-            arc_mtime = os.path.getmtime(arc_fname)
-        else:
-            arc_mtime = -1.0
-
-        # -------- Get name and modification time of original .out.zip file
-        try:
-            out_zip = out_zips[id]
-            # Make sure the out.zip file is complete / ready to archive
-            status = out_zip_status(out_zip)
-            if status in ok_statuses:
-                out_zip_mtime = os.path.getmtime(out_zip)
-            else:
-                # Act like the .out.zip file does not exist
-                out_zip_mtime = -1.0
-        except KeyError:
-            out_zip_mtime = -1.0
-
-        # -------- Decide whether we need to regenerate
-        if arc_mtime > out_zip_mtime:
-            # Arc file exists and is up-to-date, DO NOT regenerate
-            arc_fnames.append(arc_fname)
-        elif out_zip_mtime > 0:
-            # .out.zip file is OK, so let's regenerate
-           ramms_to_nc0(basename, arc_fname)
-            arc_fnames.append(arc_fname)
-        else:
-            # Neither file exists, that's an error.
-            arc_fnames.append(None)
-
 
 
 
@@ -141,25 +74,6 @@ def list_unarchived(scene_dir):
         yield AvalFile(id, out_zip, out_zip_status(out_zip))
 
 
-def out_zip_status(out_zip):
-    """Examines an .out.zip file to determine whether it is OK, or if
-    there is a problem with it that might affect mosaic."""
-
-    basename = out_zip[:-8]    # Remove .out.zip
-
-    # Make sure .in.zip exists
-    in_zip = basename + '.in.zip'
-    if not os.path.exists(in_zip):
-        return NO_IN_ZIP
-
-    # Make sure the avalanche didn't overrun the domain.
-    with zipfile.ZipFile(basename+'.out.zip', 'r') as in_zip:
-        arcnames = [os.path.split(x)[1] for x in in_zip.namelist()]
-    if any(x.endswith('.out.overrun') for x in arcnames):
-        return OVERRUN
-
-    # Add as archivable ID
-    return OK
 
 
 avalRE = re.compile(r'aval-(\d+)\.nc')

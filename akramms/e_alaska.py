@@ -9,7 +9,7 @@ from akramms import d_ifsar, d_usgs_landcover
 # Top-level experimental design for Alaska
 
 # Root directory of studies in this experiment
-name = 'ak'
+name = __name__.rsplit('.', 1)[-1]    # e_alaska
 dir = os.path.join(config.roots['PRJ'], name)
 
 # Map coordinate system we use
@@ -72,7 +72,7 @@ Combo = collections.namedtuple('Combo', combo_keys)
 
 # -------------------------------------------------------------
 def combo_to_scene_subdir(combo, type='x'):
-    trial_name = f'{name}-{combo.snow_dataset}-{combo.year0}-{combo.year1}-{combo.downscale-algo}-{combo.forest}-{combo.return_period}'
+    trial_name = f'{name}-{combo.snow_dataset}-{combo.year0}-{combo.year1}-{combo.downscale_algo}-{combo.forest}-{combo.return_period}'
     scene_name = f'{type}-{combo.idom:03d}-{combo.jdom:03d}'    # Underscores would confuse things
 
     return os.path.join(trial_name, scene_name)

@@ -25,6 +25,26 @@ error_msgs = {
 #TODO: Put avalanche bounding box into NetCDF file.  (Or a related database file)
 
 # -----------------------------------------------------------------
+def out_zip_status(out_zip):
+    """Examines an .out.zip file to determine whether it is OK, or if
+    there is a problem with it that might affect mosaic."""
+
+    basename = out_zip[:-8]    # Remove .out.zip
+
+    # Make sure .in.zip exists
+    in_zip = basename + '.in.zip'
+    if not os.path.exists(in_zip):
+        return NO_IN_ZIP
+
+    # Make sure the avalanche didn't overrun the domain.
+    with zipfile.ZipFile(basename+'.out.zip', 'r') as in_zip:
+        arcnames = [os.path.split(x)[1] for x in in_zip.namelist()]
+    if any(x.endswith('.out.overrun') for x in arcnames):
+        return OVERRUN
+
+    # Add as archivable ID
+    return OK
+# -----------------------------------------------------------------
 def getmtime(fname):
     """Returns modification time of a file; or -1 if it doesn't exist."""
     if os.path.exists(fname):
@@ -32,15 +52,12 @@ def getmtime(fname):
     else:
        return -1.0
 
-idRE = re.compile(r'.*_(\d+)\.out\.zip$')
-def extract_id(out_zip):
-    """Returns the avalanche ID from a .out.zip filename"""
-    return int(idRE.match(out_zip).group(1))
-
 # -----------------------------------------------------------------
-def arc_files(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
+arcRE = re.compile(r'aval-([TSML])-(d+)\.nc')
+out_zipRE = re.compile(r'[^_]+_[^_]+_(\d+[TSML])_(\d+)\.out\.zip$')
+def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
     """Returns the names of archive files, based on a particular combo
-    and list of IDs within that combo.
+    and list of IDs within that combo.  Archives the avalanches if needed.
 
     exp_mod:
         Main experiment info
@@ -48,29 +65,33 @@ def arc_files(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
         Describes which RAMMS run within the experiment
     id:
         Which avalanche within the RAMMS run
-
     """
 
-
-    # List all the output files in an experiment
+    # List all the output .out.zip files in an experiment
     x_dir = exp_mod.combo_to_scene_subdir(combo, type='x')
-    out_zips = {extract_id(x) : x
-        for x in glob.iglob(os.path.join(x_dir, 'CHUNKS', '*', '*', '*', '*', '*.out.zip'))}
+    out_zips = dict()    
+    for out_zip in glob.iglob(os.path.join(x_dir, 'CHUNKS', '*', '*', '*', '*', '*.out.zip')):
+        match = out_zipRE.match(out_zip)
+        sizecat = match.group(1)
+        id = int(match.group(2))
+        out_zips[id] = (out_zip, sizecat)    # full-pathname, sizecat
+
+
+    # List all the existing archive .nc files
+    arc_dir = exp_mod.combo_to_scene_subdir(combo, type='arc')
+    ncs = dict()
+    for name in os.listdir(arc_dir):
+        match = arcRE.match(name)
+        if match is not None:
+            ncs[int(match.group(2))] = (name, match.group(1))    # leaf-name, sizecat
+
 
     arc_fnames = list()
+    first = True
     for id in ids:
-        # ------- Get name and modification time of archive .nc file
-        arc_fname = os.path.join(
-            exp_mod.combo_to_scene_subdir(combo, type='arc'),
-            f'aval-{id}.nc')
-        if os.path.exists(arc_fname):
-            arc_mtime = os.path.getmtime(arc_fname)
-        else:
-            arc_mtime = -1.0
-
         # -------- Get name and modification time of original .out.zip file
         try:
-            out_zip = out_zips[id]
+            out_zip,ozip_sizecat = out_zips[id]
             # Make sure the out.zip file is complete / ready to archive
             status = out_zip_status(out_zip)
             if status in ok_statuses:
@@ -81,47 +102,47 @@ def arc_files(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
         except KeyError:
             out_zip_mtime = -1.0
 
+        # ------- Get name and modification time of archive .nc file
+        if id in ncs:
+            name,arc_sizecat = ncs[id]
+            arc_fname = os.path.join(arc_dir, name)
+            arc_mtime = os.path.getmtime(arc_fname)
+        else:
+            arc_mtime = -1.0
+
+        # ------- Reported sizecats must be the same
+        assert arc_sizecat == ozip_sizecat
+
         # -------- Decide whether we need to regenerate
         if arc_mtime > out_zip_mtime:
             # Arc file exists and is up-to-date, DO NOT regenerate
             arc_fnames.append(arc_fname)
+            if id in out_zips:
+                # Add to our delete list...
+                archived_out_zips.append(out_zip)
         elif out_zip_mtime > 0:
             # .out.zip file is OK, so let's regenerate
-           ramms_to_nc0(basename, arc_fname)
+
+            arc_fname = os.path.join(
+                exp_mod.combo_to_scene_subdir(combo, type='arc'),
+                f'aval-{ozip_sizecat}-{id}.nc')
+
+            if first:
+                os.makedirs(archive_dir, exist_ok=True)
+                first = False
+            ramms_to_nc0(out_zip, arc_fname)
             arc_fnames.append(arc_fname)
+            archived_out_zips.append(out_zip)
         else:
             # Neither file exists, that's an error.
             arc_fnames.append(None)
 
-    return arc_fnames
-
-
-
+    return arc_fnames, archived_out_zips
 
 # -----------------------------------------------------------------
-
-
-def archive_scene(scene_dir, archive_dir):
-    """Copies everything except the avalanches from a raw scene_dir to an archived archive_dir
-    scene_dir:
-        Raw scene directory.  Eg:
-            ~/prj/ak/ak_ccsm_1981_1990_lapse_For_30/x-113-026
-    archive_dir:
-        Directory where to archive. Eg:
-            ~/prj/ak/ak_ccsm_1981_1990_lapse_For_30/arc-113-026
-    """
-
-    os.makedirs(archive_dir, exist_ok=True)
-
-    # Copy a few top-level files
-    for leaf in ('scene.nc', 'scene.cdl', 'crs.prj'):
-        shutil.copy2(os.path.join(scene_dir, leaf), archive_dir)
-
-    # Copy the lists PRA polygons
-    shutil.copytree(
-        os.path.join(scene_dir, 'RELEASE'),
-        os.path.join(archive_dir, 'RELEASE'),
-        dirs_exist_ok=True)
+def ids_in_combo(exp_mod, combo):
+    """Read the RELEASE files to determine which avalanche IDs are
+    involved in a combo."""
 
     # Look in RELEASE-dir shapefiles to determine theoretical set Avalanche IDs
     # (By looking here, we avoid picking up random junk)
@@ -133,58 +154,43 @@ def archive_scene(scene_dir, archive_dir):
                 os.path.join(scene_dir, 'RELEASE', leaf), read_shapes=False)
             shp_ids += df['Id'].tolist()
 
-    # list of errors
-    no_in_zips = dict()
-    overruns = ()
+    return shp_ids
+# -----------------------------------------------------------------
+def archive_combo(exp_mod, combo, ok_statuses={OK,OVERRUN}):
+    """Archives all IDs in a combo.
+    Returns: {id: arc_fname}
+    """
 
-    # Look for .out.zip files for list of actual available Avalanche
-    # IDs.  If all avalanches have completed successfully, and there is
-    # now "pollution" of other runs in this directory, the list should
-    # be the same as shp_ids
-    out_zips = {x.id: (x.status, x.fname) for x in avquery.list_unarchived(scene_dir)}
+    scene_dir = exp_mod.combo_to_scene_subdir(combo, type='x')
+    archive_dir = exp_mod.combo_to_scene_subdir(combo, type='arc')
 
-    todels = list()
+    # Copy a few top-level files
+    os.makedirs(archive_dir, exist_ok=True)
+    for leaf in ('scene.nc', 'scene.cdl', 'crs.prj'):
+        shutil.copy2(os.path.join(scene_dir, leaf), archive_dir)
 
-    # Go through our avalanches by ID
-    errors_by_status = dict((i,list()) for i in range(MAX_STATUS+1))
-    for id in shp_ids:
-        out_nc = os.path.join(archive_dir, 'aval-{:d}.nc'.format(id))
+    # Copy the lists PRA polygons
+    shutil.copytree(
+        os.path.join(scene_dir, 'RELEASE'),
+        os.path.join(archive_dir, 'RELEASE'),
+        dirs_exist_ok=True)
 
-        # Only rewrite out_nc if it doesn't exist
-#TODO: Check file timestamps
-        status,out_zip = out_zips.get(id, (NO_OUT_ZIP, None))
-        print('yyy ', id, status, out_zip)
-        basepath = None if out_zip is None else out_zip[:-8]   # ..../.../.../.../xxxxx.out.zip
-
-        if os.path.exists(out_nc):
-            # If the archive already exists, we can just delete the old
-            # files (if they are there) and move on.
-            if basepath is not None:
-                todels.append(basepath)
-        elif status == OK:
-            # The archive does not exist, we will have to create it if we can.
-            print(f'... {out_nc}')
-            try:
-                ncaval.ramms_to_nc0(basepath, out_nc)
-                todels.append(basepath)
-            except Exception as e:
-                traceback.print_exception(e)
-                errors_by_status[UNKNOWN_ERROR].append(id)
-        else:
-            errors_by_status[status].append(id)
+    # Make sure everything in this combo is archived.
+    shp_ids = ids_in_combo(exp_mod, combo)
+    arc_fnames, archived_out_zips = fetch(exp_mod, combo, shp_ids, ok_statuses=ok_statuses)
 
     # We've successfully written the netCDF files.
     # Delete the originals (if they exist to begin with)
-    for basepath in todels:
-        if basepath is not None:
-            for suffix in ('.job.err', '.job.log', '.job.out', '.in.zip', '.out.zip'):
-                fname = f'{basepath}{suffix}'
-                if os.path.exists(fname):
-                    try:
-                        print('Remove ', fname)
-                        #os.remove(fname)
-                    except FileNotFoundError:
-                        pass
+    for out_zip in archived_out_zips:
+        basepath = out_zip[:-8]
+        for suffix in ('.job.err', '.job.log', '.job.out', '.in.zip', '.out.zip'):
+            fname = f'{basepath}{suffix}'
+            if os.path.exists(fname):
+                try:
+                    print('Remove ', fname)
+                    #os.remove(fname)
+                except FileNotFoundError:
+                    pass
 
     # Print the errors
     for status,ids in errors_by_status.items():
@@ -192,8 +198,16 @@ def archive_scene(scene_dir, archive_dir):
             print(error_msgs[status].format(ids=ids))
 
 
+#def main():
+#    scene_dir = '/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/x-113-045'
+#    archive_dir = '/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/arc-113-045'
+#    archive_scene(scene_dir, archive_dir)
+
+
 def main():
-    scene_dir = '/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/x-113-045'
-    archive_dir = '/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/arc-113-045'
-    archive_scene(scene_dir, archive_dir)
+    from akramms import e_alaska
+    
+    combo = e_alaska.Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 45)
+    fetch(e_alaska, combo, [2058])
+
 main()
