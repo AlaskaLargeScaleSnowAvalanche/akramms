@@ -1,7 +1,7 @@
 import os,subprocess,functools,re,typing,zipfile,enum,sys
 import htcondor
 import pandas as pd
-from akramms import config,file_info,parse,level,complete,resolve,archive
+from akramms import config,file_info,parse,level,complete,resolve,archive,overrun
 
 # Categorize each job int one of four sets
 #job_status_labels = ('noinput', 'incomplete', 'todo', 'inprocess', 'finished', 'overrun', 'failed')
@@ -419,7 +419,7 @@ def add_chunk_status(akdf, realized=True, update=True):
     return pd.concat(dfs)
 
 # ------------------------------------------------------------
-def add_combo_status(akdf0, realized=True, update=True):
+def add_combo_status(akdf0, realized=True, update=True, dry_run=False):
     """akdf:
         Resolved to combo level (theoretical, i.e. realized=False)
     """
@@ -445,35 +445,73 @@ def add_combo_status(akdf0, realized=True, update=True):
         df = akdf1[is_archived]
         df['combo_status'] = JobStatus.MARKED_FINISHED
         dfs.append(df)
+        akdf1 = akdf1[~is_archived]
 
         # ------------------------------------------
-        # Get jobstatus at releasefile level
+        # Get jobstatus at id level
         rfdf1 = resolve.resolve_chunk(akdf1)
-        rfdf1 = add_chunk_status(rfdf1, realized=realized, update=update)
+        iddf1 = resolve.resolve_id(rfdf1, realized=realized)
+        iddf1 = add_id_status(iddf1)
+
+        # Replace older avalanches runs with newer runs of the same ID
+        # (which presumably have fixed overrun problems)
+        iddf1 = overrun.drop_duplicates(iddf1)
+
+        if update:
+            # Archive avalanches that have finished
+            mask = (iddf1.id_status == JobStatus.FINISHED)
+            archive.archive_ids(expmod, iddf1[mask], dry_run=dry_run)
 
         # Aggregate id status back to combo level and add to akdf1
+        # (Now we know whether the combo has fully finished)
         combo_status = \
-            rfdf1[['combo','chunk_status']].groupby('combo').min() \
-            .rename(columns={'chunk_status': 'combo_status'})
+            iddf1[['combo','id_status']].groupby('combo').min() \
+            .rename(columns={'id_status': 'combo_status'})
         akdf1 = akdf1.merge(combo_status, how='left', left_on='combo', right_index=True)
         akdf1['combo_status'] = akdf1.combo_status.fillna(JobStatus.NOINPUT).astype(int)
-        # -------------------------------------------------
 
-        # Archive combos if they have in fact finished
+        # --------------------------------------------
         if update:
+            # Mark combos that have fully finished
             mask = (akdf1.combo_status == JobStatus.FINISHED)
-            dfs.append(akdf1[~mask])
+            for tup in akdf1[mask].itertuples(index=False):
+                arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
+                ofname = arcdir / 'archived.txt'
+                if dry_run:
+                    print(f'If not for dry_run, I would be writing the file {ofname}')
+                else:
+                    with open(ofname, 'w') as out:
+                        out.write('Combo archived\n')
+        dfs.append(akdf1)
 
-            finished_combo_df = akdf1[mask]
-            archive.archive_combos(finished_combo_df)
-            finished_combo_df.combo_status = JobStatus.ARCHIVED
-            dfs.append(finished_combo_df)
-        else:
-            dfs.append(akdf1)
+        # ------------------------------------------
+#        # Get jobstatus at releasefile level
+#        rfdf1 = resolve.resolve_chunk(akdf1)
+#        rfdf1 = add_chunk_status(rfdf1, realized=realized, update=update)
+#
+#        # Aggregate id status back to combo level and add to akdf1
+#        combo_status = \
+#            rfdf1[['combo','chunk_status']].groupby('combo').min() \
+#            .rename(columns={'chunk_status': 'combo_status'})
+#        akdf1 = akdf1.merge(combo_status, how='left', left_on='combo', right_index=True)
+#        akdf1['combo_status'] = akdf1.combo_status.fillna(JobStatus.NOINPUT).astype(int)
+#        # -------------------------------------------------
+#
+#        # Archive combos if they have in fact finished
+#        if update:
+#            mask = (akdf1.combo_status == JobStatus.FINISHED)
+#            dfs.append(akdf1[~mask])
+#
+#            finished_combo_df = akdf1[mask]
+#            archive.archive_combos(finished_combo_df, dry_run=dry_run)
+#            finished_combo_df.combo_status = JobStatus.ARCHIVED
+#            dfs.append(finished_combo_df)
+#        else:
+#            dfs.append(akdf1)
 
     return pd.concat(dfs)
 # ------------------------------------------------------------
-def add_status(akdf, level, realized=True, update=True):
+def add_status(akdf, level, realized=True, update=True, dry_run=False):
     if level == 'id':
         akdf = add_id_status(akdf)
 
@@ -481,7 +519,7 @@ def add_status(akdf, level, realized=True, update=True):
         akdf = add_chunk_status(akdf, realized=realized, update=update)
 
     elif level == 'combo':
-        akdf = add_combo_status(akdf, realized=realized, update=update)
+        akdf = add_combo_status(akdf, realized=realized, update=update, dry_run=dry_run)
 
     return akdf
 

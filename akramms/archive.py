@@ -209,7 +209,7 @@ def is_overrun(ozip):
     ozip: zipfile.ZipFile
         Open zipfile of <xyz>.out.zip
     """
-    arcnames = [os.path.split(x)[1] for x in out_zip.namelist()]
+    arcnames = [os.path.split(x)[1] for x in ozip.namelist()]
     overrun = any(x.endswith('.out.overrun') for x in arcnames)
 
     return overrun
@@ -365,25 +365,41 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
         rdf = rdf.set_index('Id')
 
         for tup in akdf1.reset_index(drop=True).itertuples(index=False):
-
             inout = file_info.inout_name(jb, tup.chunkid, tup.id)
             out_zip = jb.avalanche_dir / f'{inout}.out.zip'
+            out_zip_mtime = os.path.getmtime(out_zip)
+            out_zip_dtime = datetime.datetime.fromtimestamp(out_zip_mtime)
             arc_leafbase = f'aval-{jb.pra_size}-{tup.id}'
 
-            # Skip if already archived
-            if file_info.is_file_good(out_zip):
+            # Avoid archiving bad files
+            if not file_info.is_file_good(out_zip):
                 continue
 
             # Avoid archiving overrun files
             with zipfile.ZipFile(out_zip, 'r') as ozip:
                 overrun = is_overrun(ozip)
             if (not archive_overrun) and overrun:
-                print('Not archiving overrun: {out_zip}')
+                print(f'Not archiving overrun: {out_zip}')
                 continue
+
+            # Determine if the avalanche was already archived
+            Overrun = 'overrun' if overrun else ''
+            arc_fname = arc_dir / f'{arc_leafbase}-{Overrun}.nc'
+            if os.path.exists(arc_fname):
+                with netCDF4.Dataset(arc_fname) as nc:
+                    ncv = nc.variables['status']
+                    ncv_dtime = datetime.datetime.fromisoformat(ncv.avalanche_timestamp)
+
+                    if out_zip_dtime <= ncv_dtime:
+                        print(f'Not archiving based on timestamp: {out_zip}')
+                        continue
+
+#                arc_mtime = os.path.getmtime(arc_fname)
+
 
             out_zips.append(str(out_zip))
             if dry_run:
-                print(f'Archive {out_zip} -> {arc_leafbase}')
+                print(f'Except for dry_run, archive {out_zip} -> {arc_leafbase}')
                 continue
 
             # -------- Convert to NetCDF
@@ -414,8 +430,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
 
                     ncv.combo = '{exp}-{scombo}'
                     ncv.releasefile_timestamp = releasefile_timestamp
-                    out_zip_mtime = os.path.getmtime(out_zip)
-                    ncv.avalanche_timestamp = datetime.datetime.fromtimestamp(out_zip_mtime).isoformat()
+                    ncv.avalanche_timestamp = out_zip_dtime.isoformat()
                     ramms_to_nc0(out_zip, ncout)
 
                     # Add info from scene that created this avalanche
@@ -424,9 +439,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
                         grp = ncout.createGroup('scene_nc')
                         schema.create(grp)
                         schema.copy(ncin, grp)
-                Overrun = 'overrun' if overrun else ''
-                arc_fname = arc_dir / f'{arc_leafbase}-{Overrun}.nc'
-                print(f'Archive {out_zip} -> {arc_fname}')
+#                print(f'Archive {out_zip} -> {arc_fname}')
                 os.rename(tmp_fname, arc_fname)
             except Exception:
                 # Remove candidate output file, if it exists
@@ -445,7 +458,7 @@ def _git_commit(dir):
     return proc.stdout.readline().strip()    # We just want head -1
 
 # -----------------------------------------------------------------
-def archive_ids(akdf, debug=False, dry_run=False, archive_overrun=False):
+def archive_ids(expmod, akdf, debug=False, dry_run=False, archive_overrun=False):
     """Archives in multi-thread
     akdf:
         Resolved to id leavel
@@ -467,12 +480,12 @@ def archive_ids(akdf, debug=False, dry_run=False, archive_overrun=False):
 
 
 
-    akdfs = np.array_split(akdf, config.ncpu_compress)
+    akdfs = np.array_split(akdf, config.ncpu_archive)
 
     archived_out_zips = list()
     with contextlib.ExitStack() as stack:
         ex = stack.enter_context(concurrent.futures.ThreadPoolExecutor(1)) if debug \
-            else concurrent.futures.ProcessPoolExecutor(config.ncpu_compress)
+            else concurrent.futures.ProcessPoolExecutor(config.ncpu_archive)
 
         futures = [ex.submit(_archive_single_threaded,
             akdfs[0], status_attrs,
@@ -490,23 +503,23 @@ def archive_ids(akdf, debug=False, dry_run=False, archive_overrun=False):
 
     return archived_out_zips
 # ----------------------------------------------------------
-def archive_combos(akdf_combo, debug=False, dry_run=False, archive_overrun=False):
-    """
-    akdf:
-        Resolved to combo level
-    """
-    akdf = resolve.resolve_chunk(akdf_combo, scenetypes='x')
-    akdf = resolve.resolve_id(akdf, realized=True, stage='out', include_overruns=False)
-    akdf = overrun.drop_duplicates(akdf)    # Remove overruns that were re-done
-
-    archive_ids(akdf, debug=debug, dry_run=dry_run)
-
-    for tup in akdf_combo.reset_index(drop=True).itertuples(index=False):
-        arcdir = expmod.combo_to_scenedir(scenetype='arc')
-        with open(arcdir / 'archived.txt', 'w') as out:
-            out.write('Combo archived\n')
-
-# ----------------------------------------------------------
+#def archive_combos(akdf_combo, debug=False, dry_run=False, archive_overrun=False):
+#    """
+#    akdf:
+#        Resolved to combo level
+#    """
+#    akdf = resolve.resolve_chunk(akdf_combo, scenetypes='x')
+#    akdf = resolve.resolve_id(akdf, realized=True, stage='out', include_overruns=False)
+#    akdf = overrun.drop_duplicates(akdf)    # Remove overruns that were re-done
+#
+#    archive_ids(akdf, debug=debug, dry_run=dry_run)
+#
+#    for tup in akdf_combo.reset_index(drop=True).itertuples(index=False):
+#        arcdir = expmod.combo_to_scenedir(scenetype='arc')
+#        with open(arcdir / 'archived.txt', 'w') as out:
+#            out.write('Combo archived\n')
+#
+## ----------------------------------------------------------
 #def main():
 #    out_zip = '/home/efischer/prj/ak/ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/x-113-0450000230MFor_10m/RESULTS/x-113-04500002For_10m/30M/x-113-04500002For_10m_30M_3200.out.zip'
 #    with netCDF4.Dataset('x.nc', 'w') as ncout:

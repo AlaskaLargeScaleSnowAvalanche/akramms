@@ -77,9 +77,11 @@ def add_combo_status(akdf0, realized=True, update=True):
     """akdf:
         Resolved to combo level (theoretical, i.e. realized=False)
     """
+    print('zzzzzzzzzz1')
     # Make it idempotent
     if 'combo_status' in akdf0.columns:
         return akdf0
+    print('zzzzzzzzzz2')
 
     dfs = list()
 
@@ -87,6 +89,7 @@ def add_combo_status(akdf0, realized=True, update=True):
         akdf0['combo_status'] = JobStatus.TODO
         return akdf0
 
+    print('zzzzzzzzzz3')
 
     for exp,akdf1 in akdf0.reset_index(drop=True).groupby('exp'):
         expmod = parse.load_expmod(exp)
@@ -99,18 +102,65 @@ def add_combo_status(akdf0, realized=True, update=True):
         df = akdf1[is_archived]
         df['combo_status'] = JobStatus.MARKED_FINISHED
         dfs.append(df)
+        akdf1 = akdf1[~is_archived]
 
         # ------------------------------------------
-        # Get jobstatus at releasefile level
+        # Get jobstatus at id level
         rfdf1 = resolve.resolve_chunk(akdf1)
-        rfdf1 = add_chunk_status(rfdf1, realized=realized, update=update)
+        iddf1 = resolve.resolve_id(rfdf1, realized=realized)
+        iddf1 = add_id_status(iddf1)
+
+        # Replace older avalanches runs with newer runs of the same ID
+        # (which presumably have fixed overrun problems)
+        iddf1 = overrun.drop_duplciates(iddf1)
+
+        df = iddf1[iddf1.id_status == joblib.JobStatus.OVERRUN]
+        print('xxxxxxxxxxxyyyyyyyyyyyyyyyyy')
+        print(df)
+
 
         # Aggregate id status back to combo level and add to akdf1
         combo_status = \
-            rfdf1[['combo','chunk_status']].groupby('combo').min() \
-            .rename(columns={'chunk_status': 'combo_status'})
+            iddf1[['combo','id_status']].groupby('combo').min() \
+            .rename(columns={'id_status': 'combo_status'})
         akdf1 = akdf1.merge(combo_status, how='left', left_on='combo', right_index=True)
         akdf1['combo_status'] = akdf1.combo_status.fillna(JobStatus.NOINPUT).astype(int)
+
+#        # ------------------------------------------
+#        # Get jobstatus at id level
+#        rfdf1 = resolve.resolve_chunk(akdf1)
+#
+#        # Separate into chunks we know are complete, vs chunks needing further investigation
+#        rfdf1 = complete.add_chunk_complete_cached(rfdf1, 2)    # chunk_complete_stage2_cached
+#        mask = rfdf1['chunk_complete_stage2_cached']
+#        rfdf1_complete_cached = rfdf1[mask]
+#        rfdf1 = rfdf1[~mask]
+#
+#        # For chunks not yet complete, get jobstatus at id level
+#        iddf1 = resolve.resolve_id(rfdf1, realized=realized)
+#        #rfdf1 = add_chunk_status(rfdf1, realized=realized, update=update)
+#        iddf1 = add_id_status(iddf1)
+#
+#
+#        # Aggregate id status back to  level and add to akdf1
+#        combo_status = \
+#            rfdf1[['combo','chunk_status']].groupby('combo').min() \
+#            .rename(columns={'chunk_status': 'combo_status'})
+#        akdf1 = akdf1.merge(combo_status, how='left', left_on='combo', right_index=True)
+#        akdf1['combo_status'] = akdf1.combo_status.fillna(JobStatus.NOINPUT).astype(int)
+#        # -------------------------------------------------
+#
+#
+#        # Get jobstatus at chunk level
+#        rfdf1 = resolve.resolve_chunk(akdf1)
+#        rfdf1 = add_chunk_status(rfdf1, realized=realized, update=update)
+#
+#        # Aggregate id status back to combo level and add to akdf1
+#        combo_status = \
+#            rfdf1[['combo','chunk_status']].groupby('combo').min() \
+#            .rename(columns={'chunk_status': 'combo_status'})
+#        akdf1 = akdf1.merge(combo_status, how='left', left_on='combo', right_index=True)
+#        akdf1['combo_status'] = akdf1.combo_status.fillna(JobStatus.NOINPUT).astype(int)
         # -------------------------------------------------
 
         # Archive combos if they have in fact finished

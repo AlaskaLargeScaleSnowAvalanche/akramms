@@ -173,7 +173,7 @@ def parse_scenedir(scenedir):
     ret['type'] = 'scenedir'
     return ret
 # ----------------------------------------------------------------------
-_chunk_leafRE = re.compile(r'c-([TSML])-(\d+)')
+_chunk_leafRE = re.compile(r'^c-([TSML])-(\d+)$')
 #Chunk = collections.namedtuple('Chunk', ('chunkid', 'pra_size'))
 def parse_chunkdir(chunkdir):
     """

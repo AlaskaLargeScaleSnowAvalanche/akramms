@@ -124,7 +124,7 @@ def scenedir_to_chunknames(scenedir):
     scene_args = params.load(scenedir)
 #    print('scene_a1rgs ', scene_args)
 #    chunknameRE = re.compile(r'([^_]+)([TSML])(For|NoFor)_(\d+m)'.format(scene_args['return_periods'][0]))
-    chunknameRE = re.compile(r'c-([TMSL])-(\d+)')
+    chunknameRE = re.compile(r'^c-([TMSL])-(\d\d\d\d\d)$')
 
     rows = list()
     for name in os.listdir(scenedir / 'CHUNKS'):

@@ -210,14 +210,15 @@ def parse(args):
         help='Only check avalanches with .in.zip / .out.zip files'),
     argument('--update', action='store_true',
         help='Update markers of completion?'),
-
+    argument('--dry-run', action='store_true',
+        help="Don't actually do the work inside combo archive"),
 ])
 def status(args):
     """Test out parsing and resolving to different levels"""
 
     parseds = akramms.parse.parse_args(args.spec)
     akdf = resolve.resolve_to(parseds, args.level, realized=False)
-    akdf = joblib.add_status(akdf, args.level, realized=args.realized, update=args.update)
+    akdf = joblib.add_status(akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run)
     joblib.print_status(akdf, args.level)
 # ---------------------------------------------------------------------
 def get_exp_dir(exp_mod):
@@ -535,6 +536,8 @@ def ps(args):
 # ------------------------------------------------------------------
 @subcommand(name='overrun', args=[
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+    argument('--sync', action='store_true',
+        help="Wait for combos to finish running then submit overruns (rather than quitting without submitting)"),
     argument('--dry-run', action='store_true',
         help="Don't actually do the work"),
 ])
@@ -548,50 +551,50 @@ def xoverrun(args):
     # Process overruns one combo at a time for lower latency on large experiments
     for ix in range(len(akdf0)):
         akdf1 = akdf0.iloc[[ix],:]    # akdf1 is just one row of akdf0
-        overrun.resubmit(akdf1, dry_run=args.dry_run)
+        overrun.resubmit(akdf1, dry_run=args.dry_run, sync=args.sync)
 # ------------------------------------------------------------------
-@subcommand([
-    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
-    argument('--rm', action='store_true',
-        help='Delete original avalanches after finished archiving?'),
-    argument('--debug', action='store_true',
-        help='Run in debug mode, single threaded, for better catching exceptions'),
-    argument('--dry-run', action='store_true',
-        help="Don't actually do the work"),
-    argument('--overrun', action='store_true',
-        help="Archive avalanche even if it is overrun?")
-])
-def archive(args):
-    from akramms import archive, overrun
-
-    parseds = akramms.parse.parse_args(args.spec)
-
-    # Identify avalanches in the original RAMMS scene (lastest version of each avalanche)
-    akdf_x = resolve.resolve_to(parseds, 'id', realized=True, stage='out', scenetypes={'x'})
-    akdf_x = overrun.drop_duplicates(akdf_x)
-    akdf_x = akdf_x.set_index(['combo', 'id'])
-
-    # TODO: For each avalanche id choose the avalanches with highest
-    # chunkid (this happens when there are overruns and domain
-    # enlargements)
-
-
-    # Identify archived avalanches
-    akdf_arc = \
-        resolve.resolve_to(parseds, 'id', realized=True, scenetypes={'arc'}, include_overruns=args.overrun) \
-        .set_index(['combo', 'id'])
-
-    # Find rows in the 'x' directory but no the 'arc' directory
-    # That is, avalanches ready to be archived but not yet archived.
-    x_only = akdf_x.index.difference(akdf_arc.index)
-
-    # Select only those rows to archive
-    akdf = akdf_x.loc[x_only] \
-        .sort_values(['combo', 'releasefile', 'id'])
-
-
-   
-    archive.archive_ids(akdf, debug=args.debug, dry_run=args.dry_run, archive_overrun=args.overrun)
+#@subcommand([
+#    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+#    argument('--rm', action='store_true',
+#        help='Delete original avalanches after finished archiving?'),
+#    argument('--debug', action='store_true',
+#        help='Run in debug mode, single threaded, for better catching exceptions'),
+#    argument('--dry-run', action='store_true',
+#        help="Don't actually do the work"),
+#    argument('--overrun', action='store_true',
+#        help="Archive avalanche even if it is overrun?")
+#])
+#def archive(args):
+#    from akramms import archive, overrun
+#
+#    parseds = akramms.parse.parse_args(args.spec)
+#
+#    # Identify avalanches in the original RAMMS scene (lastest version of each avalanche)
+#    akdf_x = resolve.resolve_to(parseds, 'id', realized=True, stage='out', scenetypes={'x'})
+#    akdf_x = overrun.drop_duplicates(akdf_x)
+#    akdf_x = akdf_x.set_index(['combo', 'id'])
+#
+#    # TODO: For each avalanche id choose the avalanches with highest
+#    # chunkid (this happens when there are overruns and domain
+#    # enlargements)
+#
+#
+#    # Identify archived avalanches
+#    akdf_arc = \
+#        resolve.resolve_to(parseds, 'id', realized=True, scenetypes={'arc'}, include_overruns=args.overrun) \
+#        .set_index(['combo', 'id'])
+#
+#    # Find rows in the 'x' directory but no the 'arc' directory
+#    # That is, avalanches ready to be archived but not yet archived.
+#    x_only = akdf_x.index.difference(akdf_arc.index)
+#
+#    # Select only those rows to archive
+#    akdf = akdf_x.loc[x_only] \
+#        .sort_values(['combo', 'releasefile', 'id'])
+#
+#
+#   
+#    archive.archive_ids(akdf, debug=args.debug, dry_run=args.dry_run, archive_overrun=args.overrun)
 
 # ------------------------------------------------------------------
 # https://stackoverflow.com/questions/3844801/check-if-all-elements-in-a-list-are-identical

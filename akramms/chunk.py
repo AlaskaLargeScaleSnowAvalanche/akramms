@@ -519,16 +519,16 @@ ALT_LIM_LOW  {alt_lim_low}
 END
 """
 
-def write_scenario_txt(chunk_dir, alt_lim_top=1500, alt_lim_low=1000, ncpu=config.ramms_ncpu, ncpu_preprocess=config.ramms_ncpu_preprocess, cohesion=50):
+def write_scenario_txt(chunk_dir, chunk_dir_final, alt_lim_top=1500, alt_lim_low=1000, ncpu=config.ramms_ncpu, ncpu_preprocess=config.ramms_ncpu_preprocess, cohesion=50):
     """ci: ChunkInfo
     """
 
-    chunk_name = chunk_dir.parts[-1]
+    chunk_name = chunk_dir_final.parts[-1]
 
     # Create the scenario file
     kwargs = dict()
     kwargs['scenario_name'] = chunk_name
-    kwargs['remote_ramms_dir'] = config.roots.convert_to(chunk_dir, config.roots_w)
+    kwargs['remote_ramms_dir'] = config.roots.convert_to(chunk_dir_final, config.roots_w)
     kwargs['ncpu'] = str(ncpu)
     kwargs['ncpu_preprocess'] = str(ncpu_preprocess)
     kwargs['cohesion'] = str(cohesion)
@@ -593,7 +593,7 @@ def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
 
     # Write scenario.txt
     scenario_txt = os.path.join(chunk_dir, 'scenario.txt')
-    write_scenario_txt(chunk_dir, **scenario_kwargs)
+    write_scenario_txt(chunk_dir, chunk_dir_final, **scenario_kwargs)
 
     # Write the _rel.shp file
     os.makedirs(chunk_dir / 'RELEASE', exist_ok=True)

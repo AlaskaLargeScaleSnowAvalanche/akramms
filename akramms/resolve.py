@@ -115,7 +115,7 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
 
 # ------------------------------------------------------------
 #_chunk_subleafRE = re.compile(r'(\d\d\d\d\d)(\d+)([TSML])(For|NoFor)_(\d+)')
-_chunkRE = re.compile(r'c-([TSML])-(\d\d\d\d\d)')
+_chunkRE = re.compile(r'^c-([TSML])-(\d\d\d\d\d)$')
 def resolve_chunk(akdf, scenetypes={'x'}, realized=True):
     """Resolves either to a CHUNK releasefile, or an ARCHIVE directory"""
 
@@ -175,7 +175,7 @@ def resolve_chunk(akdf, scenetypes={'x'}, realized=True):
                 scenedir = expmod.combo_to_scenedir(combo, scenetype='x')
                 chunkdir = scenedir / 'CHUNKS'
                 if os.path.isdir(chunkdir):
-                    for name in sorted(os.listdir(chunkdir)):
+                    for name in sorted(os.listdir(chunkdir)):    # List chunsk in an x-dir
                         match = _chunkRE.match(name)
 #                       print('    match = ', match)
                         if match is not None:
