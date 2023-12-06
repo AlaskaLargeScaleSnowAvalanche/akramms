@@ -1,7 +1,7 @@
 import os,subprocess,functools,re,typing,zipfile,enum,sys
 import htcondor
 import pandas as pd
-from akramms import config,file_info,parse,level,complete,resolve
+from akramms import config,file_info,parse,level,complete,resolve,archive
 
 # Categorize each job int one of four sets
 #job_status_labels = ('noinput', 'incomplete', 'todo', 'inprocess', 'finished', 'overrun', 'failed')
