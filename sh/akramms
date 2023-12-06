@@ -32,6 +32,16 @@ def subcommand(args=[], parent=subparsers):
         parser.set_defaults(func=func)
     return decorator
 # ------------------------------------------------------------------------
+def run_setup_py():
+    import setuptools.sandbox
+    from akramms.util import harnutil
+
+    setup_py = os.path.join(harnutil.HARNESS, 'akramms', 'setup.py')
+    prefix = os.path.join(harnutil.HARNESS, 'akramms', 'inst')
+    cmd = ['install', '--prefix', prefix]
+    print('setup.py ', cmd)
+    setuptools.sandbox.run_setup(setup_py, cmd)
+# ------------------------------------------------------------------------
 # Files and folders to copy from one scene to jumpstart the next.
 # TODO: Make this work for general scenes
 _init_files = [
@@ -167,26 +177,6 @@ def spec(args):
 #            print('    ',x)
 
 
-
-
-@subcommand([
-    argument('ramms', help='RAMMS directory or release file to inspect'),
-])
-def mosaic(args):
-    release_files = rammsutil.get_release_files(args.ramms)
-    r_ramms.do_mosaics(release_files)
-
-
-#        omap_name = os.path.join(oramms_name.scene_dir, 'maps', f'{oramms_name.ramms_name}_maps.zip')
-#        if os.path.exists(omap_name):
-#            print(f'=========== Exists, not redoing: {omap_name}')
-#            continue
-
-#        print(f'=========== Assembling {oramms_name.ramms_dir}')
-#        needs_regen = r_ramms.assemble_stage3(oramms_name, release_files)
-#        if needs_regen:
-#            r_ramms.run_ramms_stage3(oramms_name)
-##        print('orrrrrrrrr ', oramms_name.__dict__)
 
 
 def rclone_relfiles(src, dest, relfiles, tdir):
@@ -451,6 +441,7 @@ def query(args):
     argument('query', nargs=1, help='Query file generated via akramms query'),
 ])
 def mosaic(args):
+    run_setup_py()
     from akramms import avalquery,mosaic
 
     query_fname = args.query[0]
@@ -462,7 +453,7 @@ def mosaic(args):
         extent = pickle.load(fin)
         nc_fnames = pickle.load(fin)
 
-    nc_fnames = nc_fnames[:10]    # DEBUGGING
+#    nc_fnames = nc_fnames[:10]    # DEBUGGING
 
 
     ## Do query

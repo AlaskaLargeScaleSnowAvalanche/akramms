@@ -128,16 +128,20 @@ def run_stage0(scene_dir):
         run=True, ncpu=1)
     return ramms_dirs_release_files
 # =====================================================================
-def run_stage1(scene_dir):
-    makefile = make.Makefile()
-    ramms_dirs_release_files = add_stage1_rules(makefile, scene_dir)
-
-    # We do this to make sure the domain finder C++ code is compiled.
+# TODO: Remove.  This is a copy of setup.py in sh/akramms.  It should be eventually removed from here.
+def run_setup_py():
     setup_py = os.path.join(harnutil.HARNESS, 'akramms', 'setup.py')
     prefix = os.path.join(harnutil.HARNESS, 'akramms', 'inst')
     cmd = ['install', '--prefix', prefix]
     print('setup.py ', cmd)
     setuptools.sandbox.run_setup(setup_py, cmd)
+
+def run_stage1(scene_dir):
+    makefile = make.Makefile()
+    ramms_dirs_release_files = add_stage1_rules(makefile, scene_dir)
+
+    # We do this to make sure the domain finder C++ code is compiled.
+    run_setup_py()
 
     makefile.generate(
         os.path.join(scene_dir, 'stage1_mk'),

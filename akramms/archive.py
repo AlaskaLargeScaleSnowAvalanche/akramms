@@ -241,8 +241,8 @@ def fetch(exp_mod, combo, ids):
     ncpu = config.ncpu_compress
     nzs = [nz[i::ncpu] for i in range(ncpu)]    # https://stackoverflow.com/questions/24483182/python-split-list-into-n-chunks
     print(f'Archiving {len(nz)} avalanches with {ncpu}-way parallelism')
-#    with concurrent.futures.ProcessPoolExecutor(ncpu) as ex:
-    with concurrent.futures.ThreadPoolExecutor(1) as ex:
+    with concurrent.futures.ProcessPoolExecutor(ncpu) as ex:
+#    with concurrent.futures.ThreadPoolExecutor(1) as ex:
         archive_files0 = ArchiveFiles(0, exp_mod, release_df, x_dir, status_attrs)
         archive_files1 = ArchiveFiles(1, exp_mod, release_df, x_dir, status_attrs)
         futures = [ex.submit(archive_files0, nzs[0])]

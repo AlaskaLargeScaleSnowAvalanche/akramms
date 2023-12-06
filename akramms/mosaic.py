@@ -3,7 +3,8 @@ import numpy as np
 from osgeo import gdal
 import zipfile,netCDF4
 from uafgi.util import gdalutil
-from akramms import experiment,_mosaic
+from akramms import experiment
+import _mosaic
 
 # python -m cProfile -o prof -s cumtime `which akramms` mosaic juneau1-1981-1990.qy 
 
@@ -71,15 +72,19 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
     """
     vars_set = set(vars)
 
+    shapeM = (gridM.ny, gridM.nx)
     vals = dict(
-        deposition=np.zeros((gridM.ny, gridM.nx), dtype='d'),
-        max_velocity=np.zeros((gridM.ny, gridM.nx), dtype='d'),
-        max_pressure=np.zeros((gridM.ny, gridM.nx), dtype='d'),
-        domain_count=np.zeros((gridM.ny, gridM.nx), dtype='i'),
-        avalanche_count=np.zeros((gridM.ny, gridM.nx), dtype='i'))
+        deposition=np.zeros(shapeM, dtype='f4'),
+        max_height=np.zeros(shapeM, dtype='f4'),
+        max_velocity=np.zeros(shapeM, dtype='f4'),
+        max_pressure=np.zeros(shapeM, dtype='f4'),
+        domain_count=np.zeros(shapeM, dtype='i2'),
+        avalanche_count=np.zeros(shapeM, dtype='i2'))
 
     for aval_i,fname in enumerate(avals):
+        print(f'mosaic: {fname}')
         with netCDF4.Dataset(fname) as nc:
+            nc.set_always_mask(False)
 
             # "gridA" = Avalanche's local grid (it will be one of the subdomains), WITH MARGIN
             # Geotransform of this avalanche's local grid
@@ -87,21 +92,23 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
             gridA_gt = np.array([float(x) for x in nc.variables['grid_mapping'].GeoTransform.split(' ')])
 
             # C++ extension does the real work
-            _mosaic.mosaic(
+            args = (
                 nc.variables['i_diff'][:],
                 nc.variables['j_diff'][:],
                 gridA_gt[0], gridA_gt[3],
-                nc.variables['max_velA'][:],
-                nc.variables['max_heightA'][:],
-                nc.variables['depoA'][:],
+                nc.variables['max_vel'][:].astype('f4'),
+                nc.variables['max_height'][:].astype('f4'),
+                nc.variables['depo'][:].astype('f4'),
                 rho,
                 gridM.nx, gridM.x0, gridM.dx,
                 gridM.ny, gridM.y0, gridM.dy,
                 vals['deposition'],
+                vals['max_height'],
                 vals['max_velocity'],
                 vals['max_pressure'],
                 vals['domain_count'],
-                vals['avalanche_count'])                
+                vals['avalanche_count'])
+            _mosaic.mosaic(*args)
 
     # Write output GeoTIFF and Zip it up
     with zipfile.ZipFile(ofname_zip, mode='w', compression=zipfile.ZIP_STORED) as ozip:

@@ -4,13 +4,15 @@
 //#include "structmember.h"    // Map C struct members to Python attributes
 
 #include <cstdint>
+#include <string>
+#include <algorithm>    // std::max
 
 static char module_docstring[] = 
 "Core AKRAMMS Mosaic Code";
 
 namespace akramms {
 
-void _mosaic_mosaic(
+void mosaic_mosaic(
     // Info on the gridcells within gridA represented by RAMMS
     int const ngridA,    // Number of gridcells for this avalanche
     int32_t *i_diff,    // Diff-encoded (i,j) of those gridcells
@@ -33,6 +35,7 @@ void _mosaic_mosaic(
 
     // OUTPUT: mosaic variables [gridM_ny, gridM_nx]
     float *depositionM,
+    float *max_heightM,
     float *max_velocityM,
     float *max_pressureM,
     int16_t *domain_countM,
@@ -65,6 +68,7 @@ void _mosaic_mosaic(
         if (max_velA[kA] > 0) {
             avalanche_countM[jiM] += 1;
             depositionM[jiM] = std::max(depositionM[jiM], depoA[kA]);
+            max_heightM[jiM] = std::max(max_heightM[jiM], max_heightA[kA]);
             max_velocityM[jiM] = std::max(max_velocityM[jiM], max_velA[kA]);
 
             double const _max_vel = max_velA[kA];
@@ -115,7 +119,7 @@ static bool check_array(PyArrayObject *_arr, std::string const &name, int type_n
 static char const *_mosaic_mosaic_docstring =
 R"(_Mosaic Function Docstring
 )";
-static PyObject *mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwargs)
+static PyObject *_mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwargs)
 {
     // Info on the gridcells within gridA represented by RAMMS
     //int ngridA;    // Number of gridcells for this avalanche
@@ -139,6 +143,7 @@ static PyObject *mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwarg
 
     // OUTPUT: mosaic variables [gridM_ny, gridM_nx]
     PyArrayObject *depositionM;
+    PyArrayObject *max_heightM;
     PyArrayObject *max_velocityM;
     PyArrayObject *max_pressureM;
     PyArrayObject *domain_countM;
@@ -153,13 +158,13 @@ static PyObject *mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwarg
         "rho",
         "gridM_nx", "gridM_x0", "gridM_dx",
         "gridM_ny", "gridM_y0", "gridM_dy",
-        "depositionM", "max_velocityM", "max_pressureM", "domain_countM", "avalanche_countM",
+        "depositionM", "max_heightM", "max_velocityM", "max_pressureM", "domain_countM", "avalanche_countM",
         // **kwargs
         NULL};
-    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!ddO!O!O!diddiddO!O!O!O!O!|",
+    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!ddO!O!O!diddiddO!O!O!O!O!O!|",
         (char **)kwlist,
 
-        &ngridA,
+        //&ngridA,
             &PyArray_Type, &i_diff,
             &PyArray_Type, &j_diff,
 
@@ -175,6 +180,7 @@ static PyObject *mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwarg
         &gridM_ny, &gridM_y0, &gridM_dy,
 
             &PyArray_Type, &depositionM,
+            &PyArray_Type, &max_heightM,
             &PyArray_Type, &max_velocityM,
             &PyArray_Type, &max_pressureM,
             &PyArray_Type, &domain_countM,
@@ -192,28 +198,30 @@ static PyObject *mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwarg
 
     int const nxyM = gridM_nx * gridM_ny;
     if (!check_array(depositionM, "depositionM", NPY_FLOAT, "NPY_FLOAT", nxyM)) return NULL;
+    if (!check_array(max_heightM, "max_heightM", NPY_FLOAT, "NPY_FLOAT", nxyM)) return NULL;
     if (!check_array(max_velocityM, "max_velocityM", NPY_FLOAT, "NPY_FLOAT", nxyM)) return NULL;
     if (!check_array(max_pressureM, "max_pressureM", NPY_FLOAT, "NPY_FLOAT", nxyM)) return NULL;
-    if (!check_array(domain_countM, "domain_countM", NPY_FLOAT, "NPY_FLOAT", nxyM)) return NULL;
-    if (!check_array(avalanche_countM, "avalanche_countM", NPY_FLOAT, "NPY_FLOAT", nxyM)) return NULL;
+    if (!check_array(domain_countM, "domain_countM", NPY_INT16, "NPY_INT16", nxyM)) return NULL;
+    if (!check_array(avalanche_countM, "avalanche_countM", NPY_INT16, "NPY_INT16", nxyM)) return NULL;
 
     // ------------------------------------------------------------------------
     mosaic_mosaic(
         ngridA,
-            PyArray_DATA(i_diff),
-            PyArray_DATA(j_diff),
+            (int32_t *)PyArray_DATA(i_diff),
+            (int32_t *)PyArray_DATA(j_diff),
         gridA_x0, gridA_y0,
-            PyArray_Data(max_velA),
-            PyArray_Data(max_heightA),
-            PyArray_Data(depoA),
+            (float *)PyArray_DATA(max_velA),
+            (float *)PyArray_DATA(max_heightA),
+            (float *)PyArray_DATA(depoA),
         rho,
         gridM_nx, gridM_x0, gridM_dx,
         gridM_ny, gridM_y0, gridM_dy,
-            PyArray_Data(depositionM),
-            PyArray_Data(max_velocityM),
-            PyArray_Data(max_pressureM),
-            PyArray_Data(domain_countM),
-            PyArray_Data(avalanche_countM));
+            (float *)PyArray_DATA(depositionM),
+            (float *)PyArray_DATA(max_heightM),
+            (float *)PyArray_DATA(max_velocityM),
+            (float *)PyArray_DATA(max_pressureM),
+            (int16_t *)PyArray_DATA(domain_countM),
+            (int16_t *)PyArray_DATA(avalanche_countM));
 
     Py_RETURN_NONE;
 }
