@@ -1,6 +1,7 @@
 import functools,re,os,itertools,pathlib
 import importlib
 import netCDF4
+from akramms import file_info
 
 # =====================================================================
 _module_type = type(re)    # Any module will do here
@@ -173,7 +174,7 @@ def parse_scenedir(scenedir):
     return ret
 # ----------------------------------------------------------------------
 _chunk_subleafRE = re.compile(r'(\d+)([TSML])(For|NoFor)_(\d+)m')
-#Chunk = collections.namedtuple('Chunk', ('ichunk', 'pra_size'))
+#Chunk = collections.namedtuple('Chunk', ('chunkid', 'pra_size'))
 def parse_chunkdir(chunkdir):
     """
     chunkdir:
@@ -190,7 +191,7 @@ def parse_chunkdir(chunkdir):
     x_leaf = chunkdir.parents[1].parts[-1]    # Eg: x-113-045
     chunk_subleaf = chunk_leaf[len(x_leaf):]    # Eg: 0000230TFor_10m
     match = _chunk_subleafRE.match(chunk_subleaf)
-    ret['ichunk'] = int(match.group(1))
+    ret['chunkid'] = int(match.group(1))
     ret['pra_size'] = match.group(2)
 
     return ret
@@ -223,39 +224,70 @@ def parse_dir(dir):
 # =====================================================================
 
 # -------------------------------------------------------
-_releasefileRE = re.compile(r'(.*)([TSML])([_-])rel.shp')
-_releasefile_scenetypes = {'-': 'arc', '_': 'x'}
-def parse_releasefile(releasefile):
-    """Parses names of top-level (non-CHUNK) release files
-    TODO: The format here is wrong, MUST be fixed!
+#_releasefileRE = re.compile(r'(.*)([TSML])([_-])rel.shp')
+#_releasefile_scenetypes = {'-': 'arc', '_': 'x'}
+#def parse_releasefile(releasefile):
+#    """Parses names of top-level (non-CHUNK) release files
+#    TODO: The format here is wrong, MUST be fixed!
+#
+#    releasefile: Eg:
+#        .../x-113-045/RELEASE/x-113-045For_10m_30L_rel.shp
+#        .../x-113-045/CHUNKS/x-113-0450001330MFor_10m/RELEASE/x-113-04500013For_10m_30M_rel.shp
+#        .../arc-113-045/RELEASE/ak-ccsm-1981-1990-lapse-For-30-113-045-S-rel.shp
+#    """
+#
+#    raise ValueError("This needs to be fixed to parse CHUNK or non-CHUNK releasefiles.  See use of parsed['chunkid'] in resolve.py/resolve_releasefile().  I don't think parsing by individual resleasefiles will be important going forward...")
+#
+#    match = _releasefileRE.match(releasefile.parts[-1])
+#    if match is None:
+#        raise ValueError(f'Not a releasefile: {releasefile}')
+#
+#    ret = {'releasefile': releasefile}
+#    try:
+#        ret.update(parse_dir(releasefile.parents[1]))    # The directory above RELEASE
+#    except ValueError:
+#        pass    # Maybe this is a "naked" release file
+#    ret['type'] = 'releasefile'
+#
+#    ret['pra_size'] = match.group(2)
+#    scenetype = _releasefile_scenetypes[match.group(3)]
+#    ret['scenetype'] = scenetype
+#    if scenetype == 'arc':
+#        parts = match.group(1).split('-')
+#        ret.update(parse_parts(parts, load=True))
+#
+#    return ret
+# -------------------------------------------------------
+def parse_chunk_releasefile(releasefile):
+    """Parses names of CHUNK-level release files.
 
     releasefile: Eg:
-        .../x-113-045/RELEASE/x-113-045For_10m_30L_rel.shp
+        ###.../x-113-045/RELEASE/x-113-045For_10m_30L_rel.shp
         .../x-113-045/CHUNKS/x-113-0450001330MFor_10m/RELEASE/x-113-04500013For_10m_30M_rel.shp
-        .../arc-113-045/RELEASE/ak-ccsm-1981-1990-lapse-For-30-113-045-S-rel.shp
+        ###.../arc-113-045/RELEASE/ak-ccsm-1981-1990-lapse-For-30-113-045-S-rel.shp
     """
 
-    raise ValueError("This needs to be fixed to parse CHUNK or non-CHUNK releasefiles.  See use of parsed['chunkid'] in resolve.py/resolve_releasefile().  I don't think parsing by individual resleasefiles will be important going forward...")
-
-    match = _releasefileRE.match(releasefile.parts[-1])
-    if match is None:
+    jb = file_info.parse_chunk_release_file(releasefile)
+    if jb is None:
         raise ValueError(f'Not a releasefile: {releasefile}')
 
-    ret = {'releasefile': releasefile}
-    try:
-        ret.update(parse_dir(releasefile.parents[1]))    # The directory above RELEASE
-    except ValueError:
-        pass    # Maybe this is a "naked" release file
-    ret['type'] = 'releasefile'
+    wparts = releasefile.parts[-6].split('-')
+    ijparts = releasefile.parts[-5].split('-')
 
-    ret['pra_size'] = match.group(2)
-    scenetype = _releasefile_scenetypes[match.group(3)]
-    ret['scenetype'] = scenetype
-    if scenetype == 'arc':
-        parts = match.group(1).split('-')
-        ret.update(parse_parts(parts, load=True))
 
+    ret = {
+        'exp': wparts[0],
+        'wcombo': tuple(wparts[1:]),
+        'ijdom': tuple(ijparts[1:]),
+        'type': 'releasefile',
+        'releasefile': releasefile,
+        'scenetype': 'x',
+        'scenedir': jb.scene_dir,
+        'chunkid': jb.chunkid,
+        'pra_size': jb.pra_size
+    }
     return ret
+
 # ----------------------------------------------------------------------
 # TODO: Read all info from INSIDE the arcfile, allowing it to be named anything.  We can tell it's an arcfile because it ends in .nc
 _avalRE = re.compile(r'aval-([TSML])-(\d+)')
@@ -282,8 +314,8 @@ def parse_file(file):
     """
 
     try:
-        return parse_releasefile(file)
-    except:
+        return parse_chunk_releasefile(file)
+    except ValueError as e:
         pass
     return parse_arcfile(file)
 # =============================================================
@@ -330,7 +362,6 @@ def parse_args(args, load=True):
                     state = 'i'
                     ids.clear()
                 elif (os.sep in arg) and os.path.isdir(arg) and (arg != '.') and (arg != '..'):  # If it's '.', it might be an actual directory
-                    print('aaaaaaaarg ', type(arg), arg)
                     flush_parts()
                     rets.append(parse_dir(pathlib.Path(arg)))
                 elif os.path.isfile(arg):
@@ -394,10 +425,9 @@ def parse_extent(expmod, sextent):
     # See if it's a special string
     if sextent is None:
         return 'aval'
-    try:
-        return _extent_strings[sextent]
-    except KeyError:
-        pass
+
+    if sextent in _extent_strings:
+        return sextent
 
     # See if it's a named extent
     try:

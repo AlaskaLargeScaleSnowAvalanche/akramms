@@ -110,7 +110,9 @@ def pra_post_rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **k
 
         # Add PRA size designation of T,S,M,L
         # Adds column: pra_size
+#        print('AA1 ', df.columns)
         df = chunk.add_pra_size(df)
+#        print('AA2 ', df.columns)
 
         # Compute the avalanche domains (domain builder algo)
         # Adds columns: chull, dom
@@ -118,6 +120,7 @@ def pra_post_rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **k
             df, dem_filled, dem_nodata, grid_info,
             margins=config.initial_margins,
             **kwargs)
+#        print('AA3 ', df.columns)
 
         # Write out one top-level shapefile per pra_size
         os.makedirs(scene_dir / 'RELEASE', exist_ok=True)
@@ -125,6 +128,7 @@ def pra_post_rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **k
 
         wkt = scene_args['coordinate_system']
         for pra_size,cat_df in df.groupby('pra_size'):
+#            print('AA4 ', cat_df.columns)
             root = f'{scene_name}{For}_{resolution}m_{return_period}{pra_size}'
             chunk.write_rel(
                 cat_df, wkt, return_period,

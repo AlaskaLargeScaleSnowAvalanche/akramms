@@ -2,6 +2,7 @@
 #
 
 #import cProfile
+import importlib,pathlib
 import netCDF4
 import pandas as pd
 from akramms import config,params
@@ -10,8 +11,7 @@ import argparse,itertools,os,subprocess,sys,io,codecs,re,pickle
 from akramms import r_experiment
 from akramms.util import rammsutil,exputil
 from uafgi.util import ioutil,make
-import importlib
-from akramms import r_domain_builder, r_ramms1, resolve,joblib
+from akramms import r_domain_builder, r_ramms1, resolve,joblib, avalquery
 # ------------------------------------------------------------------------
 # https://mike.depalatis.net/blog/simplifying-argparse.html
 # https://gist.github.com/mivade/384c2c41c3a29c637cb6c603d4197f9f
@@ -25,11 +25,11 @@ def argument(*name_or_flags, **kwargs):
     """
     return (list(name_or_flags), kwargs)
 
-def subcommand(args=[], parent=subparsers):
+def subcommand(args=[], name=None, parent=subparsers):
     def decorator(func):
-#        if command == '':
-#            command = func.__name__
-        name = func.__name__
+        nonlocal name
+        if name is None:
+            name = func.__name__
         parser = parent.add_parser(name, description=func.__doc__)
         for arg in args:
             parser.add_argument(*arg[0], **arg[1])
@@ -200,6 +200,22 @@ def parse(args):
 
 
 # ---------------------------------------------------------------------
+@subcommand([
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+    argument('--to', help='What to resolve to', default='releasefile'),
+])
+def test(args):
+    from akramms import joblib
+
+    releasefile = pathlib.Path(args.spec[0])
+    parseds = [akramms.parse.parse_chunk_releasefile(releasefile)]
+    akdf = resolve.resolve_to(parseds, 'id', stage='in', realized=True)
+    akdf = joblib.add_jobstatus(akdf)
+
+    print(akdf)
+
+
+# ---------------------------------------------------------------------
 def get_exp_dir(exp_mod):
     return config.roots.join('PRJ', exp_mod.name)
 
@@ -346,15 +362,7 @@ def submit(args):
     parseds = akramms.parse.parse_args(args.spec)
 
     akdf = resolve.resolve_to(parseds, 'id', realized=True, stage='in')
-    akdf = joblib.add_jobstatus(akdf)
-
-    # Only submit jobs that are ready to go and not in process or completed or something.
-    akdf = akdf[akdf.jobstatus == joblib.JobStatus.TODO]
-
-    print('==================== Submitting:')
-    print(akdf[['combo', 'chunkid', 'id']])
     joblib.submit_jobs(akdf)
-
 
 # ------------------------------------------------------------------
 @subcommand([
@@ -432,42 +440,74 @@ def all_equal(iterable):
     g = groupby(iterable)
     return next(g, True) and not next(g, False)
 
-@subcommand([
-    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+@subcommand(name='mosaic', args=[
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser.'),
+    argument('-s', '--save', help='Name of query file to write to'),
+    argument('-q', '--query', help='Name of query file to read from.  If set, then spec is ignored'),
     argument('-o', '--output', required=True, help='Name of Mosaic output file to write'),
-    argument('--limit', type=int, help='Limit number of avalanches processed (for DEBUGGING)'),
+    argument('--limit', type=int,
+        help='Limit number of avalanches processed (for DEBUGGING)'),
     argument('--overrun', action='store_true',
         help="Mosaic archived overrun avalanches?"),
     argument('--extent', '-e', required=False,
         help="Designation of extent of final mosiac"),
+    argument('--margin', '-m', type=int, required=False,
+        help="Margin to add to extent [m]"),
+    argument('--dry-run', action='store_true',
+        help="Don't actually do the work"),
 ])
-def mosaic(args):
+def xmosaic(args):
+    from akramms import mosaic
+
     run_setup_py()
 
-    # Identify archived avalanches for use in the mosaic
-    parseds = akramms.parse.parse_args(args.spec)
-    akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
+    # Get the avalanches and extent to mosaic
+    if args.query is None:
+        # Identify archived avalanches for use in the mosaic
+        parseds = akramms.parse.parse_args(args.spec)
+        akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
 
-    # Make sure they all use the same experiment
-    # (Because extents are queried from the experiment definition file)
-    assert all(x == akdf0.exp[0] for x in akdf0.exp)
-    expmod = parse.load_expmod(exp)
+        # Make sure they all use the same experiment
+        # (Because extents are queried from the experiment definition file)
+        assert all(x == akdf.exp[0] for x in akdf.exp)
+        expmod = akramms.parse.load_expmod(akdf.exp[0])
 
-    akdf, extent = avalquery.query(akdf, args.extent, include_overruns=args.overrun)
+        extent,akdf = avalquery.query(akdf, args.extent, include_overruns=args.overrun, scenetypes='arc', margin=args.margin)
+
+        if args.save is not None:
+            with open(args.save, 'wb') as out:
+                pickle.dump(expmod.name, out)
+                pickle.dump(extent, out)
+                pickle.dump(akdf, out)
+    else:
+        with open(args.query, 'rb') as fin:
+            exp = pickle.load(out)
+            expmod = parse.load_expmod(exp)
+            extent = pickle.load(out)
+            akdf = pickle.load(out)
+
 
     # Do mosaic
-    res = exp_mod.resolution
-    gridG = exp_mod.gridD.global_grid(res, res)
-#    gridM = exp_mod.gridD.sub(113,45, res, res)    # Could be arbitrary rectangle
-    gridM = exp_mod.gridD.subgrid(extent[0], extent[1], extent[2], extent[3], res, res)
+    res = expmod.resolution
+    gridG = expmod.gridD.global_grid(res, res)
+#    gridM = expmod.gridD.sub(113,45, res, res)    # Could be arbitrary rectangle
+    gridM = expmod.gridD.subgrid(extent[0], extent[1], extent[2], extent[3], res, res)
 
 
-    print(akdf[['combo','id'])
+    print(akdf[['exp', 'combo','id']])
     print(f'Extent: {extent}')
-    return
+
+    if args.dry_run or (args.output is None):
+        print('Dry Run, not going further')
+        return
+
+    ofname = args.output
+    if not ofname.endswith('.zip'):
+        raise ValueError('--output must specify a .zip file')
+
 
     with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
-        mosaic.mosaic_avals(gridM, akdf.avalfiles.tolist(), args.output, tdir)
+        mosaic.mosaic_avals(gridM, akdf.avalfile.tolist(), args.output, tdir)
 
 
 #Ways to choose the extent:

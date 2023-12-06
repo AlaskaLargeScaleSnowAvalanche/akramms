@@ -423,7 +423,7 @@ def write_rel(rdf, wkt, return_period, ofname, **kwargs):
     """
 
     # Select columns to write
-    cols = ['area_m2', 'Mean_DEM', 'Mean_Slope', 'Scene_reso', 'Id', 'i', 'j', 'sx3', 'd0star', 'slopecorr', 'Wind', f'd0_{return_period}', f'VOL_{return_period}', 'pra_size', 'pra']
+    cols = ['area_m2', 'Mean_DEM', 'Mean_Slope', 'Scene_reso', 'Id', 'i', 'j', 'sx3', 'd0star', 'slopecorr', 'Wind', f'd0_{return_period}', f'VOL_{return_period}', 'pra']
     cols += [name for name in ('chunkid', 'pra_size') if name in rdf]
     df = rdf.reset_index()[cols]
 

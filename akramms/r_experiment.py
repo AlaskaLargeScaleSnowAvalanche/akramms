@@ -91,9 +91,9 @@ def r_active_domains(exp_mod):
                     rows.append((ix,iy,domain,domain_margin))
 
         df = pd.DataFrame(rows, columns=('idom', 'jdom', 'domain', 'domain_margin'))
-        df.ix = df.ix.astype('int32')
-        df.iy = df.iy.astype('int32')
-#        df = df.astype({'ix':'int', 'iy':'int'})
+        df.idom = df.idom.astype('int32')
+        df.jdom = df.jdom.astype('int32')
+#        df = df.astype({'idom':'int', 'jdom':'int'})
 
         os.makedirs(exp_mod.dir, exist_ok=True)
         shputil.write_df(df[['idom', 'jdom', 'domain']], 'domain', 'MultiPolygon', domains_shp, wkt=exp_mod.wkt, zip_format=True)

@@ -225,22 +225,23 @@ def parse_aval_specs(args):
 
 
 
-Parsing can be:
- - expset (eg: ak.juneau)
-   --> Resolves to all combos theoretically in the expset
-
-
- - expdir (eg: .../ak)
-   --> Resolves to all trial dirs currently realized in the expdir)
- - trial directory (eg: .../ak/ak-ccsm-1981-1990-lapse-For-30)
-   - Or wildcard Combo (semantically same as trial directory)
- - x_dir (eg: .../ak/ak-ccsm-1981-1990-lapse-For-30/x-113-045)
- - arc_dir (eg: .../ak/ak-ccsm-1981-1990-lapse-For-30/arc-113-045)
- - chunk_dir  (eg: .../ak/ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/x-113-0450000230TFor_10m
-
-
-
-
-
-trial dir <--> Wildcard Combo
-scene dir <--> Combo
+#Parsing can be:
+# - expset (eg: ak.juneau)
+#   --> Resolves to all combos theoretically in the expset
+#
+#
+# - expdir (eg: .../ak)
+#   --> Resolves to all trial dirs currently realized in the expdir)
+# - trial directory (eg: .../ak/ak-ccsm-1981-1990-lapse-For-30)
+#   - Or wildcard Combo (semantically same as trial directory)
+# - x_dir (eg: .../ak/ak-ccsm-1981-1990-lapse-For-30/x-113-045)
+# - arc_dir (eg: .../ak/ak-ccsm-1981-1990-lapse-For-30/arc-113-045)
+# - chunk_dir  (eg: .../ak/ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/x-113-0450000230TFor_10m
+#
+#
+#
+#
+#
+#trial dir <--> Wildcard Combo
+#scene dir <--> Combo
+#

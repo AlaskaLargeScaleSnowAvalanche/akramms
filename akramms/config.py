@@ -47,8 +47,8 @@ shared_filesystem = True
 debug = False
 
 # Submit Avalanche simulations to Stage 2 immediately upon completion of Stage 1?
-#auto_submit = True
-auto_submit = False
+auto_submit = True
+#auto_submit = False
 
 #ramms_version = '230126'
 #ramms_version = '230210'
@@ -74,8 +74,8 @@ queue_idl = False
 
 # ------------------------------
 # DEBUG parameters
-allowed_pra_sizes = ['L']
-#allowed_pra_sizes = ['L', 'M', 'S', 'T']
+#allowed_pra_sizes = ['L']
+allowed_pra_sizes = ['L', 'M', 'S', 'T']
 #allowed_pra_sizes = {'M', 'S'}
 #allowed_forests = {True}
 #allowed_return_periods = {30}

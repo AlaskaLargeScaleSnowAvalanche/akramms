@@ -1,7 +1,8 @@
 import os,collections,re,itertools,functools
 import netCDF4
+import pandas as pd
 from uafgi.util import shputil
-from akramms import archive,avalparse,avalfilter
+from akramms import archive,avalparse,avalfilter,parse,resolve
 from akramms.util import exputil
 
 # =======================================================================
@@ -134,7 +135,8 @@ def extent_by_tiles(expmod, akdf):
             idom,jdom, expmod.resolution, expmod.resolution, margin=False) \
             .extent(order='xyxy')
         for idom,jdom in ijdoms]
-    extent = mosaic.union_extents(tile_extents)
+    extent = union_extents(tile_extents)
+    return extent
 
 # ---------------------------------------------------------------------
 def filter_avalanches_by_extent(expmod, adkf, extent):
@@ -148,7 +150,7 @@ def filter_avalanches_by_extent(expmod, adkf, extent):
     """
 
     avlanche_extents = akdf['avalfile'].map(nc_extent)
-    keep = avlanche_extents.map(lambda ext: mosaic.extents_intersect(ext, extent))
+    keep = avlanche_extents.map(lambda ext: extents_intersect(ext, extent))
     akdf = akdf[keep]
     return akdf
 # ---------------------------------------------------------------------
@@ -157,12 +159,12 @@ def extent_by_avalanches(expmod, akdf):
     akdf:
         """
 
-    extents = akdf0['avalfile'].map(nc_extent)
-    extent = mosaic.union_extents(extents.tolist())
+    extents = akdf['avalfile'].map(nc_extent)
+    extent = union_extents(extents.tolist())
     return extent
 
 # ---------------------------------------------------------------------
-def query(akdf0, sextent, include_overruns=False):
+def query(akdf0, sextent, include_overruns=False, scenetypes={'x', 'arc'}, margin=None):
 
     """akdf:
         Resolved to the combo level (or should work at id level too)
@@ -180,12 +182,12 @@ def query(akdf0, sextent, include_overruns=False):
     include_overruns:
         Should overrun avalanches be included when resolving avalanches
 
-    Returns: akdf, extent
+    Returns: extent, akdf
+        extent: (x0,y0,x1,y1)
+            Extent resulting from the query
         akdf:
             Exact set of avalanches resulting from the query
             Contains column: 'id'
-        extent: (x0,y0,x1,y1)
-            Extent resulting from the query
 
     """
 
@@ -216,7 +218,9 @@ def query(akdf0, sextent, include_overruns=False):
 
         # --------- Move to the avalanche (id) level
         # Resolve to individual avalanches
-        akdf1 = resolve.resolve_id(akdf1, include_overruns)
+        akdf1 = resolve.resolve_releasefile(akdf1, scenetypes=scenetypes)
+        akdf1 = resolve.resolve_id(akdf1, include_overruns=include_overruns, realized=True)
+
 
         # Resovle the extent to numeric
         if extent == 'tile':
@@ -229,6 +233,7 @@ def query(akdf0, sextent, include_overruns=False):
             need_aval_filter = False
             extent = extent_by_avalanches(expmod, akdf1)
 
+
         # Finally, filter avalanches to the extent, if needed
         if need_aval_filter:
             akdf1 = filter_avalanches_by_extent(expmod, akdf1, extent)
@@ -236,9 +241,17 @@ def query(akdf0, sextent, include_overruns=False):
         ret_dfs.append(akdf1)
         ret_extents.append(extent)
 
+
+    # ----------------------
     # Make final extent and avalanche list, across experiments even!
     # (IF that makes sense, i.e. the two experiements are in the same projection)
-    return pd.merge(ret_dfs), union_extents(ret_extents)
+
+    # Deal with margin
+    extent = union_extents(ret_extents)
+    if margin is not None:
+        extent = add_margin(extent, (margin,margin) )
+
+    return extent, pd.concat(ret_dfs)
 
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------

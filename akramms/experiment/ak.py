@@ -94,6 +94,7 @@ def add_combo(makefile, combo):
 
     # Set of domains that cover our experiment region
     # (This file is the same for ALL trials)
+# This is done in `akramms step1` so no need to do it here again.
 #    makefile.add(r_experiment.r_active_domains(exp_mod))
 
     # DTM and Forest (landcover==42)
@@ -179,7 +180,8 @@ def full():
 
 # -----------------------------------------------------------------
 def juneau():
-    for year0,year1 in [(1981,1990), (2051,2060)]:
+#    for year0,year1 in [(1981,1990), (2051,2060)]:
+    for year0,year1 in [(2051,2060)]:
 
         # Just one combo for now
         yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 113, 45)    # A Juneau-close box

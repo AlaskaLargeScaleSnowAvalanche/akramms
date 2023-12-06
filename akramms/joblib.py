@@ -343,7 +343,7 @@ def print_job_statuses(akdf0):
 
 
 # --------------------------------------------------------------------
-def submit_jobs(akdf):
+def _submit_jobs(akdf):
     """Does an initial (or subsequent) submit of jobs for a set of
     release files.  Submits jobs that can be submitted, and that have
     not yet been.
@@ -373,3 +373,13 @@ def submit_jobs(akdf):
 
         print('submit ', jb.avalanche_dir, job_name, inout)
         submit_job(jb.avalanche_dir, job_name, inout)
+
+def submit_jobs(akdf):
+    akdf = add_jobstatus(akdf)
+
+    # Only submit jobs that are ready to go and not in process or completed or something.
+    akdf = akdf[akdf.jobstatus == JobStatus.TODO]
+
+    print('==================== Submitting:')
+    print(akdf[['combo', 'chunkid', 'id']])
+    _submit_jobs(akdf)

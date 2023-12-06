@@ -2,7 +2,7 @@ import os,sys,shutil,multiprocessing,pickle,zipfile,re
 import setuptools.sandbox
 import pandas as pd
 from uafgi.util import make,shputil,gdalutil
-from akramms import config,params,process_tree,joblib,parse,file_info
+from akramms import config,params,process_tree,joblib,parse,file_info,parse,resolve
 from akramms.util import paramutil,harnutil,rammsutil
 
 """Rules for RAMMS Stage 1 (with auto submit to Stage 2)"""
@@ -209,13 +209,10 @@ def rule(release_file, dem_file, inputs, dry_run=False, submit=False):
         # Submit the individual avalanche runs immediately so we can
         # get going while preparing more RAMMS directories.
         if submit:
-            akdf = pd.DataFrame( [[release_file]], columns=['releasefile'] )
-            akdf = resolve.resolve_id(akdf, realized=True)
-            akdf = joblib.add_jobstatus(scene_dir, akdf)
 
-            print('About to submit (TODO, uncomment joblib.submit_jobs():')
-            print(akdf)
-#            joblib.submit_jobs(akdf)
+            parseds = [parse.parse_chunk_releasefile(release_file)]
+            akdf = resolve.resolve_to(parseds, 'id', stage='in', realized=True)
+            joblib.submit_jobs(akdf)
 
         # Write output files
         os.makedirs(os.path.dirname(done_output), exist_ok=True)
