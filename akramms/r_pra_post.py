@@ -2,7 +2,7 @@ import scipy.spatial
 import pandas as pd
 import shapely
 from osgeo import gdal
-from akramms import params,process_tree,chunk
+from akramms import params,process_tree,chunk,level
 from akramms.util import rammsutil
 from uafgi.util import shputil,gdalutil,wrfutil,make,cfutil,ioutil,rasterize
 import os,sys
@@ -66,11 +66,9 @@ def rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **kwargs):
         ramms_name = (scene_name, rn, pra_size)
         ramms_names.append(ramms_name)
 
-        rel_shp = scene_dir / 'RELEASE' / f'{scene_name}{rn}{pra_size}_rel.shp'
-        release_files.append(rel_shp)
-        outputs.append(rel_shp)
-        for ext in ('_chull.shp', '_dom.shp'):
-            outputs.append(scene_dir / 'RELEASE' / f'{scene_name}{rn}{pra_size}{ext}')
+        outputs.append(scene_dir / 'RELEASE' / f'{scene_name}{rn}{pra_size}_rel.shp')
+        outputs.append(scene_dir / 'RELEASE' / f'{scene_name}{rn}{pra_size}_chull.shp')
+        outputs.append(scene_dir / 'DOMAIN' / f'{scene_name}{rn}{pra_size}_dom.shp')
 
     # Add one-off input files
     inputs.append(snowI_tif)
@@ -115,6 +113,9 @@ def rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **kwargs):
         df = chunk.add_pra_size(df)
 
         # Write out one top-level shapefile per pra_size
+        os.makedirs(scene_dir / 'RELEASE', exist_ok=True)
+        os.makedirs(scene_dir / 'DOMAIN', exist_ok=True)
+
         wkt = scene_args['coordinate_system']
         for pra_size,cat_df in df.groupby('pra_size'):
             root = f'{scene_name}{For}_{resolution}m{return_period}{pra_size}'
@@ -128,12 +129,12 @@ def rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **kwargs):
 
             chunk.write_dom(
                 cat_df, wkt,
-                scene_dir / 'RELEASE' / f'{root}_dom.shp')
+                scene_dir / 'DOMAIN' / f'{root}_dom.shp')
 
 
     rule = make.Rule(action, inputs, outputs)
-    rule.ramms_names = ramms_names
-    rule.release_files = release_files
+#    rule.ramms_names = ramms_names
+#    rule.release_files = release_files
     return rule
 
 
@@ -157,6 +158,7 @@ def chunk_rule(scene_dir, For, resolution, return_period, pra_size):
     base = f'{scene_name}{For}_{resolution}m{return_period}{pra_size}'
     inputs = [
         scene_dir / 'RELEASE' / f'{base}_rel.shp',
+        scene_dir / 'DOMAIN' / f'{base}_dom.shp',
         scene_args['dem_file'],
         scene_args['forest_file']]
     outputs = [
@@ -165,10 +167,11 @@ def chunk_rule(scene_dir, For, resolution, return_period, pra_size):
     def action(tdir):
 
         # Read the output from r_pra_post (above)
-        rdf = shputil.read_df(inputs[0], shape='pra').set_index('Id')
+#        rdf = shputil.read_df(inputs[0], shape='pra').set_index('Id')
+        rdf = chunk.read_reldom(inputs[0])
 
         # Assign a chunkid to each avalanche
-        rdf['combo'] = level.theory_scenedir_to_combo(scene_dir)
+        rdf['combo'] = [level.theory_scenedir_to_combo(scene_dir)] * len(rdf.index)
         rdf['pra_size'] = pra_size
         rdf = chunk.add_chunkinfo(rdf, scene_args)
         rdf = chunk.add_chunkid(rdf, scene_dir, append=False)
@@ -176,7 +179,7 @@ def chunk_rule(scene_dir, For, resolution, return_period, pra_size):
         # Create the chunks
         for chunkid,dfc in rdf.groupby('chunkid'):
             chunk_info = chunk.ChunkInfo(scene_name, chunkid, For, resolution, return_period, pra_size)
-            chunk.write_chunk(scene_args, chunk_info, dfc)
+            chunk.write_chunk(scene_args, chunk_info, dfc, {})
 
         # Create the _chunks.csv control file showing the chunks have all been created
         rdf.to_csv(outputs[0])

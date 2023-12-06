@@ -12,51 +12,9 @@ from uafgi.util import make,ioutil,shputil,gdalutil
 import pandas as pd
 
 
-def setlink_or_copy(ifile, ofile):
-    if config.shared_filesystem:    # No symlinks for Windows
-        if os.path.islink(ofile) or not os.path.exists(ofile):
-            os.makedirs(os.path.dirname(ofile), exist_ok=True)
-            shutil.copy(ifile, ofile)
-    else:
-        ioutil.setlink(ifile, ofile)
 
 # --------------------------------------------------------------------
 
-# 2023-04-24 Marc Christen said:
-#   As you do not run Stage 2 in RAMMS, you do not use the variable
-#   “NRCPUS” in the scenario-file. In the new version (link below) you
-#   can now use this variable. NRCPUS = 8 means, that RAMMS will start
-#   the first 8 exe-files to create the xy_coord-files in parallel, but
-#   then RAMMS will wait for the 8-th exe-file to finish. Then RAMMS
-#   will start the next 8 exe-files, and so on…..This will give a small
-#   break, such that not 100 exe-files will execute in parallel. What do
-#   you think? Could you please try this workaround for the moment? Of
-#   course you could also increase NRCPUS, or decrease…..
-
-
-scenario_tpl = \
-r"""LSHM    {scenario_name}
-MODULE  AVAL
-MUXI    VARIABLE
-DIR     {remote_ramms_dir}\
-DEM     DEM\
-RELEASE RELEASE\
-DOMAIN  DOMAIN\
-FOREST  FOREST\
-NRCPUS  {ncpu}
-COHESION {cohesion}
-DEBUG   {debug}
-CPUS_PRE {ncpu_preprocess}
-{test_nr_tpl}KEEP_DATA {keep_data}
-ALT_LIM_TOP  {alt_lim_top}
-ALT_LIM_LOW  {alt_lim_low}
-END
-"""
-
-
-
-
-# --------------------------------------------------------------------
 def tiffmap(jb1):
 
     """Returns a mapping between a parsed RAMMS dir vs. "permanent"

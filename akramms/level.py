@@ -1,4 +1,4 @@
-import re,itertools,os
+import re,itertools,os,pathlib
 from akramms import parse
 
 
@@ -24,7 +24,7 @@ def theory_expset_to_combos(exp_name, set_fn_name):
         Fully specified combos (including idom / jdom)
     """
 
-    exp_mod = parse.exp_mod(exp_name)
+    exp_mod = parse.load_expmod(exp_name)
     set_fn = getattr(exp_mod, set_fn_name)
     yield from set_fn()
 # -----------------------------------------------------------
@@ -43,7 +43,7 @@ def theory_wcombo_to_trialdir(exp_name, wcombo):
 # -----------------------------------------------------------
 def wcombo_to_combos(exp_name, wcombo, type='x'):
     """Resolves wildcard (idom,jdom) combos"""
-    exp_mod = parse.exp_mod(exp_name)
+    exp_mod = parse.load_expmod(exp_name)
     trialdir = wcombo_to_trialdir(exp_name, wcombo)
     sceneRE = re.compile('{'+type+r'}-(\d+)-(\d+)')
     for name in os.listdir(trialdir):
@@ -66,7 +66,7 @@ def expdir_to_wcombos(exp_mod):
 def theory_combo_to_scenedir(exp_name, combo, scenetype='x'):
     """Returns the full pathname for an AKRAMMS scene, based on its experiment and combo.
     The combo must be fully specified!!!"""
-    exp_mod = parse.exp_mod(exp_name)
+    exp_mod = parse.load_expmod(exp_name)
     if scenetype is None:
         scenetypes = ['x','arc']
     else:
@@ -85,18 +85,21 @@ def theory_scenedir_to_combo(scenedir, exp_mod=None):
     scenedir = pathlib.Path(scenedir)
 
     # Get idom, jdom
+#    print('scenedir ', scenedir)
+#    print('xxxxxxxxxxxxxxxxx ', scenedir.parts[-1])
+
     match = scenedirRE.match(scenedir.parts[-1])
-    idom = int(match.group(1))
-    jdom = int(match.group(2))
+    idom = int(match.group(2))
+    jdom = int(match.group(3))
 
     # Get the rest of the combo
     sparts = scenedir.parts[-2].split('-')[1:] + [idom, jdom]
 
     # Get the exp_mod if needed
     if exp_mod is None:
-        exp_mod = parse.exp_mod(scenedir.parts[-3])
+        exp_mod = parse.load_expmod(scenedir.parts[-3])
 
-    return exp_mod, exp_mod.Combo(*sparts)
+    return exp_mod.Combo(*sparts)
 # -----------------------------------------------------------
 def commonprefix(ini_strlist):
     from itertools import takewhile

@@ -1,11 +1,11 @@
-import bisect,os
+import bisect,os,typing,shutil
 import numpy as np
 import pandas as pd
 import shapely
 from uafgi.util import rasterize,shputil
 import d8graph
 from akramms.util import rammsutil
-from akramms import snow
+from akramms import snow,config
 
 """Everything to do with reading, rearranging and writing release files and chunks.
 
@@ -103,16 +103,16 @@ def read_dom(domfname, **kwargs):
         Index set to Id column
     """
 
-    df = shputil.read_df(domfname, shape='dom', **kwargs) \
+    return shputil.read_df(domfname, shape='dom', **kwargs) \
         .drop('fid', axis=1) \
         .set_index('Id')
-
-    return dom
 # -----------------------------------------------------------
 def read_reldom(relfname, **kwargs):
     """Reads a RELEASE and related DOMAIN file and merges together resulting dataframes"""
 
-    domfname = relfname.parents[1] / 'DOMAIN' / (relfname.parts[-1][-7:] + '_dom.shp')
+#    print('xxxxx relfname ', relfname)
+    domfname = relfname.parents[1] / 'DOMAIN' / (relfname.parts[-1][:-8] + '_dom.shp')
+#    print('xxxxx domfname ', domfname)
 
     rdf = read_rel(relfname, **kwargs)
     ddf = read_dom(domfname, **kwargs)
@@ -348,13 +348,13 @@ def add_chunkinfo(df, scene_args):
     scene_name = scene_args['name']
 
     # Pull out return_period and forest (which we will call "rpfor")
-    df['rpfor'] = pd.map(df.combo, lambda x: (x.return_period, x.forest))
+    df['rpfor'] = df.combo.map(lambda x: (x.return_period, x.forest))
 
     dfs = list()
     for ((return_period,For), pra_size),dfg in df.groupby(['rpfor', 'pra_size']):
 
-        dfg['chunkinfo'] = ChunkInfo(
-            scene_args['name'], -1, For, resolution, return_period, pra_size)
+        dfg['chunkinfo'] = \
+            [ChunkInfo(scene_args['name'], -1, For, resolution, return_period, pra_size)] * len(dfg.index)
 
 
 #        jb = rammsutil.RammsName(
@@ -398,19 +398,22 @@ def add_chunkid(rdf, scenedir, append=False):
 
     # Assign chunk IDs differently for each different kind of thing
     dfs = list()
-    for (rn,pra_size),df in rdf.groupby(['rn', 'pra_size']):
+#    for (ci,pra_size),df in rdf.groupby(['chunkinfo', 'pra_size']):
 
-       for segment,chunkid0 in enumerate(range(0,df.shape[0],config.max_ramms_pras)):
-           chunkid = chunkid0 + max_chunkids.get(pra_size,0)
+    for pra_size,df in rdf.groupby('pra_size'):
+        chunkid0 = max_chunkids.get(pra_size,-1) + 1
 
-           # Select out chunk
-           dfc = df[chunkid:chunkid+config.max_ramms_pras]
+        for chunkid,chunkix in enumerate(range(0,df.shape[0],config.max_ramms_pras)):
 
-           # Add the chunk number to the name
-           dfc['chunkid'] = chunkid
+            # Select out chunk
+            dfc = df[chunkix:chunkix+config.max_ramms_pras]
 
-           dfs.append(dfc)
+            # Add the chunk number to the name
+            dfc['chunkid'] = chunkid0 + chunkid
 
+            dfs.append(dfc)
+
+        max_chunkids[pra_size] = chunkid
     return pd.concat(dfs)
 
 
@@ -487,35 +490,74 @@ def dem_forest_links(scene_args, chunk_dir, oslope_name, For):
     return links
 
 
+# 2023-04-24 Marc Christen said:
+#   As you do not run Stage 2 in RAMMS, you do not use the variable
+#   “NRCPUS” in the scenario-file. In the new version (link below) you
+#   can now use this variable. NRCPUS = 8 means, that RAMMS will start
+#   the first 8 exe-files to create the xy_coord-files in parallel, but
+#   then RAMMS will wait for the 8-th exe-file to finish. Then RAMMS
+#   will start the next 8 exe-files, and so on…..This will give a small
+#   break, such that not 100 exe-files will execute in parallel. What do
+#   you think? Could you please try this workaround for the moment? Of
+#   course you could also increase NRCPUS, or decrease…..
+
+
+scenario_tpl = \
+r"""LSHM    {scenario_name}
+MODULE  AVAL
+MUXI    VARIABLE
+DIR     {remote_ramms_dir}\
+DEM     DEM\
+RELEASE RELEASE\
+DOMAIN  DOMAIN\
+FOREST  FOREST\
+NRCPUS  {ncpu}
+COHESION {cohesion}
+DEBUG   {debug}
+CPUS_PRE {ncpu_preprocess}
+{test_nr_tpl}KEEP_DATA {keep_data}
+ALT_LIM_TOP  {alt_lim_top}
+ALT_LIM_LOW  {alt_lim_low}
+END
+"""
+
 def write_scenario_txt(chunk_dir, alt_lim_top=1500, alt_lim_low=1000, ncpu=config.ramms_ncpu, ncpu_preprocess=config.ramms_ncpu_preprocess, cohesion=50):
     """ci: ChunkInfo
     """
 
-        chunk_name = chunk_dir.parts[-1]
+    chunk_name = chunk_dir.parts[-1]
 
-        # Create the scenario file
-        kwargs = dict()
-        kwargs['scenario_name'] = chunk_name
-        kwargs['remote_ramms_dir'] = config.roots.convert_to(chunk_dir, config.roots_w)
-        kwargs['ncpu'] = str(ncpu)
-        kwargs['ncpu_preprocess'] = str(ncpu_preprocess)
-        kwargs['cohesion'] = str(cohesion)
-        if config.debug:
-            kwargs['debug'] = '1'
-            kwargs['keep_data'] = '1'
-            kwargs['test_nr_tpl'] = "TEST_NR    20\n"
-        else:
-            kwargs['debug'] = '0'
-            kwargs['keep_data'] = '1'
-            kwargs['test_nr_tpl'] = ""
-        kwargs['alt_lim_top'] = str(alt_lim_top)
-        kwargs['alt_lim_low'] = str(alt_lim_low)
+    # Create the scenario file
+    kwargs = dict()
+    kwargs['scenario_name'] = chunk_name
+    kwargs['remote_ramms_dir'] = config.roots.convert_to(chunk_dir, config.roots_w)
+    kwargs['ncpu'] = str(ncpu)
+    kwargs['ncpu_preprocess'] = str(ncpu_preprocess)
+    kwargs['cohesion'] = str(cohesion)
+    if config.debug:
+        kwargs['debug'] = '1'
+        kwargs['keep_data'] = '1'
+        kwargs['test_nr_tpl'] = "TEST_NR    20\n"
+    else:
+        kwargs['debug'] = '0'
+        kwargs['keep_data'] = '1'
+        kwargs['test_nr_tpl'] = ""
+    kwargs['alt_lim_top'] = str(alt_lim_top)
+    kwargs['alt_lim_low'] = str(alt_lim_low)
 
-        scenario_txt = os.path.join(chunk_dir, 'scenario.txt')
-        os.makedirs(chunk_dir, exist_ok=True)
-        with open(scenario_txt, 'w') as out:
-            out.write(scenario_tpl.format(**kwargs))
+    scenario_txt = os.path.join(chunk_dir, 'scenario.txt')
+    os.makedirs(chunk_dir, exist_ok=True)
+    with open(scenario_txt, 'w') as out:
+        out.write(scenario_tpl.format(**kwargs))
 
+
+def setlink_or_copy(ifile, ofile):
+    if config.shared_filesystem:    # No symlinks for Windows
+        if os.path.islink(ofile) or not os.path.exists(ofile):
+            os.makedirs(os.path.dirname(ofile), exist_ok=True)
+            shutil.copy(ifile, ofile)
+    else:
+        ioutil.setlink(ifile, ofile)
 
 def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
     """Writes a full RAMMS run (chunk), ready for RAMMS Stage 1.
@@ -540,7 +582,7 @@ def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
     ci = chunk_info
     chunk_name = f'{ci.scene_name}{ci.chunkid:05d}{ci.return_period}{ci.pra_size}{ci.For}_{ci.resolution}'
     slope_name = f'{ci.scene_name}{ci.chunkid:05d}{ci.For}_{ci.resolution}'    # Used for DEM / Forest files
-    chunk_dir = scene_dir / 'CHUNKS' / chunk_name
+    chunk_dir = scene_args['scene_dir'] / 'CHUNKS' / chunk_name
     slope_dir = chunk_dir / 'RESULTS' / slope_name
     avalanche_dir = slope_dir / f'{ci.return_period}{ci.pra_size}'
 
@@ -556,13 +598,14 @@ def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
     # Write the _rel.shp file
     os.makedirs(chunk_dir / 'RELEASE', exist_ok=True)
     ofname = chunk_dir / 'RELEASE' / f'{chunk_name}_rel.shp'
-    _dfx = dfc[list(rel_df.columns)]
+    _dfx = dfc.reset_index()[['area_m2', 'Mean_DEM', 'Mean_Slope', 'Scene_reso', 'Id', 'i', 'j', 'sx3', 'd0star', 'slopecorr', 'Wind', f'd0_{ci.return_period}', f'VOL_{ci.return_period}', 'pra']]
     shputil.write_df(_dfx, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
     
     # Write the _dom.shp file 
     os.makedirs(chunk_dir / 'DOMAIN', exist_ok=True)
     ofname = chunk_dir / 'DOMAIN' / f'{chunk_name}_dom.shp'
-    shputil.write_df(dfc[list(dom_df)], 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
+    _dfx = dfc.reset_index()[['Id', 'dom']]
+    shputil.write_df(_dfx, 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
 
 # Commented out because these files differ from the (by definition
 # correct) versions created by RAMMS.
