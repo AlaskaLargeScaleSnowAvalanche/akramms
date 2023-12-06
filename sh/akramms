@@ -198,12 +198,6 @@ def parse(args):
     akdf0 = resolve.resolve_to(parseds, args.to, realized=False)
     print(akdf0)
 
-@subcommand([
-    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
-    argument('--to', help='What to resolve to', default='releasefile'),
-])
-def parse(args):
-    """Query avalanches for mosaic"""
 
 # ---------------------------------------------------------------------
 def get_exp_dir(exp_mod):
@@ -383,22 +377,39 @@ def ps(args):
         help='Delete original avalanches after finished archiving?'),
     argument('--debug', action='store_true',
         help='Run in debug mode, single threaded, for better catching exceptions'),
+    argument('--dry-run', action='store_true',
+        help="Don't actually do the work"),
+    argument('--overrun', action='store_true',
+        help="Archive avalanche even if it is overrun?")
 ])
 def archive(args):
     from akramms import archive
 
     parseds = akramms.parse.parse_args(args.spec)
 
-    # Identify avalanches ready to be archived that have not yet been archived
-#    akdf0 = resolve.resolve_to(parseds, 'combo', realized=True, sce
+    # Identify avalanches in the original RAMMS scene
     akdf_x = \
         resolve.resolve_to(parseds, 'id', realized=True, stage='out', scenetypes={'x'}) \
         .set_index(['combo', 'id'])
+
+    # TODO: For each avalanche id choose the avalanches with highest
+    # chunkid (this happens when there are overruns and domain
+    # enlargements)
+
+
+
+    # Identify archived avalanches
     akdf_arc = \
-        resolve.resolve_to(parseds, 'id', realized=True, scenetypes={'arc'}) \
+        resolve.resolve_to(parseds, 'id', realized=True, scenetypes={'arc'}, include_overruns=args.overrun) \
         .set_index(['combo', 'id'])
 
+#    print('akdf_x ', akdf_x.avalfile.tolist())
+#    print('akdf_arc ', akdf_arc.avalfile.tolist())
+##    return
+
+
     # Find rows in the 'x' directory but no the 'arc' directory
+    # That is, avalanches ready to be archived but not yet archived.
     x_only = akdf_x.index.difference(akdf_arc.index)
 
     # Select only those rows to archive
@@ -413,7 +424,7 @@ def archive(args):
 #        print(tup)
     print(akdf)
     
-    archive.archive(akdf, debug=args.debug)
+    archive.archive(akdf, debug=args.debug, dry_run=args.dry_run, archive_overrun=args.overrun)
 
 # ------------------------------------------------------------------
 
@@ -422,24 +433,26 @@ def archive(args):
 @subcommand([
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
     #argument('-o', '--output', required=False, help='Name of Mosaic output file to write'),
-    argument('--limit', type=int, help='Limit number of avalanches processed (for DEBUGGING)')
+    argument('--limit', type=int, help='Limit number of avalanches processed (for DEBUGGING)'),
+    argument('--overrun', action='store_true',
+        help="Mosaic archived overrun avalanches?"),
 ])
 def mosaic(args):
     run_setup_py()
-    from akramms import avalquery,mosaic
+#    from akramms import avalquery,mosaic
 
-    query_fname = args.query[0]
-    ofname = os.path.splitext(query_fname)[0] + '.zip'
+    # Identify archived avalanches for use in the mosaic
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf = \
+        resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'}, include_overruns=args.overrun)
 
-    # Read the query
-    with open(query_fname, 'rb') as fin:
-        exp_mod = exputil.load(pickle.load(fin))
-        extent = pickle.load(fin)
-        nc_fnames = pickle.load(fin)
+# \
+#        .set_index(['combo', 'id'])
 
-    if args.limit is not None:
-        nc_fnames = nc_fnames[:args.limit]    # DEBUGGING
+    print(akdf)
+    return
 
+#    nc_fnames = akdf.
 
     ## Do query
     #aspecs0, nc_fnames = avalparse.parse_aval_specs(args.avals)
@@ -457,6 +470,15 @@ def mosaic(args):
 
     with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
         mosaic.mosaic_avals(gridM, nc_fnames, ofname, tdir)
+
+
+#Ways to choose the extent:
+#
+#1. User provided named extent via --extent flag, use that from ak.py  (See extents variable in ak.py)
+#2. If only one (idom,jdom) in our various combos (and --extent tile), use that (idom,jdom)
+#3. User provided numeric extent via --extent flag
+#4. If no other extent info, union all the extents
+
 
 
 

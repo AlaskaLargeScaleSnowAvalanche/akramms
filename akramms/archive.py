@@ -203,6 +203,17 @@ def nc_out(ncout, izip, arcname, attrs={}):
 
 
 # ----------------------------------------------------------
+def is_overrun(ozip):
+    """See if this avalanche overran its domain
+
+    ozip: zipfile.ZipFile
+        Open zipfile of <xyz>.out.zip
+    """
+    arcnames = [os.path.split(x)[1] for x in out_zip.namelist()]
+    overrun = any(x.endswith('.out.overrun') for x in arcnames)
+
+    return overrun
+# ----------------------------------------------------------
 def ramms_to_nc0(out_zip, ncout):
     """
     base:
@@ -235,12 +246,12 @@ def ramms_to_nc0(out_zip, ncout):
         out_infos = out_zip.infolist()
 
         # See if this avalanche overran its domain
-        arcnames = [os.path.split(x)[1] for x in out_zip.namelist()]
-        overrun = any(x.endswith('.out.overrun') for x in arcnames)
+        overrun = is_overrun(out_zip)
 
         if 'status' not in ncout.variables:
             ncv = ncout.createVariable('status', 'i')
-        ncout.variables['status'].overrun = 'True' if overrun else 'False'
+        ncout.variables['status'].overrun = 1 if overrun else 0
+#        ncout.variables['status'].overrun = 'True' if overrun else 'False'
 
         # Get the grid
         gridI = pickle.loads(in_zip.read('grid.pik'))
@@ -324,16 +335,17 @@ def ramms_to_nc0(out_zip, ncout):
         ncv[:] = np.array([
             [min(x0,x1), min(y0,y1)],
             [max(x0,x1) + gridI.dx*np.sign(gridI.dx), max(y0,y1) + gridI.dy*np.sign(gridI.dy) ]])
-        
+    return overrun
 
 
 # ----------------------------------------------------------
-def _archive_single_threaded(akdf0, status_attrs, debug=False, dry_run=False):
+def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=False, archive_overrun=False):
     """Archives a bunch of work on a single thread
     akdf0:
         Must contain cols: exp, combo, releasefile, chunkid, ic
     """
 
+    out_zips = list()
     for (exp, combo,releasefile),akdf1 in akdf0.groupby(['exp', 'combo', 'releasefile']):
         releasefile_mtime = os.path.getmtime(releasefile)
         releasefile_timestamp = datetime.datetime.fromtimestamp(releasefile_mtime).isoformat()
@@ -341,46 +353,51 @@ def _archive_single_threaded(akdf0, status_attrs, debug=False, dry_run=False):
 
         expmod = parse.load_expmod(exp)
         arc_dir = expmod.combo_to_scenedir(combo, scenetype='arc')
+#        print('arc-dir ', arc_dir)
         x_dir = expmod.combo_to_scenedir(combo, scenetype='x')
 
         jb = file_info.parse_chunk_release_file(releasefile)
-        arc_dir = jb.scene_dir
+#        arc_dir = jb.scene_dir
 
         # Read the shapefile this avalanche came from, so we can copy
         # info into the NetCDF file.
         rdf = shputil.read_df(releasefile, read_shapes=False)
         rdf = rdf.set_index('Id')
 
-        out_zips = list()
         for tup in akdf1.reset_index().itertuples(index=False):
 
             inout = joblib.inout_name(jb, tup.chunkid, tup.id)
             out_zip = jb.avalanche_dir / f'{inout}.out.zip'
-            arc_fname = arc_dir / f'aval-{jb.pra_size}-{tup.id}'
+            arc_leafbase = f'aval-{jb.pra_size}-{tup.id}'
 
 
-            print(f'Archive {out_zip} -> {arc_fname}')
+            # Avoid archiving overrun files
+            with zipfile.ZipFile(out_zip, 'r') as ozip:
+                overrun = is_overrun(ozip)
+            if (not archive_overrun) and overrun:
+                print('Not archiving overrun: {out_zip}')
+                continue
+
             out_zips.append(str(out_zip))
             if dry_run:
+                print(f'Archive {out_zip} -> {arc_leafbase}')
                 continue
 
             # -------- Convert to NetCDF
 
             # .out.zip file is OK, so let's regenerate
-            if debug:
+            if print_output:
                 print('.', end='')
                 sys.stdout.flush()
 
-            os.makedirs(arc_fname.parents[0], exist_ok=True)
+            os.makedirs(arc_dir, exist_ok=True)
 
             # Write the full NetCDF file
-            tmp_leaf = os.path.splitext(arc_fname.parts[-1])[0] + '-tmp.nc'    # Write atomically
-            tmp_fname = arc_fname.parents[0] / tmp_leaf
-                
+            tmp_fname = arc_dir / (arc_leafbase + '-tmp.nc')  # Write atomically
             try:
                 with netCDF4.Dataset(tmp_fname, 'w') as ncout:
                     # Add info from the RELEASE file
-                    ncv = ncout.createVariable('pra_attributes', 'i')
+                    ncv = ncout.createVariable('releasefile_attrs', 'i')
                     ncv.description = 'Attributes from the RELEASE shapefile used to set up this avalanche'
                     # Copy info from the RELEASE file into the NetCDF output.
                     row = rdf.loc[tup.id]
@@ -391,6 +408,7 @@ def _archive_single_threaded(akdf0, status_attrs, debug=False, dry_run=False):
                     ncv = ncout.createVariable('status', 'i')
                     for k,v in status_attrs.items():
                         setattr(ncv, k, v)
+
                     ncv.combo = scombo
                     ncv.releasefile_timestamp = releasefile_timestamp
                     out_zip_mtime = os.path.getmtime(out_zip)
@@ -403,7 +421,9 @@ def _archive_single_threaded(akdf0, status_attrs, debug=False, dry_run=False):
                         grp = ncout.createGroup('scene_nc')
                         schema.create(grp)
                         schema.copy(ncin, grp)
-
+                Overrun = 'overrun' if overrun else ''
+                arc_fname = arc_dir / f'{arc_leafbase}-{Overrun}.nc'
+                print(f'Archive {out_zip} -> {arc_fname}')
                 os.rename(tmp_fname, arc_fname)
             except Exception:
                 # Remove candidate output file, if it exists
@@ -422,8 +442,11 @@ def _git_commit(dir):
     return proc.stdout.readline().strip()    # We just want head -1
 
 # -----------------------------------------------------------------
-def archive(akdf, debug=False):
-    """Archives in multi-thread"""
+def archive(akdf, debug=False, dry_run=False, archive_overrun=False):
+    """Archives in multi-thread
+    archive_overrun:
+        Should we archive overrun avalanches?
+    """
 
     # Don't need this column, and it breaks pickle / multiprocessing...
     if 'parsed' in akdf.columns:
@@ -446,8 +469,17 @@ def archive(akdf, debug=False):
         ex = stack.enter_context(concurrent.futures.ThreadPoolExecutor(1)) if debug \
             else concurrent.futures.ProcessPoolExecutor(config.ncpu_compress)
 
-        futures = [ex.submit(_archive_single_threaded, akdfs[0], status_attrs, debug=True)]
-        futures += [ex.submit(_archive_single_threaded, akdf, status_attrs, debug=False) for akdf in akdfs[1:]]
+        futures = [ex.submit(_archive_single_threaded,
+            akdfs[0], status_attrs,
+            print_output=True, dry_run=dry_run,
+            archive_overrun=archive_overrun)]
+
+        futures += [ex.submit(_archive_single_threaded,
+            akdf, status_attrs,
+            print_output=False, dry_run=dry_run,
+            archive_overrun=archive_overrun)
+            for akdf in akdfs[1:]]
+
         for future in futures:
             archived_out_zips += future.result()
 

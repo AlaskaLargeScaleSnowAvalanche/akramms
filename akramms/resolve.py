@@ -136,7 +136,7 @@ def resolve_releasefile(akdf, scenetypes=['x'], realized=True):
         if not os.path.exists(releasedir):
             return
 
-#        print(f'process_releasedir({releasedir}')
+        print(f'process_releasedir({releasedir}')
         for name in os.listdir(releasedir):
             match = file_info.chunk_release_fileRE.match(name)
 #            print('    match2 ', name, match)
@@ -177,7 +177,9 @@ def resolve_releasefile(akdf, scenetypes=['x'], realized=True):
                                 chunkid = int(match.group(2))
                                 process_releasedir(tup, 'x', chunkid, scenedir / 'CHUNKS' / name / 'RELEASE')
                 elif scenetype == 'arc':
-                    process_releasedir(tup, 'arc', -1, scenedir / 'RELEASE')
+                    # Put the arc_dir in place of the releasefile.
+                    if os.path.isdir(scenedir):
+                        orows.append(itertools.chain(tup, [scenetype, None, None, scenedir]))
 
     df = pd.DataFrame(orows, columns=tuple(
         itertools.chain(type(tup)._fields, ['scenetype', 'pra_size', 'chunkid', 'releasefile'])))
@@ -185,11 +187,11 @@ def resolve_releasefile(akdf, scenetypes=['x'], realized=True):
     return df
 
 # ------------------------------------------------------------
-_avalRE = re.compile(r'aval-([TSML])-(\d+)')
+_avalRE = re.compile(r'^aval-([TSML])-(\d+)-([^-]*).nc$')
 #_out_zipRE = re.compile(r'(.*)_(\d+)\.out\.zip$')
 
 @functools.lru_cache()
-def _realized_ids(scenetype, releasefile, stage):
+def _realized_ids(scenetype, releasefile, stage, include_overruns=False):
     """Find IDs that exist on disk.
     (Cached separate function)
 
@@ -212,18 +214,20 @@ def _realized_ids(scenetype, releasefile, stage):
             id = int(match.group(2))
             avalfiles[id] = out_zip
     elif scenetype == 'arc':
-        avaldir = releasefile.parents[1]
+        avaldir = releasefile
         avalfiles = dict()
         for name in os.listdir(avaldir):
-            match = avalRE.match(name)
+            match = _avalRE.match(name)
             if match is not None:
+                if (not include_overruns) and (match.group(3) == 'overrun'):
+                    continue
                 avalfiles[int(match.group(2))] = avaldir / name
     else:
         assert False
 
     return avalfiles
 
-def resolve_id(akdf, realized=True, stage='out'):
+def resolve_id(akdf, realized=True, stage='out', include_overruns=False):
     """
     stage:
         If realized, are we looking for avalanche IDs with .in.zip or .out.zip?
@@ -250,21 +254,29 @@ def resolve_id(akdf, realized=True, stage='out'):
             ids = parsed['ids']
         else:
             # Read the releasefile
-            df = shputil.read_df(tup.releasefile, read_shapes=False)
-            ids = df['Id'].tolist()
-            #print(f'Reading releasefile {tup.releasefile}: {ids}')
+            if tup.scenetype == 'x':
+                df = shputil.read_df(tup.releasefile, read_shapes=False)
+                ids = df['Id'].tolist()
+                #print(f'Reading releasefile {tup.releasefile}: {ids}')
+            else:
+                ids = None    # No releasefile for archive
 
         # Add those IDs
         if realized:
             # Match those IDs against what was requested in the releasefile
-            avalfiles = _realized_ids(tup.scenetype, tup.releasefile, stage)
-            #print('avalfiles ', tup.combo, len(avalfiles), len(ids))
-            for id in ids:
-                try:
-                    orows.append(itertools.chain(tup, (id, avalfiles[id])))
-                except KeyError:
-                    # ID from releasefile was not realized, ignore it
-                    pass
+            avalfiles = _realized_ids(tup.scenetype, tup.releasefile, stage, include_overruns=include_overruns)
+
+            if ids is None:    # Archive-type directory, no releasefile
+                for id,fname in avalfiles.items():
+                    orows.append(itertools.chain(tup, (id, fname)))
+            else:
+                #print('avalfiles ', tup.combo, len(avalfiles), len(ids))
+                for id in ids:
+                    try:
+                        orows.append(itertools.chain(tup, (id, avalfiles[id])))
+                    except KeyError:
+                        # ID from releasefile was not realized, ignore it
+                        pass
         else:
             # Just include the IDs, no avalfiles
             # User can fill in avalfile column later if desired.
@@ -277,7 +289,7 @@ def resolve_id(akdf, realized=True, stage='out'):
 #        itertools.chain(type(tup)._fields, ['id', 'avalfile'])))
 
 # ------------------------------------------------------------
-def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out'):
+def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out', include_overruns=False):
     """level: exp|combo|releasefile|id
         Which level of detail to generate for this query.
         NOTE: level='id' is only used for QUERYING results, not for
@@ -285,7 +297,8 @@ def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out'):
               genderated one combo at a time, so things are resolved
               to level='combo' and then chunk.read_rel() or
               chunk.read_reldom() is used to load the releasefile.
-
+    include_overruns:
+        List overrun avalanches?  (Only affects for 'arc' scenetype)
     """
 
     akdf = initial(parseds)
@@ -303,7 +316,7 @@ def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out'):
     if level == 'releasefile':
         return akdf
 
-    akdf = resolve_id(akdf, realized=realized, stage=stage)
+    akdf = resolve_id(akdf, realized=realized, stage=stage, include_overruns=include_overruns)
 #    print('resolve_id ', akdf)
     if level == 'id':
         return akdf
