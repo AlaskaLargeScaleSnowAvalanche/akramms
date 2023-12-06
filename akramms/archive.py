@@ -98,6 +98,7 @@ def archive_scene(scene_dir, archive_dir):
         out_nc = os.path.join(archive_dir, 'aval-{:d}.nc'.format(id))
 
         # Only rewrite out_nc if it doesn't exist
+TODO: Check file timestamps
         status,out_zip = out_zips.get(id, (NO_OUT_ZIP, None))
         basepath = None if out_zip is None else out_zip[:-8]
 

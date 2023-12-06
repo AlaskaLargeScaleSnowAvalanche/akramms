@@ -1,8 +1,9 @@
 import os,collections,sys
 import schema
-from uafgi.util import schemautil,shputil
+from uafgi.util import schemautil,shputil,gisutil
 from akramms import config, experiment, stages
 from akramms import r_prepare,r_domain_builder
+from akramms import d_ifsar, d_usgs_landcover
 
 # Top-level experimental design for Alaska
 
@@ -13,11 +14,22 @@ dir = os.path.join(config.roots['PRJ'], name)
 # Map coordinate system we use
 wkt = 'PROJCS["NAD83 / Alaska Albers",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["Degree",0.017453292519943295]],PROJECTION["Albers"],PARAMETER["standard_parallel_1",55],PARAMETER["standard_parallel_2",65],PARAMETER["latitude_of_origin",50],PARAMETER["central_meridian",-154],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["Meter",1]]'
 resolution = 10    # 10m resolution for our DEM
+snow_density = 300    # [kg m-3], used for mosaic
+
+# ----------------------------------------------
+# Function extracts a DEM and writes it to a file
+dem_img = d_ifsar.r_vrt('DTM').outputs[0]    # Master DEM image file
+def extract_dem(poly, ofname, **kwargs):
+    return d_ifsar.extract('DTM', poly, ofname, resolution=resolution, **kwargs)
+
+landcover_img = d_usgs_landcover.landcover_img # Master landcover image file
+extract_landcover = d_usgs_landcover.extract    # Function to extract from master landcover
+# ----------------------------------------------
 
 # Define the domains within all of Alaska, each with an (idom, jdom) coordinate.
-domain_size = (30000., 30000.)   # 25km^2
+domain_size = (30000., 30000.)   # 30km^2
 domain_margin = (8000,8000)    # 8km margin
-domains = experiment.DomainGrid(
+gridD = gisutil.DomainGrid(
     wkt,
     config.roots.syspath('{DATA}/fischer/AlaskaBounds.shp'),
     domain_size, domain_margin)
@@ -27,7 +39,7 @@ domains = experiment.DomainGrid(
 # /vzip/ is a GDAL thing for shapefiles contained in .zip
 
 experiment_region_zip = config.roots.syspath('{DATA}/wolken/SE_AK_Domain_Land.zip')
-experiment_region_shp = '/vsizip/' + config.roots.syspath('{DATA}/wolken/SE_AK_Domain_Land.zip') + '/SE_AK_Domain_Land.shp'
+experiment_region_shp = f'/vsizip/{experiment_region_zip}/SE_AK_Domain_Land.shp'
 
 # Scehma of top-level tuple describing a single trial.
 combo_schema = schema.Schema({
@@ -67,10 +79,10 @@ def combo_to_scene_subdir(combo):
 # -------------------------------------------------------------
 def add_dem(makefile, idom, jdom, sanity_check=True):
     exp_mod = sys.modules[__name__]    # This module
-    return makefile.add(experiment.r_ifsar(exp_mod, idom, jdom, resolution=resolution, sanity_check=sanity_check)).outputs[0]
+    return makefile.add(experiment.r_ifsar(exp_mod, idom, jdom, sanity_check=sanity_check)).outputs[0]
 
 def add_combo(makefile, combo):
-    """Adds rules needed to set up (and also run) a trial."""
+    """Adds rules needed to set up (and also run) a trial. (step1)"""
 
     exp_mod = sys.modules[__name__]    # This module
 
@@ -120,7 +132,7 @@ def add_combo(makefile, combo):
 
 #    stages.add_stage0_rules(makefile, scene_dir)
 def add_experiment(makefile, combos):
-    add_dem(makefile, 0, 0, sanity_check=False)    # Get the origin scene
+#    add_dem(makefile, 0, 0, sanity_check=False)    # Get the origin scene
 #    add_dem(makefile, 1, 0, sanity_check=False)    # Get the origin scene
 #    add_dem(makefile, 55, 0, sanity_check=False)    # Get the origin scene
 #    add_dem(makefile, 113, 0, sanity_check=False)    # Get the origin scene
@@ -152,12 +164,5 @@ def full():
 # -----------------------------------------------------------------
 def juneau():
     # Just one combo for now
-    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 26)    # A Juneau-close box
-#    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 114, 26)    # Another box
-#    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 27)    # Another box
-
-#    j=0
-#    for i in range(0, domains.nx):
-#        print(domains.poly(i, j, margin=True))
-#    print(domains.dx, domains.dy)
-
+    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 45)    # A Juneau-close box
+#    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 44)    # North of Juneau

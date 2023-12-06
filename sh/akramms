@@ -316,6 +316,10 @@ def step2(args):
 ])
 def step3(args):
     """Go through RAMMS Stage 0 and 1: ArcGIS and eCognition, setting up RAMMS scenes to run.  Then run RAMMS stage 0 and 1 on each scene."""
+    import setuptools
+    from akramms.util import harnutil
+
+
     sexp_mod, sexp_fn = getattr(args, 'experiment-spec')
 
     # Make sure the domain finder C++ code is compiled. (needed for RAMMS Stage 1)

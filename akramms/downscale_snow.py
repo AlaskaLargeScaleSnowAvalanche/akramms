@@ -61,10 +61,10 @@ def r_distance_from_coast(wrf_geo_nc, ofname):
         # Find index of nearest ocean gridcell(s) to all non-cean gridcells
         land_ixs = np.where(wrfdemA1 != 0)[0]
         jjs,iis = np.where(wrfdemA != 0)
-        xs,ys = gridA.to_xy(iis, jjs)
+        xs,ys = gridA.to_xy(iis, jjs, center=True)
 
-        hdy = 0.5*gridA.dy
-        hdx = 0.5*gridA.dx
+        #hdy = 0.5*gridA.dy
+        #hdx = 0.5*gridA.dx
         bounds = [0]
         source_ixs = list()
         source_xs = list()
@@ -82,7 +82,7 @@ def r_distance_from_coast(wrf_geo_nc, ofname):
 
         # Convert 1D indices to x,y
         nearest_js, nearest_is = np.divmod(nearest_ixs, gridA.nx)
-        nearest_xs, nearest_ys = gridA.to_xy(nearest_is, nearest_js)
+        nearest_xs, nearest_ys = gridA.to_xy(nearest_is, nearest_js, center=True)
 
         # Put it all in a dataframe
 

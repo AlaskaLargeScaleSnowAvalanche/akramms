@@ -1,6 +1,6 @@
 import functools,re,os,subprocess
 from akramms import config
-from uafgi.util import make
+from uafgi.util import make,gdalutil
 
 # There needs to be a symlink to the ACTUAL location of the ifsar data
 ifsar_root = config.roots.syspath('{DATA}/ifsar')
@@ -70,10 +70,8 @@ def extract(type, poly, ofname, resolution=None, sanity_check=True):
         Output raster filename
     """
     xx,yy = poly.exterior.coords.xy
-    x0 = xx[0]
-    x1 = xx[2]
-    y0 = yy[0]
-    y1 = yy[2]
+
+    x0,x1,y0,y1 = gdalutil.positive_rectangle(xx[0], xx[2], yy[0], yy[2])
 
     cmd = ['gdal_translate']
     # https://gis.stackexchange.com/questions/1104/should-gdal-be-set-to-produce-geotiff-files-with-compression-which-algorithm-sh
@@ -85,6 +83,8 @@ def extract(type, poly, ofname, resolution=None, sanity_check=True):
         cmd += ['-tr', str(resolution), str(resolution)]
 
     cmd.append('-projwin')
+    # -projwin <ulx> <uly> <lrx> <lry>
+    # Therefore, y1<y0 in typical projection, where y increases as you go northward.
     cmd += [str(n) for n in (x0,y1,x1,y0)]
 
     # This needs to be in i/j not x/y

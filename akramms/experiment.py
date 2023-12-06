@@ -8,104 +8,27 @@ import shapely
 import pandas as pd
 from uafgi.util import make,gisutil,shputil,gdalutil
 from akramms import config
-from akramms import d_ifsar, d_usgs_landcover,downscale_snow
+from akramms import downscale_snow
+#from akramms import d_ifsar, d_usgs_landcover
 
-class DomainGrid(gisutil.RasterInfo):    # (gridD)
-    """Define a bunch of rectangles indexed by (idom, jdom).
-
-    NOTE: This is a subclass of gisutil.RasterInfo.  Each "gridcell"
-          in RasterInfo represents a domain in DomainGrid.
+def global_grid(*args):
+    """
+    gridD: DomainGrid
+        The grid giving the sub-domains.
+    dx, dy: [m]
+        Grid resolution.  Must evenly divide gridD.dx
     """
 
-    def __init__(self, wkt, index_region_shp, domain_size, domain_margin):
+    if len(args) == 1:
+        exp_mod = args[0]
+        gridD = exp_mod.gridD
+        dx = exp_mod.resolution
+        dy = exp_mod.resolution
+    else:
+        gridD, dx, dy = args
 
-        """
-        wkt:
-            Projection to use.
-        index_region_shp: shapefile name
-            A simple polygon of the ENTIRE region that MIGHT be
-            covered.  (i.e. all of Alaska).  This region is divided up
-            into domain-size rectangles, which are given (idom,jdom)
-            index numbers.  All portions of the experiment must happen
-            INSIDE this region.
-        domain_size: (x,y)
-            Size of each domain
-        domain_margin: (x,y)
-            Amount of margin to add to each domain.
-            (For avalanches that start near the edge and run out).
 
-        """
-
-        # Load the overall index region
-        index_region = list(shputil.read(index_region_shp))[0]['_shape']
-#        print('index_region ', index_region)
-        index_box = index_region.envelope  # Smallest rectangle with sides oriented to axes
-#        print('index_box ', index_box)
-
-        # ----------------------------------------
-        # Determine "domain geotransform" based on index_box
-        domain_size = domain_size
-        domain_margin = domain_margin
-        xx,yy = index_box.exterior.coords.xy
-        x0 = xx[0]
-        x1 = xx[1]
-        y0 = yy[0]
-        y1 = yy[2]
-
-        # The domain grid should have the same north-up / north-down
-        # as the original grid it's on top of.
-        assert x0 < x1
-        assert y0 < y1
-
-        dx = domain_size[0] #* xsgn
-        dy = domain_size[1] #* ysgn
-
-        # Round region to integral domain size
-        x0 = dx * math.floor(x0/dy)
-        y0 = dy * math.floor(y0/dy)
-
-        #xsgn = np.sign(x1-x0)
-        #ysgn = np.sign(y1-y0)
-
-        nx = math.ceil((x1-x0)/dx)
-        ny = math.ceil((y1-y0)/dy)
-
-        # Geotransform
-        GT = np.array([x0, dx, 0, y0, 0, dy])
-        super().__init__(wkt, nx, ny, GT)
-
-        self.domain_margin = domain_margin
-        self.index_box = index_box
-
-    def poly(self, ix, iy, margin=False):
-        """Returns given rectangle by index.
-        ix, iy:
-            Coordinates of the domain within the overall region.
-        margin:
-            Should the margin be included in the box returned?
-        Returns:
-            A rectangular polygon, oriented in standard (counter clockwise) fashion.
-        """
-
-        GT = self.geotransform
-        x0 = GT[0] + GT[1] * ix
-        y0 = GT[3] + GT[5] * iy
-
-        if margin:
-            mx = np.sign(self.dx) * self.domain_margin[0]
-            my = np.sign(self.dy) * self.domain_margin[1]
-        else:
-            mx = 0
-            my = 0
-
-        coords = [
-            (x0-mx, y0-my),
-            (x0+self.dx+mx, y0-my),
-            (x0+self.dx+mx, y0+self.dy+my),
-            (x0-mx, y0+self.dy+my),
-            (x0-mx, y0-my)]
-        return shapely.geometry.Polygon(coords)
-
+# -----------------------------------------------------
 @functools.lru_cache()
 def r_active_domains(exp_mod):
     """Writes a shapefile defining the domains for THIS experiment that will be used...
@@ -129,7 +52,7 @@ def r_active_domains(exp_mod):
             Zipped shapefile
     """
 
-    gridD = exp_mod.domains
+    gridD = exp_mod.gridD
 
 
     # Load the experiment_region as a Shapely Multipolygon
@@ -198,7 +121,7 @@ def r_active_domains(exp_mod):
 
 # -----------------------------------------------------------------------
 @functools.lru_cache()
-def r_ifsar(exp_mod, idom, jdom, resolution=None, sanity_check=True):
+def r_ifsar(exp_mod, idom, jdom, sanity_check=True):
     """Select out a portion of the overall IFSAR digital terrain model dataset, for one domain.
 
     exp_mod:
@@ -212,14 +135,14 @@ def r_ifsar(exp_mod, idom, jdom, resolution=None, sanity_check=True):
         {type}/{exp_mod.name}_{type}_{idom:03d}_{jdom:03d}
     """
 
-    type = 'DTM'
-    ifsar_vrt = d_ifsar.r_vrt(type).outputs[0]
-    ofname = os.path.join(exp_mod.dir, type, f'{exp_mod.name}_{type}_{idom:03d}_{jdom:03d}.tif')
+    #ifsar_vrt = d_ifsar.r_vrt(type).outputs[0]
+    ofname = os.path.join(exp_mod.dir, 'dem', f'{exp_mod.name}_dem_{idom:03d}_{jdom:03d}.tif')
 
     def action(tdir):
-        poly = exp_mod.domains.poly(idom, jdom, margin=True)
-        return d_ifsar.extract(type, poly, ofname, resolution=resolution, sanity_check=True)
-    return make.Rule(action, [ifsar_vrt], [ofname])
+        poly = exp_mod.gridD.poly(idom, jdom, margin=True)
+#        return d_ifsar.extract(type, poly, ofname, resolution=resolution, sanity_check=True)
+        return exp_mod.extract_dem(poly, ofname, sanity_check=True)
+    return make.Rule(action, [exp_mod.dem_img], [ofname])
 # -----------------------------------------------------------------------
 @functools.lru_cache()
 def r_landcover(exp_mod, idom, jdom):
@@ -235,9 +158,10 @@ def r_landcover(exp_mod, idom, jdom):
     ofname = os.path.join(exp_mod.dir, 'landcover', f'{exp_mod.name}_landcover_{idom:03d}_{jdom:03d}.tif')
 
     def action(tdir):
-        poly = exp_mod.domains.poly(idom, jdom, margin=True)
-        return d_usgs_landcover.extract(poly, ofname)
-    return make.Rule(action, [d_usgs_landcover.landcover_img], [ofname])
+        poly = exp_mod.gridD.poly(idom, jdom, margin=True)
+#        return d_usgs_landcover.extract(poly, ofname)
+        return exp_mod.extract_landcover(poly, ofname)
+    return make.Rule(action, [exp_mod.landcover_img], [ofname])
 # -----------------------------------------------------------------------
 @functools.lru_cache()
 def r_forest(exp_mod, idom, jdom):
