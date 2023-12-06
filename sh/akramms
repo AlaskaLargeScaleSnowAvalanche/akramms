@@ -439,6 +439,8 @@ def query(args):
 
 @subcommand([
     argument('query', nargs=1, help='Query file generated via akramms query'),
+    #argument('-o', '--output', required=False, help='Name of Mosaic output file to write'),
+    argument('--limit', type=int, help='Limit number of avalanches processed (for DEBUGGING)')
 ])
 def mosaic(args):
     run_setup_py()
@@ -453,7 +455,8 @@ def mosaic(args):
         extent = pickle.load(fin)
         nc_fnames = pickle.load(fin)
 
-#    nc_fnames = nc_fnames[:10]    # DEBUGGING
+    if args.limit is not None:
+        nc_fnames = nc_fnames[:args.limit]    # DEBUGGING
 
 
     ## Do query
@@ -471,7 +474,7 @@ def mosaic(args):
     gridM = exp_mod.gridD.subgrid(extent[0], extent[1], extent[2], extent[3], res, res)
 
     with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
-        mosaic.mosaic_avals(gridM, nc_fnames, 'avals2.zip', tdir)
+        mosaic.mosaic_avals(gridM, nc_fnames, ofname, tdir)
 
 
 

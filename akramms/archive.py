@@ -282,7 +282,7 @@ def archive_combo(exp_mod, combo, ids=None):
     if (ids is None) or (len(ids) == 0):
         _,release_df = exputil.release_df(exp_mod, combo, type='x')
         ids = release_df.index.tolist()
-    arc_fnames, archived_out_zips = fetch(exp_mod, combo, ids, ok_statuses=ok_statuses)
+    arc_fnames, archived_out_zips = fetch(exp_mod, combo, ids)
 
     # We've successfully written the netCDF files.
     # Delete the originals (if they exist to begin with)

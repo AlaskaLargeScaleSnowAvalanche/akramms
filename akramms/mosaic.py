@@ -2,7 +2,7 @@ import os
 import numpy as np
 from osgeo import gdal
 import zipfile,netCDF4
-from uafgi.util import gdalutil
+from uafgi.util import gdalutil,cfutil
 from akramms import experiment
 import _mosaic
 
@@ -19,22 +19,27 @@ _mosaic_metadata = {
         'units': 'm'
     }),
 
-    'deposition': (gdal.GDT_Float64, {
+    'deposition': (gdal.GDT_Float32, {
         'description': 'Maximum deposition from any avalanche',
         'units': 'm'
     }),
-    'max_velocity': (gdal.GDT_Float64, {
+    'max_height': (gdal.GDT_Float32, {
+        'description': 'Maximum depth of snow attained',
+        'units': 'm',
+    }),
+    'max_velocity': (gdal.GDT_Float32, {
         'description': 'Maximum snow speed from any avalanche',
         'units': 'm s-1',
     }),
-    'max_pressure': (gdal.GDT_Float64, {
+    'max_pressure': (gdal.GDT_Float32, {
         'description': 'Maximum pressure from any avalanche',
-        'units': 'Pa',
+        'source_units': 'Pa',    # Convert Pa to kPa
+        'units': 'kPa',
     }),
     'avalanche_count': (gdal.GDT_Int16, {
         'description': 'Number of avalanches hitting this gridcell',
     }),
-    'domain_count': (gdal.GDT_Byte, {
+    'domain_count': (gdal.GDT_Int16, {
         'description': 'Number of avalanches hitting this gridcell',
     }),
 }
@@ -82,6 +87,10 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
         avalanche_count=np.zeros(shapeM, dtype='i2'))
 
     for aval_i,fname in enumerate(avals):
+        if not os.path.isfile(fname):
+            print(f'Missing avalanche file: {fname}')
+            continue
+
         print(f'mosaic: {fname}')
         with netCDF4.Dataset(fname) as nc:
             nc.set_always_mask(False)
@@ -127,6 +136,8 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
             meta = dict(_meta)
             if vname == 'max_pressure':
                 meta['rho'] = f'{rho} [kg m-3]'
+            if 'source_units' in meta:
+                val = cfutil.convert(val, meta['source_units'], meta['units'])
             ofn = os.path.join(tdir.location, f'{vname}.tif')
             gdalutil.write_raster(ofn, gridM, val, 0, type=gdal_type, metadata=meta)
             ozip_write(ozip, ofn)
