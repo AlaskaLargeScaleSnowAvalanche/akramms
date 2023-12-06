@@ -1,4 +1,5 @@
 import os,collections,sys
+import numpy as np
 import schema
 from uafgi.util import schemautil,shputil,gisutil
 from akramms import config, experiment, stages
@@ -114,15 +115,15 @@ def add_combo(makefile, combo):
 
     # Determine which parts of the domain are interior (vs margin)
     # Coordinates are in (i,j) space relative to full-margin domain's origin
-    domain_margin = gridD.sub(combo.idom, combo.jdom, exp_mod.resolution, exp_mod.resolution, margin=True)
-    domain = gridD.sub(combo.idom, combo.jdom, exp_mod.resolution, exp_mod.resolution, margin=False)
+    domain_margin = gridD.poly(combo.idom, combo.jdom, margin=True)
+    domain = gridD.poly(combo.idom, combo.jdom, margin=False)
 
     kwargs = dict(
         resolution=resolution,
         # Bounds of interior, in the (i,j) space of the full-with-margin domain
         # https://stackoverflow.com/questions/20474549/extract-points-coordinates-from-a-polygon-in-shapely
-        domain = np.asarray(domain.exterior.coords).reshape(-1),
-        domain_margin = np.asarray(domain_margin.exterior.coords).reshape(-1),
+        domain = list(np.asarray(domain.exterior.coords).reshape(-1)),
+        domain_margin = list(np.asarray(domain_margin.exterior.coords).reshape(-1)),
 
         return_periods=(combo.return_period,),
         forests=((1 if combo.forest=='For' else 0),),
