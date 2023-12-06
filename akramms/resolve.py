@@ -5,7 +5,7 @@ from uafgi.util import shputil
 from akramms import level,parse,file_info
 
 # Levels:
-#   exp - combo - (pra_size) releasefile - (pra_size) - aval
+#   exp - combo - (pra_size) chunk - (pra_size) - aval
 
 def initial(parseds):
     orows = list()
@@ -25,7 +25,7 @@ def resolve_exp(akdf):
         return akdf
 
     orows = list()
-    for tup in akdf.itertuples():
+    for tup in akdf.itertuples(index=False):
         parsed = tup.parsed
 
         if 'arcfile' in parsed:
@@ -36,9 +36,9 @@ def resolve_exp(akdf):
             exp = parsed['exp']
         orows.append(itertools.chain(tup, [exp]))
 
-    return pd.DataFrame(orows, columns=tuple(
-        itertools.chain(type(tup)._fields, ['exp'])))
-
+#    return pd.DataFrame(orows, columns=tuple(
+#        itertools.chain(type(tup)._fields, ['exp'])))
+    return pd.DataFrame(orows, columns=list(akdf.columns) + ['exp'])
 
 
 def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
@@ -64,7 +64,7 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
     # ----------------------------
 
 
-    for tup in akdf.itertuples():
+    for tup in akdf.itertuples(index=False):
         expmod = parse.load_expmod(tup.exp)
 #        print('tup ', type(tup), tup)
         parsed = tup.parsed
@@ -109,20 +109,21 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
         else:
             raise ValueError('Not able to determine combos for: {}'.format(tup))
 
-    return pd.DataFrame(orows, columns=tuple(
-        itertools.chain(type(tup)._fields, ['combo'])))
+    return pd.DataFrame(orows, columns=list(akdf.columns) + ['combo'])
+#    return pd.DataFrame(orows, columns=tuple(
+#        itertools.chain(type(tup)._fields, ['combo'])))
 
 # ------------------------------------------------------------
 #_chunk_subleafRE = re.compile(r'(\d\d\d\d\d)(\d+)([TSML])(For|NoFor)_(\d+)')
 _chunkRE = re.compile(r'c-([TSML])-(\d\d\d\d\d)')
-def resolve_releasefile(akdf, scenetypes={'x'}, realized=True):
+def resolve_chunk(akdf, scenetypes={'x'}, realized=True):
     """Resolves either to a CHUNK releasefile, or an ARCHIVE directory"""
 
     # Only does realized option
     assert realized
 
     # Make sure input is non-empty
-    assert len(akdf.index) > 0
+#    assert len(akdf.index) > 0
 
     # Ensure this is idempotent
     if 'releasefile' in akdf:
@@ -148,7 +149,7 @@ def resolve_releasefile(akdf, scenetypes={'x'}, realized=True):
     # Base releasefile on **what we see on disk**
 
     # First find directories containing RELEASE files
-    for tup in akdf.itertuples():
+    for tup in akdf.itertuples(index=False):
         parsed = tup.parsed
 
         if parsed['type'] == 'releasefile':
@@ -189,8 +190,9 @@ def resolve_releasefile(akdf, scenetypes={'x'}, realized=True):
             if os.path.isdir(scenedir):
                 orows.append(itertools.chain(tup, ['arc', None, None, scenedir]))
 
-    df = pd.DataFrame(orows, columns=tuple(
-        itertools.chain(type(tup)._fields, ['scenetype', 'pra_size', 'chunkid', 'releasefile'])))
+    df = pd.DataFrame(orows, columns=list(akdf.columns) + ['scenetype', 'pra_size', 'chunkid', 'releasefile'])
+#    df = pd.DataFrame(orows, columns=tuple(
+#        itertools.chain(type(tup)._fields, ['scenetype', 'pra_size', 'chunkid', 'releasefile'])))
     #df['chunkinfo'] = df.map('releasefile', file_info.parse_chunk_release_file)
     return df
 
@@ -251,13 +253,16 @@ def resolve_id(akdf, realized=True, stage='out', include_overruns=False):
         If realized, are we looking for avalanche IDs with .in.zip or .out.zip?
     """
 
+
     # Ensure this is idempotent
     if 'id' in akdf:
         return akdf
 
     orows = list()
 
-    for tup in akdf.itertuples():
+    akdf = akdf.reset_index(drop=True)
+    for tup in akdf.itertuples(index=False):
+#        print(tup)
         if tup.scenetype == 'arc' and not realized:
             raise ValueError('Must have realized=True when resolving IDs for archived scenes')
 
@@ -309,12 +314,12 @@ def resolve_id(akdf, realized=True, stage='out', include_overruns=False):
 
 
     return pd.DataFrame(orows, columns=tuple(
-        itertools.chain(akdf.reset_index().columns, ['id', 'avalfile'])))
+        itertools.chain(akdf.columns, ['id', 'avalfile'])))
 #        itertools.chain(type(tup)._fields, ['id', 'avalfile'])))
 
 # ------------------------------------------------------------
 def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out', include_overruns=False):
-    """level: exp|combo|releasefile|id
+    """level: exp|combo|chunk|id
         Which level of detail to generate for this query.
         NOTE: level='id' is only used for QUERYING results, not for
               PRODUCING them.  When PRODUCING results, they are
@@ -335,9 +340,9 @@ def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out', inc
     if level == 'combo':
         return akdf
 
-    akdf = resolve_releasefile(akdf, scenetypes=scenetypes)
-#    print('resolve_releasefile ', akdf)
-    if level == 'releasefile':
+    akdf = resolve_chunk(akdf, scenetypes=scenetypes)
+#    print('resolve_chunk ', akdf)
+    if level == 'chunk':
         return akdf
 
     akdf = resolve_id(akdf, realized=realized, stage=stage, include_overruns=include_overruns)

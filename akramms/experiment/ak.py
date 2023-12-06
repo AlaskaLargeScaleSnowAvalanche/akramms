@@ -190,5 +190,5 @@ def juneau():
 def simple():
     yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 45)    # A Juneau-close box
 
-def elizabhet():
+def elizabeth():
     yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 47)    # A Juneau-close box
