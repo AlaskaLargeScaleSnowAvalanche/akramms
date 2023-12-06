@@ -1,6 +1,6 @@
 import re,itertools,os,pathlib
-from akramms import parse
-
+import pandas as pd
+from akramms import parse,params
 
 # =====================================================================
 # ----------------------------------------------------------------------
@@ -117,36 +117,23 @@ def commonsuffix(strs):
     return commonprefix((x[::-1] for x in strs))[::-1]
 
 def scenedir_to_chunknames(scenedir):
-    """Generator yields the chunks inside a scene
-    Yields: (sizecat, chunkid, pathname)
+    """Returns a dataframe.
+    Yields: (pra_size, chunkid, pathname)
     """
 
     scene_args = params.load(scenedir)
-    chunknameRE = re.compile(r'([^_]+)([TSML])(For|NoFor)_(\d+m)'.format(scene_args['return_period']))
+#    print('scene_a1rgs ', scene_args)
+#    chunknameRE = re.compile(r'([^_]+)([TSML])(For|NoFor)_(\d+m)'.format(scene_args['return_periods'][0]))
+    chunknameRE = re.compile(r'c-([TMSL])-(\d+)')
 
-    # Partially parse the chunk directories.
-    names = list()
+    rows = list()
     for name in os.listdir(scenedir / 'CHUNKS'):
         match = chunknameRE.match(name)
         if match is None:
             continue
-        names.append((name, match.group(1), match.group(2)))    # Eg: (x-113-0450001430, S)
+        rows.append( (match.group(1), int(match.group(2)), name) )
 
-    if len(names) == 0:
-        return
-
-    # Discern where the base ends and the return period begins
-    prefix = commonprefix(names)    # Eg: x-113-045000
-    suffix = commonsuffix(names)    # Return period
-
-    # Go through the names again
-    lprefix = len(prefix)
-    lsuffix = len(suffix)
-    for name,subname,sizecat in names:
-        chunkid = int(subname[lprefix:-lsuffix])
-        rows.append((sizecat, chunkid, name))
-
-    return pd.DataFrame(rows, columns=('sizecat', 'chunkid', 'name'))
+    return pd.DataFrame(rows, columns=('pra_size', 'chunkid', 'name'))
 
 # -----------------------------------------------------------
 def trialdir_to_scenedirs(trialdir, scenetype='x'):

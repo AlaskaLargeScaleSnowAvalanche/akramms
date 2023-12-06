@@ -4,6 +4,7 @@
 #import cProfile
 import importlib,pathlib
 import netCDF4
+import numpy as np
 import pandas as pd
 from akramms import config,params
 import akramms.parse
@@ -374,7 +375,7 @@ def ps(args):
     parseds = akramms.parse.parse_args(args.spec)
     akdf = resolve.resolve_to(parseds, 'id', realized=True, stage='in')
     akdf = joblib.add_jobstatus(akdf)
-#    print('akdf1 ', akdf)
+    print('akdf1 ', akdf)
 
 #    print(akdf[['combo', 'chunkid', 'id', 'jobstatus']])
     joblib.print_job_statuses(akdf)
@@ -385,42 +386,78 @@ def ps(args):
 def overrun(args):
     """Provides status of RAMMS avalanches"""
 
+    from akramms import file_info,chunk,level
+    from akramms import r_ramms1
+    from uafgi.util import shapelyutil
+
     # Find the overruns
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'id', realized=True, stage='out')
+#    print('akdf0a ', akdf0.columns)
     akdf0['overrun'] = akdf0['avalfile'].map(joblib.is_overrun)
-    akdf0 = akdf0[ akdf0['overrun'] ]
+    akdf0 = akdf0.loc[ akdf0['overrun'] ]
+#    print('akdf0b ', akdf0.columns)
+    if len(akdf0) == 0:
+        print('Nothing to process')
+        return
 
     # Add the release and domain shapefile info
     dfs = list()
     for releasefile,akdf1 in akdf0.groupby('releasefile'):
         jb = file_info.parse_chunk_release_file(releasefile)._replace(chunkid=-1)
         rdf = chunk.read_reldom(releasefile)
-        akdf1 = akdf1.set_index('id').merge(rdf, how='left', left_index=True, right_index=True)
-        akdf1['chunkinfo'] = jb    # Everything is set correctly here except the new chunkid
+        akdf1 = akdf1.set_index('id').merge(rdf, how='left', left_index=True, right_index=True).reset_index()
+        akdf1['chunkinfo'] = [jb]*len(akdf1)    # Everything is set correctly here except the new chunkid
         dfs.append(akdf1)
     akdf0 = pd.concat(dfs)
+
+    # Enlarge the domain
+    akdf0['dom'] = akdf0['dom'].map(lambda dom: shapelyutil.add_margin(dom, config.enlarge_increment))
+
 
     # Group into new chunks
     for (exp, combo),akdf1 in akdf0.groupby(['exp', 'combo']):
         expmod = akramms.parse.load_expmod(exp)
         scenedir = expmod.combo_to_scenedir(combo)
         max_chunkids = chunk.get_max_chunkids(scenedir)
+        print('max_chunkids ', max_chunkids)
 
         scene_args = params.load(scenedir)
 
         for pra_size,akdf2 in akdf1.groupby('pra_size'):
             # Verify this is all within one chunk
             chunkinfos = akdf2['chunkinfo'].tolist()
-            assert all(chunkinfos[0] == chunkinfos[1:])
+#            print('chunkinfos ', chunkinfos)
+            assert all((x == chunkinfos[0]) for x in chunkinfos[1:])
 
             chunkid = max_chunkids.get(pra_size,-1) + 1
             jb = chunkinfos[0]._replace(chunkid=chunkid)
 
-            print('Writing chunk: {} {}'.format(jb, akdf2.id.tolist()))
-            print(akdf2[['combo', 'id']])
+#            print(akdf2.columns)
+            print('------------- Writing chunk: ', pra_size)
+            print(jb)
+            print(akdf2.id.tolist())
 
-            # chunk.write_chunk(scene_args, jb, akdf2, {})
+            # TODO: Enlarge the  domains!!!
+
+            akdf2 = akdf2.rename(columns={'id':'Id'})
+            chunk.write_chunk(scene_args, jb, akdf2, {})
+
+            # Run RAMMS Stage 1 (and auto-submit)
+            chunk_dir = scene_args['scene_dir'] / 'CHUNKS' / jb.chunk_name
+            releasefile = chunk_dir / 'RELEASE' / f'{jb.slope_name}_{jb.avalanche_name}_rel.shp'
+            rule = r_ramms1.rule(releasefile, scene_args['dem_file'], [releasefile], submit=True)
+            rule()
+
+            #parseds = [parse.parse_chunk_releasefile(release_file)]
+            #akdf = resolve.resolve_to(parseds, 'id', stage='in', realized=True)
+            #joblib.submit_jobs(akdf)
+
+
+
+
+            # DEBUGGING: Just do one!
+            break
 # ------------------------------------------------------------------
 @subcommand([
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),

@@ -62,6 +62,8 @@ max_ramms_pras = 100
 #max_ramms_pras = 20
 #max_ramms_pras = 500
 
+enlarge_increment = 5000.    # Enlarge domains by 5km each time.
+
 setup_ncpu = 20
 ramms_ncpu = 8    # Native RAMMS Stage 2 (and also Stage 1 xy-coords)
 #ramms_ncpu_preprocess = 8    # This matters for RAMMS Stage 1 (and maybe Stage 3)

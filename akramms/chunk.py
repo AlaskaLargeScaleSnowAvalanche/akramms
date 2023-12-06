@@ -5,7 +5,7 @@ import shapely
 from uafgi.util import rasterize,shputil
 import d8graph
 from akramms.util import rammsutil
-from akramms import snow,config,file_info
+from akramms import snow,config,file_info,level,params
 
 """Everything to do with reading, rearranging and writing release files and chunks.
 

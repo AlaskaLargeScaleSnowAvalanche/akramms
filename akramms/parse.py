@@ -363,10 +363,10 @@ def parse_args(args, load=True):
                     ids.clear()
                 elif (os.sep in arg) and os.path.isdir(arg) and (arg != '.') and (arg != '..'):  # If it's '.', it might be an actual directory
                     flush_parts()
-                    rets.append(parse_dir(pathlib.Path(arg)))
+                    rets.append(parse_dir(pathlib.Path(arg).resolve()))
                 elif os.path.isfile(arg):
                     flush_parts()
-                    rets.append(parse_file(pathlib.Path(arg)))
+                    rets.append(parse_file(pathlib.Path(arg).resolve()))
                 else:
                     parts.append(arg)
             elif state == 'i':
