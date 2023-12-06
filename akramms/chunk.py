@@ -1,3 +1,11 @@
+import bisect,os
+import numpy as np
+import pandas as pd
+import shapely
+from uafgi.util import rasterize,shputil
+import d8graph
+from akramms.util import rammsutil
+from akramms import snow
 
 """Everything to do with reading, rearranging and writing release files and chunks.
 
@@ -129,14 +137,14 @@ def read_reldom(relfname, **kwargs):
 _post_cat_bounds = (0.,5000.,25000.,60000.,1e10)    # Dummy value at end
 _pra_sizes = ('T', 'S', 'M', 'L')
 
-def add_sizecat(reldf):
+def add_pra_size(reldf):
     """
     reldf:
         Releasefile read via read_releasefile()
         (or created by another means)
         Must have column: area_m2
     """
-    reldf['sizecat'] = reldf['aream2'].map(
+    reldf['pra_size'] = reldf['area_m2'].map(
         lambda x: _pra_sizes[bisect.bisect(_post_cat_bounds, x) - 1])
     return reldf
 # -----------------------------------------------------------
@@ -145,7 +153,7 @@ def add_snow(df, snowI_tif, snow_density=200.):
     snow_lokoup:
         See snow.RasterLookup
     """
-    snow_lookup = RasterLookup(snowI_tif)
+    snow_lookup = snow.RasterLookup(snowI_tif)
 
     # This is a Series of tuple (j, i, sx3)
     jisx3 = df['pra'].map(snow_lookup.value_at_centroid)    # j,i,Raw snow amount [kg m-2]
@@ -163,6 +171,7 @@ def add_snow(df, snowI_tif, snow_density=200.):
     return df
 
 # -----------------------------------------------------------
+degree = np.pi / 180.
 def add_corrections(df, return_period):
         # --- Elevation correction Reduces amount of snow with
         # steepness.  All traditional.  We measure 3-day snow depth
@@ -267,13 +276,15 @@ def clip(rdf, clip_domain):
 
 # -----------------------------------------------------------
 _empty_list = []
-def add_dom(rdf, grid_info):
+def add_dom(rdf, dem_filled, dem_nodata, grid_info, **kwargs):
     """Does the domain finder algo.
 
     Runs the domain finder code
     rdf: (MODIFIES INPLACE)
         Release file(s) as dataframe
         REQUIRED cols: pra
+    kwargs:
+        Forwarded to d8graph.find_domain()
     """
 
     # Calculate domains
@@ -291,7 +302,7 @@ def add_dom(rdf, grid_info):
         args = ()
         ret = d8graph.find_domain(
             dem_filled, dem_nodata, grid_info.geotransform, pra_burn,
-            margin=margin, debug=1, min_alpha=min_alpha, max_runout=max_runout)
+            debug=1, **kwargs)
 
         if ret is None:
             chull_list = _empty_list
@@ -311,7 +322,8 @@ def add_master_rammsname(df, scene_args):
     This is useed to set CHUNK names.
 
     rdf:
-        Avalanches for JUST ONE COMBO.
+        Dataframe of avalanches FOR ONE COMBO (see chunk.read_reldom())
+        Must be at ID level and releasefiles read.
         Must have combo and pra_size columns.
         (return_period and forest must be fields in the combo objects)
     scene_args:
@@ -344,10 +356,10 @@ def add_chunkname(rdf, scene_args, append=False):
     #scene_args = params.load(scenedir)
     scenedir = scene_args['scene_dir']
 
-    # Determine max. chunkid for each sizecat  max_chunkid[sizecat]...
+    # Determine max. chunkid for each pra_size  max_chunkid[pra_size]...
     if append:
         cdf = level.scenedir_to_chunknames(scenedir)
-        max_chunkids = cdf[['sizecat','chunkid']].groupby('sizecat').max()['chunkid'].to_dict()
+        max_chunkids = cdf[['pra_size','chunkid']].groupby('pra_size').max()['chunkid'].to_dict()
     else:
         max_chunkids = dict()
 
@@ -388,6 +400,8 @@ def write_rel(rdf, wkt, return_period, ofname, **kwargs):
     # Select columns to write
     df = rdf.reset_index()[['area_m2', 'Mean_DEM', 'Mean_Slope', 'Scene_reso', 'Id', 'i', 'j', 'sx3', 'd0star', 'slopecorr', 'Wind', f'd0_{return_period}', f'VOL_{return_period}', 'pra']]
 
+#    ofname.parents[0].mkdir(parents=True, exist_ok=True)
+    os.makedirs(ofname.parents[0], exist_ok=True)
     shputil.write_df(df, 'pra', 'Polygon', ofname, wkt=wkt, **kwargs)
 
 def write_dom(rdf, wkt, ofname, **kwargs):

@@ -46,7 +46,7 @@ Usage:
     --pause                - pause application after done
 """
 
-def rule(scene_dir, inputs, return_period, forest):
+def rule(scene_dir, inputs, return_period, For):
     """inputs:
         Outputs of r_prepare.rule()
     """
@@ -57,7 +57,8 @@ def rule(scene_dir, inputs, return_period, forest):
     # Systematically generate list of output files
     rp = return_period
     rpcat = process_tree.return_period_category(rp)
-    _For = '_For' if forest else '_NoFor'
+    _For = '_'+For
+#    _For = '_For' if forest else '_NoFor'
     outputs = list()
     for ext in ('.dbf', '.prj', '.shp', '.shx'):
         outputs.append(os.path.join(scene_dir, f'PRA_{rpcat}', f'PRA_{rp}y{_For}{ext}'))

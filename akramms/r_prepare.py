@@ -173,7 +173,7 @@ def prepare_data(scene_dir):
         shutil.rmtree(dir, ignore_errors=True)
 
     # Assemble script args
-    script_args = {'Workspace': scene_dir}
+    script_args = {'Workspace': str(scene_dir)}
     for script_arg, scene_arg in [
         ('inDEM', 'dem_file'),
         ('resampCellSize', 'resolution'),
@@ -296,8 +296,9 @@ def rule(scene_dir):
             inputs.append(scene_args[param.name])
 
         # Transfer over input files
-        cmd = ['sh', config.roots_w.syspath('{HARNESS}/akramms/sh/prepare_scene.sh', bash=True),
-            config.roots_w.syspath(scene_dir_rel, bash=True)]
+        cmd = ['sh', config.roots_w.syspath('{HARNESS}/akramms/sh/prepare_scene.sh', bash=True, as_str=True),
+            scene_dir_rel]
+#            config.roots_w.syspath(scene_dir_rel, bash=True, as_str=True)]
         harnutil.run_remote(inputs, cmd, tdir)
 
         # Make it clear / obvious we have finished

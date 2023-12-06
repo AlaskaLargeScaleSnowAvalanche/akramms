@@ -23,7 +23,14 @@ def write_neighbor1(neighbor1_file, grid_info, neighbor1, nodata_value):
     d8graph.convert_neighbor1(neighbor1, 'absolute')
 # --------------------------------------------------------------------
 def neighbor1_rule(dem_file, odir, fill_sinks=True):
-    """Compute and store the neighbors graph."""
+    """Compute and store the neighbors graph.
+    dem_file:
+        Name of the digital elevation model
+    odir:
+        Output directory where to write results.
+    fill_sinks:
+        Should the sinks in the topography be filled in?
+    """
 
     dem_root = os.path.split(dem_file)[1][:-4]
     dem_filled_file = os.path.join(odir, f'{dem_root}_filled.tif')

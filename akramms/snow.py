@@ -1,3 +1,6 @@
+from uafgi.util import gdalutil,wrfutil
+import pyproj
+
 class WrfLookup:
     def __init__(self, scene_wkt, data_fname, vname, geo_fname, units=None):
         """

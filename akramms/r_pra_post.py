@@ -2,7 +2,7 @@ import scipy.spatial
 import pandas as pd
 import shapely
 from osgeo import gdal
-from akramms import params,process_tree
+from akramms import params,process_tree,chunk
 from akramms.util import rammsutil
 from uafgi.util import shputil,gdalutil,wrfutil,make,cfutil,ioutil,rasterize
 import os,sys
@@ -18,8 +18,7 @@ import d8graph
 # ---------------------------------------------------------------------------------
 
 
-def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
-    min_alpha=18., max_runout=10000., margin=0.):
+def rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **kwargs):
     """
     scene_dir:
         Uses params: name ("site"), resample_cell_size ("res")
@@ -36,12 +35,13 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
     snowI_tif: str
         Name of the snowdepth file, in local scene coordinates, that we will use.
 
-    min_alpha: [deg]
-        Minimum slope that "avalanche" can continue in domain finder
-    max_runout:
-        Maximum distance avalanche can go
-   margin: [m]
-       Margin to add around convex hull to minimum bounding rectangle.
+    kwargs forwarded to d8graph.find_domain():
+        min_alpha: [deg]
+            Minimum slope that "avalanche" can continue in domain finder
+        max_runout:
+            Maximum distance avalanche can go
+       margin: [m]
+           Margin to add around convex hull to minimum bounding rectangle.
     """
 
     scene_args = params.load(scene_dir)
@@ -50,19 +50,23 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
     inputs = list()
     resolution = scene_args['resolution']
     scene_name = scene_args['name']
-    For = 'For' if forest else 'NoFor'
+#    For = 'For' if forest else 'NoFor'
 
     # eCognition filename conventions
-    pra_file = process_tree.pra_file(scene_args, return_period, forest)
+    pra_file = process_tree.pra_file(scene_args, return_period, For)
     inputs.append(pra_file)    # This rule does NOT use the burn files for domains...
 
-    # Full pathnames of release files generated from this (scene_name, return_period, forest) combo
+    # Full pathnames of initial release files generated from this (scene_name, return_period, forest) combo
+    # Initial release files are in the top-level RELEASE/ directory, before chopping into chunks.
+    ramms_names = list()
     outputs = list()
-    ramms_names = list(rammsutil.master_ramms_names(scene_args, return_period, forest))
-    for jb,_ in ramms_names:
-        for dir,ext in (('RELEASE', '_rel.shp'), ('RELEASE','_chull.shp'), ('RELEASE','_dom.shp')):
-            outputs.append(
-                os.path.join(scene_dir, dir, f'{jb.ramms_name}{ext}'))
+    rn = f'{For}_{resolution}m{return_period}'
+    for pra_size in config.allowed_pra_sizes:
+        # Copied from rammsutil.RammsName
+        ramms_name = (scene_name, rn, pra_size)
+        ramms_names.append(ramms_name)
+        for ext in ('_rel.shp', '_chull.shp', '_dom.shp'):
+            outputs.append(scene_dir / 'RELEASE' / f'{scene_name}{rn}{pra_size}{ext}')
 
     # Add one-off input files
     inputs.append(snowI_tif)
@@ -78,6 +82,7 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
         print('======== Reading {}'.format(inputs[0]))
         df = shputil.read_df(inputs[0], shape='pra')
         df = df.rename(columns={'fid': 'Id'})    # RAMMS etc. want it named "Id"
+        print('aa1 ', df)
 
         # Adds columns: j,i,sx3
         df = chunk.add_snow(df, snowI_tif, snow_density=200.)
@@ -98,113 +103,29 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
         df = chunk.clip(df, scene_args['domain'])
 
         # Compute the avalanche domains (domain finder algo)
-        df = chunk.add_dom(df, grid_info)
+        # Adds columns: chull, dom
+        df = chunk.add_dom(df, dem_filled, dem_nodata, grid_info, **kwargs)
 
 
+        # Add PRA size designation of T,S,M,L
+        # Adds column: pra_size
+        df = chunk.add_pra_size(df)
 
+        # Write out one top-level shapefile per pra_size
+        wkt = scene_args['coordinate_system']
+        for pra_size,cat_df in df.groupby('pra_size'):
+            root = f'{scene_name}{For}_{resolution}m{return_period}{pra_size}'
+            chunk.write_rel(
+                cat_df, wkt, return_period,
+                scene_dir / 'RELEASE' / f'{root}_rel.shp')
 
+            chunk.write_chull(
+                cat_df, wkt,
+                scene_dir / 'RELEASE' / f'{root}_chull.shp')
 
-        ioutil.mkdirs_for_files(outputs)
-        for jb,pra_size in ramms_names:
-            print('--- p_pra_post.rule() pra_size = ', pra_size)
-
-            # Select out rows for this category
-            low,high = post_cat_bounds[pra_size]
-            print(f'Category: {pra_size}, [{low}, {high})')
-            cat_rows = df['area_m2'].between(low, high, inclusive='left')
-            cat_df = df[cat_rows]
-
-            # Remove PRAs of elevation <150m
-            cat_df = cat_df[cat_df['Mean_DEM'] >= 150.]            
-
-<< CUT
-            # Only keep PRAs that are >50% in the interior part of the domain (not margin)
-            if 'domain' in scene_args:
-                domain = scene_args['domain']    # list
-                npoints = len(domain) // 2
-
-                _xy = np.array(domain, dtype='d').reshape( (npoints, 2) )
-                x0,y0 = _xy[0,:]
-                x1,y1 = _xy[2,:]
-                xmin = min(x0,x1)
-                xmax = max(x0,x1)
-                ymin = min(y0,y1)
-                ymax = max(y0,y1)
-                #domain = shapely.geometry.Polygon(_xy.reshape((len(_xy)//2,2)))
-                #in_domain_fn = lambda pra: in_domain(domain, pra)
-                in_domain_fn = lambda pra: in_domain(xmin,ymin,xmax,ymax, pra)
-                cat_df = cat_df[cat_df['pra'].map(in_domain_fn)]
-
-            # Add size designator to the internal RELEASE file rows
-            cat_df['pra_size'] = pra_size
->> END CUT
-
-<< CUT
-            # Calculate domains
-            chulls = list()
-            doms = list()
-            for ix,(_,row) in enumerate(cat_df.iterrows()):
-
-                if ix%1000 == 0:
-                    print('   Calculated {} of {} domains'.format(ix, len(cat_df)))
-
-                # Get list of gridcells covered by the PRA polygon (the "PRA Burn")
-                pra_burn = rasterize.rasterize_polygon_compressed(row['pra'], grid_info)
-
-                # Get the domain from the PRA burn
-                args = ()
-                ret = d8graph.find_domain(
-                    dem_filled, dem_nodata, grid_info.geotransform, pra_burn,
-                    margin=margin, debug=1, min_alpha=min_alpha, max_runout=max_runout)
-
-                if ret is not None:
-                    seen,chull_list,domain_list = ret
-                    chulls.append(shapely.geometry.Polygon(chull_list))
-                    doms.append(shapely.geometry.Polygon(domain_list))
-                else:
-                    # Not able to make a domain for this PRA
-                    chulls.append(shapely.geometry.Polygon([]))
-                    doms.append(shapely.geometry.Polygon([]))
->> END CUT
-
-            # Store the _rel file
-            shputil.write_df(
-                cat_df, 'pra', 'Polygon',
-                os.path.join(scene_dir, 'RELEASE', f'{jb.ramms_name}_rel.shp'),
-                wkt=scene_args['coordinate_system'])
-
-            # Store the _chull file
-            chull_df = pd.DataFrame(index=cat_df.index)
-            chull_df['Id'] = cat_df['Id']
-            chull_df['chull'] = chulls
-            #print('chull_df = ', chull_df)
-            print('chull_df columns ', chull_df.columns)
-            shputil.write_df(
-                chull_df, 'chull', 'Polygon',
-                os.path.join(scene_dir, 'RELEASE', f'{jb.ramms_name}_chull.shp'),
-                wkt=scene_args['coordinate_system'])
-
-            # Store the _dom file
-            dom_df = pd.DataFrame(index=cat_df.index)
-            dom_df['Id'] = cat_df['Id']
-            dom_df['domain'] = doms
-            shputil.write_df(
-                dom_df, 'domain', 'Polygon',
-                os.path.join(scene_dir, 'RELEASE', f'{jb.ramms_name}_dom.shp'),
-                wkt=scene_args['coordinate_system'])
-
-            # Create a _centroid file
-            if False:
-                centroids = np.zeros(snow_lookup.value.shape, dtype='b')    # byte
-                jj = cat_df['j'].to_numpy()
-                ii = cat_df['i'].to_numpy()
-#                print('jj ', jj)
-#                print('ii ', ii)
-                for j,i in zip(jj,ii):
-                    centroids[j,i] = 1
-                gdalutil.write_raster(
-                    os.path.join(scene_dir, 'RELEASE', f'{jb.ramms_name}_centroids.tif'),
-                    snow_lookup.geo_info, centroids, 0, type=gdal.GDT_Byte)
+            chunk.write_dom(
+                cat_df, wkt,
+                scene_dir / 'RELEASE' / f'{root}_dom.shp')
 
 
     rule = make.Rule(action, inputs, outputs)

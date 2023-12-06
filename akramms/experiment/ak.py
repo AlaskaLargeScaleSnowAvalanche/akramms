@@ -116,7 +116,7 @@ def add_combo(makefile, combo):
         combo.year0, combo.year1, combo.idom, combo.jdom)).outputs[0]
 
     # Convert Combo to a scene_dir / scen_args
-    scene_dir = os.path.join(exp_mod.dir, combo_to_scene_dir(combo))
+    scene_dir = os.path.join(exp_mod.dir, combo_to_scenedir(combo))
 
     # Determine which parts of the domain are interior (vs margin)
     # Coordinates are in (i,j) space relative to full-margin domain's origin
@@ -184,3 +184,6 @@ def juneau():
         # Just one combo for now
         yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 113, 45)    # A Juneau-close box
         yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 113, 44)    # North of Juneau
+
+def simple():
+    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 45)    # A Juneau-close box

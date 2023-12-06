@@ -95,6 +95,9 @@ def run_remote(inputs, cmd, tdir, write_inputs=False):
         Output files on remote machine (Relative pathnames)
     """
 
+    cmd = [str(x) for x in cmd]
+    print('cmd ', cmd)
+
     # Sync RAMMS input files to remote dir
     if not config.shared_filesystem:
         rsync_files(inputs, tdir, direction='up')

@@ -116,7 +116,10 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
 # ------------------------------------------------------------
 _chunk_subleafRE = re.compile(r'(\d+)([TSML])(For|NoFor)_(\d+)m')
 _releasefileRE = re.compile(r'(.*)([TSML])([_-])rel.shp')
-def resolve_releasefile(akdf, scenetypes=['x'], chunktypes=['CHUNKS']):
+def resolve_releasefile(akdf, scenetypes=['x'], chunktypes=['CHUNKS'], realized=True):
+
+    # Only does realized option
+    assert realized
 
     # Ensure this is idempotent
     if 'releasefile' in akdf:
@@ -132,6 +135,7 @@ def resolve_releasefile(akdf, scenetypes=['x'], chunktypes=['CHUNKS']):
                 orows.append(itertools.chain(tup, [scenetype, sizecat, releasedir / name]))
     # -----------------------------
 
+    # Base releasefile on **what we see on disk**
     for scenetype in scenetypes:
         # First find directories containing RELEASE files
         for tup in akdf.itertuples():
@@ -245,9 +249,14 @@ def resolve_id(akdf, realized=True):
 
 # ------------------------------------------------------------
 def resolve_to(parseds, level, realized=True, scenetypes={'x'}, chunktypes=['CHUNKS']):
-    """
-    level: exp|combo|releasefile|id
+    """level: exp|combo|releasefile|id
         Which level of detail to generate for this query.
+        NOTE: level='id' is only used for QUERYING results, not for
+              PRODUCING them.  When PRODUCING results, they are
+              genderated one combo at a time, so things are resolved
+              to level='combo' and then chunk.read_rel() or
+              chunk.read_reldom() is used to load the releasefile.
+
     """
 
     akdf = initial(parseds)

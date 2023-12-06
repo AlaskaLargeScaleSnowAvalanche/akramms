@@ -6,34 +6,6 @@ import os,sys
 import setuptools.sandbox
 import pandas as pd
 
-def add_stage0_rules(makefile, scene_dir):
-
-    scene_args = params.load(scene_dir)
-
-    # Run ArcGIS script to prepare files for eCognition
-    prepare_outputs = makefile.add(r_prepare.rule(scene_dir)).outputs
-
-    # Get neighbor1 graph for DEM routing network
-    dem_file = scene_args['dem_file']
-    dem_filled_file = f'{dem_file[:-4]}_filled.tif'
-
-    # Loop over combos
-    all_release_files = list()    # Release files we will run RAMMS on
-    for return_period in scene_args['return_periods']:
-        for forest in scene_args['forests']:
-
-            # Run eCognition
-            makefile.add(r_ecog.rule(scene_dir, prepare_outputs, return_period, forest))
-
-            # Post-Process eCognition Output (the pra_file)
-            # and also split into chunks.
-            # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
-            pra_post_rule, ramms_names = r_pra_post.rule(
-                scene_dir, dem_filled_file, return_period, forest, scene_args['snow_file'])
-            release_shplists = makefile.add(pra_post_rule).outputs
-
-            makefile.add(r_ramms.chunk_rule(scene_dir, ramms_names))
-
 def read_release_files(scene_args):
     """Returns: release_files for all chunks"""
 

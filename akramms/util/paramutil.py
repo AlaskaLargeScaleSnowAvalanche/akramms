@@ -1,9 +1,8 @@
 from akramms.util import harnutil
 from akramms import config
 import collections
-import pathlib
 import textwrap
-import os
+import os,pathlib
 import netCDF4
 import numpy as np
 
@@ -35,9 +34,14 @@ class PathType(Type):
         print('{} => {}'.format(val, ret))
         return ret
 
+    def write_nc(self, nc, vname, val):
+        ncv = nc.createVariable(vname, 'i', [])
+        ncv.setncattr('value', str(val))
+        return ncv
+
 class InputFileType(Type):
     def __init__(self):
-        super().__init__(str)
+        super().__init__(pathlib.Path)
 
     def validate(self, val):
         if not os.path.exists(val):
@@ -48,6 +52,11 @@ class InputFileType(Type):
 
     def read_nc(self, ncv):
         return ncv.value.format(**config.roots.lookup)    # Format filenames native to this system
+
+    def write_nc(self, nc, vname, val):
+        ncv = nc.createVariable(vname, 'i', [])
+        ncv.setncattr('value', str(val))
+        return ncv
 
 class ListType:
     def validate(self, val):

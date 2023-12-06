@@ -251,92 +251,101 @@ def get_exp_dir(exp_mod):
     return config.roots.join('PRJ', exp_mod.name)
 
 @subcommand([
-    argument('experiment-module',
-        help='Python module describing the experiment'),
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
 def step1(args):
     """Generate grid defining active domains.  The extent of future
     steps likely depends on this."""
 
-    exp_mod = exputil.load(getattr(args, 'experiment-module'))
-    exp_dir = get_exp_dir(exp_mod)
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf0 = resolve.resolve_to(parseds, 'exp', realized=False)
 
-    makefile = make.Makefile()
-    makefile.add(r_experiment.r_active_domains(exp_mod))
-    makefile.generate(os.path.join(exp_dir, 'init_mk'), run=True, ncpu=1)
-# -----------------------------------------------------------
-def _parse_experiment_spec():    # DUMMY; should this be avalparse.parse_aval_specs??
-    pass
+    for exp,_ in akdf0.groupby('exp'):
+        expmod = akramms.parse.load_expmod(exp)
+
+        makefile = make.Makefile()
+        makefile.add(r_experiment.r_active_domains(expmod))
+        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
 
 # -----------------------------------------------------------
 @subcommand([
-    argument('experiment-spec', type=_parse_experiment_spec,
-        help='Python module and combo function describing the experiment, eg: e_alaska.juneau'),
-#    argument('-c', '--combos', default='full',
-#        help='Name of combo-generating function'),
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
 def step2(args):
     """Create required DEMs, Forest files, scene definitions, etc.
     NO Proprietary Software in this step, it can run with high levels of parallelism."""
 
-    sexp_mod, sexp_fn = getattr(args, 'experiment-spec')
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
 
-    # Load the module (initial 'akramms.' is optional)
-    exp_mod = exputil.load(sexp_mod)
-    exp_dir = get_exp_dir(exp_mod)
+    for exp,akdf1 in akdf0.groupby('exp'):
+        expmod = akramms.parse.load_expmod(exp)
+        add_experiment_fn = getattr(expmod, 'add_experiment')    # Select out a DEM tile
 
-    # Load functions from module
-    combos_fn = getattr(exp_mod, sexp_fn)     # List the combos
-    add_experiment_fn = getattr(exp_mod, 'add_experiment')    # Select out a DEM tile
-    #add_combo_fn = getattr(exp_mod, 'add_combo')    # Comobs to rules
-
-    # Generate the makefile
-    makefile = make.Makefile()
-
-    # Add the experiment and combos
-    add_experiment_fn(makefile, combos_fn())
-
-    makefile.generate(os.path.join(exp_dir, 'init_mk'), run=True, ncpu=config.setup_ncpu)
+        # Add the experiment and combos
+        makefile = make.Makefile()
+        add_experiment_fn(makefile, akdf1.combo.tolist())
+        makefile.generate(expmod.dir / 'init_mk', run=True, ncpu=config.setup_ncpu)
 
 
 @subcommand([
-    argument('experiment-spec', type=_parse_experiment_spec,
-        help='Python module and combo function describing the experiment, eg: e_alaska.juneau'),
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
 def step3(args):
     """Go through RAMMS Stage 0 and 1: ArcGIS and eCognition, setting up RAMMS scenes to run.  Then run RAMMS stage 0 and 1 on each scene."""
     import setuptools
     from akramms.util import harnutil
+    from akramms import r_prepare,r_ecog,r_pra_post
 
-
-    sexp_mod, sexp_fn = getattr(args, 'experiment-spec')
-
+    # ------------
     # Make sure the domain finder C++ code is compiled. (needed for RAMMS Stage 1)
     setup_py = os.path.join(harnutil.HARNESS, 'akramms', 'setup.py')
     prefix = os.path.join(harnutil.HARNESS, 'akramms', 'inst')
     cmd = ['install', '--prefix', prefix]
     print('setup.py ', cmd)
     setuptools.sandbox.run_setup(setup_py, cmd)
+    # ------------
 
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
 
-    # Load the module (initial 'akramms.' is optional)
-    exp_mod = exputil.load(sexp_mod)
-    exp_dir = get_exp_dir(exp_mod)
-
-    # Load functions from module
-    combos_fn = getattr(exp_mod, sexp_fn)     # List the combos
-
-    # Generate the makefile
     makefile = make.Makefile()
-    for combo in combos_fn():
-        scene_dir = os.path.join(exp_mod.dir, exp_mod.combo_to_scene_subdir(combo))
-        print(f'----- Adding Scene: {scene_dir}')
-        stages.add_stage0_rules(makefile, scene_dir)
 
-        # RAMMS Stage 1...
-#        ramms_dirs_release_files = add_stage1_rules(makefile, scene_dir)
+    for exp,akdf1 in akdf0.groupby('exp'):
+        expmod = akramms.parse.load_expmod(exp)
 
-    makefile.generate(os.path.join(exp_dir, 'init_mk'), run=True, ncpu=1)
+        for combo in akdf1.combo.tolist():
+            scenedir = expmod.combo_to_scenedir(combo)
+            scene_args = params.load(scenedir)
+
+            print(f'----- Adding Scene: {scenedir}')
+
+            # Run ArcGIS script to prepare files for eCognition
+            prepare_outputs = makefile.add(r_prepare.rule(scenedir)).outputs
+
+            # Get neighbor1 graph for DEM routing network
+            dem_file = scene_args['dem_file']
+            dem_filled_file = f'{dem_file[:-4]}_filled.tif'
+
+            # Run eCognition
+            makefile.add(r_ecog.rule(scenedir, prepare_outputs, combo.return_period, combo.forest))
+
+            # Post-Process eCognition Output (the pra_file)
+            # and also split into chunks.
+            # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
+            pra_post_rule, ramms_names = r_pra_post.rule(
+                scenedir, dem_filled_file, combo.return_period, combo.forest, scene_args['snow_file'])
+            release_shplists = makefile.add(pra_post_rule).outputs
+
+# COMMENTED OUT TO DEBUG
+#            makefile.add(r_ramms.chunk_rule(scenedir, ramms_names))
+
+
+            # RAMMS Stage 1...
+# TODO: REfactor this to use releasefile, relized=True level
+#           ramms_dirs_release_files = add_stage1_rules(makefile, scene_dir)
+
+        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
 
 # ------------------------------------------------------------------
 
@@ -383,7 +392,7 @@ def step4(args):
     stages.run_stage1(scene_dir)
 
 @subcommand([
-    argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
     argument('-l', '--level', type=str, default='releasefile',
         help='Level of detail to resolve results to: exp|combo|releasefile|id'),
     argument('-s', '--scenetype', nargs='*',
@@ -393,7 +402,7 @@ def step4(args):
 ])
 def parse(args):
 
-    parseds = akramms.parse.parse_args(args.avals)
+    parseds = akramms.parse.parse_args(args.spec)
 
     kwargs = {'realized': args.realized}
     if args.scenetype is not None:

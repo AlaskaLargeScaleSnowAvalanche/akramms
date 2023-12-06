@@ -113,11 +113,13 @@ def commonprefix(ini_strlist):
 def commonsuffix(strs):
     return commonprefix((x[::-1] for x in strs))[::-1]
 
-chunknameRE = re.compile(r'([^_]+)([TSML])(For|NoFor)_(\d+m)'.format(return_period))
 def scenedir_to_chunknames(scenedir):
     """Generator yields the chunks inside a scene
     Yields: (sizecat, chunkid, pathname)
     """
+
+    scene_args = params.load(scenedir)
+    chunknameRE = re.compile(r'([^_]+)([TSML])(For|NoFor)_(\d+m)'.format(scene_args['return_period']))
 
     # Partially parse the chunk directories.
     names = list()

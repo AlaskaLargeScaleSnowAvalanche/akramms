@@ -1,4 +1,4 @@
-import os,configparser,functools,sys
+import os,configparser,functools,sys,pathlib
 from uafgi.util import pathutil,ioutil
 
 
@@ -6,22 +6,25 @@ def _harness_dir():
     path = os.path.abspath(__file__)
     for i in range(3):
         path = os.path.split(path)[0]
-    return path
+    return pathlib.Path(path)
 HARNESS = _harness_dir()
 
 # Default values of configuration parametesrs.  If these parameters
 # are provided on the command line, they may be monkeypatched in here
 # at runtime.
 
-def default_roots(sep, harness):
-    return pathutil.RootsDict(sep, (
+def default_roots(PureSysPath, harness):
+    harness = PureSysPath(harness)
+    return pathutil.RootsDict(PureSysPath, (
         ('HARNESS', harness),
-        ('DATA', sep.join((harness, 'data'))),
-        ('PRJ', sep.join((harness, 'prj'))),
+        ('DATA', harness / 'data'),
+        ('PRJ', harness / 'prj'),
     ))
 
-roots_l = default_roots(os.sep, os.path.abspath(os.path.realpath(os.path.join(os.path.dirname(__file__), '..', '..'))))
-roots_w = default_roots('\\', r'C:\Users\efischer\av') # r'\\nona.dnr.state.ak.us\enggeo_projects\avalanche_sim\av'
+roots_l = default_roots(
+    pathlib.PurePosixPath,
+    os.path.abspath(os.path.realpath(os.path.join(os.path.dirname(__file__), '..', '..'))))
+roots_w = default_roots(pathlib.PureWindowsPath, r'C:\Users\efischer\av') # r'\\nona.dnr.state.ak.us\enggeo_projects\avalanche_sim\av'
 
 # Differences from defaults
 roots_l['PRJ'] = '/mnt/avalanche_sim/prj'

@@ -112,8 +112,8 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
     """Generates the scenario file, which becomes key to running RAMMS.
     Also split into chunks.
 
-    release:
-        Release file to process
+    scene_dir:
+    ramms_names: [(scene_name, {For}_{resolution}m{return_period}, pra_size), ...]
     oramms_name:
         Output RAMMS directory to create
     """
@@ -126,9 +126,14 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
 
     def action(tdir):
 
-        for jb,pra_size in ramms_names:    # see master_ramms_names() in r_pra_post, includes CHUNKS in it.
-            base = os.path.join(scene_args['scene_dir'], 'RELEASE', f'{jb.ramms_name}')
-            df = read_reldom_df(base, jb)
+# TODO: Redo using rdf infrastructure, using a dataframe of avalanches.
+# use add_master_rammsname().
+
+        for scene_name,rn,pra_size in ramms_names:    # see master_ramms_names() in r_pra_post, includes CHUNKS in it.
+            #base = os.path.join(scene_args['scene_dir'], 'RELEASE', f'{scene_name}{rn}')
+            rel_leaf = f'{scene_name}{rn}{pra_size}_rel.shp'
+            relfname = scene_args['scene_dir'] / 'RELEASE' / rel_leaf
+            df = chunk.read_reldom(relfname)
 
             ofnames = list()
             chunk_info = list()
@@ -141,11 +146,11 @@ def chunk_rule(scene_dir, ramms_names, **scenario_kwargs):
                 dfc = df[chunkix:chunkix+config.max_ramms_pras]
 
                 # Add the chunk number to the name
-                jb1 = copy.copy(jb)
+                jb1 = rammsutil.parse_release_file(scene_args['scene_dir'] / 'CHUNKS' / rel_leaf)
                 jb1.set(segment=segment)
                 print(f'Generating CHUNK: {jb1.ramms_dir}')
 
-                prepare_chunk(scene_args, jb1, )
+                prepare_chunk(scene_args, jb1)
 
             # Write names of our PRA files into the _chunks.txt output file
             chunk_index_df = pd.DataFrame(chunk_info, columns=['segment', 'Id', 'chunk_name'])

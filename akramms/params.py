@@ -1,6 +1,7 @@
 import functools
 import os
 import numpy as np
+import pathlib
 from akramms.util import paramutil
 
 
@@ -124,5 +125,5 @@ DEFAULTS = {
 def load(scene_dir):
     """Reads the scene """
     ret = paramutil.load_nc(os.path.join(scene_dir, 'scene.nc'))
-    ret['scene_dir'] = scene_dir
+    ret['scene_dir'] = pathlib.Path(scene_dir)
     return ret
