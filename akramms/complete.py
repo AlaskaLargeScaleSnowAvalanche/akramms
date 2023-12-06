@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from akramms import level,parse
+from akramms import level,parse,resolve
 
 
 def add_chunk_complete_cached(akdf0, ramms_stage):
@@ -18,11 +18,11 @@ def add_chunk_complete_cached(akdf0, ramms_stage):
         according to cached values?
     """
 
-    akdf0 = akdf0.add_chunkname(akdf1)
+    akdf0 = resolve.add_chunkname(akdf0)
     dfs = list()
     for (exp,combo),akdf1 in akdf0.groupby(['exp', 'combo']):
         expmod = parse.load_expmod(exp)
-        xdir = expmod.comb_to_scenedir(combo, 'x')
+        xdir = expmod.combo_to_scenedir(combo, 'x')
         ramms_stage_dir = xdir / f'ramms_stage{ramms_stage}'
 
         akdf1[f'chunk_complete_stage{ramms_stage}_cached'] = akdf1.chunkname.map(
@@ -139,33 +139,29 @@ def add_combo_complete_stage2(akdf0, realized=True):
             realized=False)
         iddf1 = add_id_complete_stage2(iddf1)
         complete = iddf1['id_complete_stage2'].all()
-        orows.append((exp, combo, complete]
+        orows.append((exp, combo, complete))
     df = pd.DataFrame(orows, columns=('exp', 'combo', 'combo_complete_stage2'))
 
     return akdf0.merge(df, on=['exp', 'combo'])
 # ------------------------------------------------------------
-def add_combo_complete(akdf0):
-    """Determines whether all avalanches in an x-dir combo have been
-    completed (and therefore it is ready to be archived).  Should ONLY
-    be run on combos that have not already been confirmed archived."""
-# ------------------------------------------------------------
 # ------------------------------------------------------------
 
 
-QUESTIONS
-===============
-
-1. Do I need to create and submit any new chunks to RAMMS Stage 1 (per combo)?
-
-2. Is Stage 2 done running (for now) (per chunk)?
-  - Examine only chunks that are not yet complete stage 2 (cached)
-  - Use joblib.add_jobstatus()
-  - If any chunks are NOW determined to be complete, cache the result
-  ==> per combo: aggregate into chunks
-
-3. Are there any avalanches I need to archive to complete a specific mosaic query?
-
-
-4. Are there any complete chunks I need to archive?
-
-5. Are there any archived chunks I need to delete?
+#QUESTIONS
+#===============
+#
+#1. Do I need to create and submit any new chunks to RAMMS Stage 1 (per combo)?
+#
+#2. Is Stage 2 done running (for now) (per chunk)?
+#  - Examine only chunks that are not yet complete stage 2 (cached)
+#  - Use joblib.add_jobstatus()
+#  - If any chunks are NOW determined to be complete, cache the result
+#  ==> per combo: aggregate into chunks
+#
+#3. Are there any avalanches I need to archive to complete a specific mosaic query?
+#
+#
+#4. Are there any complete chunks I need to archive?
+#
+#5. Are there any archived chunks I need to delete?
+#

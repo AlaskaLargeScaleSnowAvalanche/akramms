@@ -217,6 +217,41 @@ def test(args):
 
 
 # ---------------------------------------------------------------------
+@subcommand([
+    argument('to', help='What to resolve to', default='releasefile'),
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+    argument('--realized', action='store_true',
+        help='Only check avalanches with .in.zip / .out.zip files'),
+    argument('--update', action='store_true',
+        help='Update markers of completion?'),
+
+])
+def status(args):
+    """Test out parsing and resolving to different levels"""
+
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf = resolve.resolve_to(parseds, args.to, realized=False)
+
+    if args.to == 'id':
+        akdf = joblib.add_id_status(akdf)
+    elif args.to == 'releasefile':
+        akdf0 = joblib.add_releasefile_status(akdf, realized=args.realized, update=args.update)
+
+        for (exp,combo),akdf1 in akdf0.groupby(['exp', 'combo']):
+            print(f'-------------- {exp} {combo}')
+            for chunk_status,akdf2 in akdf1.groupby('chunk_status'):
+                chunk_status = joblib.JobStatus._member_names_[chunk_status]
+                chunknames = ', '.join(akdf2.chunkname.tolist())
+                print(f'{chunk_status}: {chunknames}')
+
+
+    elif args.to == 'combo':
+        akdf = joblib.add_combo_status(akdf, realized=args.realized, update=args.update)
+
+    print(akdf)
+
+
+# ---------------------------------------------------------------------
 def get_exp_dir(exp_mod):
     return config.roots.join('PRJ', exp_mod.name)
 
@@ -510,7 +545,7 @@ def finish_chunks(args):
 
 
 # ------------------------------------------------------------------
-def archive(args):
+#def archive(args):
     # -------------------------------------------------------------------
     # All chunks are complete, now we can archive combos
     # Go back to combo level (akdf)

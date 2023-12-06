@@ -1,7 +1,7 @@
 import os,subprocess,functools,re,typing,zipfile,enum
 import htcondor
 import pandas as pd
-from akramms import config,file_info,parse,level
+from akramms import config,file_info,parse,level,complete,resolve
 
 # Categorize each job int one of four sets
 #job_status_labels = ('noinput', 'incomplete', 'todo', 'inprocess', 'finished', 'overrun', 'failed')
@@ -14,7 +14,7 @@ class JobStatus(enum.IntEnum):
     OVERRUN = 5      # Avalanche overran the boundary; auto-resubmit
     FINISHED = 6     # The avalanche (or chunk or combo) has finished, and it's successful
     MARKED_FINISHED = 7       # Chunk or combo has finished, and has been marked as such (shortcut)
-    ARCHIVED = 7    # For combos: It's been fully archived to an arc directory
+    ARCHIVED = 8    # For combos: It's been fully archived to an arc directory
 
 # =========================================================================================
 # ===== RAMMS Stage 2: Manage avalanche jobs
@@ -231,7 +231,10 @@ def add_id_status(akdf0):
 
     statuses = list()
 
-    for exp,akdf1 in akdf0.reset_index().groupby('exp'):
+    print('xxxxxxxxxxx ')
+    print(akdf0)
+    print(akdf0.columns)
+    for exp,akdf1 in akdf0.groupby('exp'):
         expmod = parse.load_expmod(exp)
 
         # Pick up what info we can from HTCondor
@@ -361,7 +364,7 @@ def _submit_jobs(akdf):
             Job statuses BEFORE submissions were made
     """
 
-   for _,row in akdf.iterrows():
+    for _,row in akdf.iterrows():
         jb = file_info.parse_chunk_release_file(row['releasefile'])
 
         # Eg: .../ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/c-L-00000/RESULTS/c-L-00000For_10m/30
@@ -387,7 +390,7 @@ def submit_jobs(akdf):
 
     return akdf
 # ------------------------------------------------------------
-def add_releasefile_status(akdf, realized=True):
+def add_releasefile_status(akdf, realized=True, update=True):
     """Determins a status for each releasefile (chunk)
 
     akdf:
@@ -403,18 +406,15 @@ def add_releasefile_status(akdf, realized=True):
     """
 
     dfs = list()
-    for (exp,combo),akdf1 in akdf0.reset_index().groupby(['exp', 'combo']):
+    for (exp,combo),akdf1 in akdf.reset_index().groupby(['exp', 'combo']):
         expmod = parse.load_expmod(exp)
-        xdir = expmod.comb_to_scenedir(combo, 'x')
-
-        ## Resolve combo -> releasefile
-        #rfdf1 = resolve.resolve_releasefile(akdf1, scenetypes={'x'})
+        xdir = expmod.combo_to_scenedir(combo, 'x')
 
         # Get releasefiles (chunks) that are not yet complete (as per cache)
-        akdf1 = akdf1.add_chunk_complete_cached(akdf1, 2)    # chunk_complete_stage2_cached
+        akdf1 = complete.add_chunk_complete_cached(akdf1, 2)    # chunk_complete_stage2_cached
         mask = akdf1['chunk_complete_stage2_cached']
         rf_complete_cached = akdf1[mask]
-        rf_complete_cached[status] = JobStatus.MARKED_FINISHED
+        rf_complete_cached['chunk_status'] = JobStatus.MARKED_FINISHED
         dfs.append(rf_complete_cached)
 
         # Go on with releasefiles not marked as cached
@@ -423,6 +423,7 @@ def add_releasefile_status(akdf, realized=True):
         # ------------------------------------------
         # Get jobstatus at id level
         # Pick up job statuses
+        rfdf1 = resolve.resolve_releasefile(akdf1, scenetypes={'x'})
         iddf1 = resolve.resolve_id(rfdf1, realized=realized)
         iddf1 = add_id_status(iddf1)
 
@@ -435,11 +436,13 @@ def add_releasefile_status(akdf, realized=True):
         # Mark chunks as finished if they have in fact finished
         mask = (akdf1.chunk_status == JobStatus.FINISHED)
         finished_df = akdf1[mask]
-        for chunkname in finished_df.chunkname:
-            fname = xdir / 'ramms_stage2' / f'{chunkname}.txt'
-            with open(fname, 'w') as out:
-                out.write('RAMMS Stage 2 complete\n')
-        finished_df['chunk_status'] = JobStatus.MARKED_FINISHED
+        if update:
+            os.makedirs(xdir / 'ramms_stage2', exist_ok=True)
+            for chunkname in finished_df.chunkname:
+                fname = xdir / 'ramms_stage2' / f'{chunkname}.txt'
+                with open(fname, 'w') as out:
+                    out.write('RAMMS Stage 2 complete\n')
+            finished_df['chunk_status'] = JobStatus.MARKED_FINISHED
         dfs.append(finished_df)
 
         # Append the rest of the chunk status rows as-is
