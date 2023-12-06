@@ -1,7 +1,7 @@
 # Fundamental stuff needed to run an experiment.
 
 import functools
-import math,os
+import math,os,subprocess
 import numpy as np
 from osgeo import ogr,gdal
 import shapely
@@ -232,7 +232,14 @@ def r_forest(exp_mod, idom, jdom):
 
         # Write it out!
         os.makedirs(os.path.split(ofname)[0], exist_ok=True)
-        gdalutil.write_raster(ofname, grid_info, forest, 0, type=gdal.GDT_Byte)
+        gdalutil.write_raster(ofname, grid_info, forest, 255, type=gdal.GDT_Byte)
+
+        # Add statistics in a .tif.aux.xml file
+        # (Needed by the ArcGIS prep script)
+        # https://gis.stackexchange.com/questions/208996/how-to-create-raster-statistics-with-gdal-externally
+        cmd = ['gdalinfo', '-stats', '-hist', ofname]
+        subprocess.run(cmd, check=True)
+
 
     return make.Rule(action, [landcover_tif], [ofname])
 

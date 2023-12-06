@@ -1,7 +1,8 @@
 import os,collections,sys
 import schema
 from uafgi.util import schemautil,shputil
-from akramms import config, experiment,r_prepare
+from akramms import config, experiment, stages
+from akramms import r_prepare,r_domain_builder
 
 # Top-level experimental design for Alaska
 
@@ -74,6 +75,10 @@ def add_combo(makefile, combo):
 
     # DTM and Forest (landcover==42)
     dem_tif = makefile.add(experiment.r_ifsar(exp_mod, combo.idom, combo.jdom)).outputs[0]
+    dem_filled_file,sinks_file,neighbor1_file = makefile.add(r_domain_builder.neighbor1_rule(
+        dem_tif, os.path.split(dem_tif)[0], fill_sinks=True)).outputs
+
+    # Forest File
     if combo.forest == 'For':
         landcover_tif = makefile.add(experiment.r_landcover(
             exp_mod, combo.idom, combo.jdom)).outputs[0]
@@ -94,10 +99,12 @@ def add_combo(makefile, combo):
         return_periods=(combo.return_period,),
         forests=((1 if combo.forest=='For' else 0),),
         dem_file=dem_tif,
-        snowdepth_file=sx3I_tif)
+        snow_file=sx3I_tif)
     if combo.forest:
         kwargs['forest_file'] = forest_tif
 
+    # Print out what we've got!
+    print('------ Preparing Scene:')
     print(f'   scene_dir: {scene_dir}')
     for k,v in kwargs.items():
         print(f'   {k}: {v}')
@@ -105,10 +112,7 @@ def add_combo(makefile, combo):
         scene_dir, defaults='alaska', **kwargs)
     makefile.add(rule)
 
-
-    # TODO: call stages.add_stage0_rules() and stages.add_stage1_rules()
-    # Those will need to be changed, due to changes in kwargs for r_prepare_scene().
-
+    stages.add_stage0_rules(makefile, scene_dir)
 
 # -------------------------------------------------------------
 # Different subsets of combos to try when running the experiment

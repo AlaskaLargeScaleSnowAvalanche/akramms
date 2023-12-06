@@ -14,7 +14,7 @@ from akramms import params
 
 # -----------------------------------------------------------------------
 # ---------------------------------------------------------------------------
-def r_prepare_scene(scene_dir, defaults=dict(), **kwargs):
+def r_prepare_scene(xscene_dir, defaults=dict(), **kwargs):
 
     """Sets up a new scene by creating a directory with all
     parameters required for processing.
@@ -36,13 +36,19 @@ def r_prepare_scene(scene_dir, defaults=dict(), **kwargs):
     def action(tdir):
 
         # Create the directory
-        scene_dir = os.path.abspath(scene_dir)
+        scene_dir = os.path.abspath(xscene_dir)
         os.makedirs(scene_dir, exist_ok=True)
 
         # Assemble the scene args, using default params if provided
         if isinstance(defaults, str):    # Lookup pre-loaded defaults
-            defaults = params.DEFAULTS[defaults]
-        scene_args = paramutil.validate_args({**defaults, **kwargs}, params=params.ALL)
+            xdefaults = params.DEFAULTS[defaults]
+        else:
+            xdefaults = defaults
+
+        scene_args = {**xdefaults, **kwargs}
+        scene_args = paramutil.validate_args(scene_args, params=params.ALL)
+
+#        scene_args = paramutil.validate_args({**xdefaults, **kwargs}, params=params.ALL)
 
         # Get the scene name as the leaf of the scene_dir
         if 'name' not in scene_args:
@@ -54,19 +60,19 @@ def r_prepare_scene(scene_dir, defaults=dict(), **kwargs):
         with open(os.path.join(scene_dir, 'scene.cdl'), 'w') as out:
             subprocess.run(cmd, stdout=out)
 
-    inputs = [kwargs['dem_file'], kwargs['snowdepth_file']]
+    inputs = [kwargs['dem_file'], kwargs['snow_file']]
     if 'forest_file' in kwargs:
         inputs.append(kwargs['forest_file'])
-    outputs = [os.path.join(scene_dir, 'scene.nc')]
+    outputs = [os.path.join(xscene_dir, 'scene.nc')]
 
     return make.Rule(action, inputs, outputs)
 
 # ---------------------------------------------------------------------------
-@functools.lru_cache()
-def r_prepare_scene(scene_dir, defaults=dict(), **kwargs):
-    def action(tdir):
-        prepare_scene(scene_dir, defaults=defaults, **kwargs)
-    return make.Rule(action, [], [os.path.join(scene_dir, 'scene.nc')])
+#@functools.lru_cache()
+#def r_prepare_scene(scene_dir, defaults=dict(), **kwargs):
+#    def action(tdir):
+#        prepare_scene(scene_dir, defaults=defaults, **kwargs)
+#    return make.Rule(action, [], [os.path.join(scene_dir, 'scene.nc')])
 
 # ---------------------------------------------------------------------------
 import_xml_tpl = """<?xml version="1.0" encoding="UTF-8"?>
@@ -258,6 +264,9 @@ def prepare_data(scene_dir):
 
 def rule(scene_dir):
     """Runs the data_prep_PRA.py script on a scene
+    TO RERUN:
+        Delete arcgis_stage0.txt
+
     hostname:
         Remote host to run the command on
     HARNESS_REMOTE:
@@ -269,7 +278,7 @@ def rule(scene_dir):
 
     # inputs = [os.path.join(scene_dir, 'scene.nc')]
     inputs = []
-    outputs = _prepare_data_outputs(scene_dir, scene_args)
+    outputs = _prepare_data_outputs(scene_dir, scene_args) + [os.path.join(scene_dir, 'arcgis_stage0.txt')]
 
     def action(tdir):
         scene_dir_rel = config.roots.relpath(scene_dir)
@@ -291,4 +300,8 @@ def rule(scene_dir):
             config.roots_w.syspath(scene_dir_rel, bash=True)]
         harnutil.run_remote(inputs, cmd, tdir)
 
+        # Make it clear / obvious we have finished
+        with open(os.path.join(scene_dir, 'arcgis_stage0.txt'), 'w') as out:
+            out.write('Successfully finished running ArcGIS script data_prep_PRA.py')
+        
     return make.Rule(action, inputs, outputs)

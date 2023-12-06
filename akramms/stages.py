@@ -1,6 +1,6 @@
 from uafgi.util import make,shputil
 from akramms import config,params,process_tree
-from akramms import r_prepare, r_ecog, r_pra_post, r_domain_builder, r_ramms, r_snow
+from akramms import r_prepare, r_ecog, r_pra_post, r_domain_builder, r_ramms
 from akramms.util import paramutil,harnutil,rammsutil
 import os,sys
 import setuptools.sandbox
@@ -10,33 +10,14 @@ def add_stage0_rules(makefile, scene_dir):
 
     scene_args = params.load(scene_dir)
 
-    # Create snow input file on the scene grid
-    if scene_args['downscale'] == 'select':
-        snow_input = makefile.add(r_snow.select_sx3_rule(
-            scene_dir, scene_args['snowdepth_file'], scene_args['snowdepth_geo'])).outputs[0]
-    elif scene_args['downscale'] == 'lapse':
-        distance_from_coastA_tif = os.path.join(scene_dir, 'distance_from_coastA.tif')
-        makefile.add(r_snow.distance_from_coast_rule(
-            scene_args['snowdepth_geo'], distance_from_coastA_tif))
-
-        snow_input = makefile.add(r_snow.lapse_sx3_rule(
-            scene_dir, scene_args['snowdepth_file'], scene_args['snowdepth_geo'],
-            distance_from_coastA_tif)).outputs[0]
-
-    else:
-        raise ValueError("Illegel downscale algorithm: '{}'".format(scene_args['downscale']))
-
     # Run ArcGIS script to prepare files for eCognition
     prepare_outputs = makefile.add(r_prepare.rule(scene_dir)).outputs
 
     # Get neighbor1 graph for DEM routing network
     dem_file = scene_args['dem_file']
-    dem_filled_file,sinks_file,neighbor1_file = makefile.add(r_domain_builder.neighbor1_rule(
-        dem_file, scene_dir, fill_sinks=True)).outputs
+    dem_filled_file = f'{dem_file[:-4]}_filled.tif'
 
     # Loop over combos
-#    ramms_dirs_release_files = list()    # [(ramms_dir, [release_file, ...]), ...]
-#    all_ramms_dirs = list()
     all_release_files = list()    # Release files we will run RAMMS on
     for return_period in scene_args['return_periods']:
         for forest in scene_args['forests']:
@@ -44,16 +25,11 @@ def add_stage0_rules(makefile, scene_dir):
             # Run eCognition
             makefile.add(r_ecog.rule(scene_dir, prepare_outputs, return_period, forest))
 
-#            # Burn PRAs produced by eCognition into raster
-#            pra_file, pra_burn_file = process_tree.pra_files(scene_args, return_period, forest)
-#            makefile.add(
-#                r_domain_builder.burn_pra_rule(dem_file, pra_file, pra_burn_file))
-
             # Post-Process eCognition Output (the pra_file)
             # and also split into chunks.
             # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
             pra_post_rule, ramms_names = r_pra_post.rule(
-                scene_dir, dem_filled_file, return_period, forest, snow_input)
+                scene_dir, dem_filled_file, return_period, forest, scene_args['snow_file'])
             release_shplists = makefile.add(pra_post_rule).outputs
 
             makefile.add(r_ramms.chunk_rule(scene_dir, ramms_names))

@@ -16,6 +16,8 @@ ALL = paramutil.parse([
         """Name of DEM file to use (GeoTIFF)"""),
     ('forest_file', None, 'input_file', False,
         """Name of forest cover file to use (GeoTIFF)"""),
+    ('snow_file', None, 'input_file', True,
+        """Downscaled snow field on the local grid."""),
     ('clip_file', None, 'input_file', False,
         """Clip domain to this region (Shapefile)"""),
 
@@ -47,31 +49,6 @@ ALL = paramutil.parse([
     ('stats_kernel', None, 'array', True,
         """2D kernel used for statistics on DEM in ArcGIS data prep"""),
 
-    # Parameters for PRA postprocessing (after eCognition)
-#    ('hs_flatfield', 'm', 'float', True,
-#        """TODO DHS3 flatfield"""),
-##### reference_elevation and gradient_snowdepth not needed for Alaska....
-    ('reference_elevation', 'm', 'float', True,
-        """TODO???"""),
-    ('gradient_snowdepth', '.01', 'float', True,
-        """Snow depth increase with elevation [m/100m]"""),
-# TODO: The formula looks like it has two params, not one.  I'm confused.
-#    ('wind_load', 'm', 'float', True,
-#        """Snow drift"""),
-    ('snowdepth_type', None, 'str', True,
-        """Type of snowdepth file: 'wrf' or 'original'"""),
-    ('snowdepth_geo', None, 'input_file', False,
-        """Name of Snowdepth geometry file (if snowdepth_type=='wrf')"""),
-    # TODO: Will we need more than one???
-    ('snowdepth_file', None, 'input_file', True,
-        """Name of file containing snow depth information"""),
-    ('downscale', None, 'str', True,
-        """Algorithm used to downscale WRF snowdepth files to local grid."""),
-    ('longname', None, 'str', True,
-        """Long-term permanent name for this scene."""),
-    ('map_name_format', None, 'str', True,
-        """Format for output map files"""),
-
     ])
 
 ## Not included in main parameters because it doesn't affect the value
@@ -98,7 +75,6 @@ DEFAULTS = {
         [0.625, 1.5, 3, 1.5, 0.625],
         [0.625, 1.5, 1.5, 1.5, 0.625],
         [0.625, 0.625, 0.625, 0.625, 0.625]]),
-    snowdepth_type='original',
     ),
 
     'alaska': dict(
@@ -131,13 +107,6 @@ DEFAULTS = {
         [0.625, 1.5, 3, 1.5, 0.625],
         [0.625, 1.5, 1.5, 1.5, 0.625],
         [0.625, 0.625, 0.625, 0.625, 0.625]]),
-
-    snowdepth_type='wrf',
-    downscale='select',    # No smoothing or interpolation
-
-    # These are WILD GUESSES
-    reference_elevation=100.,
-    gradient_snowdepth=0.1,    # [m/100m] (in Switzerland this is .05)
 
 )}
 

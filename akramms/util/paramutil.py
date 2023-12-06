@@ -51,7 +51,7 @@ class InputFileType(Type):
 
 class ListType:
     def validate(self, val):
-        assert isinstance(val, list)
+        assert isinstance(val, list) or isinstance(val, tuple)
         return val
 
     def write_nc(self, nc, vname, val):
@@ -149,7 +149,10 @@ def validate_args(args, params=None):
     for name,param in params.items():
         if name in remain_args:
             typ = TYPES[param.type]
-            ret[name] = typ.validate(remain_args[name])
+            try:
+                ret[name] = typ.validate(remain_args[name])
+            except:
+                raise ValueError(f'Error validating {name}={remain_args[name]}')
             del remain_args[name]
         elif param.required:
             raise ValueError('Missing REQUIRED argument: {}'.format(name))

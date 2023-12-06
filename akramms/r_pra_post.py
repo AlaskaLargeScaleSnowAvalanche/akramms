@@ -96,7 +96,7 @@ def master_ramms_names(scene_args, return_period, forest):
 
 
 
-def rule(scene_dir, dem_filled_file, return_period, forest, snowdepthI_tif,
+def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
     min_alpha=18., max_runout=10000., margin=0.):
     """
     scene_dir:
@@ -111,7 +111,7 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowdepthI_tif,
 
     forest: bool
         Whether we are doing with / without forest
-    snowdepthI_tif: str
+    snowI_tif: str
         Name of the snowdepth file, in local scene coordinates, that we will use.
 
     min_alpha: [deg]
@@ -143,7 +143,7 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowdepthI_tif,
                 os.path.join(scene_dir, dir, f'{jb.ramms_name}{ext}'))
 
     # Add one-off input files
-    inputs.append(snowdepthI_tif)
+    inputs.append(snowI_tif)
 
     def action(tdir):
 
@@ -151,7 +151,7 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowdepthI_tif,
 #        snow_lookup = WrfLookup(
 #            scene_args['coordinate_system'], scene_args['snowdepth_file'],
 #            'sx3', scene_args['snowdepth_geo'], units='m')
-        snow_lookup = RasterLookup(snowdepthI_tif)
+        snow_lookup = RasterLookup(snowI_tif)
 
         degree = np.pi / 180.
         name = scene_args['name']
