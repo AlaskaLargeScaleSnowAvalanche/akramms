@@ -3,10 +3,11 @@
 
 from akramms import config,params
 import argparse,itertools,os,subprocess,sys,io,codecs,re
-from akramms import r_ramms,experiment,stages
+from akramms import experiment,stages
 from akramms.util import rammsutil
 from uafgi.util import ioutil,make
 import importlib
+from akramms import r_domain_builder, r_ramms
 
 # ------------------------------------------------------------------------
 # https://mike.depalatis.net/blog/simplifying-argparse.html
@@ -264,6 +265,9 @@ def get_exp_dir(exp_mod):
         help='Python module describing the experiment'),
 ])
 def step1(args):
+    """Generate grid defining active domains.  The extent of future
+    steps likely depends on this."""
+
     exp_mod = load_exp_mod(getattr(args, 'experiment-module'))
     exp_dir = get_exp_dir(exp_mod)
 
@@ -283,6 +287,9 @@ def _parse_experiment_spec(spec):
 #        help='Name of combo-generating function'),
 ])
 def step2(args):
+    """Create required DEMs, Forest files, etc.
+    NO Proprietary Software in this step, it can run with high levels of parallelism."""
+
     sexp_mod, sexp_fn = getattr(args, 'experiment-spec')
 
     # Load the module (initial 'akramms.' is optional)
@@ -308,7 +315,16 @@ def step2(args):
         help='Python module and combo function describing the experiment, eg: e_alaska.juneau'),
 ])
 def step3(args):
+    """Go through RAMMS Stage 0 and 1: ArcGIS and eCognition, setting up RAMMS scenes to run.  Then run RAMMS stage 0 and 1 on each scene."""
     sexp_mod, sexp_fn = getattr(args, 'experiment-spec')
+
+    # Make sure the domain finder C++ code is compiled. (needed for RAMMS Stage 1)
+    setup_py = os.path.join(harnutil.HARNESS, 'akramms', 'setup.py')
+    prefix = os.path.join(harnutil.HARNESS, 'akramms', 'inst')
+    cmd = ['install', '--prefix', prefix]
+    print('setup.py ', cmd)
+    setuptools.sandbox.run_setup(setup_py, cmd)
+
 
     # Load the module (initial 'akramms.' is optional)
     exp_mod = load_exp_mod(sexp_mod)
@@ -324,9 +340,54 @@ def step3(args):
         print(f'----- Adding Scene: {scene_dir}')
         stages.add_stage0_rules(makefile, scene_dir)
 
+        # RAMMS Stage 1...
+#        ramms_dirs_release_files = add_stage1_rules(makefile, scene_dir)
 
     makefile.generate(os.path.join(exp_dir, 'init_mk'), run=True, ncpu=1)
 
+# ------------------------------------------------------------------
+
+@subcommand([argument('ramms', help='RAMMS directory or release file to inspect')])
+def ramms(args):
+    """Run RAMMS Stage 1 and prerequisites on (possibly) a single release file.  Used for debugging."""
+    release_files = rammsutil.get_release_files(args.ramms)
+    #print(release_files)
+
+    makefile = make.Makefile()
+
+    for release_file in release_files:
+        jb = rammsutil.parse_release_file(release_file)
+        scene_dir = jb.scene_dir    # Use this at end
+        scene_args = params.load(jb.scene_dir)
+
+        dem_file = scene_args['dem_file']
+        dem_filled_file = os.path.splitext(dem_file)[0] + '_filled.tif'
+
+        # Different directory for chull and domain
+        chull_file = os.path.join(jb.ramms_dir, 'CHULL', '{}_chull.shp'.format(jb.ramms_name))
+        domain_file = os.path.join(jb.ramms_dir, 'DOMAIN', '{}_dom.shp'.format(jb.ramms_name))
+        makefile.add(r_domain_builder.domain_rule(
+            dem_filled_file, release_file, chull_file, domain_file, min_alpha=18., margin=config.initial_margins[jb.pra_size]))
+
+
+        # RAMMS Stage 1: IDL Prep
+        stage1_outputs = makefile.add(r_ramms.ramms_stage1_rule(
+            release_file, dem_file, [release_file, dem_file, domain_file], dry_run=False, submit=config.auto_submit)).outputs
+
+    makefile.generate(os.path.join(scene_dir, 'ramms_mk'), run=True, ncpu=1)
+
+# ------------------------------------------------------------------
+@subcommand([
+    argument('scene', help='Top-Level scene directory to setup through stages 0 and 1.'),
+])
+def step4(args):
+    """Run RAMMS Stage 1 and submit avalanches to HTCondor."""
+    scene_dir = args.scene
+    scene_args = params.load(scene_dir)
+    print(scene_args)
+
+    stages.run_stage0(scene_dir)
+    stages.run_stage1(scene_dir)
 
 
 

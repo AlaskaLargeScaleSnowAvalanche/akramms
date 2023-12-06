@@ -75,6 +75,8 @@ difference_decode = np.cumsum
 # Marc
 
 def parse_xy_coord(gridI, fin):
+    """Read the .xy-coord file"""
+
     # https://docs.python.org/3/library/struct.html
     # < = little-endian
     # L = unsigned long
@@ -124,6 +126,7 @@ def nc_xy_coord(ncout, gridI, coord_attrs, fname):
 # --------------------------------------------------------------
 
 def parse_out(fin):
+    """Read the .out file"""
 
     # ncells: long
     fmt = '<L'
@@ -163,7 +166,7 @@ def nc_out(ncout, fname, attrs={}):
 
 
 # ----------------------------------------------------------
-def ramms_to_nc(gridI, base, ofname):
+def ramms_to_nc0(gridI, base, ofname):
     """
     base:
         Base name of avalanche, including full pathname.
@@ -240,6 +243,7 @@ def ramms_to_nc(gridI, base, ofname):
         nc_out(ncout, f'{base}.out',
             attrs={'grid_mapping': 'grid_mapping'})
 
+# ----------------------------------------------------------
 # ----------------------------------------------------------
 def main():
     base = '/Users/eafischer2/tmp/aval/juneauA00000For_5m_30L_4981'

@@ -76,6 +76,7 @@ print('\n'.join(files))
 # Launch RAMMS exe to run one avalanche
 
 out_zip_fname = f'{log_base}.out.zip'    # Assume it did not overrun base and we have a successful run
+out_tmp_zip_fname = f'{log_base}.out_tmp.zip'    # Assume it did not overrun base and we have a successful run
 files_for_zip.add(f'{log_base}.out')
 files_for_zip.add(f'{log_base}.out.log')
 
@@ -119,8 +120,12 @@ try:
 
 finally:
     # Whatever happened, make sure we collect the files written by the .exe
-    with zipfile.ZipFile(out_zip_fname, 'w', zipfile.ZIP_DEFLATED) as out_zip:
+    with zipfile.ZipFile(out_tmp_zip_fname, 'w', zipfile.ZIP_DEFLATED) as out_zip:
         for file in sorted(list(files_for_zip)):
             if os.path.exists(file):
                 out_zip.write(file, arcname=os.path.split(file)[1])
+
+    # ...and write it atomically
+    os.rename(out_tmp_zip_fname, out_zip_fname)
+
 

@@ -64,6 +64,9 @@ ramms_ncpu = 8    # Native RAMMS Stage 2 (and also Stage 1 xy-coords)
 ramms_ncpu_preprocess = 1    # 1 is fastest, due to IDL's overhead in parallelizing and the small granularity of RAMMS Stage 1
 ncpu_compress = 8    # Number of CPUs to use when compressing stuff after RAMMS Stage 1
 
+# Should we use the Redis Queue for running remote IDL commands?
+queue_idl = False
+
 # ------------------------------
 # DEBUG parameters
 allowed_pra_sizes = ['L']

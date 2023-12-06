@@ -1,5 +1,5 @@
 import os,subprocess,re,sys,itertools,gzip,collections,io,typing,codecs,copy
-import multiprocessing
+import multiprocessing,pickle
 import numpy as np
 import datetime,time,zipfile
 import contextlib
@@ -8,7 +8,7 @@ import numpy as np
 import htcondor
 from akramms import config,params
 from akramms.util import harnutil,rammsutil
-from uafgi.util import make,ioutil,shputil
+from uafgi.util import make,ioutil,shputil,gdalutil
 import pandas as pd
 
 
@@ -426,14 +426,11 @@ def ramms_stage1_rule(release_file, dem_file, inputs, dry_run=False, submit=Fals
 
         # RAMMS Stage 1 accepts inputs on stdin
         # rammsdist.run_on_windows_stage() calls read_inputs()
-#        dynamic_outputs = list()
-#        dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=True)
-        dynamic_outputs = harnutil.run_remote_queued(inputs, cmd, tdir, write_inputs=True)
-
-        # Write output files
-        os.makedirs(os.path.dirname(done_output), exist_ok=True)
-        with open(done_output, 'w') as out:
-            out.write('Finished RAMMS Stage 1\n')
+        dynamic_outputs = list()
+        if config.queue_idl:
+            dynamic_outputs = harnutil.run_remote_queued(inputs, cmd, tdir, write_inputs=True)
+        else:
+            dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=True)
 
         # Copy .tif files to be reused by later RAMMS Stage 1
         for fname0,fname1 in tmap:
@@ -479,6 +476,12 @@ def ramms_stage1_rule(release_file, dem_file, inputs, dry_run=False, submit=Fals
         # get going while preparing more RAMMS directories.
         if submit:
             submit_jobs([release_file])
+
+        # Write output files
+        os.makedirs(os.path.dirname(done_output), exist_ok=True)
+        with open(done_output, 'w') as out:
+            out.write('Finished RAMMS Stage 1\n')
+
 
         return dynamic_outputs
 
