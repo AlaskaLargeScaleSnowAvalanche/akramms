@@ -18,6 +18,11 @@ resolution = 10    # 10m resolution for our DEM
 snow_density = 300    # [kg m-3], used for mosaic
 
 # ----------------------------------------------
+# Named regions we typically query: (x0, y0, x1, y1)
+extents = {
+    'southeast': [0,0,1,1],    # Dummy for now
+}
+# ----------------------------------------------
 # Function extracts a DEM and writes it to a file
 dem_img = d_ifsar.r_vrt('DTM').outputs[0]    # Master DEM image file
 def extract_dem(poly, ofname, **kwargs):
@@ -61,9 +66,9 @@ combo_schema = schema.Schema({
         int, repr,
         {10, 30, 100, 300},
         "Return period of avalanche hazard to consider."),
-    'idom': schemautil.Int(
+    'idom': schemautil.NullableInt(
         "x index of the Alaska sub-domain to run"),
-    'jdom': schemautil.Int(
+    'jdom': schemautil.NullableInt(
         "y index of the Alaska sub-domain to run"),
 })
 
