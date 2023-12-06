@@ -91,10 +91,11 @@ def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
     # List all the existing archive .nc files
     arc_dir = exp_mod.combo_to_scene_subdir(combo, type='arc')
     ncs = dict()
-    for name in os.listdir(arc_dir):
-        match = avalparse.avalRE.match(name)
-        if match is not None:
-            ncs[int(match.group(2))] = (name, match.group(1))    # leaf-name, sizecat
+    if os.path.isdir(arc_dir):
+        for name in os.listdir(arc_dir):
+            match = avalparse.avalRE.match(name)
+            if match is not None:
+                ncs[int(match.group(2))] = (name, match.group(1))    # leaf-name, sizecat
 
 
     # Information from the RELEASE shpaefile
@@ -161,6 +162,7 @@ def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
 
                 # Add provenance info
                 ncv = ncout.createVariable('provenance', 'i')
+                ncv.exp_mod = exp_mod.name
                 ncv.created_by = os.getlogin()
                 ncv.release_timestamp = datetime.datetime.fromtimestamp(os.path.getmtime(release_file)).isoformat()
                 ncv.avalanche_timestamp = datetime.datetime.fromtimestamp(out_zip_mtime).isoformat()

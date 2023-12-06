@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 #
 
+import netCDF4
 from akramms import config,params
 import argparse,itertools,os,subprocess,sys,io,codecs,re
 from akramms import r_experiment,stages,avalparse
-from akramms.util import rammsutil
+from akramms.util import rammsutil,exputil
 from uafgi.util import ioutil,make
 import importlib
 from akramms import r_domain_builder, r_ramms
@@ -412,6 +413,35 @@ def query(args):
     print('============ nc_fnames')
     for ncf in nc_fnames:
         print(ncf)
+
+@subcommand([
+    argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),
+])
+def mosaic(args):
+    from akramms import avalquery,mosaic
+
+    # Do query
+    aspecs0, nc_fnames = avalparse.parse_aval_specs(args.avals)
+    aspecs = avalquery.normalize(aspecs0)
+    nc_fnames, extent = avalquery.query(aspecs, nc_fnames)
+
+    print('query returned ', len(nc_fnames))
+
+    if len(aspecs) > 0:
+        exp_mod = aspecs[0].exp_mod
+    else:
+        # Get exp_mod from the .nc file
+        with netCDF4.Dataset(nc_fnames[0]) as nc:
+            exp_mod = exputil.load(nc.variables['provenance'].exp_mod)
+
+    # Do mosaic
+    res = exp_mod.resolution
+    gridG = exp_mod.gridD.global_grid(res, res)
+#    gridM = exp_mod.gridD.sub(113,45, res, res)    # Could be arbitrary rectangle
+    gridM = exp_mod.gridD.subgrid(extent[0], extent[1], extent[2], extent[3], res, res)
+
+    with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
+        mosaic.mosaic_avals(gridM, nc_fnames, 'avals2.zip', tdir)
 
 
 

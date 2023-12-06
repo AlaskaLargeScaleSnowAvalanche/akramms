@@ -36,7 +36,8 @@ _mosaic_metadata = {
         'description': 'Number of avalanches hitting this gridcell',
     }),
 }
-_mosaic_keys = list(_mosaic_metadata.keys())
+_avoid = ('dem', 'landcover')    # Only include these if user provides fetch fn
+_mosaic_keys = list(x for x in _mosaic_metadata.keys() if x not in _avoid)
 
 def ozip_write(ozip, fname):
     """Writes with truncated arcname"""
@@ -85,8 +86,16 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
 #    print('gridD ', exp_mod.gridD)
 #    print('gridM ', gridM)
 
-    for fname in avals:
+    for aval_i,fname in enumerate(avals):
+#        if aval_i > 3:
+#            break    # DEBUGGING
+
         with netCDF4.Dataset(fname) as nc:
+
+            print('Processing {}: ({} of {}): {} gridcells'.format(
+                os.path.basename(fname),
+                aval_i, len(avals),
+                nc.variables['i_diff'].shape))
 
             # "gridA" = Avalanche's local grid (it will be one of the subdomains), WITH MARGIN
             # Geotransform of this avalanche's local grid
@@ -107,7 +116,7 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
 #            print(jjs), gridM.ny
 #            print(iis), gridM.nx
             good_ixs = np.where(np.logical_and.reduce((iis >= 0, iis < gridM.nx, jjs >= 0, jjs < gridM.ny)))
-            print('good_ixs ', good_ixs, gridM.nx, gridM.ny)
+#            print('good_ixs ', good_ixs, gridM.nx, gridM.ny)
 
             # Clip out-of-query-range gridcells
             _iis = iis[good_ixs]
@@ -164,7 +173,7 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
         # Land Cover
         if 'landcover' in vars_set:
             ofn = os.path.join(tdir.location, 'landcover.tif')
-            exp_mod.extract_landcover(box_poly, os.path.join(tdir.location, 'landcover.tif'))
+            landcover_fn(box_poly, os.path.join(tdir.location, 'landcover.tif'))
             ozip_write(ozip, ofn)
             ozip_write(ozip, os.path.join(tdir.location, 'landcover.tif.aux.xml'))
             ozip_write(ozip, os.path.join(tdir.location, 'landcover.tfw'))
@@ -172,7 +181,7 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
         # DEM
         if 'dem' in vars_set:
             ofn = os.path.join(tdir.location, 'dem.tif')
-            exp_mod.extract_dem(box_poly, ofn)
+            dem_fn(box_poly, ofn)
             ozip_write(ozip, ofn)
             ozip_write(ozip, os.path.join(tdir.location, 'dem.tfw'))
 
@@ -182,26 +191,26 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
 
 
 
-
-def main():
-    from uafgi.util import ioutil
-    from akramms import experiment
-
-    import akramms.e_alaska as exp_mod
-
-    res = exp_mod.resolution
-    gridG = exp_mod.gridD.global_grid(res, res)
-#    gridM = exp_mod.gridD.sub(113,45, res, res)    # Could be arbitrary rectangle
-    gridM = exp_mod.gridD.subgrid(
-        1109800, 1107000,
-        1111300, 1108000,
-        res, res)
-
-    avals = ['/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/arc-113-045/aval-1762.nc']
-    with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
-        mosaic_avals(exp_mod, gridM, avals, 'avals2.zip', tdir=tdir)
-
-main()
+#
+#def main():
+#    from uafgi.util import ioutil
+#    from akramms import experiment
+#
+#    import akramms.e_alaska as exp_mod
+#
+#    res = exp_mod.resolution
+#    gridG = exp_mod.gridD.global_grid(res, res)
+##    gridM = exp_mod.gridD.sub(113,45, res, res)    # Could be arbitrary rectangle
+#    gridM = exp_mod.gridD.subgrid(
+#        1109800, 1107000,
+#        1111300, 1108000,
+#        res, res)
+#
+#    avals = ['/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/arc-113-045/aval-1762.nc']
+#    with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
+#        mosaic_avals(exp_mod, gridM, avals, 'avals2.zip', tdir=tdir)
+#
+#main()
 
 # 
 # 

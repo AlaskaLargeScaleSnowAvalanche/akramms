@@ -33,6 +33,9 @@ def combo_to_scene_dir(exp_mod, combo, type='x'):
 # -------------------------------------------------------
 @functools.lru_cache()
 def _release_df(scene_dir):
+    """Returns:
+        release_fname, df
+    """
     # Look in RELEASE-dir shapefiles to determine theoretical set Avalanche IDs
     # (By looking here, we avoid picking up random junk)
     for leaf in os.listdir(os.path.join(scene_dir, 'RELEASE')):
