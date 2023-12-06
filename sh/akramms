@@ -3,8 +3,8 @@
 
 from akramms import config,params
 import argparse,itertools,os,subprocess,sys,io,codecs,re
-from akramms import experiment,stages
-from akramms.util import rammsutil
+from akramms import r_experiment,stages
+from akramms.util import rammsutil,exputil
 from uafgi.util import ioutil,make
 import importlib
 from akramms import r_domain_builder, r_ramms
@@ -262,7 +262,7 @@ def step1(args):
     exp_dir = get_exp_dir(exp_mod)
 
     makefile = make.Makefile()
-    makefile.add(experiment.r_active_domains(exp_mod))
+    makefile.add(r_experiment.r_active_domains(exp_mod))
     makefile.generate(os.path.join(exp_dir, 'init_mk'), run=True, ncpu=1)
 # -----------------------------------------------------------
 experiment_specRE = re.compile(r'([^.]+)\.([^.]+)$')
@@ -383,6 +383,13 @@ def step4(args):
     stages.run_stage0(scene_dir)
     stages.run_stage1(scene_dir)
 
+@subcommand([
+    argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),
+])
+def parse(args):
+    avals = exputil.parse_avals(args.avals)
+    for aval in avals:
+        print(aval)
 
 
 def main():

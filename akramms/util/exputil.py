@@ -75,7 +75,7 @@ def parse_id(exp_mod, sids):
         pass
 
     # Try parsing the extent (comma-separated)
-    return [Extent(*(float(x) for x in sids.split(',')))]
+    return Extent(*(float(x) for x in sids.split(',')))
 
 # -------------------------------------------------------
 all_dotsRE = re.compile(r'^([\.]+)$')
@@ -124,6 +124,10 @@ def parse_avals(args):
                 state = 0
 
         if state == 0:
+            # Remove trailing slash
+            if arg[-1] == os.sep:
+                arg = arg[:-1]
+
             if os.path.isfile(arg):
                 # Full pathname contains info on exp_mod, combo and id...
 
@@ -217,6 +221,9 @@ def parse_avals(args):
         else:
             raise ValueError('Must specify full combo (except for idom / jdom)')
 
+        combo = parse_combo(exp_mod, scombo)
+        rets.append( (AvalTuple(exp_mod, combo, [None]), None) )
+
     return rets
 
 # -------------------------------------------------------
@@ -224,11 +231,3 @@ def combo_to_scene_dir(exp_mod, combo, type='x'):
     """Returns the full pathname for a RAMMS scene, based on its experiment and combo"""
     return os.path.join(config.roots['PRJ'], exp_mod.name,
         exp_mod.combo_to_scene_subdir(combo, type=type))
-
-def main():
-    import sys
-    for aval in parse_avals(sys.argv[1:]):
-        print(aval)
-main()
- 
-
