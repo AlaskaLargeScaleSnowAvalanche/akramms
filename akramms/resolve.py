@@ -137,7 +137,7 @@ def resolve_chunk(akdf, scenetypes={'x'}, realized=True):
         if not os.path.exists(releasedir):
             return
 
-        print(f'process_releasedir({releasedir}')
+#        print(f'process_releasedir({releasedir}')
         for name in os.listdir(releasedir):
             match = file_info.chunk_release_fileRE.match(name)
 #            print('    match2 ', name, match)

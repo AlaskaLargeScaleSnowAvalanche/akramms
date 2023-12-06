@@ -557,6 +557,8 @@ def setlink_or_copy(ifile, ofile):
     else:
         ioutil.setlink(ifile, ofile)
 
+
+# TODO: Write this atomically!!!
 def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
     """Writes a full RAMMS run (chunk), ready for RAMMS Stage 1.
     scene_args:
@@ -579,13 +581,9 @@ def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
     """
 
     ci = chunk_info
-    #chunk_name = f'{ci.scene_name}{ci.chunkid:05d}{ci.return_period}{ci.pra_size}{ci.For}_{ci.resolution}'
-#    slope_name = f'{ci.scene_name}{ci.chunkid:05d}{ci.For}_{ci.resolution}m'    # Used for DEM / Forest files
-#    chunk_name = f'{slope_name}_{ci.return_period}{ci.pra_size}'
-#    chunk_dir = scene_args['scene_dir'] / 'CHUNKS' / ci.chunk_name
-#    slope_dir = chunk_dir / 'RESULTS' / slope_name
-#    avalanche_dir = slope_dir / f'{ci.return_period}{ci.pra_size}'
-    chunk_dir = scene_args['scene_dir'] / 'CHUNKS' / ci.chunk_name
+
+    chunk_dir = scene_args['scene_dir'] / 'CHUNKS' / f'{ci.chunk_name}.tmp'    # Temporary while we write it
+    chunk_dir_final = scene_args['scene_dir'] / 'CHUNKS' / ci.chunk_name    # Final atomically written location
     slope_dir = chunk_dir / 'RESULTS' / ci.slope_name
     avalanche_dir = slope_dir / ci.avalanche_name
 
@@ -609,7 +607,8 @@ def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
     _dfx = dfc.reset_index()[['Id', 'dom']]
     shputil.write_df(_dfx, 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
 
-    return chunk_dir
+    os.rename(chunk_dir, chunk_dir_final)
+    return chunk_dir_final
 # Commented out because these files differ from the (by definition
 # correct) versions created by RAMMS.
 #    # Write the .relp and .domp files for each avalanche

@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 from akramms import file_info,chunk,level,joblib,config
-from akramms import r_ramms1,parse,params
+from akramms import r_ramms1,parse,params,resolve
 from uafgi.util import shapelyutil
 
 
@@ -16,41 +16,46 @@ def resubmit(akdf0, check_running=True, update=True, dry_run=False):
     check_running:
         Check if any IDs are running (or should be running); and
         if so, aborts.
+    Returns: akdf
+        Dataframe of resubmitted avalanches
     """
 
-    # ------------------ Work at the cdombo level
-    # 1. Make sure combos aren't in-progres.
-    akdf0 = joblib.add_combo_status(akdf0, realized=True, update=update)
-    if check_running:
-        running_df = akdf0[akdf0.combo_status <= joblib.JobStatus.INPROCESS]
-        if len(running_df) > 0:
-            print(running_df[['combo', 'combo_status']])
-            raise ValueError('Some combos are still running')
+    # ------------------ Work at the combo level
+    akdf0 = joblib.add_combo_status(akdf0, realized=False, update=update)
 
-    # 2 Dismiss combos that are already complete.
-    mask = akdf0.combo_status >= joblib.JobStatus.FINISHED
-    akdf0 = akdf0[~mask]
+    # Only look at combos in the OVERRUN state, ignore all others
+    mask = (akdf0.combo_status == joblib.JobStatus.OVERRUN)
+    ignores = akdf0[~mask][['combo', 'combo_status']]
+    if len(ignores) > 0:
+        print('Not resubmitting combos because of status:')
+        for tup in ignores.itertuples():
+            scombo = '-'.join(str(x) for x in tup.combo)
+            sstatus = joblib.JobStatus._member_names_[tup.combo_status]
+            print(f'    {scombo} : {sstatus}')
+    akdf0 = akdf0[mask]
+
+    if len(akdf0) == 0:
+        print('No combos eligible to resubmit')
+        return
+
+    print('Combos to resubmit')
+    print(akdf0)
+    return
 
 
-
+    # ----------------- Move to id level
+    akdf0 = resolve.resolve_chunk(akdf0, scenetypes={'x'}, realized=True)
+    akdf0 = resolve.resolve_id(akdf0, realized=True)
     akdf0 = joblib.add_id_status(akdf0)
-
-    if check_running:
-        akdf0['running'] = akdf0.id_status.isin({joblib.JobStatus.TODO, joblib.JobStatus.INPROCESS})
-
-
-
     akdf0 = akdf0[akdf0.id_status == joblib.JobStatus.OVERRUN]
+
+    if len(akdf0) == 0:
+        print('No IDs need to be resubmitted')
+        return akdf0
+
     print('Resubmitting these avalanches...')
     joblib.print_status(akdf0, 'id')
-
-#    print('akdf0a ', akdf0.columns)
-#    akdf0['overrun'] = akdf0['avalfile'].map(joblib.is_overrun)
-#    akdf0 = akdf0.loc[ akdf0['overrun'] ]
-#    print('akdf0b ', akdf0.columns)
-    if len(akdf0) == 0:
-        print('Nothing to process')
-        return
+    print('------------------------------------------------------')
 
     # Add the release and domain shapefile info
     dfs = list()
@@ -92,22 +97,18 @@ def resubmit(akdf0, check_running=True, update=True, dry_run=False):
             chunk_dir = scene_args['scene_dir'] / 'CHUNKS' / jb.chunk_name
             if not not os.path.exists(chunk_dir):    # Sanity / Safety Check
                 raise ValueError(f'Path should not exist but does: {chunk_dir}')
-            chunk.write_chunk(scene_args, jb, akdf2, {})
+            if dry_run:
+                print(f'Except for --dry-run, I would be writing chunk to directory {chunk_dir}')
+            else:
+                chunk.write_chunk(scene_args, jb, akdf2, {})
 
             # Run RAMMS Stage 1 (and auto-submit)
             releasefile = chunk_dir / 'RELEASE' / f'{jb.slope_name}_{jb.avalanche_name}_rel.shp'
             rule = r_ramms1.rule(releasefile, scene_args['dem_file'], [releasefile], dry_run=dry_run, submit=True)
-            rule()
-
-            #parseds = [parse.parse_chunk_releasefile(release_file)]
-            #akdf = resolve.resolve_to(parseds, 'id', stage='in', realized=True)
-            #joblib.submit_jobs(akdf)
-
-
-
-
-            # DEBUGGING: Just do one!
-            break
+            if dry_run:
+                print(f'Except for --dry-run, I would be running RAMMS on the releasefile {releasefile}')
+            else:
+                rule()
 
 
 def drop_duplicates(akdf):

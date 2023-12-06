@@ -543,9 +543,12 @@ def xoverrun(args):
     # Find the overruns
     parseds = akramms.parse.parse_args(args.spec)
 #    akdf0 = resolve.resolve_to(parseds, 'id', realized=True, stage='out', scenetypes={'x'})
-    akdf0 = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'x'})
+    akdf0 = resolve.resolve_to(parseds, 'combo', realized=False, scenetypes={'x', 'arc'})
 
-    overrun.resubmit(akdf0, dry_run=args.dry_run)
+    # Process overruns one combo at a time for lower latency on large experiments
+    for ix in range(len(akdf0)):
+        akdf1 = akdf0.iloc[[ix],:]    # akdf1 is just one row of akdf0
+        overrun.resubmit(akdf1, dry_run=args.dry_run)
 # ------------------------------------------------------------------
 @subcommand([
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),

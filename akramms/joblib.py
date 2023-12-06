@@ -190,9 +190,9 @@ def add_id_status(akdf0):
 
     statuses = list()
 
-    print('xxxxxxxxxxx ')
-    print(akdf0)
-    print(akdf0.columns)
+#    print('xxxxxxxxxxx ')
+#    print(akdf0)
+#    print(akdf0.columns)
     for exp,akdf1 in akdf0.groupby('exp'):
         expmod = parse.load_expmod(exp)
 
@@ -290,9 +290,9 @@ def print_job_statuses(akdf0):
             jb = file_info.parse_chunk_release_file(releasefile)
             print(f"----- {jb.avalanche_dir}")
 
-            for jobstatus,akdf3 in akdf2.groupby('id_status'):
-                if showall or (jobstatus in _include_statuses):
-                    print('{}: {}'.format(repr(JobStatus(jobstatus)), sorted(akdf3.id.tolist())))
+            for id_status,akdf3 in akdf2.groupby('id_status'):
+                if showall or (id_status in _include_statuses):
+                    print('{}: {}'.format(repr(JobStatus(id_status)), sorted(akdf3.id.tolist())))
 
 
 
@@ -341,7 +341,7 @@ def submit_jobs(akdf):
     akdf = add_id_status(akdf)
 
     # Only submit jobs that are ready to go and not in process or completed or something.
-    akdf = akdf[akdf.jobstatus == JobStatus.TODO]
+    akdf = akdf[akdf.id_status == JobStatus.TODO]
 
     print('==================== Submitting:')
     print(akdf[['combo', 'chunkid', 'id']])

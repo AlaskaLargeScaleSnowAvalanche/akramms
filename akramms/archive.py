@@ -5,7 +5,7 @@ import numpy as np
 import netCDF4
 import pyproj
 from uafgi.util import gdalutil,shputil,ncutil
-from akramms import config,parse,file_info,resolve
+from akramms import config,parse,file_info,resolve,overrun
 
 # Convert Avalanche outputs to NetCDF
 
@@ -364,7 +364,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
         rdf = shputil.read_df(releasefile, read_shapes=False)
         rdf = rdf.set_index('Id')
 
-        for tup in akdf1.reset_index().itertuples(index=False):
+        for tup in akdf1.reset_index(drop=True).itertuples(index=False):
 
             inout = file_info.inout_name(jb, tup.chunkid, tup.id)
             out_zip = jb.avalanche_dir / f'{inout}.out.zip'
@@ -496,12 +496,12 @@ def archive_combos(akdf_combo, debug=False, dry_run=False, archive_overrun=False
         Resolved to combo level
     """
     akdf = resolve.resolve_chunk(akdf_combo, scenetypes='x')
-    akdf = resolve.resolve_id(realized=True, stage='out', include_overruns=False)
+    akdf = resolve.resolve_id(akdf, realized=True, stage='out', include_overruns=False)
     akdf = overrun.drop_duplicates(akdf)    # Remove overruns that were re-done
 
     archive_ids(akdf, debug=debug, dry_run=dry_run)
 
-    for tup in akdf_combo.reset_index().itertuples():
+    for tup in akdf_combo.reset_index(drop=True).itertuples(index=False):
         arcdir = expmod.combo_to_scenedir(scenetype='arc')
         with open(arcdir / 'archived.txt', 'w') as out:
             out.write('Combo archived\n')
