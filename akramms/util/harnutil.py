@@ -159,9 +159,9 @@ def run_remote(inputs, cmd, tdir, write_inputs=False):
     return outputs
 
 class QueueRunner:
-    def __init__(self, **kwargs):
+    def __init__(self, qname, **kwargs):
         self.redis = redis.Redis()
-        self.queue = rq.Queue(connection=self.redis, **kwargs)
+        self.queue = rq.Queue(qname, connection=self.redis, **kwargs)
 
     # Timeout includes time waiting in the queue; so it needs to be as long as the longest job we MIGHT run.
     def run(self, func, *args, timeout=3*3600, at_front=False, **kwargs):
@@ -201,10 +201,14 @@ class QueueRunner:
 
             raise
 
-queue_runner = QueueRunner()
+# One queue per licensed piece of software
+queues = {qname: QueueRunner(qname) for qname in ('arcgis', 'ecognition', 'idl')}
 
-def run_remote_queued(*args, **kwargs):
-    return queue_runner.run(run_remote, *args, **kwargs)
+def run_remote_queued(qname, *args, **kwargs):
+    return queues[qname].run(run_remote, *args, **kwargs)
+
+def run_local_queued(qname, fn, *args, **kwargs):
+    return queues[qname].run(fn, *args, **kwargs)
 
 def print_outputs(outputs):
     """Helper function"""
