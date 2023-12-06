@@ -353,6 +353,7 @@ def set_new_chunkinfo(df, scene_args, realized=False):
     scene_name = scene_args['name']
 
     # Pull out return_period and forest (which we will call "rpfor")
+    # TODO: This is experiment-specific!
     df['rpfor'] = df.combo.map(lambda x: (x.return_period, x.forest))
 
     dfs = list()
@@ -376,7 +377,8 @@ def get_max_chunkids(scenedir):
 def add_chunkid(rdf, scenedir, append=False):
     """Divides avalanches into chunks.
     rdf:
-        Must have chunkinfo column.
+        
+        Must have pra_size column.
     append:
         If True, add chunk numbers to the latest.
         Otherwise, start over. """
@@ -386,7 +388,7 @@ def add_chunkid(rdf, scenedir, append=False):
 
     # Determine max. chunkid for each pra_size  max_chunkid[pra_size]...
     if append:
-        max_chunkds = get_max_chunkids(scenedir)
+        max_chunkids = get_max_chunkids(scenedir)
     else:
         max_chunkids = dict()
 

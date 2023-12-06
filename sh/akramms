@@ -387,15 +387,40 @@ def overrun(args):
 
     # Find the overruns
     parseds = akramms.parse.parse_args(args.spec)
-    akdf = resolve.resolve_to(parseds, 'id', realized=True, stage='out', include_overruns=True)
-    akdf['overrun'] = akdf['avalfile'].map(joblib.is_overrun)
-    akdf = akdf[ akdf['overrun'] ]
+    akdf0 = resolve.resolve_to(parseds, 'id', realized=True, stage='out')
+    akdf0['overrun'] = akdf0['avalfile'].map(joblib.is_overrun)
+    akdf0 = akdf0[ akdf0['overrun'] ]
 
-    print(akdf)
-#    print('akdf1 ', akdf)
+    # Add the release and domain shapefile info
+    dfs = list()
+    for releasefile,akdf1 in akdf0.groupby('releasefile'):
+        jb = file_info.parse_chunk_release_file(releasefile)._replace(chunkid=-1)
+        rdf = chunk.read_reldom(releasefile)
+        akdf1 = akdf1.set_index('id').merge(rdf, how='left', left_index=True, right_index=True)
+        akdf1['chunkinfo'] = jb    # Everything is set correctly here except the new chunkid
+        dfs.append(akdf1)
+    akdf0 = pd.concat(dfs)
 
-#    print(akdf[['combo', 'chunkid', 'id', 'jobstatus']])
-#    joblib.print_job_statuses(akdf)
+    # Group into new chunks
+    for (exp, combo),akdf1 in akdf0.groupby(['exp', 'combo']):
+        expmod = akramms.parse.load_expmod(exp)
+        scenedir = expmod.combo_to_scenedir(combo)
+        max_chunkids = chunk.get_max_chunkids(scenedir)
+
+        scene_args = params.load(scenedir)
+
+        for pra_size,akdf2 in akdf1.groupby('pra_size'):
+            # Verify this is all within one chunk
+            chunkinfos = akdf2['chunkinfo'].tolist()
+            assert all(chunkinfos[0] == chunkinfos[1:])
+
+            chunkid = max_chunkids.get(pra_size,-1) + 1
+            jb = chunkinfos[0]._replace(chunkid=chunkid)
+
+            print('Writing chunk: {} {}'.format(jb, akdf2.id.tolist()))
+            print(akdf2[['combo', 'id']])
+
+            # chunk.write_chunk(scene_args, jb, akdf2, {})
 # ------------------------------------------------------------------
 @subcommand([
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),

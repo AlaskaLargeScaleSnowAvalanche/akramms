@@ -141,7 +141,7 @@ def resolve_releasefile(akdf, scenetypes={'x'}, realized=True):
             match = file_info.chunk_release_fileRE.match(name)
 #            print('    match2 ', name, match)
             if match is not None:
-                pra_size = match.group(2)
+                pra_size = match.group(1)
                 orows.append(itertools.chain(tup, ['x', pra_size, chunkid, releasedir / name]))
     # -----------------------------
 
@@ -207,8 +207,8 @@ def _realized_ids(scenetype, releasefile, stage, include_overruns=False):
 
     # include_overruns only makes sense for scenetype='arc'
     # To tell overruns with 'x', we have to look inside the files.
-    if scenetype == 'x':
-        assert not include_overruns
+    if scenetype == 'x' and include_overruns:
+        raise ValueError("include_overruns only makes sense for scenetype='arc'.  With scenetype='x', it is not possible to determine overruns from the filename.  To fix, set include_overruns=False")
 
 #    print('realized_ids ', scenetype, stage, releasefile)
 
