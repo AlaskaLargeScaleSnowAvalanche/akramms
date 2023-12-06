@@ -58,6 +58,7 @@ max_ramms_pras = 100
 #max_ramms_pras = 20
 #max_ramms_pras = 500
 
+setup_ncpu = 20
 ramms_ncpu = 8    # Native RAMMS Stage 2 (and also Stage 1 xy-coords)
 #ramms_ncpu_preprocess = 8    # This matters for RAMMS Stage 1 (and maybe Stage 3)
 ramms_ncpu_preprocess = 1    # 1 is fastest, due to IDL's overhead in parallelizing and the small granularity of RAMMS Stage 1

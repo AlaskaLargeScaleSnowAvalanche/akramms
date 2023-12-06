@@ -62,7 +62,7 @@ def r_vrt(type):
 
     return make.Rule(action, [], [ofname])
 # ------------------------------------------------------------------
-def extract(type, poly, ofname):
+def extract(type, poly, ofname, resolution=None, sanity_check=True):
     """
     poly:
         A rectangle
@@ -79,7 +79,10 @@ def extract(type, poly, ofname):
     # https://gis.stackexchange.com/questions/1104/should-gdal-be-set-to-produce-geotiff-files-with-compression-which-algorithm-sh
     cmd += ['-co', 'COMPRESS=DEFLATE']
     cmd += ['-co', 'TFW=YES']   # https://gis.stackexchange.com/questions/271995/how-to-get-gdal-translate-to-create-world-file-for-geotiff
-    cmd += ['-eco']    # Error when completely outside (SANITY CHECK)
+#    if sanity_check:
+#        cmd += ['-eco']    # Error when completely outside (SANITY CHECK)
+    if resolution is not None:
+        cmd += ['-tr', str(resolution), str(resolution)]
 
     cmd.append('-projwin')
     cmd += [str(n) for n in (x0,y1,x1,y0)]

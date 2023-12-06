@@ -3,7 +3,7 @@
 
 from akramms import config,params
 import argparse,itertools,os,subprocess,sys,io,codecs,re
-from akramms import r_ramms,experiment
+from akramms import r_ramms,experiment,stages
 from akramms.util import rammsutil
 from uafgi.util import ioutil,make
 import importlib
@@ -263,7 +263,7 @@ def get_exp_dir(exp_mod):
     argument('experiment-module',
         help='Python module describing the experiment'),
 ])
-def init(args):
+def step1(args):
     exp_mod = load_exp_mod(getattr(args, 'experiment-module'))
     exp_dir = get_exp_dir(exp_mod)
 
@@ -282,26 +282,53 @@ def _parse_experiment_spec(spec):
 #    argument('-c', '--combos', default='full',
 #        help='Name of combo-generating function'),
 ])
-def setup(args):
+def step2(args):
     sexp_mod, sexp_fn = getattr(args, 'experiment-spec')
 
     # Load the module (initial 'akramms.' is optional)
     exp_mod = load_exp_mod(sexp_mod)
     exp_dir = get_exp_dir(exp_mod)
 
-    # Load combo-generating function
-    combos_fn = getattr(exp_mod, sexp_fn)
+    # Load functions from module
+    combos_fn = getattr(exp_mod, sexp_fn)     # List the combos
+    add_experiment_fn = getattr(exp_mod, 'add_experiment')    # Select out a DEM tile
+    #add_combo_fn = getattr(exp_mod, 'add_combo')    # Comobs to rules
 
-    # Load combo-to-rule function
-    add_combo_fn = getattr(exp_mod, 'add_combo')
+    # Generate the makefile
+    makefile = make.Makefile()
+
+    # Add the experiment and combos
+    add_experiment_fn(makefile, combos_fn())
+
+    makefile.generate(os.path.join(exp_dir, 'init_mk'), run=True, ncpu=config.setup_ncpu)
+
+
+@subcommand([
+    argument('experiment-spec', type=_parse_experiment_spec,
+        help='Python module and combo function describing the experiment, eg: e_alaska.juneau'),
+])
+def step3(args):
+    sexp_mod, sexp_fn = getattr(args, 'experiment-spec')
+
+    # Load the module (initial 'akramms.' is optional)
+    exp_mod = load_exp_mod(sexp_mod)
+    exp_dir = get_exp_dir(exp_mod)
+
+    # Load functions from module
+    combos_fn = getattr(exp_mod, sexp_fn)     # List the combos
 
     # Generate the makefile
     makefile = make.Makefile()
     for combo in combos_fn():
-        print(f'----- Adding Combo: {combo}')
-        add_combo_fn(makefile, combo)
+        scene_dir = os.path.join(exp_mod.dir, exp_mod.combo_to_scene_subdir(combo))
+        print(f'----- Adding Scene: {scene_dir}')
+        stages.add_stage0_rules(makefile, scene_dir)
+
 
     makefile.generate(os.path.join(exp_dir, 'init_mk'), run=True, ncpu=1)
+
+
+
 
 def main():
     args = cli.parse_args()

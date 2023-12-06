@@ -52,10 +52,21 @@ class DomainGrid(gisutil.RasterInfo):    # (gridD)
         y0 = yy[0]
         y1 = yy[2]
 
-        xsgn = np.sign(x1-x0)
-        ysgn = np.sign(y1-y0)
-        dx = xsgn * domain_size[0]
-        dy = ysgn * domain_size[1]
+        # The domain grid should have the same north-up / north-down
+        # as the original grid it's on top of.
+        assert x0 < x1
+        assert y0 < y1
+
+        dx = domain_size[0] #* xsgn
+        dy = domain_size[1] #* ysgn
+
+        # Round region to integral domain size
+        x0 = dx * math.floor(x0/dy)
+        y0 = dy * math.floor(y0/dy)
+
+        #xsgn = np.sign(x1-x0)
+        #ysgn = np.sign(y1-y0)
+
         nx = math.ceil((x1-x0)/dx)
         ny = math.ceil((y1-y0)/dy)
 
@@ -109,9 +120,13 @@ def r_active_domains(exp_mod):
         {exp_name}_domains.shp:
             The domains from griD that touch the experiment_region_shp
             Includes columns ix,iy giving indices of each domain.
+        {exp_name}_domains.zip:
+            Zipped shapefile
         {exp_name}_domains_margin.shp:
             Same as {exp_name}_domains.shp, but includes margin.
             This is the domain that will be used for eCognition (and subsetted for RAMMS).
+        {exp_name}_domains_margin.zip:
+            Zipped shapefile
     """
 
     gridD = exp_mod.domains
@@ -120,6 +135,10 @@ def r_active_domains(exp_mod):
     # Load the experiment_region as a Shapely Multipolygon
     domains_shp = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains.shp')
     domains_margin_shp = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains_margin.shp')
+
+    domains_zip = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains.zip')
+    domains_margin_zip = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains_margin.zip')
+
     def action(tdir):
         # Load the experiment region and convert to Shapely Polygon
         driver = ogr.GetDriverByName('ESRI Shapefile')
@@ -160,6 +179,7 @@ def r_active_domains(exp_mod):
             print(f'Computing domains iy={iy}')
             for ix in range(0, gridD.nx):
                 domain = gridD.poly(ix, iy)
+#                print('domain ', domain)
                 if domain.intersects(experiment_region):
                     domain_margin = gridD.poly(ix, iy, margin=True)
                     rows.append((ix,iy,domain,domain_margin))
@@ -170,14 +190,15 @@ def r_active_domains(exp_mod):
 #        df = df.astype({'ix':'int', 'iy':'int'})
 
         os.makedirs(exp_mod.dir, exist_ok=True)
-        shputil.write_df(df[['ix', 'iy', 'domain']], 'domain', 'MultiPolygon', domains_shp, wkt=exp_mod.wkt)
-        shputil.write_df(df[['ix', 'iy', 'domain_margin']], 'domain_margin', 'MultiPolygon', domains_margin_shp, wkt=exp_mod.wkt)
+        shputil.write_df(df[['ix', 'iy', 'domain']], 'domain', 'MultiPolygon', domains_shp, wkt=exp_mod.wkt, zip_format=True)
+        shputil.write_df(df[['ix', 'iy', 'domain_margin']], 'domain_margin', 'MultiPolygon', domains_margin_shp, wkt=exp_mod.wkt, zip_format=True)
 
-    return make.Rule(action, [exp_mod.experiment_region_zip], [domains_shp, domains_margin_shp])
+    return make.Rule(action, [exp_mod.experiment_region_zip],
+        [domains_shp, domains_margin_shp, domains_zip, domains_margin_zip])
 
 # -----------------------------------------------------------------------
 @functools.lru_cache()
-def r_ifsar(exp_mod, idom, jdom):
+def r_ifsar(exp_mod, idom, jdom, resolution=None, sanity_check=True):
     """Select out a portion of the overall IFSAR digital terrain model dataset, for one domain.
 
     exp_mod:
@@ -197,7 +218,7 @@ def r_ifsar(exp_mod, idom, jdom):
 
     def action(tdir):
         poly = exp_mod.domains.poly(idom, jdom, margin=True)
-        return d_ifsar.extract(type, poly, ofname)
+        return d_ifsar.extract(type, poly, ofname, resolution=resolution, sanity_check=True)
     return make.Rule(action, [ifsar_vrt], [ofname])
 # -----------------------------------------------------------------------
 @functools.lru_cache()
@@ -280,7 +301,7 @@ def r_snow(exp_mod, snow_dataset, downscale_algo, year0, year1, idom, jdom):
 
     domains_margin_shp = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains_margin.shp')
     dem_tif = r_ifsar(exp_mod, idom, jdom).outputs[0]
-    inputs = [domains_margin_shp, geo_nc, sx3_file]
+    inputs = [dem_tif, domains_margin_shp, geo_nc, sx3_file]
 
     if downscale_algo == 'lapse':
         dfcA_tif = r_dfcA(exp_mod).outputs[0]

@@ -12,6 +12,7 @@ dir = os.path.join(config.roots['PRJ'], name)
 
 # Map coordinate system we use
 wkt = 'PROJCS["NAD83 / Alaska Albers",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["Degree",0.017453292519943295]],PROJECTION["Albers"],PARAMETER["standard_parallel_1",55],PARAMETER["standard_parallel_2",65],PARAMETER["latitude_of_origin",50],PARAMETER["central_meridian",-154],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["Meter",1]]'
+resolution = 10    # 10m resolution for our DEM
 
 # Define the domains within all of Alaska, each with an (idom, jdom) coordinate.
 domain_size = (30000., 30000.)   # 25km^2
@@ -64,6 +65,10 @@ def combo_to_scene_subdir(combo):
     return os.path.join(trial_name, scene_name)
 
 # -------------------------------------------------------------
+def add_dem(makefile, idom, jdom, sanity_check=True):
+    exp_mod = sys.modules[__name__]    # This module
+    return makefile.add(experiment.r_ifsar(exp_mod, idom, jdom, resolution=resolution, sanity_check=sanity_check)).outputs[0]
+
 def add_combo(makefile, combo):
     """Adds rules needed to set up (and also run) a trial."""
 
@@ -74,7 +79,7 @@ def add_combo(makefile, combo):
 #    makefile.add(experiment.r_active_domains(exp_mod))
 
     # DTM and Forest (landcover==42)
-    dem_tif = makefile.add(experiment.r_ifsar(exp_mod, combo.idom, combo.jdom)).outputs[0]
+    dem_tif = add_dem(makefile, combo.idom, combo.jdom)  #makefile.add(experiment.r_ifsar(exp_mod, combo.idom, combo.jdom, resolution=resolution)).outputs[0]
     dem_filled_file,sinks_file,neighbor1_file = makefile.add(r_domain_builder.neighbor1_rule(
         dem_tif, os.path.split(dem_tif)[0], fill_sinks=True)).outputs
 
@@ -96,6 +101,7 @@ def add_combo(makefile, combo):
     scene_dir = os.path.join(exp_mod.dir, combo_to_scene_subdir(combo))
 
     kwargs = dict(
+        resolution=resolution,
         return_periods=(combo.return_period,),
         forests=((1 if combo.forest=='For' else 0),),
         dem_file=dem_tif,
@@ -112,7 +118,16 @@ def add_combo(makefile, combo):
         scene_dir, defaults='alaska', **kwargs)
     makefile.add(rule)
 
-    stages.add_stage0_rules(makefile, scene_dir)
+#    stages.add_stage0_rules(makefile, scene_dir)
+def add_experiment(makefile, combos):
+    add_dem(makefile, 0, 0, sanity_check=False)    # Get the origin scene
+#    add_dem(makefile, 1, 0, sanity_check=False)    # Get the origin scene
+#    add_dem(makefile, 55, 0, sanity_check=False)    # Get the origin scene
+#    add_dem(makefile, 113, 0, sanity_check=False)    # Get the origin scene
+    for combo in combos:
+        print(f'----- Adding Combo: {combo}')
+        add_combo(makefile, combo)
+
 
 # -------------------------------------------------------------
 # Different subsets of combos to try when running the experiment
@@ -138,3 +153,11 @@ def full():
 def juneau():
     # Just one combo for now
     yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 26)    # A Juneau-close box
+#    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 114, 26)    # Another box
+#    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 27)    # Another box
+
+#    j=0
+#    for i in range(0, domains.nx):
+#        print(domains.poly(i, j, margin=True))
+#    print(domains.dx, domains.dy)
+
