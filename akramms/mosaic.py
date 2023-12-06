@@ -5,6 +5,7 @@ import zipfile,netCDF4
 from uafgi.util import gdalutil
 from akramms import experiment
 
+# python -m cProfile -o prof -s cumtime `which akramms` mosaic juneau1-1981-1990.qy 
 
 _mosaic_metadata = {
     'dem': (gdal.GDT_Float32, {
@@ -83,13 +84,7 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
     avalanche_count = vals['avalanche_count']
     domain_count = vals['domain_count']
 
-#    print('gridD ', exp_mod.gridD)
-#    print('gridM ', gridM)
-
     for aval_i,fname in enumerate(avals):
-#        if aval_i > 3:
-#            break    # DEBUGGING
-
         with netCDF4.Dataset(fname) as nc:
 
             print('Processing {}: ({} of {}): {} gridcells'.format(
@@ -101,31 +96,30 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
             # Geotransform of this avalanche's local grid
             # TODO: Store Geotransform as machine-precision doubles in the file
             gridA_gt = np.array([float(x) for x in nc.variables['grid_mapping'].GeoTransform.split(' ')])
-#            print('gridA_gt ', gridA_gt)
 
             deltai = int(-(gridM.x0 - gridA_gt[0]) / gridM.dx + 0.5)
             deltaj = int(-(gridM.y0 - gridA_gt[3]) / gridM.dy + 0.5)
 
-#            print('deltaxxxxx ', gridM.x0, gridA_gt[0], gridM.dx)
-#            print('deltayyyyy ', gridM.y0, gridA_gt[3], gridM.dy)
-#            print('delta i/j ', deltai, deltaj)
-
             # Load (i,j) of each avalanche and convert to local mosaic-box coordinates
             iis = np.cumsum(nc.variables['i_diff'][:]) + deltai
             jjs = np.cumsum(nc.variables['j_diff'][:]) + deltaj
-#            print(jjs), gridM.ny
-#            print(iis), gridM.nx
             good_ixs = np.where(np.logical_and.reduce((iis >= 0, iis < gridM.nx, jjs >= 0, jjs < gridM.ny)))
-#            print('good_ixs ', good_ixs, gridM.nx, gridM.ny)
 
+
+            print('   AA1 ', good_ixs[:5])
             # Clip out-of-query-range gridcells
             _iis = iis[good_ixs]
             _jjs = jjs[good_ixs]
 
             # Load original variables
-            _max_vel = nc.variables['max_vel'][good_ixs]
+            print('   AA2')
+            _max_vel = nc.variables['max_vel']
+            print('   AA2.1')
+            _max_vel = _max_vel[good_ixs]
+            print('   AA2.2')
             _max_height = nc.variables['max_height'][good_ixs]
             _depo = nc.variables['depo'][good_ixs]
+            print('   AA3')
 
             domain_count[_jjs,_iis] += 1    # 1 if any domain touches this
 
@@ -136,16 +130,14 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
             _max_vel = _max_vel[nz_ixs]
             _max_height = _max_height[nz_ixs]
             _depo = _depo[nz_ixs]
+            print('   AA4')
 
             # Mosaic into final variables
-#            print('jjs ', _jjs)
-#            print('iis ', _iis)
-#            print('deposition ', deposition[_jjs,_iis])
-#            print('_depo ', _depo)
             deposition[_jjs,_iis] = np.maximum(deposition[_jjs,_iis], _depo)
             max_velocity[_jjs,_iis] = np.maximum(max_velocity[_jjs,_iis], _max_vel)
             max_pressure[_jjs,_iis] = np.maximum(max_pressure[_jjs,_iis], rho * _max_vel*_max_vel)
             avalanche_count[_jjs,_iis] += 1    # 1 if it touches cell, otherwise 0
+            print('   AA5')
 
     # Write output GeoTIFF and Zip it up
     with zipfile.ZipFile(ofname_zip, mode='w', compression=zipfile.ZIP_STORED) as ozip:

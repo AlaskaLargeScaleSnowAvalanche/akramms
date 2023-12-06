@@ -1,16 +1,16 @@
-import shutil,os,re,zipfile,glob,datetime,time,subprocess
+import shutil,os,re,zipfile,glob,datetime,time,subprocess,sys
 import netCDF4
 from uafgi.util import shputil,ncutil
 from akramms import ncaval,r_ramms,config
 from akramms import avalparse
 from akramms.util import exputil
+import concurrent.futures
 import traceback
 
 #_out_zipRE = re.compile(r'^(.*)_(\d+)\.out\.zip$')
 # Status of each avalanche found on disk
 OK = 0                # Implies .out.zip
 NO_IN_ZIP = 1
-OVERRUN = 2
 NO_OUT_ZIP = 3
 UNKNOWN_ERROR = 4
 ARCHIVED = 5        # It's a .nc file
@@ -18,7 +18,6 @@ MAX_STATUS = 5
 
 error_msgs = {
     NO_IN_ZIP: 'ERROR: No .in.zip for Avalanche IDs: {ids}',
-    OVERRUN: 'ERROR: Domain overruns for Avalanche IDs: {ids}',
     NO_OUT_ZIP: 'ERROR: No .out.zip for Avalanche IDs {ids}',
     UNKNOWN_ERROR: 'Unknown error archiving: {ids}',
 }
@@ -38,11 +37,11 @@ def out_zip_status(out_zip):
     if not os.path.exists(in_zip):
         return NO_IN_ZIP
 
-    # Make sure the avalanche didn't overrun the domain.
-    with zipfile.ZipFile(basename+'.out.zip', 'r') as in_zip:
-        arcnames = [os.path.split(x)[1] for x in in_zip.namelist()]
-    if any(x.endswith('.out.overrun') for x in arcnames):
-        return OVERRUN
+#    # Make sure the avalanche didn't overrun the domain.
+#    with zipfile.ZipFile(basename+'.out.zip', 'r') as in_zip:
+#        arcnames = [os.path.split(x)[1] for x in in_zip.namelist()]
+#    if any(x.endswith('.out.overrun') for x in arcnames):
+#        return OVERRUN
 
     # Add as archivable ID
     return OK
@@ -61,7 +60,87 @@ def _git_commit(dir):
     return proc.stdout.readline().strip()    # We just want head -1
 
 # -----------------------------------------------------------------
-def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
+
+class ArchiveFiles:
+    def __init__(self, ithread, exp_mod, release_df, x_dir, status_attrs):
+        self.ithread = ithread
+        self.sexp_mod = exp_mod.name    # Make it picklable
+        self.release_df = release_df
+        self.x_dir = x_dir
+        self.status_attrs = status_attrs
+
+    def __call__(self, to_archive):
+        from akramms.util import exputil
+        ithread = self.ithread
+        exp_mod = exputil.load(self.sexp_mod)
+        release_df = self.release_df
+        x_dir = self.x_dir
+
+        archived_out_zips = list()
+        if ithread == 0:
+            print(f'Thread Archiving {len(to_archive)} avalanches')
+        for ix,(id,arc_fname,out_zip) in enumerate(to_archive):
+
+            if ithread == 0 and ix % 50 == 0:
+                print(f'\n{ix:5} ', end='')
+
+            # -------- Convert to NetCDF
+            # .out.zip file is OK, so let's regenerate
+            if ithread == 0:
+                print('.', end='')
+                sys.stdout.flush()
+
+            arc_dir = os.path.dirname(arc_fname)
+            os.makedirs(arc_dir, exist_ok=True)
+
+            # Write the full NetCDF file
+            tmp_fname = os.path.splitext(arc_fname)[0] + '-tmp.nc'    # Write atomically
+            try:
+                with netCDF4.Dataset(tmp_fname, 'w') as ncout:
+                    # Add info from the RELEASE file
+                    ncv = ncout.createVariable('pra_attributes', 'i')
+                    ncv.description = 'Attributes from the RELEASE shapefile used to set up this avalanche'
+                    row = release_df.loc[id]
+                    for aname,val in row.items():
+                        setattr(ncv, aname, val)
+
+                    # Add provenance info
+                    ncv = ncout.createVariable('status', 'i')
+                    for k,v in self.status_attrs.items():
+                        setattr(ncv, k, v)
+                    out_zip_mtime = os.path.getmtime(out_zip)
+                    ncv.avalanche_timestamp = datetime.datetime.fromtimestamp(out_zip_mtime).isoformat()
+                    ncaval.ramms_to_nc0(out_zip, ncout)
+
+                    # Add info from scene that created this avalanche
+                    with netCDF4.Dataset(os.path.join(x_dir, 'scene.nc')) as ncin:
+                        schema = ncutil.Schema(ncin)
+                        grp = ncout.createGroup('scene_nc')
+                        schema.create(grp)
+                        schema.copy(ncin, grp)
+
+                os.rename(tmp_fname, arc_fname)
+
+                #arc_fnames.append(arc_fname)
+                archived_out_zips.append(out_zip)
+            except ValueError as err:
+                if 'shape mismatch' in str(err):
+                    print(f'SKIPPING NetCDF: Shape mismatch between .in.zip and .out.zip files for: {out_zip}')
+                else:
+                    raise
+
+            # ----------------------------------------
+
+
+
+        if ithread == 0:
+            print('\nDone!')
+            sys.stdout.flush()
+        return archived_out_zips
+
+
+# -----------------------------------------------------------------
+def fetch(exp_mod, combo, ids):
     """Returns the names of archive files, based on a particular combo
     and list of IDs within that combo.  Archives the avalanches if needed.
 
@@ -71,11 +150,10 @@ def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
         Describes which RAMMS run within the experiment
     id:
         Which avalanche within the RAMMS run we wish to fetch
-    returns: arc_fnames, archived_out_zips
-        arc_fnames: [arc_fname, ...]
-            Names of files found
-        archived_out_zips: [xxx.out.zip, ...]
-            Original files that can be deleted now.
+    returns: [id, nc_fname, out_zip]
+        NetCDF files matching the query.
+        if out_zip is None:
+            The .out.zip file didn't exist  but NetCDF was already done.
     """
 
     # List all the output .out.zip files in an experiment
@@ -99,18 +177,18 @@ def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
 
 
     # Information from the RELEASE shpaefile
-    release_file,release_df = exputil.release_df(exp_mod, combo)
+    release_files,release_df = exputil.release_df(exp_mod, combo, type='x')
 
-    arc_fnames = list()
+    nc_fnames = list()
+    to_archive = list()
     archived_out_zips = list()
-    first = True
     for id in ids:
         # -------- Get name and modification time of original .out.zip file
         try:
             out_zip,ozip_sizecat = out_zips[id]
             # Make sure the out.zip file is complete / ready to archive
             status = out_zip_status(out_zip)
-            if status in ok_statuses:
+            if status == OK:
                 out_zip_mtime = os.path.getmtime(out_zip)
             else:
                 # Act like the .out.zip file does not exist
@@ -131,68 +209,56 @@ def fetch(exp_mod, combo, ids, ok_statuses={OK,OVERRUN}):
 
 
         # -------- Decide whether we need to regenerate
+#        print(f'{id}: {out_zip_mtime} -> {arc_mtime}')
         if arc_mtime > out_zip_mtime:
             # Arc file exists and is up-to-date, DO NOT regenerate
-            arc_fnames.append(arc_fname)
-            if id in out_zips:
-                # Add to our delete list...
-                archived_out_zips.append(out_zip)
-        elif out_zip_mtime > 0:
-            # .out.zip file is OK, so let's regenerate
-
+            nc_fnames.append((id,arc_fname, out_zip))
+        elif out_zip_mtime >= 0:
+            # out.zip exists but arc is not up-to-date, regenerate.
             arc_dir = exp_mod.combo_to_scene_subdir(combo, type='arc')
             arc_fname = os.path.join(
                 arc_dir,
                 f'aval-{ozip_sizecat}-{id}.nc')
+            to_archive.append((id, arc_fname, out_zip))
+            nc_fnames.append((id, arc_fname, out_zip))
 
-            if first:
-                os.makedirs(arc_dir, exist_ok=True)
-                first = False
-
-            # --------- Write the full NetCDF file
-            with netCDF4.Dataset(arc_fname, 'w') as ncout:
-                ncaval.ramms_to_nc0(out_zip, ncout)
-
-                # Add info from the RELEASE file
-                ncv = ncout.createVariable('release_shp', 'i')
-                ncv.description = 'Attributes from the RELEASE shapefile used to set up this avalanche'
-                row = release_df.loc[id]
-                for aname,val in row.items():
-                    setattr(ncv, aname, val)
-
-                # Add provenance info
-                ncv = ncout.createVariable('provenance', 'i')
-                ncv.exp_mod = exp_mod.name
-                ncv.created_by = os.getlogin()
-                ncv.release_timestamp = datetime.datetime.fromtimestamp(os.path.getmtime(release_file)).isoformat()
-                ncv.avalanche_timestamp = datetime.datetime.fromtimestamp(out_zip_mtime).isoformat()
-                ncv.archive_timestamp = datetime.datetime.now().isoformat()
-                ncv.akramms_commit = _git_commit(os.path.join(config.HARNESS, 'akramms'))
-                ncv.uafgi_commit = _git_commit(os.path.join(config.HARNESS, 'uafgi'))
-
-                # Add info from scene that created this avalanche
-                with netCDF4.Dataset(os.path.join(x_dir, 'scene.nc')) as ncin:
-                    schema = ncutil.Schema(ncin)
-                    grp = ncout.createGroup('scene_nc')
-                    schema.create(grp)
-                    schema.copy(ncin, grp)
-
-    
+    # -------------------------------
+    # -------------------------------
 
 
-            # ----------------------------------------
+    # Status attributes
+    status_attrs = dict(
+        exp_mod = exp_mod.name,
+        created_by = os.getlogin(),
+        # TODO: Determine which release file this is associated with and get appropriate timestamp
+        #release_timestamp = datetime.datetime.fromtimestamp(os.path.getmtime(release_file)).isoformat(),
+        archive_timestamp = datetime.datetime.now().isoformat(),
+        akramms_commit = _git_commit(os.path.join(config.HARNESS, 'akramms')),
+        uafgi_commit = _git_commit(os.path.join(config.HARNESS, 'uafgi')))
 
+    # Archive the files
+    nz = [x for x in to_archive if x[1] is not None]    # x[1] == arc_fname
+    ncpu = config.ncpu_compress
+    nzs = [nz[i::ncpu] for i in range(ncpu)]    # https://stackoverflow.com/questions/24483182/python-split-list-into-n-chunks
+    print(f'Archiving {len(nz)} avalanches with {ncpu}-way parallelism')
+#    with concurrent.futures.ProcessPoolExecutor(ncpu) as ex:
+    with concurrent.futures.ThreadPoolExecutor(1) as ex:
+        archive_files0 = ArchiveFiles(0, exp_mod, release_df, x_dir, status_attrs)
+        archive_files1 = ArchiveFiles(1, exp_mod, release_df, x_dir, status_attrs)
+        futures = [ex.submit(archive_files0, nzs[0])]
+        futures += [ex.submit(archive_files1, nz) for nz in nzs[1:]]
+        for future in futures:
+            archived_out_zips += future.result()
 
-            arc_fnames.append(arc_fname)
-            archived_out_zips.append(out_zip)
-        else:
-            # Neither file exists, that's an error.
-            arc_fnames.append(None)
-
-    return arc_fnames, archived_out_zips
+    # =======================================================
+    # Pare down nc_fnames
+    nc_fnames = [(id, nc_fname, out_zip) for id,nc_fname,out_zip in nc_fnames if os.path.exists(nc_fname)]
+    return \
+        [(id,nc_fname) for id,nc_fname,_ in nc_fnames], \
+        [out_zip for _,_,out_zip in nc_fnames if out_zip is not None]
 
 # -----------------------------------------------------------------
-def archive_combo(exp_mod, combo, ids=None, ok_statuses={OK,OVERRUN}):
+def archive_combo(exp_mod, combo, ids=None):
     """Archives all IDs in a combo.
     Returns: {id: arc_fname}
     """
@@ -231,22 +297,3 @@ def archive_combo(exp_mod, combo, ids=None, ok_statuses={OK,OVERRUN}):
                 except FileNotFoundError:
                     pass
 
-#    # Print the errors
-#    for status,ids in errors_by_status.items():
-#        if len(ids) > 0:
-#            print(error_msgs[status].format(ids=ids))
-
-
-#def main():
-#    scene_dir = '/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/x-113-045'
-#    archive_dir = '/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/arc-113-045'
-#    archive_scene(scene_dir, archive_dir)
-
-
-def main():
-    from akramms.experiment import ak
-    
-    combo = ak.Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 45)
-    fetch(ak, combo, [2058])
-
-#main()

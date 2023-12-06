@@ -262,7 +262,10 @@ def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,
 
             # Only keep PRAs that are >50% in the interior part of the domain (not margin)
             if 'domain' in scene_args:
-                _xy = np.array(scene_args['domain'], dtype='d')
+                domain = scene_args['domain']    # list
+                npoints = len(domain) // 2
+
+                _xy = np.array(domain, dtype='d').reshape( (npoints, 2) )
                 x0,y0 = _xy[0,:]
                 x1,y1 = _xy[2,:]
                 xmin = min(x0,x1)

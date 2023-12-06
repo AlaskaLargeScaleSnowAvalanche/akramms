@@ -1,7 +1,7 @@
 import os,collections,re,itertools,functools
 import netCDF4
 from uafgi.util import shputil
-from akramms import archive,avalparse
+from akramms import archive,avalparse,avalfilter
 from akramms.util import exputil
 
 # -----------------------------------------------------------------
@@ -128,7 +128,7 @@ def _normalize_aval_spec(aspec0):
                 margin=False).extent(order='xyxy')
 
         # Determine IDs (depends on whether user supplied)
-        return [ avalparse.AvalSpec(aspec0.exp_mod, aspec0.combo, aspec0.ids, [extent]) ]
+        return [ avalparse.AvalSpec(aspec0.exp_mod.name, aspec0.combo, aspec0.ids, [extent]) ]
 
 
     # --- User specified a wildcard combo, select combos by extent
@@ -151,7 +151,7 @@ def _normalize_aval_spec(aspec0):
             if extents_intersect(dom_ext, extent):
                 lcombo = list(combo[:-2]) + [idom, jdom]
                 combo = exp_mod.Combo(*lcombo)
-                aspec1s.append(avalparse.AvalSpec(aspec0.exp_mod, combo, [], [extent]))
+                aspec1s.append(avalparse.AvalSpec(aspec0.exp_mod.name, combo, [], [extent]))
 
         return aspec1s
 
@@ -167,27 +167,33 @@ def normalize(aspec0s):
 # "Query" means converting whatever was normalized to:
 #     [nc_fname, ...]    Avalanche files to mosaic
 #     extent             Area to mosaic
-def query(aspecs, nc_fnames0, margin=(0.,0.), filter_in_fn=lambda *args: True, ok_statuses={archive.OK, archive.OVERRUN}):
+def query(aspecs, nc_fnames0, margin=(0.,0.), filter_in_fn=avalfilter.all):
     """Produces lists of NetCDF filenames.  Also converts to NetCDF at
     this point if needed.
 
-    extent:
-        User-provided extent to include.  (Or typically comes from nc_fnames)
-        This will be unioned with individual aspecs extents.
     aspecs: [AvalSpec, ...]
         Normalized AvalSpecs
+    filter_in_fn:
+        Used to determine which avalanches not explicitly specified to include.
+        If NO such avalanches are to be included, use filter_in_fn=avalfilter.none()
     returns: [nc_fname, ...], extent
         [nc_fname, ...]
-            Filenames of archive files to include in the mosaic]
+
+            Filenames of archive files to include in the mosaic.
+            Filenames are included for three reasons:
+              1. Valid NetCDF files provided in nc_fnames0
+              2. IDs explicitly included in query spec(s) aspecs
+              3. Any other avalanches that match filter_in_fn
         extent
             Final mosaic extent
     """
 
-    # Determine extent
+    # Sanity check
     for aspec in aspecs:
         assert len(aspec.extents) == 1
         check_extent_sign(aspec.extents[0])
 
+    # Initial extent based on bounding boxes of provided netCDF files...
     extent = union_extents(itertools.chain(
         (nc_extent(nc_fname) for nc_fname in nc_fnames0),
         (aspec.extents[0] for aspec in aspecs)))
@@ -196,43 +202,45 @@ def query(aspecs, nc_fnames0, margin=(0.,0.), filter_in_fn=lambda *args: True, o
     # Convert to set of archive filenames
     nc_fnames = list(nc_fnames0)    # Start with filenames explicitly provided
     for aspec in aspecs:
-        aspec_ids = set(aspec.ids)    # IDs we know we want to keep
-        release_fname,release_df = exputil.release_df(aspec.exp_mod, aspec.combo)
-#        print('release_df len ', len(release_df))
-#        print('x1 ', type(release_df))
-#        print('x2 ', type(release_df.index))
-        all_ids = release_df.index.to_list()
-#        print('all_ids len ', len(all_ids))
+        release_files,release_df = exputil.release_df(aspec.exp_mod, aspec.combo)
 
-        # Filter IN user-provided IDs, filter OUT avalanches outside the extent
-        # Otherwise, apply user's filter
-        all_nc_fnames,archived_out_zips = archive.fetch(
-            aspec.exp_mod, aspec.combo, all_ids, ok_statuses)
-#        print('all_nc_fnames1 ', all_nc_fnames)
-#        nc_fnames = [x for x in nc_fnames if x is not None]    # Ignore avalanches not found
+        # Determine overall list of IDs to search (before filtering)
+        # Each of these IDs will be converted to NetCDF.  If only
+        # listed IDs are to be included, we can skip searching all IDs
+        # in the RELEASE file.
+        if filter_in_fn is avalfilter.none:
+            all_ids = [id for id in aspec.ids if id in release_df.index]
+        else:
+            all_ids = release_df.index.to_list()
+        all_ids.sort()
+
+        print('len(all_ids) = ', len(all_ids))
+
+        # Obtain initial list of NetCDF files to filter through
+        all_avals,archived_out_zips = archive.fetch(
+            aspec.exp_mod, aspec.combo, all_ids)
 
         # Apply filter to result of archive.fetch()
-        #efilter_fn = wrap_filter(filter_fn, aspec.ids, extent)
-        print('AA1 extent ', extent)
-        for (id,row),nc_fname in zip(release_df.iterrows(), all_nc_fnames):
+        aspec_ids = set(aspec.ids)    # IDs we know we want to keep
+        for id,nc_fname in all_avals:
+#            print(id, nc_fname)
+
+            # Was not able to generate a NetCDF file for this ID
+            if nc_fname is None:
+                continue
+
             # No NetCDF file for that ID was found (or able to be generated)
             if nc_fname is None:
                 continue
 
+            row = release_df.loc[id]
+
             # Include things in the ids list, or that the filter function allows.
             if (id in aspec_ids) or filter_in_fn(id, row, nc_fname):
-
-                # Get the bounding box for the avalanche
-                if 'bounding_box' in row:
-                    bbox = row['bounding_box']
-                    print('AA3 bbox ', bbox)
-                else:
-                    bbox = nc_extent(nc_fname)
-                    #print('AA4 bbox ', bbox)
-
+#                print('   -> passed filter')
 
                 # Include for real if this intersects.
-                if extents_intersect(bbox, extent):
+                if extents_intersect(nc_extent(nc_fname), extent):
                     nc_fnames.append(nc_fname)
 
     return nc_fnames, extent

@@ -225,10 +225,18 @@ def ramms_to_nc0(out_zip, ncout):
     base = out_zip[:-8]    # Remove .out.zip
     leaf = os.path.split(base)[1]
     with zipfile.ZipFile(f'{base}.in.zip', 'r') as in_zip:
-     with zipfile.ZipFile(f'{base}.out.zip', 'r') as out_zip:
+      with zipfile.ZipFile(f'{base}.out.zip', 'r') as out_zip:
 
         in_infos = in_zip.infolist()
         out_infos = out_zip.infolist()
+
+        # See if this avalanche overran its domain
+        arcnames = [os.path.split(x)[1] for x in out_zip.namelist()]
+        overrun = any(x.endswith('.out.overrun') for x in arcnames)
+
+        if 'status' not in ncout.variables:
+            ncv = ncout.createVariable('status', 'i')
+        ncout.variables['status'].overrun = 'True' if overrun else 'False'
 
         # Get the grid
         gridI = pickle.loads(in_zip.read('grid.pik'))
@@ -285,6 +293,7 @@ def ramms_to_nc0(out_zip, ncout):
         # The .out file
         vars = nc_out(ncout, out_zip, f'{leaf}.out',
             attrs={'grid_mapping': 'grid_mapping'})
+            
         max_height = vars['max_height']
 
         # -----------------------------------
@@ -317,10 +326,11 @@ def ramms_to_nc0(out_zip, ncout):
 # ----------------------------------------------------------
 # ----------------------------------------------------------
 #def main():
-#    base = '/Users/eafischer2/tmp/aval/juneauA00000For_5m_30L_4981'
-#    dem_file = '/Users/eafischer2/tmp/maps/Juneau_IFSAR_DTM_AKAlbers_EPSG_3338_filled.tif'
-#    gridI = gdalutil.read_grid(dem_file)
-#    ramms_to_nc(gridI, base, 'x.nc')
+#    out_zip = '/home/efischer/prj/ak/ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/x-113-0450000230MFor_10m/RESULTS/x-113-04500002For_10m/30M/x-113-04500002For_10m_30M_3200.out.zip'
+#    with netCDF4.Dataset('x.nc', 'w') as ncout:
+#        ncv = ncout.createVariable('status', 'i')
+#        ramms_to_nc0(out_zip, ncout)
+
 #main()
 
 

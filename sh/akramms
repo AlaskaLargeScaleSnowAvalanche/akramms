@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 #
 
+#import cProfile
 import netCDF4
 from akramms import config,params
-import argparse,itertools,os,subprocess,sys,io,codecs,re
+import argparse,itertools,os,subprocess,sys,io,codecs,re,pickle
 from akramms import r_experiment,stages,avalparse
 from akramms.util import rammsutil,exputil
 from uafgi.util import ioutil,make
@@ -94,7 +95,9 @@ def submit(args):
 
 @subcommand([
     argument('ramms', help='RAMMS directory or release file to inspect'),
-    argument('ids', type=int, nargs='*', help='ID of avalanche in run_dir to run')])
+    argument('ids', type=int, nargs='*', help='ID of avalanche in run_dir to run (If not present, then enlarge all overrun avalanches)'),
+    argument('--dry-run', action='store_true', help="Don't do anything"),
+])
 def enlarge(args):
     """Enlarges domain of jobs that overran"""
 
@@ -102,7 +105,7 @@ def enlarge(args):
 
     # Separate into numeric-only and non-numerica args in the spec
     release_files = rammsutil.get_release_files(args.ramms)
-    r_ramms.enlarge_domains(release_files, ids=ids)
+    r_ramms.enlarge_domains(release_files, ids=ids, dry_run=args.dry_run)
 
 @subcommand([
     argument('ramms', help='RAMMS directory or release file to inspect'),
@@ -259,7 +262,7 @@ def step1(args):
     """Generate grid defining active domains.  The extent of future
     steps likely depends on this."""
 
-    exp_mod = load_exp_mod(getattr(args, 'experiment-module'))
+    exp_mod = exputil.load(getattr(args, 'experiment-module'))
     exp_dir = get_exp_dir(exp_mod)
 
     makefile = make.Makefile()
@@ -284,7 +287,7 @@ def step2(args):
     sexp_mod, sexp_fn = getattr(args, 'experiment-spec')
 
     # Load the module (initial 'akramms.' is optional)
-    exp_mod = load_exp_mod(sexp_mod)
+    exp_mod = exputil.load(sexp_mod)
     exp_dir = get_exp_dir(exp_mod)
 
     # Load functions from module
@@ -322,7 +325,7 @@ def step3(args):
 
 
     # Load the module (initial 'akramms.' is optional)
-    exp_mod = load_exp_mod(sexp_mod)
+    exp_mod = exputil.load(sexp_mod)
     exp_dir = get_exp_dir(exp_mod)
 
     # Load functions from module
@@ -399,13 +402,43 @@ def parse(args):
 
 @subcommand([
     argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),
+    argument('-f', '--filter', type=str,
+        help='Filter to apply, must return True to include, False to exclude.  See avalfilter.py'),
+    argument('-o', '--output',
+        help='Name of query file to write'),
 ])
 def query(args):
-    from akramms import avalquery
+    from akramms import avalquery,avalfilter
 
-    aspecs, nc_fnames = avalparse.parse_aval_specs(args.avals)
+    if args.filter is not None:
+        filter_in = avalfilter.parse(args.filter)
+    else:
+        filter_in = avalfilter.all
+
+    aspecs, nc_fnames0 = avalparse.parse_aval_specs(args.avals)
     aspecs = avalquery.normalize(aspecs)
-    nc_fnames, extent = avalquery.query(aspecs, nc_fnames)
+    nc_fnames, extent = avalquery.query(aspecs, nc_fnames0, filter_in_fn=filter_in)
+
+    # Get exp_mod
+    if len(aspecs) > 0:
+        sexp_mod = aspecs[0].exp_mod.name
+    else:
+        # Get exp_mod from the .nc file
+        with netCDF4.Dataset(nc_fnames[0]) as nc:
+            sexp_mod = nc.variables['provenance'].exp_mod
+
+    # Write query results to file
+    if args.output is not None:
+        with open(args.output, 'wb') as out:
+            # Query results
+            pickle.dump(sexp_mod, out)
+            pickle.dump(extent, out)
+            pickle.dump(nc_fnames, out)
+
+            # Parsed but unprocessed query
+            pickle.dump(aspecs, out)
+            pickle.dump(nc_fnames0, out)
+
 
     print('============ AvalTuple Specs')
     for aspec in aspecs:
@@ -415,24 +448,30 @@ def query(args):
         print(ncf)
 
 @subcommand([
-    argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),
+    argument('query', nargs=1, help='Query file generated via akramms query'),
 ])
 def mosaic(args):
     from akramms import avalquery,mosaic
 
-    # Do query
-    aspecs0, nc_fnames = avalparse.parse_aval_specs(args.avals)
-    aspecs = avalquery.normalize(aspecs0)
-    nc_fnames, extent = avalquery.query(aspecs, nc_fnames)
+    query_fname = args.query[0]
+    ofname = os.path.splitext(query_fname)[0] + '.zip'
+
+    # Read the query
+    with open(query_fname, 'rb') as fin:
+        exp_mod = exputil.load(pickle.load(fin))
+        extent = pickle.load(fin)
+        nc_fnames = pickle.load(fin)
+
+    nc_fnames = nc_fnames[:10]    # DEBUGGING
+
+
+    ## Do query
+    #aspecs0, nc_fnames = avalparse.parse_aval_specs(args.avals)
+    #aspecs = avalquery.normalize(aspecs0)
+    #nc_fnames, extent = avalquery.query(aspecs, nc_fnames)
 
     print('query returned ', len(nc_fnames))
 
-    if len(aspecs) > 0:
-        exp_mod = aspecs[0].exp_mod
-    else:
-        # Get exp_mod from the .nc file
-        with netCDF4.Dataset(nc_fnames[0]) as nc:
-            exp_mod = exputil.load(nc.variables['provenance'].exp_mod)
 
     # Do mosaic
     res = exp_mod.resolution
@@ -454,7 +493,7 @@ def archive(args):
     aspecs, nc_fnames = avalparse.parse_aval_specs(args.avals)
     for aspec in aspecs:
         print(aspec)
-        archive.archive_combo(aspec.exp_mod, aspec.combo, aspec.ids, ok_statuses={archive.OK})
+        archive.archive_combo(aspec.exp_mod, aspec.combo, aspec.ids)
 
 def main():
     args = cli.parse_args()

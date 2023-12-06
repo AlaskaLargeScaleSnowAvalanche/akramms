@@ -2,6 +2,7 @@
 
 import functools
 import re,os,collections,importlib
+import pandas as pd
 from uafgi.util import shputil
 from akramms import config
 
@@ -11,6 +12,7 @@ avalRE = re.compile(r'aval-([TSML])-(d+)\.nc')
 scene_dirRE = re.compile(r'(x|arc)-(\d+)-(\d+)$')
 intRE = re.compile(r'\s*(\d+)\s*')
 # -----------------------------------------------------
+@functools.lru_cache()
 def load(ename):
     """Loads the module of an experiment based on its name."""
 
@@ -38,16 +40,19 @@ def _release_df(scene_dir):
     """
     # Look in RELEASE-dir shapefiles to determine theoretical set Avalanche IDs
     # (By looking here, we avoid picking up random junk)
+    release_files = list()
+    dfs = list()
     for leaf in os.listdir(os.path.join(scene_dir, 'RELEASE')):
         match = _relRE.match(leaf)
         if match is not None:
             fname = os.path.join(scene_dir, 'RELEASE', leaf)
-            df = shputil.read_df(
-                fname, read_shapes=False)
-            df = df.set_index('Id')
-            return fname,df    # There will be only one
+            dfs.append(shputil.read_df(fname, read_shapes=False))
+            release_files.append(fname)
 
-    return None
+    if len(dfs) > 0:
+        return release_files,pd.concat(dfs).set_index('Id')
+    else:
+        return None
 
 _relRE = re.compile(r'^(.*)_rel\.shp$')
 def release_df(exp_mod, combo, type=None):

@@ -611,6 +611,13 @@ def get_job_ids(release_file):
     release_df = shputil.read_df(release_file, read_shapes=False)
     return sorted(list(release_df['Id']))
 
+def get_mtime(fname):
+    if os.path.exists(fname):
+        return os.path.getmtime(fname)
+    else:
+        return -1
+
+
 # Categorize each job int one of four sets
 job_status_labels = ('noinput', 'incomplete', 'todo', 'inprocess', 'finished', 'overrun', 'failed')
 class JobStatus:
@@ -692,7 +699,7 @@ def job_statuses(release_files):
                 statuses.append((jb, id, JobStatus.NOINPUT))
                 continue
 
-            # See if Condor tells is what's going on with the job
+            # See if Condor knows is what's going on with the job
             if job_name in condor_statuses:
                 statuses.append((jb, id, condor_statuses[job_name]))
                 continue
@@ -700,16 +707,24 @@ def job_statuses(release_files):
             # Not in Condor?  Either it hasn't launched, or it's finished / failed
             # Let's look at the files on disk to decide.
 
+            in_zip = os.path.join(jb.avalanche_dir, f'{job_name}.in.zip')
+            in_zip_tm = get_mtime(in_zip)
+            out_zip = os.path.join(jb.avalanche_dir, f'{job_name}.out.zip')
+            out_zip_tm = get_mtime(out_zip)
+
             # If an archive NetCDF file exists, then this avalanche is FINISHED.
             if archive_dir is not None:
                 aval_nc = os.path.join(archive_dir, f'aval-{id}.nc')
                 if os.path.exists(aval_nc):
-                    statuses.append((jb, id, JobStatus.FINISHED))
-                    continue
+                    aval_nc_tm = os.path.getmtime(aval_nc)
+                    if (aval_nc_tm > out_zip_tm) and (out_zip_tm > in_zip_tm):
+                        # .nc files only "count" if they are newer than raw files
+                        # (or those raw files don't exist)
+                        statuses.append((jb, id, JobStatus.FINISHED))
+                        continue
 
             # Identify avalanches that have finished: .out.zip exists and has non-zero size
             # (User can reset jobs by removing *.out.zip)
-            out_zip = os.path.join(jb.avalanche_dir, f'{job_name}.out.zip')
             if os.path.exists(out_zip):
 
                 # Check for abandoned job
@@ -726,8 +741,8 @@ def job_statuses(release_files):
                 # We tentatively think the job is finished.  But let's
                 # look inside the zip file to make sure the domain
                 # wasn't overrun.
-                with zipfile.ZipFile(out_zip, 'r') as in_zip:
-                    arcnames = [os.path.split(x)[1] for x in in_zip.namelist()]
+                with zipfile.ZipFile(out_zip, 'r') as ozip:
+                    arcnames = [os.path.split(x)[1] for x in ozip.namelist()]
                 if any(x.endswith('.out.overrun') for x in arcnames):
                     statuses.append((jb, id, JobStatus.OVERRUN))
                 else:
@@ -806,31 +821,46 @@ def enlarge_domain(run_dir, job_name, enlarge_increment=5000.):
     print('Resubmitting: {}/{}'.format(run_dir, job_name))
     submit_job(run_dir, job_name)
 
-def enlarge_domains(release_files, ids=None):
+def enlarge_domains(release_files, ids=None, dry_run=False):
     print('Fetching job statuses...')
     df = job_statuses(release_files)
     df = df[df.job_status == JobStatus.OVERRUN]
-    for _,row in df.iterrows():
+    ix_vals = list()
+    for ix,row in df.iterrows():
         jb = row.jb
         run_dir = jb.avalanche_dir
         job_name = f"{jb.ramms_name}_{row['id']}"
         if ids is None or row['id'] in ids:
+            ix_vals.append(ix)
+            continue
 
-            # TODO: ONLY enlarge if the .in.zip is newer than the .out.zip file
-
-
-            # ONLY enlarge if the .out.zip file is newer than the .in.zip file
-            # (Otherwise, we apparently already enlarged but have not yet re-run)
-            out_zip = os.path.join(run_dir, f'{job_name}.out.zip')
-            in_zip = os.path.join(run_dir, f'{job_name}.in.zip')
-            out_zip_tm = os.path.getmtime(out_zip)
-            try:
-                in_zip_tm = os.path.getmtime(in_zip)
-            except OSError:    # File not exist
-                in_zip_tm = -1
+        # ONLY enlarge if the .out.zip file is newer than the .in.zip file
+        # (Otherwise, we apparently already enlarged but have not yet re-run)
+        out_zip = os.path.join(run_dir, f'{job_name}.out.zip')
+        in_zip = os.path.join(run_dir, f'{job_name}.in.zip')
+        out_zip_tm = os.path.getmtime(out_zip)
+        try:
+            in_zip_tm = os.path.getmtime(in_zip)
             if out_zip_tm > in_zip_tm:
-                enlarge_domain(run_dir, job_name)
-#            submit_job(run_dir, job_name)
+                ix_vals.append(ix)
+        except OSError:    # File not exist
+            # This shouldn't normally happen
+            in_zip_tm = -1
+            print(f'Input file missing: {in_zip}')
+
+    # Display what we're gonna do
+    all_ids = [df.id[ix] for ix in ix_vals]
+    print(f'Enlarging domains for avalanche IDs: {all_ids}')
+    if dry_run:
+        print('Dry Run, doing nothing.')
+        return
+
+    for ix in ix_vals:
+        row = df.loc[ix]
+        jb = row.jb
+        run_dir = jb.avalanche_dir
+        job_name = f"{jb.ramms_name}_{row['id']}"
+        enlarge_domain(run_dir, job_name)
 
     return df
 

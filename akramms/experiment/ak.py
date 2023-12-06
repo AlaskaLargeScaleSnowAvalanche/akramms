@@ -2,7 +2,7 @@ import os,collections,sys
 import numpy as np
 import schema
 from uafgi.util import schemautil,shputil,gisutil
-from akramms import config, experiment, stages
+from akramms import config, r_experiment, stages
 from akramms import r_prepare,r_domain_builder
 from akramms import d_ifsar, d_usgs_landcover
 
@@ -179,6 +179,8 @@ def full():
 
 # -----------------------------------------------------------------
 def juneau():
-    # Just one combo for now
-    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 45)    # A Juneau-close box
-    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 44)    # North of Juneau
+    for year0,year1 in [(1981,1990), (2051,2060)]:
+
+        # Just one combo for now
+        yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 113, 45)    # A Juneau-close box
+        yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 113, 44)    # North of Juneau

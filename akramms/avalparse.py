@@ -1,14 +1,15 @@
 # Fundamental stuff needed to run an experiment.
 
-import re,os,collections,importlib
+import re,os,collections,importlib,typing
 from akramms import config
+from akramms.util import exputil
 
 """Parse specifications from the user (on the command line) into a
 list of either AvalSpec objects or names of archived avalanches."""
 
 
-out_zipRE = re.compile(r'[^_]+_[^_]+_(\d+[TSML])_(\d+)\.out\.zip$')
-avalRE = re.compile(r'aval-([TSML])-(d+)\.nc')
+out_zipRE = re.compile(r'[^_]+_[^_]+_\d+([TSML])_(\d+)\.out\.zip$')
+avalRE = re.compile(r'aval-([TSML])-(\d+)\.nc')
 scene_dirRE = re.compile(r'(x|arc)-(\d+)-(\d+)$')
 intRE = re.compile(r'\s*(\d+)\s*')
 # -----------------------------------------------------
@@ -91,7 +92,17 @@ def replace_wildcards(pieces):
             ret.append(piece)
     return ret
 # -------------------------------------------------------
-AvalSpec = collections.namedtuple('AvalSpec', ('exp_mod', 'combo', 'ids', 'extents'))
+#AvalSpec = collections.namedtuple('AvalSpec', ('exp_mod', 'combo', 'ids', 'extents'))
+
+class AvalSpec(typing.NamedTuple):
+    sexp_mod: str
+    combo: object
+    ids: list
+    extents: list
+
+    @property
+    def exp_mod(self):
+        return exputil.load(self.sexp_mod)
 
 
 def parse_aval_specs(args):
@@ -129,7 +140,7 @@ def parse_aval_specs(args):
                 continue
             except:
                 # It's not a parseable ID or extent, reinterpret arg in state 0
-                aspecs.append( AvalSpec(exp_mod, combo, ids, extents) )
+                aspecs.append( AvalSpec(exp_mod.name, combo, ids, extents) )
                 state = 0
 
         if state == 0:
@@ -158,7 +169,7 @@ def parse_aval_specs(args):
                     match = out_zipRE.match(out_zip)
                     id =int(match.group(2))
 
-                    aspecs.append( AvalSpec(exp_mod, combo, [id], []) )
+                    aspecs.append( AvalSpec(exp_mod.name, combo, [id], []) )
                     clear()
                     continue
 
@@ -220,7 +231,7 @@ def parse_aval_specs(args):
     # Finish up after we exit
     if state == 3:    # Looking for ID...
         # Emit any remaining ids (or floating point numbers) at end of parsing
-        aspecs.append( AvalSpec(exp_mod, combo, ids, extents) )
+        aspecs.append( AvalSpec(exp_mod.name, combo, ids, extents) )
     elif state == 1:    # Looking for more of the combo...
         missing_len = len(exp_mod.combo_schema.schema) - len(scombo)
         if missing_len == 2:
@@ -229,7 +240,7 @@ def parse_aval_specs(args):
             raise ValueError('Must specify full combo (except for idom / jdom)')
 
         combo = parse_combo(exp_mod, scombo)
-        aspecs.append( AvalSpec(exp_mod, combo, [], extents) )
+        aspecs.append( AvalSpec(exp_mod.name, combo, [], extents) )
 
     return aspecs, nc_fnames
 
