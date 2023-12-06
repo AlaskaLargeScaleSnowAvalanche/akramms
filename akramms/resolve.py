@@ -1,4 +1,5 @@
 import itertools,re,os,functools,glob
+import netCDF4
 import pandas as pd
 from uafgi.util import shputil
 from akramms import level,parse
@@ -12,33 +13,64 @@ def initial(parseds):
         orows.append({'parsed': parsed})
     return pd.DataFrame(orows)
 
-#    print('parseds ', parseds)
-#    akdf = pd.DataFrame(parseds, columns=['parsed'])
-#    return akdf
 
-
-def add_exp(akdf):
+def resolve_exp(akdf):
     """
     parsed:
         Result of 
     """
-    for tup in akdf.itertuples():
-        parsed = tup.parsed
-#        if 'expmod' not in parsed:
-#            parsed['expmod'] = 
-    akdf['exp'] = akdf['parsed'].map(lambda parsed: parsed['exp'])
-    return akdf
 
-def add_combo(akdf, realized=True, scenetypes={'x','arc'}):
-    #akdf = akdf.add_exp(akdf)
+    # Ensure this is idempotent
+    if 'exp' in akdf:
+        return akdf
 
     orows = list()
+    for tup in akdf.itertuples():
+        parsed = tup.parsed
+
+        if 'arcfile' in parsed:
+            with netCDF4.Dataset(parsed['arcfile']) as nc:
+                statusv = nc.variables['status']
+                exp = statusv.getncattr('exp_mod')
+        else:
+            exp = parsed['exp']
+        orows.append(itertools.chain(tup, [exp]))
+
+    return pd.DataFrame(orows, columns=tuple(
+        itertools.chain(type(tup)._fields, ['exp'])))
+
+
+
+def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
+
+    # Ensure this is idempotent
+    if 'combo' in akdf:
+        return akdf
+
+    orows = list()
+
+    # ----------------------------
+    def process_trialdir(trialdir, wcombo):
+        ijdoms = set()
+        for scenetype in scenetypes:
+            scenedirs = level.trialdir_to_scenedirs(trialdir, scenetype=scenetype)
+            for ijdom,_,_ in scenedirs:
+                ijdoms.add(ijdom)
+
+        # Add rows to the dataframe now
+        for ijdom in sorted(ijdoms):
+            combo = tuple(itertools.chain(wcombo, ijdom))
+            orows.append(itertools.chain(tup, [combo]))
+    # ----------------------------
+
+
     for tup in akdf.itertuples():
 #        print('tup ', type(tup), tup)
         parsed = tup.parsed
 
         if parsed['type'] == 'arcfile':
             orows.append(itertools.chain(tup, [None]))
+            continue
 
         if 'wcombo' in parsed:
             wcombo = parsed['wcombo']
@@ -48,17 +80,7 @@ def add_combo(akdf, realized=True, scenetypes={'x','arc'}):
             elif realized:
                 # It's a wildcard combo, list the full combos there on disk
                 trialdir = level.theory_wcombo_to_trialdir(tup.exp, wcombo)
-                ijdoms = set()
-                for scenetype in scenetypes:
-                    scenedirs = level.trialdir_to_scenedirs(trialdir, scenetype=scenetype)
-                    for ijdom,_,_ in scenedirs:
-                        ijdoms.add(ijdom)
-
-                # Add rows to the dataframe now
-                for ijdom in sorted(ijdoms):
-                    combo = tuple(itertools.chain(wcombo, ijdom))
-
-                    orows.append(itertools.chain(tup, [combo]))
+                process_trialdir(trialdir, wcombo)
 
         elif 'expset_fn' in parsed:
             # User asked for a list of combos...
@@ -68,8 +90,23 @@ def add_combo(akdf, realized=True, scenetypes={'x','arc'}):
         elif realized:
             # No combo info given, our only clue is the experiment itself.
             # Let's list ALL the combos in this experiment
-            print('TODO: List all combos in experiment')
-            pass
+
+            expmod = parse.load_expmod(tup.exp)
+            if 'expdir' in parsed:
+                expdir = parsed['expdir']
+            else:
+                expdir = expmod.dir
+            nwcombo = len(expmod.combo_keys)-2
+            xre = [parsed['exp']] + [r'([^-]*)'] * nwcombo
+            sre = '-'.join(xre)
+            print('sre ', sre)
+            trialRE = re.compile(sre)
+            for name in os.listdir(expdir):
+                match = trialRE.match(name)
+                if match is not None:
+                    wcombo = tuple(match.group(i) for i in range(1,nwcombo+1))
+                    print('wcombo ', wcombo)
+                    process_trialdir(expdir / name, wcombo)
         else:
             raise ValueError('Not able to determine combos for: {}'.format(tup))
 
@@ -79,7 +116,11 @@ def add_combo(akdf, realized=True, scenetypes={'x','arc'}):
 # ------------------------------------------------------------
 _chunk_subleafRE = re.compile(r'(\d+)([TSML])(For|NoFor)_(\d+)m')
 _releasefileRE = re.compile(r'(.*)([TSML])([_-])rel.shp')
-def add_releasefile(akdf, scenetypes=['x']):
+def resolve_releasefile(akdf, scenetypes=['x'], chunktypes=['CHUNKS']):
+
+    # Ensure this is idempotent
+    if 'releasefile' in akdf:
+        return akdf
 
     # -----------------------------
     orows = list()
@@ -110,12 +151,13 @@ def add_releasefile(akdf, scenetypes=['x']):
                 scenedir = expmod.combo_to_scenedir(combo, scenetype=scenetype)
                 if scenetype == 'x':
                     sceneleaf = scenedir.parts[-1]    # Eg: x-113-045
-                    for name in os.listdir(scenedir / 'CHUNKS'):
-                        chunk_subleaf = name[len(sceneleaf):]    # Eg: 0000230TFor_10m
-                        match = _chunk_subleafRE.match(chunk_subleaf)
-                        if match is not None:
-                            # We found a valid chunk dir!  Remember its associated RELEASE dir.
-                            process_releasedir(tup, 'x', scenedir / 'CHUNKS' / name / 'RELEASE')
+                    for chunktype in chunktypes:
+                        for name in os.listdir(scenedir / chunktype):
+                            chunk_subleaf = name[len(sceneleaf):]    # Eg: 0000230TFor_10m
+                            match = _chunk_subleafRE.match(chunk_subleaf)
+                            if match is not None:
+                                # We found a valid chunk dir!  Remember its associated RELEASE dir.
+                                process_releasedir(tup, 'x', scenedir / 'CHUNKS' / name / 'RELEASE')
                 elif scenetype == 'arc':
                     process_releasedir(tup, 'arc', scenedir / 'RELEASE')
 
@@ -155,7 +197,11 @@ def _realized_ids(scenetype, releasefile):
 
 _avalRE = re.compile(r'aval-([TSML])-(\d+)')
 _out_zipRE = re.compile(r'(.*)_(\d+)\.out\.zip$')
-def add_id(akdf, realized=True):
+def resolve_id(akdf, realized=True):
+    # Ensure this is idempotent
+    if 'id' in akdf:
+        return akdf
+
     orows = list()
 
     for tup in akdf.itertuples():
@@ -197,4 +243,29 @@ def add_id(akdf, realized=True):
     return pd.DataFrame(orows, columns=tuple(
         itertools.chain(type(tup)._fields, ['id', 'avalfile'])))
 
+# ------------------------------------------------------------
+def resolve_to(parseds, level, realized=True, scenetypes={'x'}, chunktypes=['CHUNKS']):
+    """
+    level: exp|combo|releasefile|id
+        Which level of detail to generate for this query.
+    """
 
+    akdf = initial(parseds)
+    akdf = resolve_exp(akdf)
+    if level == 'exp':
+        return akdf
+
+    akdf = resolve_combo(akdf, realized=realized, scenetypes=scenetypes)
+    if level == 'combo':
+        return akdf
+
+    akdf = resolve_releasefile(akdf, scenetypes=scenetypes)
+    if level == 'rf':
+        return akdf
+
+    akdf = resolve_id(akdf, realized=realized)
+    if level == 'id':
+        return akdf
+
+    raise ValueError(f'Illegal level="{level}"')
+# ------------------------------------------------------------

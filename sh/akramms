@@ -107,20 +107,6 @@ def submit(args):
     release_files = rammsutil.get_release_files(args.ramms)
     r_ramms.submit_jobs(release_files, ids=ids)
 
-#@subcommand([
-#    argument('ramms', help='RAMMS directory or release file to inspect'),
-#    argument('ids', type=int, nargs='*', help='ID of avalanche in run_dir to run (If not present, then enlarge all overrun avalanches)'),
-#    argument('--dry-run', action='store_true', help="Don't do anything"),
-#])
-#def enlarge(args):
-#    """Enlarges domain of jobs that overran"""
-#
-#    ids = None if len(args.ids) == 0 else args.ids
-#
-#    # Separate into numeric-only and non-numeric args in the spec
-#    release_files = rammsutil.get_release_files(args.ramms)
-#    r_ramms.enlarge_domains(release_files, ids=ids, dry_run=args.dry_run)
-
 @subcommand([
     argument('query', nargs=1, help='Query file generated via akramms rammsquery'),
 ])
@@ -391,25 +377,29 @@ def step4(args):
 
 @subcommand([
     argument('avals', nargs='*', help='Items to feed to avalanche spec parser'),
+    argument('-l', '--level', type=str, default='releasefile',
+        help='Level of detail to resolve results to: exp|combo|releasefile|id'),
+    argument('-s', '--scenetype', nargs='*',
+        help='Type of scene to query: x|arc'),
+    argument('-r', '--realized', action='store_true',
+        help='Base this on the files on disk?'),
 ])
 def parse(args):
     from akramms import resolve
 
     parseds = akramms.parse.parse_args(args.avals)
-    for pr in parseds:
-        print('-------------------------------')
-        for k,v in pr.items():
-            print(f'{k}: {v}')
 
+    kwargs = {'realized': args.realized}
+    if args.scenetype is not None:
+        kwargs['scenetypes'] = set(args.scenetype)
 
-    akdf = resolve.initial(parseds)
-    akdf = resolve.add_exp(akdf)
-    akdf = resolve.add_combo(akdf, scenetypes={'x'})
-    akdf = resolve.add_releasefile(akdf, scenetypes={'x'})
-    akdf = resolve.add_id(akdf, realized=True)
-    akdf = akdf.drop('parsed', axis=1)
+    akdf = resolve.resolve_to(parseds, args.level, **kwargs)
+    print('=========================>>> akdf')
     print(akdf)
 
+    for tup in akdf.itertuples():
+        print(tup)
+    return
 
 
 @subcommand([

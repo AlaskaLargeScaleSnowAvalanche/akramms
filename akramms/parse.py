@@ -290,29 +290,26 @@ def parse_args(args, load=True):
 
     # --------------------------------
     def flush_parts():    # Parses
-        nonlocal rets, parts
+        nonlocal rets, parts, ids
 
-        if len(parts) == 0:
-            return
-
+        # ----------- Handle main portion (before the single colon)
         if len(parts) == 1:
             # First try parsing as an expset
             try:
-                parsed = parse_expset(parts[0], load=load)
+                rets.append(parse_expset(parts[0], load=load))
             except ValueError:
                 # I guess it's not an expset
-                parsed = parse_parts(parts, load=load)
+                rets.append(parse_parts(parts, load=load))
 
-        else:
-            parsed = parse_parts(parts, load=load)
+        elif len(parts) > 1:
+            rets.append(parse_parts(parts, load=load))
 
-        # Add any Avalanche IDs we accumulated.
+        parts = list()
+
+        # ----------- Handle IDs
         if len(ids) > 0:
-            parsed['ids'] = ids
-
-        rets.append(parsed)
-        parts.clear()
-        ids.clear()
+            rets.append(ids)
+        ids = list()
 
     # --------------------------------
     state = 'p'
@@ -334,9 +331,25 @@ def parse_args(args, load=True):
                     parts.append(arg)
             elif state == 'i':
                 ids.append(int(arg))
+                print('Added to ids ', ids)
+            else:
+                assert False    # Illegal state
+    print('vv1 done loop')
     flush_parts()
 
-    return rets
+    # Now  combine IDs into previous item
+    last_dict = None
+    rets2 = list()
+    for ret in rets:
+        if isinstance(ret, dict):    # Query
+            last_dict = ret
+            rets2.append(ret)
+        else:    # Additional IDs
+            if 'ids' in last_dict:
+                last_dict['ids'] += ret
+            else:
+                last_dict['ids'] = ret
+    return rets2
 # -----------------------------------------------------------
 #def main():
 #    import sys
