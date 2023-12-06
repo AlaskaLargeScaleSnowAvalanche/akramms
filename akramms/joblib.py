@@ -1,3 +1,8 @@
+import os,subprocess,functools,re
+import htcondor
+import pandas as pd
+from akramms import config
+
 # =========================================================================================
 # ===== RAMMS Stage 2: Manage avalanche jobs
 
@@ -254,9 +259,9 @@ def add_combo_job_status(xdir, akdf0):
                 # Default to TODO
                 statuses.append((release_file, jb, id, JobStatus.TODO))
 
-    statuses = [(id, status, jb.key())] for release_file,jb,id,status in statuses]
-    df = pd.DataFrame(statuses, columns=('id', 'jobstatus', 'jbkey')
-    return akdf1.merge(df, left_index=True, right_on='id').
+    statuses = [(id, status, jb.key()) for release_file,jb,id,status in statuses]
+    df = pd.DataFrame(statuses, columns=('id', 'jobstatus', 'jbkey'))
+    return akdf1.merge(df, left_index=True, right_on='id')
 # --------------------------------------------------------
 _include_statuses = {JobStatus.NOINPUT, JobStatus.INCOMPLETE, JobStatus.TODO, JobStatus.INPROCESS, JobStatus.OVERRUN, JobStatus.FAILED}
 def print_job_statuses(df):

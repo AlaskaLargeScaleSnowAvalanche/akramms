@@ -7,11 +7,11 @@ import pandas as pd
 from akramms import config,params
 import akramms.parse
 import argparse,itertools,os,subprocess,sys,io,codecs,re,pickle
-from akramms import r_experiment,stages
+from akramms import r_experiment
 from akramms.util import rammsutil,exputil
 from uafgi.util import ioutil,make
 import importlib
-from akramms import r_domain_builder, r_ramms, resolve
+from akramms import r_domain_builder, r_ramms1, resolve
 # ------------------------------------------------------------------------
 # https://mike.depalatis.net/blog/simplifying-argparse.html
 # https://gist.github.com/mivade/384c2c41c3a29c637cb6c603d4197f9f
@@ -233,19 +233,6 @@ def export(args):
             relfiles, tdir)
 
 
-@subcommand([
-    argument('scene', help='Top-Level scene directory to setup through stages 0 and 1.'),
-])
-def setup_scene(args):
-    scene_dir = args.scene
-    scene_args = params.load(scene_dir)
-    print(scene_args)
-
-    stages.run_stage0(scene_dir)
-    stages.run_stage1(scene_dir)
-
-
-
 # ---------------------------------------------------------------------
 def get_exp_dir(exp_mod):
     return config.roots.join('PRJ', exp_mod.name)
@@ -356,15 +343,20 @@ def step4(args):
     # This will resolve to the CHUNK releasefiles
     akdf0 = resolve.resolve_to(parseds, 'releasefile', realized=True)
 
+    print('akdf0 ', akdf0)
     makefile = make.Makefile()
 
     for exp,akdf1 in akdf0.groupby('exp'):
         expmod = akramms.parse.load_expmod(exp)
         for releasefile in akdf1.releasefile.tolist():
 
+            print('------ releasefile ', releasefile)
+
             # Identify the scene this is part of and find the DEM file
             chunkdir = releasefile.parents[1]
-            scenedir = chunkdir.parets[0]
+            scenedir = chunkdir.parents[1]
+            print('ax chunkdir ', chunkdir)
+            print('ax scenedir ', scenedir)
             scene_args = params.load(scenedir)
             demfile = scene_args['dem_file']
 

@@ -63,6 +63,7 @@ def pra_post_rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **k
     # Initial release files are in the top-level RELEASE/ directory, before chopping into chunks.
     ramms_names = list()
     outputs = list()
+    # See email from Marc Christen 2023-01-23
     rn = f'{For}_{resolution}m{return_period}'
     for pra_size in config.allowed_pra_sizes:
         # Copied from rammsutil.RammsName
@@ -106,16 +107,16 @@ def pra_post_rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **k
         # Clip to the non-margin part of the local grid (subdomain)
         df = chunk.clip(df, scene_args['domain'])
 
+        # Add PRA size designation of T,S,M,L
+        # Adds column: pra_size
+        df = chunk.add_pra_size(df)
+
         # Compute the avalanche domains (domain builder algo)
         # Adds columns: chull, dom
         df = chunk.add_dom(
             df, dem_filled, dem_nodata, grid_info,
             margins=config.initial_margins,
             **kwargs)
-
-        # Add PRA size designation of T,S,M,L
-        # Adds column: pra_size
-        df = chunk.add_pra_size(df)
 
         # Write out one top-level shapefile per pra_size
         os.makedirs(scene_dir / 'RELEASE', exist_ok=True)
@@ -160,7 +161,9 @@ def chunk_rule(scene_dir, For, resolution, return_period, pra_size):
 
     # Just include overall output files
 
+    # See email from Marc Christen 2023-01-23
     base = f'{scene_name}{For}_{resolution}m{return_period}{pra_size}'
+#    base = f'r-{pra_size}'
     inputs = [
         scene_dir / 'RELEASE' / f'{base}_rel.shp',
         scene_dir / 'DOMAIN' / f'{base}_dom.shp',

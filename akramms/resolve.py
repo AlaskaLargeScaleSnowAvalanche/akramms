@@ -99,13 +99,13 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
             nwcombo = len(expmod.combo_keys)-2
             xre = [parsed['exp']] + [r'([^-]*)'] * nwcombo
             sre = '-'.join(xre)
-            print('sre ', sre)
+#            print('sre ', sre)
             trialRE = re.compile(sre)
             for name in os.listdir(expdir):
                 match = trialRE.match(name)
                 if match is not None:
                     wcombo = tuple(match.group(i) for i in range(1,nwcombo+1))
-                    print('wcombo ', wcombo)
+#                    print('wcombo ', wcombo)
                     process_trialdir(expdir / name, wcombo)
         else:
             raise ValueError('Not able to determine combos for: {}'.format(tup))
@@ -114,8 +114,9 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
         itertools.chain(type(tup)._fields, ['combo'])))
 
 # ------------------------------------------------------------
-_chunk_subleafRE = re.compile(r'(\d+)([TSML])(For|NoFor)_(\d+)m')
-_releasefileRE = re.compile(r'(.*)([TSML])([_-])rel.shp')
+#_chunk_subleafRE = re.compile(r'(\d\d\d\d\d)(\d+)([TSML])(For|NoFor)_(\d+)')
+_chunkRE = re.compile(r'c-([TSML])-(\d\d\d\d\d)')
+_releasefileRE = re.compile(r'c-([TSML])-(\d\d\d\d\d)(For|NoFor)_(\d+)m_rel.shp')
 def resolve_releasefile(akdf, scenetypes=['x'], realized=True):
     """These are CHUNK releasefiles."""
 
@@ -129,8 +130,10 @@ def resolve_releasefile(akdf, scenetypes=['x'], realized=True):
     # -----------------------------
     orows = list()
     def process_releasedir(tup, scenetype, releasedir):
+        print(f'process_releasedir({releasedir}')
         for name in os.listdir(releasedir):
             match = _releasefileRE.match(name)
+            print('match2 ', name, match)
             if match is not None:
                 pra_size = match.group(2)
                 orows.append(itertools.chain(tup, [scenetype, pra_size, releasedir / name]))
@@ -140,6 +143,7 @@ def resolve_releasefile(akdf, scenetypes=['x'], realized=True):
     for scenetype in scenetypes:
         # First find directories containing RELEASE files
         for tup in akdf.itertuples():
+#            print('BB1 tup ', tup)
             parsed = tup.parsed
 
             if parsed['type'] == 'releasefile':
@@ -155,10 +159,9 @@ def resolve_releasefile(akdf, scenetypes=['x'], realized=True):
                 combo = expmod.Combo(*tup.combo)
                 scenedir = expmod.combo_to_scenedir(combo, scenetype=scenetype)
                 if scenetype == 'x':
-                    sceneleaf = scenedir.parts[-1]    # Eg: x-113-045
-                    for name in os.listdir(scenedir / 'CHUNKS'):
-                        chunk_subleaf = name[len(sceneleaf):]    # Eg: 0000230TFor_10m
-                        match = _chunk_subleafRE.match(chunk_subleaf)
+                    for name in sorted(os.listdir(scenedir / 'CHUNKS')):
+                        match = _chunkRE.match(name)
+#                        print('    match = ', match)
                         if match is not None:
                             # We found a valid chunk dir!  Remember its associated RELEASE dir.
                             process_releasedir(tup, 'x', scenedir / 'CHUNKS' / name / 'RELEASE')
@@ -269,7 +272,7 @@ def resolve_to(parseds, level, realized=True, scenetypes={'x'}):
         return akdf
 
     akdf = resolve_releasefile(akdf, scenetypes=scenetypes)
-    if level == 'rf':
+    if level == 'releasefile':
         return akdf
 
     akdf = resolve_id(akdf, realized=realized)

@@ -334,7 +334,7 @@ def parse_args(args, load=True):
                 print('Added to ids ', ids)
             else:
                 assert False    # Illegal state
-    print('vv1 done loop')
+#    print('vv1 done loop')
     flush_parts()
 
     # Now  combine IDs into previous item

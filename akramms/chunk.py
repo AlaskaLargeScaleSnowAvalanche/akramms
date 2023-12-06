@@ -144,8 +144,9 @@ def add_pra_size(reldf):
         (or created by another means)
         Must have column: area_m2
     """
-    reldf['pra_size'] = reldf['area_m2'].map(
+    pra_size = reldf['area_m2'].map(
         lambda x: _pra_sizes[bisect.bisect(_post_cat_bounds, x) - 1])
+    reldf['pra_size'] = pra_size.astype('string')
     return reldf
 # -----------------------------------------------------------
 def add_snow(df, snowI_tif, snow_density=200.):
@@ -289,8 +290,6 @@ def add_dom(rdf, dem_filled, dem_nodata, grid_info, margins, **kwargs):
 
     Optional kwargs
         Forwarded to d8graph.find_domain()
-        margin: float
-            Margin to add around the avalanche when computing domain
         debug: int
             Set to 1 to put d8graph CPP code in debug mode
         min_alpha: (default 18.0 degrees)
@@ -313,7 +312,7 @@ def add_dom(rdf, dem_filled, dem_nodata, grid_info, margins, **kwargs):
 
         # Get the domain from the PRA burn
         args = ()
-        margin = row['pra_size']
+        margin = margins[row['pra_size']]
         ret = d8graph.find_domain(
             dem_filled, dem_nodata, grid_info.geotransform, pra_burn,
             debug=1, margin=margin, **kwargs)
@@ -343,6 +342,20 @@ class ChunkInfo(typing.NamedTuple):
     resolution: int    # 10
     return_period: int
     pra_size: str    # TSML
+
+    @property
+    def chunk_name(self):
+        """{scene_dir}/CHUNKS/{chunk_name}"""
+        return f'c-{self.pra_size}-{self.chunkid:05}'
+
+    @property
+    def slope_name(self):
+        """{scene_dir}/CHUNKS/{chunk_name}/RESULTS/{slope_name}/{return_period}{pra_size}"""
+        return f'{self.chunk_name}{self.For}_{self.resolution}m'    # Used for DEM / Forest files
+
+    @property
+    def avalanche_name(self):
+        return f'{self.return_period}{self.pra_size}'
 
 def add_chunkinfo(df, scene_args):
     """Adds a master_rammsname (type rammsutil.RammsName) column.
@@ -444,7 +457,7 @@ def write_rel(rdf, wkt, return_period, ofname, **kwargs):
 
     # Select columns to write
     cols = ['area_m2', 'Mean_DEM', 'Mean_Slope', 'Scene_reso', 'Id', 'i', 'j', 'sx3', 'd0star', 'slopecorr', 'Wind', f'd0_{return_period}', f'VOL_{return_period}', 'pra']
-    cols += [name for name in ('chunkid', 'pra_size') if name in df]
+    cols += [name for name in ('chunkid', 'pra_size') if name in rdf]
     df = rdf.reset_index()[cols]
 
 #    ofname.parents[0].mkdir(parents=True, exist_ok=True)
@@ -590,22 +603,25 @@ def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
         chunk_dir
 
     NOTE:
-        chunk_name = f'{scene_name}{chunkid:05d}{return_period}{pra_size}{For}_{resolution}'
-        slope_name = f'{scene_name}{chunkid:05d}{For}_{resolution}'    # Used for DEM / Forest files
+        chunk_name = f'{ci.scene_name}{ci.chunkid:05d}{ci.For}_{ci.resolution}m_{ci.return_period}{ci.pra_size}'
+        slope_name = f'{scene_name}{chunkid:05d}{For}_{resolution}m'    # Used for DEM / Forest files
         chunk_dir = scene_dir / 'CHUNKS' / chunk_name
 
     """
 
     ci = chunk_info
-    chunk_name = f'{ci.scene_name}{ci.chunkid:05d}{ci.return_period}{ci.pra_size}{ci.For}_{ci.resolution}'
-    slope_name = f'{ci.scene_name}{ci.chunkid:05d}{ci.For}_{ci.resolution}'    # Used for DEM / Forest files
-    chunk_dir = scene_args['scene_dir'] / 'CHUNKS' / chunk_name
-    slope_dir = chunk_dir / 'RESULTS' / slope_name
-    avalanche_dir = slope_dir / f'{ci.return_period}{ci.pra_size}'
-
+    #chunk_name = f'{ci.scene_name}{ci.chunkid:05d}{ci.return_period}{ci.pra_size}{ci.For}_{ci.resolution}'
+#    slope_name = f'{ci.scene_name}{ci.chunkid:05d}{ci.For}_{ci.resolution}m'    # Used for DEM / Forest files
+#    chunk_name = f'{slope_name}_{ci.return_period}{ci.pra_size}'
+#    chunk_dir = scene_args['scene_dir'] / 'CHUNKS' / ci.chunk_name
+#    slope_dir = chunk_dir / 'RESULTS' / slope_name
+#    avalanche_dir = slope_dir / f'{ci.return_period}{ci.pra_size}'
+    chunk_dir = scene_args['scene_dir'] / 'CHUNKS' / ci.chunk_name
+    slope_dir = chunk_dir / 'RESULTS' / ci.slope_name
+    avalanche_dir = slope_dir / ci.avalanche_name
 
     # Make symlinks for DEM file, etc.
-    for ifile,ofile in dem_forest_links(scene_args, chunk_dir, slope_name, ci.For):
+    for ifile,ofile in dem_forest_links(scene_args, chunk_dir, ci.slope_name, ci.For):
         setlink_or_copy(ifile, ofile)
 
     # Write scenario.txt
@@ -614,13 +630,13 @@ def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
 
     # Write the _rel.shp file
     os.makedirs(chunk_dir / 'RELEASE', exist_ok=True)
-    ofname = chunk_dir / 'RELEASE' / f'{chunk_name}_rel.shp'
+    ofname = chunk_dir / 'RELEASE' / f'{ci.slope_name}_rel.shp'
     _dfx = dfc.reset_index()[['area_m2', 'Mean_DEM', 'Mean_Slope', 'Scene_reso', 'Id', 'i', 'j', 'sx3', 'd0star', 'slopecorr', 'Wind', f'd0_{ci.return_period}', f'VOL_{ci.return_period}', 'pra']]
     shputil.write_df(_dfx, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
     
     # Write the _dom.shp file 
     os.makedirs(chunk_dir / 'DOMAIN', exist_ok=True)
-    ofname = chunk_dir / 'DOMAIN' / f'{chunk_name}_dom.shp'
+    ofname = chunk_dir / 'DOMAIN' / f'{ci.slope_name}_dom.shp'
     _dfx = dfc.reset_index()[['Id', 'dom']]
     shputil.write_df(_dfx, 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
 
