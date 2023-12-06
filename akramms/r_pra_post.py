@@ -95,8 +95,8 @@ def master_ramms_names(scene_args, return_period, forest):
 
 def in_domain(domain, pra):
     """Returns True if the PRA is >50% in the domain"""
-
     ret = domain.contains(pra.centroid)
+    return ret
 
 
 def rule(scene_dir, dem_filled_file, return_period, forest, snowI_tif,

@@ -58,7 +58,7 @@ def archive_scene(scene_dir, archive_dir):
     overruns = ()
 
     # Look for .out.zip files for list of actual available Avalanche
-    # IDs.  If all avalnches have completed successfully, and there is
+    # IDs.  If all avalanches have completed successfully, and there is
     # now "pollution" of other runs in this directory, the list should
     # be the same as shp_ids
     out_zips = dict()
@@ -98,8 +98,9 @@ def archive_scene(scene_dir, archive_dir):
         out_nc = os.path.join(archive_dir, 'aval-{:d}.nc'.format(id))
 
         # Only rewrite out_nc if it doesn't exist
-TODO: Check file timestamps
+#TODO: Check file timestamps
         status,out_zip = out_zips.get(id, (NO_OUT_ZIP, None))
+        print('yyy ', id, status, out_zip)
         basepath = None if out_zip is None else out_zip[:-8]
 
         if os.path.exists(out_nc):
@@ -139,7 +140,7 @@ TODO: Check file timestamps
 
 
 def main():
-    scene_dir = '/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/x-113-026'
-    archive_dir = '/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/arc-113-026'
+    scene_dir = '/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/x-113-045'
+    archive_dir = '/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/arc-113-045'
     archive_scene(scene_dir, archive_dir)
 main()

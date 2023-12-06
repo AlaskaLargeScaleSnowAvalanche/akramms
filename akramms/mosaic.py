@@ -1,16 +1,19 @@
+import os
+import numpy as np
 from osgeo import gdal
 import zipfile,netCDF4
 from uafgi.util import gdalutil
 from akramms import experiment
-import numpy as np
 
 
 _mosaic_metadata = {
-    'elevation': (gdal.GDT_Float32, {
+    'dem': (gdal.GDT_Float32, {
+        'description': 'IFSAR Digital elevation model',
         'units': 'm'
     }),
-    'elevation': (gdal.GDT_Int16, {
-        'description': 'Digital elevation model',
+
+    'landcover': (gdal.GDT_Int16, {
+        'description': 'USGS Land cover types',
         'units': 'm'
     }),
 
@@ -32,6 +35,10 @@ _mosaic_metadata = {
 }
 _mosaic_keys = list(_mosaic_metadata.keys())
 
+def ozip_write(ozip, fname):
+    """Writes with truncated arcname"""
+    ozip.write(fname, arcname=os.path.split(fname)[1])
+
 def mosaic_aval(exp_mod, gridM, avals, ofname_zip, rho=300, tdir=None, vars=_mosaic_keys):
 
     """
@@ -52,16 +59,16 @@ def mosaic_aval(exp_mod, gridM, avals, ofname_zip, rho=300, tdir=None, vars=_mos
     """
     vars_set = set(vars)
 
-    _vars = dict(
+    vals = dict(
         deposition=np.zeros((gridM.ny, gridM.nx), dtype='d'),
         max_velocity=np.zeros((gridM.ny, gridM.nx), dtype='d'),
         max_pressure=np.zeros((gridM.ny, gridM.nx), dtype='d'),
         count=np.zeros((gridM.ny, gridM.nx), dtype='i'))
 
-    deposition = _vars['deposition']
-    max_velocity = _vars['max_velocity']
-    max_pressure = _vars['max_pressure']
-    count = _vars['count']
+    deposition = vals['deposition']
+    max_velocity = vals['max_velocity']
+    max_pressure = vals['max_pressure']
+    count = vals['count']
 
     print('gridD ', exp_mod.gridD)
     print('gridM ', gridM)
@@ -75,58 +82,85 @@ def mosaic_aval(exp_mod, gridM, avals, ofname_zip, rho=300, tdir=None, vars=_mos
             gridA_gt = np.array([float(x) for x in nc.variables['grid_mapping'].GeoTransform.split(' ')])
             print('gridA_gt ', gridA_gt)
 
-            deltai = int((gridM.x0 - gridA_gt[0]) / gridM.dx + 0.5)
-            deltaj = int((gridM.y0 - gridA_gt[3]) / gridM.dy + 0.5)
+            deltai = int(-(gridM.x0 - gridA_gt[0]) / gridM.dx + 0.5)
+            deltaj = int(-(gridM.y0 - gridA_gt[3]) / gridM.dy + 0.5)
+
+            print('deltaxxxxx ', gridM.x0, gridA_gt[0], gridM.dx)
+            print('deltayyyyy ', gridM.y0, gridA_gt[3], gridM.dy)
+            print('delta i/j ', deltai, deltaj)
 
             # Load (i,j) of each avalanche and convert to local mosaic-box coordinates
             iis = np.cumsum(nc.variables['i_diff'][:]) + deltai
             jjs = np.cumsum(nc.variables['j_diff'][:]) + deltaj
-            print(jjs), gridM.ny
-            print(iis), gridM.nx
-            good_ixs = np.where(
-                np.logical_and.reduce((iis >= 0, iis < gridM.nx, jjs >= 0, jjs < gridM.ny)))
+#            print(jjs), gridM.ny
+#            print(iis), gridM.nx
+            good_ixs = np.where(np.logical_and.reduce((iis >= 0, iis < gridM.nx, jjs >= 0, jjs < gridM.ny)))
+            print('good_ixs ', good_ixs, gridM.nx, gridM.ny)
 
-            # Load original variables, and clip out-of-range gridcells
+            # Clip out-of-query-range gridcells
             _iis = iis[good_ixs]
             _jjs = jjs[good_ixs]
+
+            # Load original variables
             _max_vel = nc.variables['max_vel'][good_ixs]
             _max_height = nc.variables['max_height'][good_ixs]
             _depo = nc.variables['depo'][good_ixs]
 
+            # Narrow down to ONLY cells that avalanche touched
+            nz_ixs = np.where(_max_vel > 0)
+            _iis = _iis[nz_ixs]
+            _jjs = _jjs[nz_ixs]
+            _max_vel = _max_vel[nz_ixs]
+            _max_height = _max_height[nz_ixs]
+            _depo = _depo[nz_ixs]
+
             # Mosaic into final variables
-            deposition[_jjs,_iis] = np.max(deposition[_jjs,_iis], _depo)
-            max_velocity[_jjs,_iis] = np.max(max_velocity[_jjs,_iis], _max_vel)
-            max_pressure[_jjs,_iis] = np.max(max_pressure[_jjs,_iis], rho * _max_vel*_max_vel)
-            count[_jjs,_iis] += 1
+#            print('jjs ', _jjs)
+#            print('iis ', _iis)
+#            print('deposition ', deposition[_jjs,_iis])
+#            print('_depo ', _depo)
+            deposition[_jjs,_iis] = np.maximum(deposition[_jjs,_iis], _depo)
+            max_velocity[_jjs,_iis] = np.maximum(max_velocity[_jjs,_iis], _max_vel)
+            max_pressure[_jjs,_iis] = np.maximum(max_pressure[_jjs,_iis], rho * _max_vel*_max_vel)
+            count[_jjs,_iis] += 1    # 1 if it touches cell, otherwise 0
 
     # Write output GeoTIFF and Zip it up
     with zipfile.ZipFile(ofname_zip, mode='w', compression=zipfile.ZIP_STORED) as ozip:
 
-        # DEM
-        if 'dem' in vars_set:
-            ofn = os.path.join(tdir.location, 'dem.tif')
-            exp_mod.extract_dem(box_poly, ofn)
-            ozip.write(ofn)
+        box_poly = gridM.bounding_box
 
-        # Land Cover
-        if 'landcover' in vars_set:
-            ofn = os.path.join(tdir.location, 'landcover.tif')
-            exp_mod.extract_dem(box_poly, ofn)
-            ozip.write(ofn)
-
-        exp_mod.extract_landcover(box_poly, os.path.join(tdir.location, 'landcover.tif'))
 
         # Other variables
-        for vname, val in vars:
+#        print('vars ', vars)
+#        for vname, val in vars.items():
+        for vname in vars:
             if vname in {'dem', 'landcover'}:
                 continue    # Already handled above
+            val = vals[vname]
             gdal_type,_meta = _mosaic_metadata[vname]
             meta = dict(_meta)
             if vname == 'max_pressure':
                 meta['rho'] = f'{rho} [kg m-3]'
             ofn = os.path.join(tdir.location, f'{vname}.tif')
-            gdalutil.write_raster(ofn, gridM, val, type=gdal_type, metadata=meta)
-            ozip.write(ofn)
+            gdalutil.write_raster(ofn, gridM, val, 0, type=gdal_type, metadata=meta)
+            ozip_write(ozip, ofn)
+            ozip_write(ozip, os.path.join(tdir.location, f'{vname}.tfw'))
+
+        # These are last so they appear as lower layers in QGIS
+        # Land Cover
+        if 'landcover' in vars_set:
+            ofn = os.path.join(tdir.location, 'landcover.tif')
+            exp_mod.extract_landcover(box_poly, os.path.join(tdir.location, 'landcover.tif'))
+            ozip_write(ozip, ofn)
+            ozip_write(ozip, os.path.join(tdir.location, 'landcover.tif.aux.xml'))
+            ozip_write(ozip, os.path.join(tdir.location, 'landcover.tfw'))
+
+        # DEM
+        if 'dem' in vars_set:
+            ofn = os.path.join(tdir.location, 'dem.tif')
+            exp_mod.extract_dem(box_poly, ofn)
+            ozip_write(ozip, ofn)
+            ozip_write(ozip, os.path.join(tdir.location, 'dem.tfw'))
 
 def main():
     from uafgi.util import ioutil
@@ -136,10 +170,15 @@ def main():
 
     res = exp_mod.resolution
     gridG = exp_mod.gridD.global_grid(res, res)
-    gridM = exp_mod.gridD.sub(113,45, res, res)    # Could be arbitrary rectangle
-    avals = ['/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/arc-113-045/aval-524.nc']
+#    gridM = exp_mod.gridD.sub(113,45, res, res)    # Could be arbitrary rectangle
+    gridM = exp_mod.gridD.subgrid(
+        1109800, 1107000,
+        1111300, 1108000,
+        res, res)
+
+    avals = ['/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/arc-113-045/aval-1762.nc']
     with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
-        mosaic_aval(exp_mod, gridM, avals, 'avals.zip', tdir=tdir)
+        mosaic_aval(exp_mod, gridM, avals, 'avals2.zip', tdir=tdir)
 
 main()
 
