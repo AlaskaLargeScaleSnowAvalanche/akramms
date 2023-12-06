@@ -245,9 +245,9 @@ def ramms_to_nc0(gridI, base, ofname):
 
 # ----------------------------------------------------------
 # ----------------------------------------------------------
-def main():
-    base = '/Users/eafischer2/tmp/aval/juneauA00000For_5m_30L_4981'
-    dem_file = '/Users/eafischer2/tmp/maps/Juneau_IFSAR_DTM_AKAlbers_EPSG_3338_filled.tif'
-    gridI = gdalutil.read_grid(dem_file)
-    ramms_to_nc(gridI, base, 'x.nc')
-main()
+#def main():
+#    base = '/Users/eafischer2/tmp/aval/juneauA00000For_5m_30L_4981'
+#    dem_file = '/Users/eafischer2/tmp/maps/Juneau_IFSAR_DTM_AKAlbers_EPSG_3338_filled.tif'
+#    gridI = gdalutil.read_grid(dem_file)
+#    ramms_to_nc(gridI, base, 'x.nc')
+#main()
