@@ -1,4 +1,4 @@
-import os,re,itertools,struct
+import os,re,itertools,struct,pickle,zipfile,io
 import numpy as np
 import netCDF4
 import pyproj
@@ -10,9 +10,10 @@ from uafgi.util import gdalutil
 # ------------------------------------------------------------------
 # NOTE: Similar to rammsutil.read_polygon_from_zip()
 _all_spaceRE = re.compile(r'$\s*^')
-def _read_polygon(poly_file):
+def _read_polygon(izip, poly_file):
 
-    with open(poly_file) as fin:
+#    with open(poly_file) as fin:
+    with io.TextIOWrapper(izip.open(poly_file, 'r'), encoding='utf-8') as fin:
         line = next(fin).split(' ')
         # Get repeated coordinate at the end
         #print('line ', line)
@@ -22,11 +23,24 @@ def _read_polygon(poly_file):
 
     return shapely.geometry.Polygon(list(zip(coords[::2], coords[1::2])))
 # ------------------------------------------------------------------
-def nc_poly(ncout, ifname, vname, coord_attrs, attrs={}, required=True):
-    if (not required) and (not os.path.exists(ifname)):
+def nc_poly(ncout, izip, arcname, vname, coord_attrs, attrs={}, required=True):
+    """
+    izip: zip.ZipFile
+        Open zip file to read from
+    arcname:
+        Name of file to read out of izip
+    """
+
+    try:
+        info = izip.getinfo(arcname)
+    except KeyError:
+        info = None
+
+
+    if (not required) and (info is None):
         return None
 
-    poly = _read_polygon(ifname)
+    poly = _read_polygon(izip, arcname)
     ncout.createDimension(f'{vname}_len', len(poly)//2)
     ncv = ncout.createVariable(vname, 'd', (f'{vname}_len', 'two'), compression='zlib')
     for attr,val in attrs.items():
@@ -98,10 +112,15 @@ def parse_xy_coord(gridI, fin):
     return ivec, jvec
 
 
-def nc_xy_coord(ncout, gridI, coord_attrs, fname):
+def nc_xy_coord(ncout, gridI, coord_attrs, izip, arcname):
+    """
+    izip, arcname:
+        File .xy-coord file to read (from inside a zip)
+    """
 
     # Read the original file
-    with open(fname,'rb') as fin:
+#    with open(fname,'rb') as fin:
+    with izip.open(arcname, 'r') as fin:
         ivec, jvec = parse_xy_coord(gridI, fin)
 
     # Difference-encode i/j to increase compression
@@ -132,7 +151,7 @@ def parse_out(fin):
     fmt = '<L'
     buf = fin.read(struct.calcsize(fmt))
     ncells = struct.unpack(fmt, buf)[0]
-    print('ncells ', ncells)
+#    print('ncells ', ncells)
 
     buf = fin.read(ncells * 4)
     max_vel = np.frombuffer(buf, dtype='<f4')
@@ -147,9 +166,10 @@ def parse_out(fin):
         ('max_height', max_height, {'units': 'm'}),
         ('depo', depo,  {'units': 'm'}))
 
-def nc_out(ncout, fname, attrs={}):
+def nc_out(ncout, izip, arcname, attrs={}):
     # Read the values from the .out file
-    with open(fname, 'rb') as fin:
+#    with open(fname, 'rb') as fin:
+    with izip.open(arcname, 'r') as fin:
         namevals = parse_out(fin)
 
     # Create and populate the variables
@@ -166,7 +186,7 @@ def nc_out(ncout, fname, attrs={}):
 
 
 # ----------------------------------------------------------
-def ramms_to_nc0(gridI, base, ofname):
+def ramms_to_nc0(base, ofname):
     """
     base:
         Base name of avalanche, including full pathname.
@@ -189,7 +209,17 @@ def ramms_to_nc0(gridI, base, ofname):
 
 
     """
-    with netCDF4.Dataset(ofname, 'w') as ncout:
+    leaf = os.path.split(base)[1]
+    with zipfile.ZipFile(f'{base}.in.zip', 'r') as in_zip:
+     with zipfile.ZipFile(f'{base}.out.zip', 'r') as out_zip:
+      with netCDF4.Dataset(ofname, 'w') as ncout:
+
+        in_infos = in_zip.infolist()
+        out_infos = out_zip.infolist()
+
+        # Get the grid
+        gridI = pickle.loads(in_zip.read('grid.pik'))
+
         # http://cfconventions.org/cf-conventions/cf-conventions.html#coordinate-system
         # Write the CRS
         # (TODO: Move this to uafgi/gisutil.py)
@@ -209,17 +239,17 @@ def ramms_to_nc0(gridI, base, ofname):
 
         # The .relp and .domp files
         ncout.createDimension('two', 2)
-        nc_poly(ncout, f'{base}.relp', 'relp', coord_attrs,
+        nc_poly(ncout, in_zip, f'{leaf}.relp', 'relp', coord_attrs,
             {'description': 'UNOFFICIAL release area polygon written by AKRAMMS Python code.',
             'grid_mapping': 'grid_mapping'},
             required=False)
-        nc_poly(ncout, f'{base}.domp', 'domp', coord_attrs,
+        nc_poly(ncout, in_zip, f'{leaf}.domp', 'domp', coord_attrs,
             {'description': 'UNOFFICIAL domain polygon written by AKRAMMS Python code.',
             'grid_mapping': 'grid_mapping'},
             required=False)
 
         # The .rel file
-        nc_poly(ncout, f'{base}.rel', 'rel', coord_attrs,
+        nc_poly(ncout, in_zip, f'{leaf}.rel', 'rel', coord_attrs,
             {'description': 'OFFICIAL release area polygon written by RAMMS IDL code.',
             'grid_mapping': 'grid_mapping'},
             required=False)
@@ -228,7 +258,7 @@ def ramms_to_nc0(gridI, base, ofname):
         vdoms = list()
         for i in itertools.count(1):
             ifname = f'{base}.v{i}.dom'
-            ret = nc_poly(ncout, f'{base}.v{i}.dom', f'dom_v{i}', coord_attrs,
+            ret = nc_poly(ncout, in_zip, f'{leaf}.v{i}.dom', f'dom_v{i}', coord_attrs,
                 {'description': f'OFFICIAL release area polygon written by RAMMS IDL code (enlargement try #{i}).'},
                 required=False)
             if ret is None:
@@ -237,10 +267,10 @@ def ramms_to_nc0(gridI, base, ofname):
         # The .xyz file (SKIP)
 
         # The .xy-coord file
-        nc_xy_coord(ncout, gridI, coord_attrs, f'{base}.xy-coord')
+        nc_xy_coord(ncout, gridI, coord_attrs, in_zip, f'{leaf}.xy-coord')
 
         # The .out file
-        nc_out(ncout, f'{base}.out',
+        nc_out(ncout, out_zip, f'{leaf}.out',
             attrs={'grid_mapping': 'grid_mapping'})
 
 # ----------------------------------------------------------
@@ -251,3 +281,7 @@ def ramms_to_nc0(gridI, base, ofname):
 #    gridI = gdalutil.read_grid(dem_file)
 #    ramms_to_nc(gridI, base, 'x.nc')
 #main()
+
+
+#TODO: Add T/S/M/L categorization to netCDF file
+#Add authorship metadata to netCDF file

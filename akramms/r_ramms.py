@@ -622,6 +622,7 @@ class JobStatus:
     OVERRUN = 5      # Avalanche overran the boundary; auto-resubmit
     FAILED = 6       # The job finished but did not produce full / correct output
 
+_subsceneRE = re.compile(r'x-(\d+-\d+)')
 def job_statuses(release_files):
     """Determines status of ALL Condor jobs for a RAMMS run."""
 
@@ -636,6 +637,14 @@ def job_statuses(release_files):
     for release_file in release_files:
         jb = rammsutil.parse_release_file(release_file)
         ids = get_job_ids(release_file)
+
+        # Determine whether this scene is part of a large experiment
+        # If so, determine its associated archive directory
+        match = _subsceneRE.match(os.path.split(jb.scene_dir)[1])
+        if match is None:
+            archive_dir = None    # Not part of a larger experiment, not archive directory
+        else:
+            archive_dir = os.path.join(os.path.split(jb.scene_dir)[0], 'arc-{}'.format(match.group(1)))
 
         # Query Condor
         schedd = htcondor.Schedd()   # get the Python representation of the scheduler
@@ -691,12 +700,20 @@ def job_statuses(release_files):
             # Not in Condor?  Either it hasn't launched, or it's finished / failed
             # Let's look at the files on disk to decide.
 
+            # If an archive NetCDF file exists, then this avalanche is FINISHED.
+            if archive_dir is not None:
+                aval_nc = os.path.join(archive_dir, f'aval-{id}.nc')
+                if os.path.exists(aval_nc):
+                    statuses.append((jb, id, JobStatus.FINISHED))
+                    continue
+
             # Identify avalanches that have finished: .out.zip exists and has non-zero size
             # (User can reset jobs by removing *.out.zip)
             out_zip = os.path.join(jb.avalanche_dir, f'{job_name}.out.zip')
             if os.path.exists(out_zip):
 
                 # Check for abandoned job
+                # TODO: Use file_is_good() instead!
                 statinfo = os.stat(out_zip)
                 if (statinfo.st_size==0):
                     # The HTCondor output file has been created, but
