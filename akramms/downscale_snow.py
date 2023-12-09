@@ -255,7 +255,7 @@ def downscale_sx3_with_lapse(sx3_file, geo_nc, distance_from_coastA_tif, dem_tif
             resample_algo=gdalconst.GRA_NearestNeighbour)
 
         # Smooth it!
-        sigma = (.5*gridA.dy, .5*gridA.dx)
+        sigma = (.5 * gridA.dy / gridI.dy, .5 * gridA.dx / gridI.dx)
         print('sigma ', sigma)
 #        kernel = gaussian(sigma, (gridA.dy, gridA.dx))
 #        sx3I = scipy.signal.fftconvolve(sx3I, kernel mode='same')    # Assumes no missing values
