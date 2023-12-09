@@ -10,6 +10,7 @@ from akramms import config,process_tree
 from akramms.util import paramutil,harnutil,arcgisutil
 from uafgi.util import make
 from akramms import params
+import scipy.ndimage
 
 """Rules to prepare the snow field for direct use in determining snow depth for PRAs."""
 
