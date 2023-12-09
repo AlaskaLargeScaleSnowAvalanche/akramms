@@ -241,7 +241,8 @@ def downscale_sx3_with_lapse(sx3_file, geo_nc, distance_from_coastA_tif, dem_tif
     print('elevI_nd = ', elevI_nd)
 
     # Regrid sx3
-    sx3I_tif = os.path.join('sx3I.tif')
+    sx3I_tif = ofname.with_name('{}_sx3I.tif'.format(ofname.with_suffix('').parts[-1]))
+#    sx3I_tif = os.path.join('sx3I.tif')
 #    if os.path.exists(sx3I_tif):
 #        _,sx3I,_ = gdalutil.read_raster(sx3I_tif)
 #    else:
@@ -255,19 +256,16 @@ def downscale_sx3_with_lapse(sx3_file, geo_nc, distance_from_coastA_tif, dem_tif
             resample_algo=gdalconst.GRA_NearestNeighbour)
 
         # Smooth it!
-        sigma = (.5 * gridA.dy / gridI.dy, .5 * gridA.dx / gridI.dx)
+        sigma = (gridA.dy / gridI.dy, gridA.dx / gridI.dx)
         print('sigma ', sigma)
 #        kernel = gaussian(sigma, (gridA.dy, gridA.dx))
 #        sx3I = scipy.signal.fftconvolve(sx3I, kernel mode='same')    # Assumes no missing values
         sx3I = scipy.ndimage.gaussian_filter(sx3I, sigma)
 
-        if True:
-            gdalutil.write_raster(
-                sx3I_tif,
-                gridI, sx3I, sx3A_nd, type=gdal.GDT_Float32)
-
-
-    sys.exit(0)
+        print('Writing smoothed sx3I intermediary file')
+        gdalutil.write_raster(
+            sx3I_tif,
+            gridI, sx3I, sx3A_nd, type=gdal.GDT_Float32)
 
     # --------------------------------------------------------
     # Read input from distance file
