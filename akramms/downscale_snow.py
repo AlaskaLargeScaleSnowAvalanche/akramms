@@ -3,7 +3,7 @@ import os,pathlib,shutil,functools,sys
 import netCDF4
 import numpy as np
 import pandas as pd
-import rtree
+import rtree,math
 from osgeo import gdalconst,gdal
 from uafgi.util import wrfutil,gdalutil
 from akramms import config,process_tree
@@ -257,7 +257,7 @@ def downscale_sx3_with_lapse(sx3_file, geo_nc, distance_from_coastA_tif, dem_tif
             resample_algo=gdalconst.GRA_NearestNeighbour)
 
         # Smooth it!
-        sigma = (gridA.dy / gridI.dy, gridA.dx / gridI.dx)
+        sigma = (math.abs(gridA.dy / gridI.d)y, math.abs(gridA.dx / gridI.dx))
         print('sigma ', sigma)
 #        kernel = gaussian(sigma, (gridA.dy, gridA.dx))
 #        sx3I = scipy.signal.fftconvolve(sx3I, kernel mode='same')    # Assumes no missing values
