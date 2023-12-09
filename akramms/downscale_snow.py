@@ -291,6 +291,9 @@ def downscale_sx3_with_lapse(sx3_file, geo_nc, distance_from_coastA_tif, dem_tif
             lapseA, gridA, float(-1.e30),
             gridI, float(-1.e30),
             resample_algo=gdalconst.GRA_NearestNeighbour)
+        # Smooth lapse same as snow
+        lapseAI = scipy.ndimage.gaussian_filter(lapseAI, sigma)
+
 #        gdalutil.write_raster(
 #            lapseAI_tif,
 #            gridI, lapseAI, -1.e30, type=gdal.GDT_Float32)
@@ -311,6 +314,8 @@ def downscale_sx3_with_lapse(sx3_file, geo_nc, distance_from_coastA_tif, dem_tif
             elevA, gridA, float(elevI_nd),
             gridI, float(elevI_nd),
             resample_algo=gdalconst.GRA_NearestNeighbour)
+        # Smooth elevation same as snow
+        elevAI = scipy.ndimage.gaussian_filter(elevAI, sigma)
 
 #        gdalutil.write_raster(elevAI_tif, gridI, elevAI, elevI_nd, type=gdal.GDT_Float32)
 
