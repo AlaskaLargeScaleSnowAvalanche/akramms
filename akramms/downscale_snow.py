@@ -264,6 +264,7 @@ def downscale_sx3_with_lapse(sx3_file, geo_nc, distance_from_coastA_tif, dem_tif
         sx3I = scipy.ndimage.gaussian_filter(sx3I, sigma)
 
         print('Writing smoothed sx3I intermediary file')
+        os.path.mkdirs(sx3I_tif.parents[0])
         gdalutil.write_raster(
             sx3I_tif,
             gridI, sx3I, sx3A_nd, type=gdal.GDT_Float32)
