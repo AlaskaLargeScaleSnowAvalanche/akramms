@@ -1,5 +1,5 @@
 import subprocess
-import os,pathlib,shutil,functools
+import os,pathlib,shutil,functools,sys
 import netCDF4
 import numpy as np
 import pandas as pd
@@ -215,6 +215,7 @@ def lapse_by_distance_from_coast(cdistA):
 #    def action(tdir):
 
 
+# -----------------------------------------------------------------
 def downscale_sx3_with_lapse(sx3_file, geo_nc, distance_from_coastA_tif, dem_tif, ofname):
     """
     sx3_file: (gridA)
@@ -239,20 +240,32 @@ def downscale_sx3_with_lapse(sx3_file, geo_nc, distance_from_coastA_tif, dem_tif
     print('elevI_nd = ', elevI_nd)
 
     # Regrid sx3
-#    sx3I_tif = os.path.join(scene_dir, 'sx3I.tif')
+    sx3I_tif = os.path.join('sx3I.tif')
 #    if os.path.exists(sx3I_tif):
 #        _,sx3I,_ = gdalutil.read_raster(sx3I_tif)
 #    else:
     if True:
         print('Computing sx3I...')
+
+        # Regrid WRF snow field sx3 to the local grid by resampling
         sx3I = gdalutil.regrid(
             sx3A, gridA, float(sx3A_nd),
             gridI, float(sx3A_nd),
             resample_algo=gdalconst.GRA_NearestNeighbour)
-#        gdalutil.write_raster(
-#            sx3I_tif,
-#            gridI, sx3I, sx3A_nd, type=gdal.GDT_Float32)
 
+        # Smooth it!
+        sigma = (.5*gridA.dy, .5*gridA.dx)
+#        kernel = gaussian(sigma, (gridA.dy, gridA.dx))
+#        sx3I = scipy.signal.fftconvolve(sx3I, kernel mode='same')    # Assumes no missing values
+        sx3I = scipy.ndimage.gaussian_filter(sx3I, sigma)
+
+        if True:
+            gdalutil.write_raster(
+                sx3I_tif,
+                gridI, sx3I, sx3A_nd, type=gdal.GDT_Float32)
+
+
+    sys.exit(0)
 
     # --------------------------------------------------------
     # Read input from distance file

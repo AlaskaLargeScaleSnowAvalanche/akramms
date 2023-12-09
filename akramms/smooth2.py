@@ -105,6 +105,8 @@ def gaussian(sigma, dx, cutoff=2.0):
 # -----------------------------------------------------------------
 def zsmooth(imgI, elevI, sigma3d, dxI, cutoff=2.0):
 
+#    imgI[1,:] += 1    # DEBUG
+
     # Determine spacing of elevation classes (dz)
     sigmaz = sigma3d[-1]
     dz = sigmaz / 2.    # /2. is an arbitrary constant here
@@ -113,30 +115,49 @@ def zsmooth(imgI, elevI, sigma3d, dxI, cutoff=2.0):
     k0 = math.floor(np.min(elevI) / dz)
     k1 = math.ceil(np.max(elevI) / dz) + 1
     nk = k1 - k0
+    print('k0, k1, nk ', k0, k1, nk)
 
     # Get k coordinate of each gridcell in 2D
-    kI = k0 + np.floor(elevI / dz)
+    kI = np.floor(elevI.reshape(-1) / dz).astype(int) - k0
+#    kI[2:] = 1    # DEBUG
+    print('kI ', kI, type(kI))
 
     # Project 2D into 3D
     # K grid = I grid + 3d dimension of size nk
     shapeK = tuple(list(imgI.shape) + [nk])
     imgK = np.zeros(shapeK) + np.nan
-    ndim0 = len(imgI.shape)
+    ndim = len(imgI.shape)
+
     iiss = [    # [ [i,...], [j,...] ] indices of all gridcells
         [q[d] for q in np.ndindex(imgI.shape)]
         for d in range(ndim)]
-    iissK = iiss + [kI[*iiss]]    # # [ [i,...], [j,...], [k,...] ] indices of all gridcells
-    imgK[*iissK] = imgI[*iiss]
+    iissK = iiss + [kI]    # # [ [i,...], [j,...], [k,...] ] indices of all gridcells
+
+    iiss = tuple(iiss)
+    iissK = tuple(iissK)
+
+#    print('iiss ', iiss)
+#    print('iissK ', iissK)
+
+    imgK[iissK] = imgI[iiss]
+
+#    print('imgI')
+#    print(imgI)
+#    print(imgK)
+
 
     # Get the Gaussian kernel
     dxK = tuple(list(dxI) + [dz])
     kernel = gaussian(sigma3d, dxK)
+#    print('kernel')
+#    print(kernel)
 
     # Convolve!
     imgKc = convolve_fft_missing(imgK, kernel)    # imgKc = imgK-convolved
 
     # Remove extra dimension
-    imgIc[*iiss] = imgKc[*iissK]
+    imgIc = np.zeros(imgI.shape)
+    imgIc[iiss] = imgKc[iissK]
     return imgIc
 # -----------------------------------------------------------------
 # -----------------------------------------------------------------
@@ -146,22 +167,38 @@ imgI_file = dir / 'ak_ccsm_1981_1990_lapse_113_045.tif'
 elevI_file = dir / 'ak_dem_113_045_filled.tif'
 
 def main():
-    import PIL
+#    import PIL.Image    # https://github.com/python-pillow/Pillow/issues/6614
 
     # Read sample images
-    with PIL.Image.open(imgI_file) as fin:
-        imgI = np.array(fin)    # Should be dtype='d' already
-    with PIL.Image.open(elevI_file) as fin:
-        elevI = np.array(fin)
-    size = 400
-    imgI = imgI[:size,:size]
-    elevI = elevI[:size,:size]
+#    with PIL.Image.open(elevI_file) as fin:
+#        elevI = np.array(fin)
+#    with PIL.Image.open(imgI_file) as fin:
+#        imgI = np.array(fin)    # Should be dtype='d' already
+
+    from uafgi.util import gdalutil
+
+    elevI_grid, elevI, elevI_nd = gdalutil.read_raster(elevI_file)
+    imgI_grid, imgI, imgI_nd = gdalutil.read_raster(imgI_file)
+
+
+#    sizex = 2
+#    sizey = 3
+    sizex = 1000
+    sizey = 1000
+    imgI = imgI[:sizey,:sizex]
+    elevI = elevI[:sizey,:sizex]
 
 
     # Smooth
-    imgIc = zsmooth(imgI, elevI, (100,100,50), (10.,10.))
+    imgIc = zsmooth(imgI, elevI, (1000,1000,50), (10.,10.))
+    imgIc *= (np.sum(imgI) / np.sum(imgIc))
+#    imgIc = imgI
 
     # Store
+    gdalutil.write_raster('x.tif', imgI_grid, imgIc, imgI_nd)
+
+    # View
+    import PIL.Image
     imgIc_tif = PIL.Image.fromarray(imgIc)
     imgIc_tif.show()
 
