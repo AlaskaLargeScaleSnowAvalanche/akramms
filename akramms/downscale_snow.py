@@ -241,6 +241,7 @@ def downscale_sx3_with_lapse(sx3_file, geo_nc, distance_from_coastA_tif, dem_tif
     print('elevI_nd = ', elevI_nd)
 
     # Regrid sx3
+    ofname = pathlib.Path(ofname)
     sx3I_tif = ofname.with_name('{}_sx3I.tif'.format(ofname.with_suffix('').parts[-1]))
 #    sx3I_tif = os.path.join('sx3I.tif')
 #    if os.path.exists(sx3I_tif):
