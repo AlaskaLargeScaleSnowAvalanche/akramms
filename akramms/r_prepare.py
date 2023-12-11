@@ -216,10 +216,9 @@ def prepare_data(scene_dir):
         # It's an ESRI code
         script_args['outCoordSystem'] = arcgisutil.Lambda('arcpy', 'SpatialReference', scene_args['coordinate_system'])
 
-    # Run the core script
+    # Run the core script (we've already passed the rq barrier by now)
     data_prep_PRA_py = os.path.join(harnutil.HARNESS, 'akramms', 'sh', 'arcgis', 'data_prep_PRA.py')
-    harnutil.run_queued('arcgis',
-        arcgisutil.run_script, data_prep_PRA_py, script_args, cwd=scene_dir, dry_run=False)
+    arcgisutil.run_script(data_prep_PRA_py, script_args, cwd=scene_dir, dry_run=False)
 
     # Clean up temporary files from ArcGIS step
     for dir in temporaries:
@@ -301,7 +300,9 @@ def data_prep_PRA_rule(scene_dir):
         cmd = ['sh', config.roots_w.syspath('{HARNESS}/akramms/sh/prepare_scene.sh', bash=True, as_str=True),
             scene_dir_rel]
 #            config.roots_w.syspath(scene_dir_rel, bash=True, as_str=True)]
-        harnutil.run_remote(inputs, cmd, tdir)
+
+        harnutil.run_queued('arcgis',
+            harnutil.run_remote, inputs, cmd, tdir)
 
         # Make it clear / obvious we have finished
         with open(os.path.join(scene_dir, 'arcgis_stage0.txt'), 'w') as out:
