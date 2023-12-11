@@ -120,7 +120,8 @@ def rule(scene_dir, inputs, return_period, For):
 
         # Run eCognition (in Docker container)!
         print(' '.join(cmd))
-        subprocess.run(cmd, check=True)
+        harnutil.run_queued('ecognition',
+            subprocess.run, cmd, check=True)
 
         # ---------------------------------------
         # eCognition writes out shapefiles with wrong projection.  Fix that

@@ -202,13 +202,19 @@ class QueueRunner:
             raise
 
 # One queue per licensed piece of software
-queues = {qname: QueueRunner(qname) for qname in ('arcgis', 'ecognition', 'idl')}
+_queues = {qname: (lambda: QueueRunner(qname)) for qname in ('arcgis', 'ecognition', 'idl')}
 
-def run_remote_queued(qname, *args, **kwargs):
-    return queues[qname].run(run_remote, *args, **kwargs)
+@functools.lru_cache()
+def queue(qname):
+    return _queues[qname]()
 
-def run_local_queued(qname, fn, *args, **kwargs):
-    return queues[qname].run(fn, *args, **kwargs)
+#def run_remote_queued(qname, *args, **kwargs):
+#    return queues[qname].run(run_remote, *args, **kwargs)
+
+def run_queued(qname, fn, *args, **kwargs):
+    if config.queue[qname]:
+        return queue(qname).run(fn, *args, **kwargs)
+    return fn(*args, **kwargs)
 
 def print_outputs(outputs):
     """Helper function"""

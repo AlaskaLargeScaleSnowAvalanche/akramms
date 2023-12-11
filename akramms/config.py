@@ -74,7 +74,7 @@ ncpu_archive = 8
 poll_period = 60*5    # Seconds between polling attempts
 
 # Should we use the Redis Queue for running remote IDL commands?
-queue_idl = False
+queue = {'arcgis': True, 'ecognition': True, 'idl': True}
 
 # ------------------------------
 # DEBUG parameters

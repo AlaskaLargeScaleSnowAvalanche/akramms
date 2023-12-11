@@ -165,10 +165,8 @@ def rule(release_file, dem_file, inputs, dry_run=False, submit=False):
         # RAMMS Stage 1 accepts inputs on stdin
         # rammsdist.run_on_windows_stage() calls read_inputs()
         dynamic_outputs = list()
-        if config.queue_idl:
-            dynamic_outputs = harnutil.run_remote_queued(inputs, cmd, tdir, write_inputs=True)
-        else:
-            dynamic_outputs = harnutil.run_remote(inputs, cmd, tdir, write_inputs=True)
+        harnutil.run_queued('idl',
+            harnutil.run_remote, inputs, cmd, tdir, write_inputs=True)
 
         # Copy .tif files to be reused by later RAMMS Stage 1
         for fname0,fname1 in tmap:

@@ -218,7 +218,8 @@ def prepare_data(scene_dir):
 
     # Run the core script
     data_prep_PRA_py = os.path.join(harnutil.HARNESS, 'akramms', 'sh', 'arcgis', 'data_prep_PRA.py')
-    arcgisutil.run_script(data_prep_PRA_py, script_args, cwd=scene_dir, dry_run=False)
+    harnutil.run_queued('arcgis',
+        arcgisutil.run_script, data_prep_PRA_py, script_args, cwd=scene_dir, dry_run=False)
 
     # Clean up temporary files from ArcGIS step
     for dir in temporaries:
