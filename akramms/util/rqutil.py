@@ -65,10 +65,17 @@ def queue(qname):
 def blocking_lock(lname, sleep=5, timeout=3*3600):
     # https://redis-py.readthedocs.io/en/v5.0.1/connections.html
     assert lname in _queue_names
-    return conn().lock('l_'+lname, timeout=timeout)
+    return conn().lock('l_'+lname, blocking=True, timeout=timeout)
 
 def clear_locks():
     rd = conn()
     for lname in _queue_names:
         print(f'Resetting lock l_{lname}')
         rd.delete('l_'+lname)
+
+def query_locks():
+    rd = conn()
+    for lname in _queue_names:
+        with conn().lock('l'+lname, blocking=False, timeout=1) as ret:
+            print(f'l_{lname}: {ret}')
+

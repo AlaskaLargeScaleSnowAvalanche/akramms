@@ -339,6 +339,13 @@ def reset(args):
     """Reset locks"""
     from akramms.util import rqutil
     rqutil.clear_locks()
+
+@subcommand([
+])
+def locks(args):
+    """Query locks"""
+    from akramms.util import rqutil
+    rqutil.query_locks()
 # ------------------------------------------------------------------
 @subcommand([
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
