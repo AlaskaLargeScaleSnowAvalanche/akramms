@@ -402,6 +402,6 @@ def filter_by_part(akdf0, part, nparts):
         return akdf0
 
     hm = akdf0['combo'].map(lambda combo: _hashmod_combo(combo, nparts))
-    akdf0 = akdf0[hm == args.part]
+    akdf0 = akdf0[hm == part]
 
     return akdf0
