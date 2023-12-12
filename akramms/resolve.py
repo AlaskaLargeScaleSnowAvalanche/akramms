@@ -1,4 +1,4 @@
-import itertools,re,os,functools,glob
+import itertools,re,os,functools,glob,hashlib,pickle
 import netCDF4
 import pandas as pd
 from uafgi.util import shputil
@@ -379,11 +379,29 @@ def remove_duplicate_ids(akdf0):
     return pd.concat(dfs)
 
 # -------------------------------------------------------------
-#def filter_by_part(akdf, part, nparts):
-#    """Divide workload between multile running instances of akramms run.
-#    part:
-#        Which instance (start with 0)
-#    nparts:
-#        How many instances
-#    """
-#    return akdf
+def _hashmod_combo(combo, nparts):
+    hasher = hashlib.sha256()
+    hasher.update(pickle.dumps(combo))
+    dig = hasher.digest()
+    val = int.from_bytes(dig)
+    return val % nparts
+
+# hash(combo) % nparts)
+
+def filter_by_part(akdf0, part, nparts):
+    """Divide workload between multile running instances of akramms run.
+    part:
+        Which instance (start with 0)
+    nparts:
+        How many instances
+    """
+
+    # Filter by part
+    assert (part >= -1) and (part < nparts)
+    if part < 0:
+        return akdf0
+
+    hm = akdf0['combo'].map(lambda combo: _hashmod_combo(combo, nparts))
+    akdf0 = akdf0[hm == args.part]
+
+    return akdf0

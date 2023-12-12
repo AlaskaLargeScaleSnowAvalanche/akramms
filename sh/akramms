@@ -370,14 +370,8 @@ def run(args):
 
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
-
-    # Filter by part
-    assert args.part in {-1,0,1}
     nparts = 2
-    if args.part >= 0:
-        hm = akdf0['combo'].map(lambda combo: hash(combo) % nparts)
-        akdf0 = akdf0[hm == args.part]
-
+    akdf0 = resolve.filter_by_part(akdf0, args.part, nparts)
     akdf0 = akdf0.reset_index(drop=True)
 
     print(akdf0['combo'])
