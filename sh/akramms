@@ -375,7 +375,6 @@ def run(args):
     akdf0 = akdf0.reset_index(drop=True)
 
     print(akdf0['combo'])
-    return
 
     for exp,akdf1 in akdf0.groupby('exp'):
         expmod = akramms.parse.load_expmod(exp)
