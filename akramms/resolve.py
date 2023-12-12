@@ -383,7 +383,7 @@ def _hashmod_combo(combo, nparts):
     hasher = hashlib.sha256()
     hasher.update(pickle.dumps(combo))
     dig = hasher.digest()
-    val = int.from_bytes(dig)
+    val = int.from_bytes(dig, 'big')
     return val % nparts
 
 # hash(combo) % nparts)
