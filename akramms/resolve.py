@@ -379,3 +379,11 @@ def remove_duplicate_ids(akdf0):
     return pd.concat(dfs)
 
 # -------------------------------------------------------------
+#def filter_by_part(akdf, part, nparts):
+#    """Divide workload between multile running instances of akramms run.
+#    part:
+#        Which instance (start with 0)
+#    nparts:
+#        How many instances
+#    """
+#    return akdf

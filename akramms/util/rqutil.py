@@ -65,6 +65,7 @@ def queue(qname):
 def blocking_lock(lname, sleep=5, timeout=3*3600):
     # https://redis-py.readthedocs.io/en/v5.0.1/connections.html
     assert lname in _queue_names
+    print(f'Acquiring lock l_{lname}...')
     return conn().lock('l_'+lname, blocking=True, timeout=timeout)
 
 def clear_locks():
