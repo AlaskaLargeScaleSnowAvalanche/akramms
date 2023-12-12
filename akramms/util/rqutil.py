@@ -1,6 +1,10 @@
 import functools
 import redis,rq
 
+@functools.lru_cache()
+def conn():
+    return redis.Redis()
+
 class QueueRunner:
     def __init__(self, qname, **kwargs):
         self.redis = redis.Redis()
@@ -45,7 +49,8 @@ class QueueRunner:
             raise
 
 # One queue per licensed piece of software
-_queues = {qname: (lambda: QueueRunner(qname)) for qname in ('arcgis', 'ecognition', 'idl')}
+_queues = {qname: (lambda: QueueRunner('q_'+qname)) for qname in ('arcgis', 'ecognition', 'idl')}
+_queue_names = {_queues.keys()}
 
 @functools.lru_cache()
 def queue(qname):
@@ -55,3 +60,14 @@ def queue(qname):
 #    return queues[qname].run(run_remote, *args, **kwargs)
 
 
+# ==============================================================================
+
+def blocking_lock(lname, sleep=5, timeout=3*3600):
+    # https://redis-py.readthedocs.io/en/v5.0.1/connections.html
+    assert lname in _queue_names
+    return conn().lock('l_'+lname, timeout=timeout)
+
+def clear_locks():
+    rd = conn()
+    for lname in _queue_names:
+        rd.delete('l_'+lname):
