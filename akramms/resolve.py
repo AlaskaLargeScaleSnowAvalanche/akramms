@@ -419,6 +419,6 @@ def filter_by_part_section(akdf0, part, nparts):
 def part_range(nrows, part, nparts):
     return list(range(part,nrows,nparts))
 
-def filter_by_part_section(akdf0, part, nparts):
+def filter_by_part(akdf0, part, nparts):
     rr = part_range(len(akdf0), part, nparts)
     return akdf0.iloc[rr]
