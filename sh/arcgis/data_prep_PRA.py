@@ -214,8 +214,8 @@ if inForest != "":
     # Checking for Intersection of inForest and DEM
     arcpy.RasterDomain_3d(inForest, IN_MEM("inForest_RasterDomain", '.shp'), 'POLYGON')
     arcpy.RasterDomain_3d(DEM, IN_MEM("DEM_RasterDomain", '.shp'), 'POLYGON')
-    arcpy.Intersect_analysis([IN_MEM("inForest_RasterDomain", '.shp'), IN_MEM("DEM_RasterDomain", '.shp')], IN_MEM("Intersection"), 'ALL', '#', 'INPUT')
-    if arcpy.management.GetCount(IN_MEM("Intersection"))[0] == "0":
+    arcpy.Intersect_analysis([IN_MEM("inForest_RasterDomain", '.shp'), IN_MEM("DEM_RasterDomain", '.shp')], IN_MEM("Intersection", '.shp'), 'ALL', '#', 'INPUT')
+    if arcpy.management.GetCount(IN_MEM("Intersection", '.shp'))[0] == "0":
         arcpy.AddError("InputError:Forest and DEM do not intersect")
         exit()
 
