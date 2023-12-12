@@ -49,8 +49,8 @@ def BASE_DATA(leaf):
 def ECOG(leaf):
     return os.path.join(Workspace, 'eCog', leaf)
 
-def IN_MEM(leaf):
-    # Formerly: return f"in_memory/{leaf}"
+def IN_MEM(leaf, ext='.tif'):
+    # Formerly: return f"in_memory/{leaf}{ext}"
     return os.path.join(Workspace, 'in_mem', f'{leaf}.tif')
 def MEM(leaf):
     # Formerly: return f"memory/{leaf}"
@@ -132,9 +132,9 @@ XMax_inDEM = int(round(extent_inDEM.XMax))
 YMax_inDEM = int(round(extent_inDEM.YMax))
 
 # Check extent of Raster Domain of inDEM
-arcpy.RasterDomain_3d(inDEM, IN_MEM("inDEM_RasterDomain"), 'POLYGON')
+arcpy.RasterDomain_3d(inDEM, IN_MEM("inDEM_RasterDomain", '.shp'), 'POLYGON')
 buffer_dist = str(float(DEM_res.getOutput(0))/2)
-arcpy.Buffer_analysis(IN_MEM("inDEM_RasterDomain"), IN_MEM("inDEM_RasterDomain_Buffer"), '%s Meters' % (buffer_dist), 'FULL', 'ROUND', 'NONE', '#', 'PLANAR')
+arcpy.Buffer_analysis(IN_MEM("inDEM_RasterDomain", '.shp'), IN_MEM("inDEM_RasterDomain_Buffer"), '%s Meters' % (buffer_dist), 'FULL', 'ROUND', 'NONE', '#', 'PLANAR')
 extent_RasterDomain = arcpy.Describe(IN_MEM("inDEM_RasterDomain_Buffer")).extent
 XMin_RasterDomain = int(round(extent_RasterDomain.XMin))
 YMin_RasterDomain = int(round(extent_RasterDomain.YMin))
