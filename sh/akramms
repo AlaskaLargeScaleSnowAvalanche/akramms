@@ -352,7 +352,7 @@ def locks(args):
         help='Which segment (of 2) to run: 0 or 1.  If -1, do all parts'),
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
-def run(args):
+def setup(args):
     """Steps 1-4"""
 
     import setuptools
@@ -370,8 +370,6 @@ def run(args):
 
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
-    nparts = 2
-    akdf0 = resolve.filter_by_part(akdf0, args.part, nparts)
     akdf0 = akdf0.reset_index(drop=True)
 
     print(akdf0['combo'])
@@ -388,6 +386,7 @@ def run(args):
             rule()
         # -------------------------------
 
+        makefile = make.Makefile()
         for _,row1 in akdf1.iterrows():
         #for combo,akdf1 in akdf0b.groupby('combo'):
             combo = row1['combo']
@@ -395,13 +394,18 @@ def run(args):
             # -------------------- Step 2:
             # (a) Prepare DEM files, forest files
             # (d) Set up tile directories (AKRAMMS scenes)
-            makefile = make.Makefile()
 
             # Add the experiment and combos
             # This calls through to r_prepare.prepare_scene_rule()
 #            getattr(expmod, 'add_experiment')(makefile, akdf1.combo.tolist())
             getattr(expmod, 'add_experiment')(makefile, [combo])
-            makefile.generate(expmod.dir / 'init_mk', run=True, ncpu=config.setup_ncpu)
+
+        makefile.generate(expmod.dir / 'init_mk', run=True, ncpu=config.setup_ncpu)
+
+
+        makefile = make.Makefile()
+        for _,row1 in akdf1.iterrows():
+            combo = row1['combo']
 
 
             # -------------------- Step 3
@@ -418,6 +422,36 @@ def run(args):
 
             # Run ArcGIS script to prepare files for eCognition
             prepare_outputs = makefile.add(r_prepare.data_prep_PRA_rule(scenedir)).outputs
+
+        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
+
+# ------------------------------------------------------------------
+
+@subcommand([
+    argument('--part', type=int, required=True,
+        help='Which segment (of 2) to run: 0 or 1.  If -1, do all parts'),
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+])
+def ramms(args):
+    """Steps 4"""
+
+    from akramms.util import harnutil
+    from akramms import r_pra_post
+
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
+    nparts = 2
+    akdf0 = resolve.filter_by_part(akdf0, args.part, nparts)
+    akdf0 = akdf0.reset_index(drop=True)
+
+    print(akdf0['combo'])
+
+    for exp,akdf1 in akdf0.groupby('exp'):
+        expmod = akramms.parse.load_expmod(exp)
+
+        for _,row1 in akdf1.iterrows():
+        #for combo,akdf1 in akdf0b.groupby('combo'):
+            combo = row1['combo']
 
             # Obtain name of neighbor1 graph file for DEM routing network
             # (created above in add_experiment_fn())
