@@ -70,4 +70,4 @@ def blocking_lock(lname, sleep=5, timeout=3*3600):
 def clear_locks():
     rd = conn()
     for lname in _queue_names:
-        rd.delete('l_'+lname):
+        rd.delete('l_'+lname)
