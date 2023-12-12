@@ -236,7 +236,7 @@ def run(akdf0):
     makefile = make.Makefile()
 
     for exp,akdf1 in akdf0.groupby('exp'):
-        expmod = akramms.parse.load_expmod(exp)
+        expmod = parse.load_expmod(exp)
         for releasefile in akdf1.releasefile.tolist():
 
             print('------ releasefile ', releasefile)
