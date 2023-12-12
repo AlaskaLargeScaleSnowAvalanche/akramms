@@ -49,6 +49,9 @@ def BASE_DATA(leaf):
 def ECOG(leaf):
     return os.path.join(Workspace, 'eCog', leaf)
 
+def IN_MEM0(leaf, ext='.tif'):
+    return f"in_memory/{leaf}{ext}"
+
 def IN_MEM(leaf, ext='.tif'):
     # Formerly: return f"in_memory/{leaf}{ext}"
     return os.path.join(Workspace, 'in_mem', f'{leaf}{ext}')
@@ -134,8 +137,8 @@ YMax_inDEM = int(round(extent_inDEM.YMax))
 # Check extent of Raster Domain of inDEM
 arcpy.RasterDomain_3d(inDEM, IN_MEM("inDEM_RasterDomain", '.shp'), 'POLYGON')
 buffer_dist = str(float(DEM_res.getOutput(0))/2)
-arcpy.Buffer_analysis(IN_MEM("inDEM_RasterDomain", '.shp'), IN_MEM("inDEM_RasterDomain_Buffer"), '%s Meters' % (buffer_dist), 'FULL', 'ROUND', 'NONE', '#', 'PLANAR')
-extent_RasterDomain = arcpy.Describe(IN_MEM("inDEM_RasterDomain_Buffer")).extent
+arcpy.Buffer_analysis(IN_MEM("inDEM_RasterDomain", '.shp'), IN_MEM0("inDEM_RasterDomain_Buffer"), '%s Meters' % (buffer_dist), 'FULL', 'ROUND', 'NONE', '#', 'PLANAR')
+extent_RasterDomain = arcpy.Describe(IN_MEM0("inDEM_RasterDomain_Buffer")).extent
 XMin_RasterDomain = int(round(extent_RasterDomain.XMin))
 YMin_RasterDomain = int(round(extent_RasterDomain.YMin))
 XMax_RasterDomain = int(round(extent_RasterDomain.XMax))
@@ -145,7 +148,7 @@ YMax_RasterDomain = int(round(extent_RasterDomain.YMax))
 if (XMin_inDEM > XMin_RasterDomain) or (YMin_inDEM > YMin_RasterDomain) or (XMax_inDEM > XMax_RasterDomain) or (YMax_inDEM > YMax_RasterDomain):
     arcpy.AddMessage("clip DEM to raster domain, because extent of DEM bigger than raster domain...")
     inDEM_RasterDomain = BASE_DATA(f"{Name}_DEM_ExtentRasterDomain.tif")
-    arcpy.Clip_management(inDEM, '%s %s %s %s' %(XMin_RasterDomain, YMin_RasterDomain, XMax_RasterDomain, YMax_RasterDomain), inDEM_RasterDomain, IN_MEM("inDEM_RasterDomain_Buffer"), '#', 'NONE', 'NO_MAINTAIN_EXTENT')
+    arcpy.Clip_management(inDEM, '%s %s %s %s' %(XMin_RasterDomain, YMin_RasterDomain, XMax_RasterDomain, YMax_RasterDomain), inDEM_RasterDomain, IN_MEM0("inDEM_RasterDomain_Buffer"), '#', 'NONE', 'NO_MAINTAIN_EXTENT')
     inDEM_RasterDomainChecked = inDEM_RasterDomain
 
 else:
