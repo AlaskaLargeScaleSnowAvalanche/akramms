@@ -51,7 +51,7 @@ def ECOG(leaf):
 
 def IN_MEM(leaf, ext='.tif'):
     # Formerly: return f"in_memory/{leaf}{ext}"
-    return os.path.join(Workspace, 'in_mem', f'{leaf}.tif')
+    return os.path.join(Workspace, 'in_mem', f'{leaf}{ext}')
 def MEM(leaf):
     # Formerly: return f"memory/{leaf}"
     return os.path.join(Workspace, 'mem', f'{leaf}.tif')
