@@ -77,5 +77,5 @@ def query_locks():
     rd = conn()
     for lname in _queue_names:
         with conn().lock('l'+lname, blocking=False, timeout=1) as ret:
-            print(f'l_{lname}: {ret}')
+            print(f'l_{lname}: {ret.locked()} {ret.owned()}')
 
