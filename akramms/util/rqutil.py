@@ -50,7 +50,7 @@ class QueueRunner:
 
 # One queue per licensed piece of software
 _queues = {qname: (lambda: QueueRunner('q_'+qname)) for qname in ('arcgis', 'ecognition', 'idl')}
-_queue_names = {_queues.keys()}
+_queue_names = set(_queues.keys())
 
 @functools.lru_cache()
 def queue(qname):
