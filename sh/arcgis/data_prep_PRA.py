@@ -49,6 +49,12 @@ def BASE_DATA(leaf):
 def ECOG(leaf):
     return os.path.join(Workspace, 'eCog', leaf)
 
+def IN_MEM(leaf):
+    # Formerly: return f"in_memory/{leaf}"
+    return os.path.join(Workspace, 'in_mem', f'{leaf}.tif')
+def MEM(leaf):
+    # Formerly: return f"memory/{leaf}"
+    return os.path.join(Workspace, 'mem', f'{leaf}.tif')
 
 
 # Local variables:
@@ -99,6 +105,8 @@ arcpy.env.snapRaster = arcpy.sa.Raster(inDEM)
 
 arcpy.CreateFolder_management(Workspace, 'base_data')
 arcpy.CreateFolder_management(Workspace, 'eCog')
+arcpy.CreateFolder_management(Workspace, 'in_mem')
+arcpy.CreateFolder_management(Workspace, 'mem')
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
@@ -124,10 +132,10 @@ XMax_inDEM = int(round(extent_inDEM.XMax))
 YMax_inDEM = int(round(extent_inDEM.YMax))
 
 # Check extent of Raster Domain of inDEM
-arcpy.RasterDomain_3d(inDEM, "in_memory/inDEM_RasterDomain", 'POLYGON')
+arcpy.RasterDomain_3d(inDEM, IN_MEM("inDEM_RasterDomain"), 'POLYGON')
 buffer_dist = str(float(DEM_res.getOutput(0))/2)
-arcpy.Buffer_analysis("in_memory/inDEM_RasterDomain", "in_memory/inDEM_RasterDomain_Buffer", '%s Meters' % (buffer_dist), 'FULL', 'ROUND', 'NONE', '#', 'PLANAR')
-extent_RasterDomain = arcpy.Describe("in_memory/inDEM_RasterDomain_Buffer").extent
+arcpy.Buffer_analysis(IN_MEM("inDEM_RasterDomain"), IN_MEM("inDEM_RasterDomain_Buffer"), '%s Meters' % (buffer_dist), 'FULL', 'ROUND', 'NONE', '#', 'PLANAR')
+extent_RasterDomain = arcpy.Describe(IN_MEM("inDEM_RasterDomain_Buffer")).extent
 XMin_RasterDomain = int(round(extent_RasterDomain.XMin))
 YMin_RasterDomain = int(round(extent_RasterDomain.YMin))
 XMax_RasterDomain = int(round(extent_RasterDomain.XMax))
@@ -137,7 +145,7 @@ YMax_RasterDomain = int(round(extent_RasterDomain.YMax))
 if (XMin_inDEM > XMin_RasterDomain) or (YMin_inDEM > YMin_RasterDomain) or (XMax_inDEM > XMax_RasterDomain) or (YMax_inDEM > YMax_RasterDomain):
     arcpy.AddMessage("clip DEM to raster domain, because extent of DEM bigger than raster domain...")
     inDEM_RasterDomain = BASE_DATA(f"{Name}_DEM_ExtentRasterDomain.tif")
-    arcpy.Clip_management(inDEM, '%s %s %s %s' %(XMin_RasterDomain, YMin_RasterDomain, XMax_RasterDomain, YMax_RasterDomain), inDEM_RasterDomain, "in_memory/inDEM_RasterDomain_Buffer", '#', 'NONE', 'NO_MAINTAIN_EXTENT')
+    arcpy.Clip_management(inDEM, '%s %s %s %s' %(XMin_RasterDomain, YMin_RasterDomain, XMax_RasterDomain, YMax_RasterDomain), inDEM_RasterDomain, IN_MEM("inDEM_RasterDomain_Buffer"), '#', 'NONE', 'NO_MAINTAIN_EXTENT')
     inDEM_RasterDomainChecked = inDEM_RasterDomain
 
 else:
@@ -153,29 +161,29 @@ def PerimeterClip():
         arcpy.Copy_management(inPerimeter, Perimeter)
 
     arcpy.FeatureEnvelopeToPolygon_management(Perimeter, Perimeter_Envelope, 'SINGLEPART')
-    arcpy.Buffer_analysis(Perimeter_Envelope, "in_memory/Perimeter_Envelop_Buffer", '200 Meters', 'FULL', 'ROUND', 'NONE', '#', 'PLANAR')
-    arcpy.FeatureEnvelopeToPolygon_management("in_memory/Perimeter_Envelop_Buffer", Perimeter_Envelope_Buffer, 'SINGLEPART')
+    arcpy.Buffer_analysis(Perimeter_Envelope, IN_MEM("Perimeter_Envelop_Buffer"), '200 Meters', 'FULL', 'ROUND', 'NONE', '#', 'PLANAR')
+    arcpy.FeatureEnvelopeToPolygon_management(IN_MEM("Perimeter_Envelop_Buffer"), Perimeter_Envelope_Buffer, 'SINGLEPART')
     extent_Perimeter = arcpy.Describe(Perimeter_Envelope_Buffer).extent
     XMin_Perimeter = extent_Perimeter.XMin
     YMin_Perimeter = extent_Perimeter.YMin
     XMax_Perimeter = extent_Perimeter.XMax
     YMax_Perimeter = extent_Perimeter.YMax
     inDEM_Perimeter = DEM = BASE_DATA(f"{Name}_DEM_Perimeter.tif")
-    arcpy.Clip_management("in_memory/inDEM_resamp", '%s %s %s %s' %(XMin_Perimeter, YMin_Perimeter, XMax_Perimeter, YMax_Perimeter), inDEM_Perimeter, Perimeter_Envelope_Buffer, '#', 'NONE', 'NO_MAINTAIN_EXTENT')
+    arcpy.Clip_management(IN_MEM("inDEM_resamp"), '%s %s %s %s' %(XMin_Perimeter, YMin_Perimeter, XMax_Perimeter, YMax_Perimeter), inDEM_Perimeter, Perimeter_Envelope_Buffer, '#', 'NONE', 'NO_MAINTAIN_EXTENT')
 
 #-------------------------------------------------------------------------------
 # Prepare DEM
 # Check Cellsize of inDEM raster
 if DEM_res != resampCellSize:
     arcpy.AddMessage("preparing DEM...")
-    arcpy.Resample_management(inDEM_RasterDomainChecked, "in_memory/inDEM_resamp", resampCellSize, 'BILINEAR')
+    arcpy.Resample_management(inDEM_RasterDomainChecked, IN_MEM("inDEM_resamp"), resampCellSize, 'BILINEAR')
     if inPerimeter != "":
         arcpy.AddMessage("clipping DEM to Perimeter")
         PerimeterClip()
         inDEM_Perimeter = DEM = BASE_DATA(f"{Name}_DEM_Perimeter.tif")
         inDEM_RasterDomainChecked_PerimeterChecked = inDEM_Perimeter
     else:
-        inDEM_RasterDomainChecked_PerimeterChecked = "in_memory/inDEM_resamp"
+        inDEM_RasterDomainChecked_PerimeterChecked = IN_MEM("inDEM_resamp")
 
     DEM_resamp_smooth = BASE_DATA(f"{Name}_DEM_resamp_smooth.tif")
     arcpy.gp.FocalStatistics_sa(inDEM_RasterDomainChecked_PerimeterChecked, DEM_resamp_smooth, 'Weight %s' % Weightingkernel, 'MEAN', 'NODATA')
@@ -201,10 +209,10 @@ if inForest != "":
     arcpy.AddMessage("checking inForest...")
 
     # Checking for Intersection of inForest and DEM
-    arcpy.RasterDomain_3d(inForest, "in_memory/inForest_RasterDomain", 'POLYGON')
-    arcpy.RasterDomain_3d(DEM, "in_memory/DEM_RasterDomain", 'POLYGON')
-    arcpy.Intersect_analysis(["in_memory/inForest_RasterDomain", "in_memory/DEM_RasterDomain"], "in_memory/Intersection", 'ALL', '#', 'INPUT')
-    if arcpy.management.GetCount("in_memory/Intersection")[0] == "0":
+    arcpy.RasterDomain_3d(inForest, IN_MEM("inForest_RasterDomain"), 'POLYGON')
+    arcpy.RasterDomain_3d(DEM, IN_MEM("DEM_RasterDomain"), 'POLYGON')
+    arcpy.Intersect_analysis([IN_MEM("inForest_RasterDomain"), IN_MEM("DEM_RasterDomain")], IN_MEM("Intersection"), 'ALL', '#', 'INPUT')
+    if arcpy.management.GetCount(IN_MEM("Intersection"))[0] == "0":
         arcpy.AddError("InputError:Forest and DEM do not intersect")
         exit()
 
@@ -239,8 +247,8 @@ arcpy.AddMessage("creating Aspect...")
 arcpy.gp.Aspect_sa(DEM, Aspect_tif)
 
 # Classify Aspect into sectors
-arcpy.gp.Reclassify_sa(Aspect_tif, 'VALUE', '-1 0 NODATA; 0 22.5 0; 22.5 67.5 100; 67.5 112.5 200; 112.5 157.5 100; 157.5 202.5 0; 202.5 247.5 -100; 247.5 292.5 -200; 292.5 337.5 -100; 337.5 360 0', "memory/Aspect_sectors_N0_eCog", 'DATA')
-arcpy.gp.Reclassify_sa(Aspect_tif, 'VALUE', '-1 0 NODATA; 0 22.5 200; 22.5 67.5 100; 67.5 112.5 0; 112.5 157.5 -100; 157.5 202.5 -200; 202.5 247.5 -100; 247.5 292.5 0; 292.5 337.5 100; 337.5 360 200', "memory/Aspect_sectors_Nmax_eCog", 'DATA')
+arcpy.gp.Reclassify_sa(Aspect_tif, 'VALUE', '-1 0 NODATA; 0 22.5 0; 22.5 67.5 100; 67.5 112.5 200; 112.5 157.5 100; 157.5 202.5 0; 202.5 247.5 -100; 247.5 292.5 -200; 292.5 337.5 -100; 337.5 360 0', MEM("Aspect_sectors_N0_eCog"), 'DATA')
+arcpy.gp.Reclassify_sa(Aspect_tif, 'VALUE', '-1 0 NODATA; 0 22.5 200; 22.5 67.5 100; 67.5 112.5 0; 112.5 157.5 -100; 157.5 202.5 -200; 202.5 247.5 -100; 247.5 292.5 0; 292.5 337.5 100; 337.5 360 200', MEM("Aspect_sectors_Nmax_eCog"), 'DATA')
 
 # Create Curvature
 arcpy.AddMessage("creating Curvature...")
@@ -274,7 +282,7 @@ arcpy.gp.RasterCalculator_sa('Con("%s" <= 0, "%s" * %s, "%s" * %s)' % (Curv_plan
 
 # Create Hillshade
 arcpy.AddMessage("creating Hillshade...")
-arcpy.gp.HillShade_sa(DEM, "memory/Hillshade_eCog", '315', '45', 'NO_SHADOWS', '1')
+arcpy.gp.HillShade_sa(DEM, MEM("Hillshade_eCog"), '315', '45', 'NO_SHADOWS', '1')
 
 #-------------------------------------------------------------------------------
 # Create Ruggedness
@@ -332,36 +340,37 @@ Ruggedness.save(BASE_DATA(f"{Name}_Ruggedness_n" + Rugged_neighborhood + ".tif")
 # Clip eCog files to the same extent
 arcpy.AddMessage("clipping eCog files to the same extent")
 if inPerimeter != "":
-    arcpy.gp.ExtractByMask_sa(DEM, Perimeter_Envelope_Buffer, "in_memory/Mask")
-    Mask = "in_memory/Mask"
+    arcpy.gp.ExtractByMask_sa(DEM, Perimeter_Envelope_Buffer, IN_MEM("Mask"))
+    Mask = IN_MEM("Mask")
 else:
     Mask = DEM
 
 arcpy.gp.ExtractByMask_sa(DEM, Mask, DEM_eCog)
 arcpy.gp.ExtractByMask_sa(Slope_tif, Mask, Slope_eCog)
-arcpy.gp.ExtractByMask_sa("memory/Aspect_sectors_N0_eCog", Mask, Aspect_sectors_N0_eCog)
-arcpy.gp.ExtractByMask_sa("memory/Aspect_sectors_Nmax_eCog", Mask, Aspect_sectors_Nmax_eCog)
+arcpy.gp.ExtractByMask_sa(MEM("Aspect_sectors_N0_eCog"), Mask, Aspect_sectors_N0_eCog)
+arcpy.gp.ExtractByMask_sa(MEM("Aspect_sectors_Nmax_eCog"), Mask, Aspect_sectors_Nmax_eCog)
 arcpy.gp.ExtractByMask_sa(Curv_profile_eCog_temp, Mask, Curv_profile_eCog)
 arcpy.gp.ExtractByMask_sa(Curv_plan_eCog_temp, Mask, Curv_plan_eCog)
-arcpy.gp.ExtractByMask_sa("memory/Hillshade_eCog", Mask, Hillshade_eCog)
+arcpy.gp.ExtractByMask_sa(MEM("Hillshade_eCog"), Mask, Hillshade_eCog)
 
-# Delete all files, which are not needed
-arcpy.Delete_management(Curv_plan_temp)
-arcpy.Delete_management(Curv_plan_eCog_temp)
-arcpy.Delete_management(Curv_profile_temp)
-arcpy.Delete_management(Curv_profile_eCog_temp)
-arcpy.Delete_management(SlopeRad)
-arcpy.Delete_management(AspectRad)
-arcpy.Delete_management(xyRaster)
-arcpy.Delete_management(zRaster)
-arcpy.Delete_management(SinAspectRad)
-arcpy.Delete_management(CosAspectRad)
-arcpy.Delete_management(xRaster)
-arcpy.Delete_management(yRaster)
-arcpy.Delete_management(xSumRaster)
-arcpy.Delete_management(ySumRaster)
-arcpy.Delete_management(zSumRaster)
-arcpy.Delete_management(RRaster)
+
+# Delete all files that are not needed
+#arcpy.Delete_management(Curv_plan_temp)
+#arcpy.Delete_management(Curv_plan_eCog_temp)
+#arcpy.Delete_management(Curv_profile_temp)
+#arcpy.Delete_management(Curv_profile_eCog_temp)
+#arcpy.Delete_management(SlopeRad)
+#arcpy.Delete_management(AspectRad)
+#arcpy.Delete_management(xyRaster)
+#arcpy.Delete_management(zRaster)
+#arcpy.Delete_management(SinAspectRad)
+#arcpy.Delete_management(CosAspectRad)
+#arcpy.Delete_management(xRaster)
+#arcpy.Delete_management(yRaster)
+#arcpy.Delete_management(xSumRaster)
+#arcpy.Delete_management(ySumRaster)
+#arcpy.Delete_management(zSumRaster)
+#arcpy.Delete_management(RRaster)
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
@@ -410,14 +419,14 @@ def data_prep_PRA(Slope_lowerlimit, name_scenario):
 
     # NoForest
     PRA_raw_NoForest = ECOG(f"{Name}__PRA_raw_{name_scenario}_NoForest.tif")
-    arcpy.gp.Reclassify_sa(SlopeCurvRuggednessBinary, 'Value', '1 200;0 0', "memory/PRA_raw_NoForest", 'DATA')
-    arcpy.gp.ExtractByMask_sa("memory/PRA_raw_NoForest", Mask, PRA_raw_NoForest)
+    arcpy.gp.Reclassify_sa(SlopeCurvRuggednessBinary, 'Value', '1 200;0 0', MEM("PRA_raw_NoForest"), 'DATA')
+    arcpy.gp.ExtractByMask_sa(MEM("PRA_raw_NoForest"), Mask, PRA_raw_NoForest)
 
     # Forest
     if inForest != "":
         PRA_raw_Forest = ECOG(f"{Name}__PRA_raw_{name_scenario}_Forest.tif")
-        arcpy.gp.Reclassify_sa(SlopeCurvRuggednessForestBinary, 'Value', '1 200;0 0', "memory/PRA_raw_Forest", 'DATA')
-        arcpy.gp.ExtractByMask_sa("memory/PRA_raw_Forest", Mask, PRA_raw_Forest)
+        arcpy.gp.Reclassify_sa(SlopeCurvRuggednessForestBinary, 'Value', '1 200;0 0', MEM("PRA_raw_Forest"), 'DATA')
+        arcpy.gp.ExtractByMask_sa(MEM("PRA_raw_Forest"), Mask, PRA_raw_Forest)
 
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
