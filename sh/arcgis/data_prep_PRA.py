@@ -49,8 +49,8 @@ def BASE_DATA(leaf):
 def ECOG(leaf):
     return os.path.join(Workspace, 'eCog', leaf)
 
-def IN_MEM0(leaf, ext='.tif'):
-    return f"in_memory/{leaf}{ext}"
+def IN_MEM0(leaf):
+    return f"in_memory/{leaf}"
 
 def IN_MEM(leaf, ext='.tif'):
     # Formerly: return f"in_memory/{leaf}{ext}"
