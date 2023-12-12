@@ -6,7 +6,7 @@
 #-------------------------------------------------------------------------------
 #-------------------------------------------------------------------------------
 # Add akramms to PYTHONPATH, and import utilities therein
-import sys,os
+import sys,os,pickle
 sys.path.append(os.path.abspath(os.path.join(os.path.abspath(__file__), '..', '..', '..')))
 import akramms.util.arcgisutil
 
@@ -83,6 +83,7 @@ Curv_profile_eCog = ECOG(f"{Name}_Curv_profile.tif")
 Curv_plan_eCog_temp = ECOG(f"{Name}_Curv_plan_temp.tif")
 Curv_plan_eCog = ECOG(f"{Name}_Curv_plan.tif")
 Hillshade_eCog = ECOG(f"{Name}_Hillshade.tif")
+Ruggedness_tif = BASE_DATA(f"{Name}_Ruggedness_n{Rugged_neighborhood}.tif")
 
 #-------------------------------------------------------------------------------
 # Give Messages
@@ -337,105 +338,139 @@ Ruggedness1 = 1 - (RRaster / Square(n))
 Ruggedness = Ruggedness1*100
 
 # Save the output
-Ruggedness.save(BASE_DATA(f"{Name}_Ruggedness_n" + Rugged_neighborhood + ".tif"))
+Ruggedness.save(Ruggedness_tif)
 
 #-------------------------------------------------------------------------------
-# Clip eCog files to the same extent
-arcpy.AddMessage("clipping eCog files to the same extent")
-if inPerimeter != "":
-    arcpy.gp.ExtractByMask_sa(DEM, Perimeter_Envelope_Buffer, IN_MEM("Mask"))
-    Mask = IN_MEM("Mask")
-else:
-    Mask = DEM
+# Write control file, which also serves to save our filenames
 
-arcpy.gp.ExtractByMask_sa(DEM, Mask, DEM_eCog)
-arcpy.gp.ExtractByMask_sa(Slope_tif, Mask, Slope_eCog)
-arcpy.gp.ExtractByMask_sa(MEM("Aspect_sectors_N0_eCog"), Mask, Aspect_sectors_N0_eCog)
-arcpy.gp.ExtractByMask_sa(MEM("Aspect_sectors_Nmax_eCog"), Mask, Aspect_sectors_Nmax_eCog)
-arcpy.gp.ExtractByMask_sa(Curv_profile_eCog_temp, Mask, Curv_profile_eCog)
-arcpy.gp.ExtractByMask_sa(Curv_plan_eCog_temp, Mask, Curv_plan_eCog)
-arcpy.gp.ExtractByMask_sa(MEM("Hillshade_eCog"), Mask, Hillshade_eCog)
+vnames = [
 
+    # Input parameters
+    'Workspace', 'inDEM', 'inForest', 'resampCellSize', 'inPerimeter',
+    'Slope_lowerlimit_frequent', 'Slope_lowerlimit_extreme',
+    'Slope_upperlimit', 'Curv_upperlimit', 'Rugged_neighborhood',
+    'Rugged_upperlimit', 'outCoordSystem', 'Weightingkernel',
 
-# Delete all files that are not needed
-#arcpy.Delete_management(Curv_plan_temp)
-#arcpy.Delete_management(Curv_plan_eCog_temp)
-#arcpy.Delete_management(Curv_profile_temp)
-#arcpy.Delete_management(Curv_profile_eCog_temp)
-#arcpy.Delete_management(SlopeRad)
-#arcpy.Delete_management(AspectRad)
-#arcpy.Delete_management(xyRaster)
-#arcpy.Delete_management(zRaster)
-#arcpy.Delete_management(SinAspectRad)
-#arcpy.Delete_management(CosAspectRad)
-#arcpy.Delete_management(xRaster)
-#arcpy.Delete_management(yRaster)
-#arcpy.Delete_management(xSumRaster)
-#arcpy.Delete_management(ySumRaster)
-#arcpy.Delete_management(zSumRaster)
-#arcpy.Delete_management(RRaster)
+    # Non-paths
+    'Name',
+
+    # Defined at script entry
+    'DEM_eCog', 'Forest', 'Perimeter', 'Perimeter_Envelope',
+    'Perimeter_Envelope_Buffer', 'Slope_tif', 'Slope_eCog',
+    'Aspect_tif', 'Aspect_sectors_N0_eCog',
+    'Aspect_sectors_Nmax_eCog', 'Curv', 'Curv_profile_temp',
+    'Curv_profile', 'Curv_plan_temp', 'Curv_plan',
+    'Curv_profile_eCog_temp', 'Curv_profile_eCog',
+    'Curv_plan_eCog_temp', 'Curv_plan_eCog', 'Hillshade_eCog',
+    'Ruggedness_tif',
+
+    # Defined later in the script
+    'DEM',
+]
+glb = globals()
+vars = {vname: glb[vname] for vname in vnames}
+with open(os.path.join(Workspace, 'data_prep_PRA1.pik'), 'wb') as out:
+    pickle.dump(vars, out)
 
 #-------------------------------------------------------------------------------
-#-------------------------------------------------------------------------------
-# Boolean Model
 
-def data_prep_PRA(Slope_lowerlimit, name_scenario):
-    arcpy.AddMessage("executing Scenario_" + name_scenario + "...")
-
-    tdir = f"temp_model_{name_scenario}"
-    arcpy.CreateFolder_management(Workspace, tdir)
-    def TDIR(leaf):
-        return os.path.join(Workspace, tdir, leaf)
-
-    #-------------------------------------------------------------------------------
-    arcpy.AddMessage("creating binary layers...")
-
-    # create Slope binary
-    SlopeBinary = Con((arcpy.sa.Raster(Slope_tif) < float(Slope_lowerlimit)) | (arcpy.sa.Raster(Slope_tif) > float(Slope_upperlimit)), 0, 1)
-    SlopeBinary.save(TDIR(f"{Name}_Slope_binary.tif"))
-
-    # create Curvature binary
-    CurvBinary = Con((arcpy.sa.Raster(Curv_plan) < (-1*float(Curv_upperlimit))) | (arcpy.sa.Raster(Curv_plan) > float(Curv_upperlimit)), 0, 1)
-    CurvBinary.save(TDIR(f"{Name}_Curv_binary.tif"))
-
-    # create Ruggedness binary
-    RuggednessBinary = Con((Ruggedness > float(Rugged_upperlimit)), 0, 1)
-    RuggednessBinary.save(TDIR(f"{Name}_Ruggedness_n{Rugged_neighborhood}_binary.tif"))
-
-    #-------------------------------------------------------------------------------
-    arcpy.AddMessage("combining binary layers...")
-
-    # Boolean Overlay: Slope AND Curvature AND Ruggedness
-    SlopeCurvRuggednessBinary = SlopeBinary * CurvBinary * RuggednessBinary
-    SlopeCurvRuggednessBinary.save(TDIR(f"{Name}_Slope_Curv_Ruggedness_binary.tif"))
-
-    if inForest != "":
-        # Boolean Overlay: Slope AND Curvature AND Ruggedness AND Forest
-        SlopeCurvRuggednessForestBinary = TDIR(f"{Name}_Slope_Curv_Ruggedness_Forest_binary.tif")
-        SlopeCurvRuggednessForestBinary = SlopeBinary * CurvBinary * RuggednessBinary * BooleanNot(arcpy.sa.Raster(inForest))
-        SlopeCurvRuggednessForestBinary.save(TDIR(f"{Name}_Slope_Curv_Ruggedness_Forest_binary.tif"))
-
-    #-------------------------------------------------------------------------------
-    arcpy.AddMessage("writing out PRA_raw...")
-
-    # Boolean Overlay Raster to PRA_raw Raster
-
-    # NoForest
-    PRA_raw_NoForest = ECOG(f"{Name}__PRA_raw_{name_scenario}_NoForest.tif")
-    arcpy.gp.Reclassify_sa(SlopeCurvRuggednessBinary, 'Value', '1 200;0 0', MEM("PRA_raw_NoForest"), 'DATA')
-    arcpy.gp.ExtractByMask_sa(MEM("PRA_raw_NoForest"), Mask, PRA_raw_NoForest)
-
-    # Forest
-    if inForest != "":
-        PRA_raw_Forest = ECOG(f"{Name}__PRA_raw_{name_scenario}_Forest.tif")
-        arcpy.gp.Reclassify_sa(SlopeCurvRuggednessForestBinary, 'Value', '1 200;0 0', MEM("PRA_raw_Forest"), 'DATA')
-        arcpy.gp.ExtractByMask_sa(MEM("PRA_raw_Forest"), Mask, PRA_raw_Forest)
-
-#-------------------------------------------------------------------------------
-#-------------------------------------------------------------------------------
-# Execute Model
-if Slope_lowerlimit_frequent != "":
-    data_prep_PRA(Slope_lowerlimit_frequent, "frequent")
-
-if Slope_lowerlimit_extreme != "":
-    data_prep_PRA(Slope_lowerlimit_extreme, "extreme")
+## Clip eCog files to the same extent
+#arcpy.AddMessage("clipping eCog files to the same extent")
+#if inPerimeter != "":
+#    arcpy.gp.ExtractByMask_sa(DEM, Perimeter_Envelope_Buffer, IN_MEM("Mask"))
+#    Mask = IN_MEM("Mask")
+#else:
+#    Mask = DEM
+#
+#arcpy.gp.ExtractByMask_sa(DEM, Mask, DEM_eCog)
+#arcpy.gp.ExtractByMask_sa(Slope_tif, Mask, Slope_eCog)
+#arcpy.gp.ExtractByMask_sa(MEM("Aspect_sectors_N0_eCog"), Mask, Aspect_sectors_N0_eCog)
+#arcpy.gp.ExtractByMask_sa(MEM("Aspect_sectors_Nmax_eCog"), Mask, Aspect_sectors_Nmax_eCog)
+#arcpy.gp.ExtractByMask_sa(Curv_profile_eCog_temp, Mask, Curv_profile_eCog)
+#arcpy.gp.ExtractByMask_sa(Curv_plan_eCog_temp, Mask, Curv_plan_eCog)
+#arcpy.gp.ExtractByMask_sa(MEM("Hillshade_eCog"), Mask, Hillshade_eCog)
+#
+#
+## Delete all files that are not needed
+##arcpy.Delete_management(Curv_plan_temp)
+##arcpy.Delete_management(Curv_plan_eCog_temp)
+##arcpy.Delete_management(Curv_profile_temp)
+##arcpy.Delete_management(Curv_profile_eCog_temp)
+##arcpy.Delete_management(SlopeRad)
+##arcpy.Delete_management(AspectRad)
+##arcpy.Delete_management(xyRaster)
+##arcpy.Delete_management(zRaster)
+##arcpy.Delete_management(SinAspectRad)
+##arcpy.Delete_management(CosAspectRad)
+##arcpy.Delete_management(xRaster)
+##arcpy.Delete_management(yRaster)
+##arcpy.Delete_management(xSumRaster)
+##arcpy.Delete_management(ySumRaster)
+##arcpy.Delete_management(zSumRaster)
+##arcpy.Delete_management(RRaster)
+#
+##-------------------------------------------------------------------------------
+##-------------------------------------------------------------------------------
+## Boolean Model
+#
+#def data_prep_PRA(Slope_lowerlimit, name_scenario):
+#    arcpy.AddMessage("executing Scenario_" + name_scenario + "...")
+#
+#    tdir = f"temp_model_{name_scenario}"
+#    arcpy.CreateFolder_management(Workspace, tdir)
+#    def TDIR(leaf):
+#        return os.path.join(Workspace, tdir, leaf)
+#
+#    #-------------------------------------------------------------------------------
+#    arcpy.AddMessage("creating binary layers...")
+#
+#    # create Slope binary
+#    SlopeBinary = Con((arcpy.sa.Raster(Slope_tif) < float(Slope_lowerlimit)) | (arcpy.sa.Raster(Slope_tif) > float(Slope_upperlimit)), 0, 1)
+#    SlopeBinary.save(TDIR(f"{Name}_Slope_binary.tif"))
+#
+#    # create Curvature binary
+#    CurvBinary = Con((arcpy.sa.Raster(Curv_plan) < (-1*float(Curv_upperlimit))) | (arcpy.sa.Raster(Curv_plan) > float(Curv_upperlimit)), 0, 1)
+#    CurvBinary.save(TDIR(f"{Name}_Curv_binary.tif"))
+#
+#    # create Ruggedness binary
+#    RuggednessBinary = Con((Ruggedness > float(Rugged_upperlimit)), 0, 1)
+#    RuggednessBinary.save(TDIR(f"{Name}_Ruggedness_n{Rugged_neighborhood}_binary.tif"))
+#
+#    #-------------------------------------------------------------------------------
+#    arcpy.AddMessage("combining binary layers...")
+#
+#    # Boolean Overlay: Slope AND Curvature AND Ruggedness
+#    SlopeCurvRuggednessBinary = SlopeBinary * CurvBinary * RuggednessBinary
+#    SlopeCurvRuggednessBinary.save(TDIR(f"{Name}_Slope_Curv_Ruggedness_binary.tif"))
+#
+#    if inForest != "":
+#        # Boolean Overlay: Slope AND Curvature AND Ruggedness AND Forest
+#        SlopeCurvRuggednessForestBinary = TDIR(f"{Name}_Slope_Curv_Ruggedness_Forest_binary.tif")
+#        SlopeCurvRuggednessForestBinary = SlopeBinary * CurvBinary * RuggednessBinary * BooleanNot(arcpy.sa.Raster(inForest))
+#        SlopeCurvRuggednessForestBinary.save(TDIR(f"{Name}_Slope_Curv_Ruggedness_Forest_binary.tif"))
+#
+#    #-------------------------------------------------------------------------------
+#    arcpy.AddMessage("writing out PRA_raw...")
+#
+#    # Boolean Overlay Raster to PRA_raw Raster
+#
+#    # NoForest
+#    PRA_raw_NoForest = ECOG(f"{Name}__PRA_raw_{name_scenario}_NoForest.tif")
+#    arcpy.gp.Reclassify_sa(SlopeCurvRuggednessBinary, 'Value', '1 200;0 0', MEM("PRA_raw_NoForest"), 'DATA')
+#    arcpy.gp.ExtractByMask_sa(MEM("PRA_raw_NoForest"), Mask, PRA_raw_NoForest)
+#
+#    # Forest
+#    if inForest != "":
+#        PRA_raw_Forest = ECOG(f"{Name}__PRA_raw_{name_scenario}_Forest.tif")
+#        arcpy.gp.Reclassify_sa(SlopeCurvRuggednessForestBinary, 'Value', '1 200;0 0', MEM("PRA_raw_Forest"), 'DATA')
+#        arcpy.gp.ExtractByMask_sa(MEM("PRA_raw_Forest"), Mask, PRA_raw_Forest)
+#
+##-------------------------------------------------------------------------------
+##-------------------------------------------------------------------------------
+## Execute Model
+#if Slope_lowerlimit_frequent != "":
+#    data_prep_PRA(Slope_lowerlimit_frequent, "frequent")
+#
+#if Slope_lowerlimit_extreme != "":
+#    data_prep_PRA(Slope_lowerlimit_extreme, "extreme")
+#

@@ -132,28 +132,11 @@ def import_xml_str(scene_args, freq, forest):
 # ---------------------------------------------------------------------------
 def _prepare_data_outputs(scene_dir, scene_args):
 
-
     # Basic stuff
     outputs = [
         os.path.join(scene_dir, 'stats_kernel.txt'),
         os.path.join(scene_dir, '{}_DataPrep_InputParameters.csv'.format(scene_args['name'])),
     ]
-
-    # xml import files
-    for freq in ('frequent', 'extreme'):
-        for forest in ((True,False) if scene_args['forest_file'] else (False,)):
-            _Forest = '_Forest' if forest else '_NoForest'
-            import_xml = os.path.join(scene_dir, 'eCog', f'PRA_import_{freq}{_Forest}.xml')
-            outputs.append(import_xml)
-
-    # GHK Files
-    for return_period in scene_args['return_periods']:
-        for forest in (False, True):
-            _For = '_For' if forest else '_NoFor'
-            ofname = os.path.join(scene_dir, 'eCog',
-                f'GHK_{return_period:d}y{_For}.dcp')
-            outputs.append(ofname)
-
 
     return outputs
 
@@ -162,13 +145,17 @@ def prepare_data(scene_dir):
     outputs = list()
     scene_args = params.load(scene_dir)
 
+    # Delete all output files/folders
+    # (otherwise ArcGIS complains)
     temporaries = [
         os.path.join(scene_dir, 'base_data'),
         os.path.join(scene_dir, 'temp_model_frequent'),
-        os.path.join(scene_dir, 'temp_model_extreme')]
+        os.path.join(scene_dir, 'temp_model_extreme'),
+        os.path.join(scene_dir, 'in_mem'),
+        os.path.join(scene_dir, 'mem'),
+        os.path.join(scene_dir, 'eCog'),
+    ]
 
-    # Delete all output files/folders
-    # (otherwise ArcGIS complains)
     _outputs = _prepare_data_outputs(scene_dir, scene_args)
     for dir in (temporaries + _outputs):
         shutil.rmtree(dir, ignore_errors=True)
@@ -220,50 +207,13 @@ def prepare_data(scene_dir):
     data_prep_PRA_py = os.path.join(harnutil.HARNESS, 'akramms', 'sh', 'arcgis', 'data_prep_PRA.py')
     arcgisutil.run_script(data_prep_PRA_py, script_args, cwd=scene_dir, dry_run=False)
 
-    # Clean up temporary files from ArcGIS step
-    for dir in temporaries:
-        shutil.rmtree(dir, ignore_errors=True)
-
-    # Copy DEM to eCog folder
-    ecog_dir = os.path.join(scene_dir, 'eCog')
-    os.makedirs(ecog_dir, exist_ok=True)
-    dem_tif = os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name']))
-    outputs.append(dem_tif)
-    shutil.copy(scene_args['dem_file'], os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name'])))
-
-    # Write import...xml files 
-    for freq in ('frequent', 'extreme'):
-        for forest in ((True,False) if scene_args['forest_file'] else (False,)):
-            _Forest = '_Forest' if forest else '_NoForest'
-            import_xml = os.path.join(ecog_dir, f'PRA_import_{freq}{_Forest}.xml')
-            outputs.append(import_xml)
-            with open(import_xml, 'w') as out:
-                out.write(import_xml_str(scene_args, freq, forest))
-
-    # Generate the required process trees
-    for return_period in scene_args['return_periods']:
-
-        # They are sorted into two categories: _frequent and _extreme
-        return_period_category = 'frequent' if return_period < 100 else 'extreme'
-        odir = os.path.join(scene_dir, f'PRA_{return_period_category}')
-        os.makedirs(odir, exist_ok=True)
-
-        for forest in (False, True):
-            _For = '_For' if forest else '_NoFor'
-            ofname = os.path.join(scene_dir, 'eCog',
-                f'GHK_{return_period:d}y{_For}.dcp')
-            outputs.append(ofname)
-            with open(ofname, 'w') as out:
-                # scene_dir=/mnt because this runs in a docker container
-                out.write(process_tree.get(scene_args, '/mnt', return_period, forest))
-#                out.write(process_tree.get(scene_dir, return_period, forest))
 
     # Declare our output files so they may be copied back to Linux
     harnutil.print_outputs(outputs)
 
 # ---------------------------------------------------------------------------
 
-def data_prep_PRA_rule(scene_dir):
+def data_prep_PRA1_rule(scene_dir):
     """Runs the data_prep_PRA.py script on a scene
     TO RERUN:
         Delete arcgis_stage0.txt
@@ -277,39 +227,240 @@ def data_prep_PRA_rule(scene_dir):
 
     scene_args = params.load(scene_dir)
 
-    # inputs = [os.path.join(scene_dir, 'scene.nc')]
-    inputs = []
-    outputs = _prepare_data_outputs(scene_dir, scene_args) + [os.path.join(scene_dir, 'arcgis_stage0.txt')]
+    # Assemble list of files to copy to remote Windows host
+    inputs = [os.path.join(scene_dir, 'scene.nc')]
+
+    # Input files: dem and forest
+    for param in params.ALL.values():
+        if (param.type == 'input_file') and (param.name in scene_args):
+            inputs.append(scene_args[param.name])
+
+    outputs = _prepare_data_outputs(scene_dir, scene_args) + [os.path.join(scene_dir, 'data_prep_PRA1.txt')]
 
     def action(tdir):
         from akramms.util import rqutil
 
+        # Remote command to run
         scene_dir_rel = config.roots.relpath(scene_dir)
-
-        # Assemble list of files to copy to remote Windows host
-        inputs = [os.path.join(scene_dir, 'scene.nc')]
-
-        # Input files: dem and forest
-        for param in params.ALL.values():
-            if param.type != 'input_file':
-                continue
-            if param.name not in scene_args:
-                continue
-
-            inputs.append(scene_args[param.name])
-
-        # Transfer over input files
         cmd = ['sh', config.roots_w.syspath('{HARNESS}/akramms/sh/prepare_scene.sh', bash=True, as_str=True),
             scene_dir_rel]
-#            config.roots_w.syspath(scene_dir_rel, bash=True, as_str=True)]
 
+        # Run it
 #        harnutil.run_queued('arcgis',
 #            harnutil.run_remote, inputs, cmd, tdir)
         with rqutil.blocking_lock('arcgis'):
             harnutil.run_remote(inputs, cmd, tdir)
 
-        # Make it clear / obvious we have finished
-        with open(os.path.join(scene_dir, 'arcgis_stage0.txt'), 'w') as out:
-            out.write('Successfully finished running ArcGIS script data_prep_PRA.py')
+#        # Make it clear / obvious we have finished
+#        with open(os.path.join(scene_dir, 'data_prep_PRA1.txt'), 'w') as out:
+#            out.write('Successfully finished running ArcGIS script data_prep_PRA.py')
         
     return make.Rule(action, inputs, outputs)
+# -----------------------------------------------------------------------------
+def mask_and_copy(itif, mask_out, otif, type=gdal.GDT_Float64):
+    print(f'Masking and writing to: {otif}')
+    ival = gdalutil.read_raster(itif)
+    ival.data[mask_out] = ival.nodata
+    gdalutil.write_raster(otif, *ival, type=type)
+        
+# -----------------------------------------------------------------------------
+def _data_prep_PRA(Slope_lowerlimit, name_scenario, vars):
+
+    locals().update(vars)
+
+    print("executing Scenario_" + name_scenario + "...")
+
+    #-------------------------------------------------------------------------------
+    tdir = os.path.join(Workspace, f"temp_model_{name_scenario}")
+    os.makedirs(tdir, exist_ok=True)
+    def TDIR(leaf):
+        return os.path.join(tdir, leaf)
+
+    def ECOG(leaf):
+        return os.path.join(Workspace, 'eCog', leaf)
+
+    #-------------------------------------------------------------------------------
+    print("creating binary layers...")
+
+    # create Slope binary 
+    #     SlopeBinary = Con((arcpy.sa.Raster(Slope_tif) <
+    #         float(Slope_lowerlimit)) | (arcpy.sa.Raster(Slope_tif) >
+    #         float(Slope_upperlimit)), 0, 1)
+    Slope_r = gdalutil.read_raster(Slope_tif)
+    Slope_in = np.logical_and(
+        Slope_r.data >= Slope_lowerlimit,
+        Slope_r.data <= Slope_upperlimit)
+
+    # create Curvature binary
+    #     CurvBinary = Con((arcpy.sa.Raster(Curv_plan) <
+    #         (-1*float(Curv_upperlimit))) |
+    #         (arcpy.sa.Raster(Curv_plan) > float(Curv_upperlimit)), 0, 1)
+    Curve_r = gdalutil.read_raster(Curv_plan)
+    Curve_in = np.logical_and(
+        Curve_r.data >= -Curv_lowerlimit,
+        Curve_r.data <= -Curv_upperlimit)
+
+    # create Ruggedness binary
+    # RuggednessBinary = Con((Ruggedness > float(Rugged_upperlimit)), 0, 1)
+    Ruggedness_r = gdalutil.read_raster(Ruggedness_tif)
+    Ruggedness_in = (Ruggedness_r.data <= Rugged_upperlimit)
+
+    # Combine all binaries
+    print("combining binary layers...")
+    SlopeCurvRuggedness_in = np.and(np.and(Slope_in, Curv_in), Ruggedness_in)
+    #-------------------------------------------------------------------------------
+    if inForest != "":
+        # Boolean Overlay: Slope AND Curvature AND Ruggedness AND Forest
+        Forest_r = gdalutil.read_raster(inForest)
+        Forest_in = (Forest_r != 0)
+        SlopeCurvRuggednessForest_in = np.and(SlopeCurvRuggedness_in, Forest_in)
+
+    #-------------------------------------------------------------------------------
+    print("writing out PRA_raw...")
+
+    # Boolean Overlay Raster to PRA_raw Raster
+
+    # NoForest
+    PRA_raw_NoForest = ECOG(f"{Name}__PRA_raw_{name_scenario}_NoForest.tif")
+    val = np.zeros(SlopeCurvRuggedness_in.shape)#, dtype='i')
+    val[SlopeCurvRuggedness_in] = 200
+    val[mask_out] = DEM_r.nodata
+    gdalutil.write_raster(PRA_raw_NoForest, DEM.grid, val, DEM.nodata)
+
+    # Forest
+    if inForest != "":
+        PRA_raw_NoForest = ECOG(f"{Name}__PRA_raw_{name_scenario}_NoForest.tif")
+        val = np.zeros(SlopeCurvRuggednessForest_in.shape)#, dtype='i')
+        val[SlopeCurvRuggedness_in] = 200
+        val[mask_out] = DEM_r.nodata
+        gdalutil.write_raster(PRA_raw_NoForest, DEM.grid, val, DEM.nodata)
+
+
+def prepare_data2(scene_dir):
+    """Called from prepare_scene.py; RUNS LOCALLY ON LINUX"""
+
+    scene_args = params.load(scene_dir)
+    Worksapce = scene_dir
+
+    # Retrieve filenames used in data_prep_PRA.py ArcGIS script
+    with open(os.path.join(Workspace, 'data_prep_PRA1.pik'), 'rb') as fin:
+        vars = pickle.load(fin)
+
+    # Define retrieved names as local variables in this function
+    locals().update(vars)
+
+    # -------------------------------------------------------------
+    def MEM(leaf):
+        # Formerly: return f"memory/{leaf}"
+        return os.path.join(Workspace, 'mem', f'{leaf}.tif')
+    # -------------------------------------------------------------
+
+    # Clip eCog files to the same extent as the DEM or perimeter polygon
+
+    print("clipping eCog files to the same extent")
+
+    # Make a mask based on DEM extent
+    DEM_r = gdalutil.read_raster(DEM)
+    mask_out = (DEM_r.data == DEM_r.nodata)
+
+    # Mask out areas beyond the perimeter
+    if (inPerimeter is not None) and (inPerimeter != ""):
+        # Mask based on the perimeter polygon
+        ds = ogr.GetDriverByName('ESRI Shapefile').Open(Perimeter_Envelope_Buffer)
+        try:
+            # This will be 1 inside perimeter polygon, 0 outside
+            in_perimeter = rasterize.rasterize_polygons(ds, DEM_r.grid)
+        finally:
+            ds = None
+
+        # Mask out anything additional outside the perimeter.
+        mask_out[np.logical_not(in_perimeter)] = True
+
+    # Apply mask to files
+    mask_and_copy(DEM, mask_out, DEM_eCog)
+    mask_and_copy(Slope_tif, mask_out, Slope_eCog)
+    mask_and_copy(MEM("Aspect_sectors_N0_eCog"), mask_out, Aspect_sectors_N0_eCog)
+    mask_and_copy(MEM("Aspect_sectors_Nmax_eCog"), mask_out, Aspect_sectors_Nmax_eCog)
+    mask_and_copy(Curv_profile_eCog_temp, mask_out, Curv_profile_eCog)
+    mask_and_copy(Curv_plan_eCog_temp, mask_out, Curv_plan_eCog)
+    mask_and_copy(MEM("Hillshade_eCog"), mask_out, Hillshade_eCog)
+
+    if Slope_lowerlimit_frequent != "":
+        _data_prep_PRA(Slope_lowerlimit_frequent, "frequent")
+
+    if Slope_lowerlimit_extreme != "":
+        _data_prep_PRA(Slope_lowerlimit_extreme, "extreme")
+
+
+
+def data_prep_PRA2_rule(scene_dir, inputs):
+    """
+    inputs:
+        Outputs from data_prep_PRA1_rule
+    outputs:
+    """
+    outputs = [os.path.join(scene_dir, 'data_prep_PRA2.txt')]
+
+    # xml import files
+    for freq in ('frequent', 'extreme'):
+        for forest in ((True,False) if scene_args['forest_file'] else (False,)):
+            _Forest = '_Forest' if forest else '_NoForest'
+            import_xml = os.path.join(scene_dir, 'eCog', f'PRA_import_{freq}{_Forest}.xml')
+            outputs.append(import_xml)
+
+    # GHK Files
+    for return_period in scene_args['return_periods']:
+        for forest in (False, True):
+            _For = '_For' if forest else '_NoFor'
+            ofname = os.path.join(scene_dir, 'eCog',
+                f'GHK_{return_period:d}y{_For}.dcp')
+            outputs.append(ofname)
+
+    def action(tdir):
+
+        prepare_data2(scene_dir)
+
+        # Write import...xml files 
+        for freq in ('frequent', 'extreme'):
+            for forest in ((True,False) if scene_args['forest_file'] else (False,)):
+                _Forest = '_Forest' if forest else '_NoForest'
+                import_xml = os.path.join(ecog_dir, f'PRA_import_{freq}{_Forest}.xml')
+                outputs.append(import_xml)
+                with open(import_xml, 'w') as out:
+                    out.write(import_xml_str(scene_args, freq, forest))
+
+        # Generate the required process trees
+        for return_period in scene_args['return_periods']:
+
+            # They are sorted into two categories: _frequent and _extreme
+            return_period_category = 'frequent' if return_period < 100 else 'extreme'
+            odir = os.path.join(scene_dir, f'PRA_{return_period_category}')
+            os.makedirs(odir, exist_ok=True)
+
+            for forest in (False, True):
+                _For = '_For' if forest else '_NoFor'
+                ofname = os.path.join(scene_dir, 'eCog',
+                    f'GHK_{return_period:d}y{_For}.dcp')
+                outputs.append(ofname)
+                with open(ofname, 'w') as out:
+                    # scene_dir=/mnt because this runs in a docker container
+                    out.write(process_tree.get(scene_args, '/mnt', return_period, forest))
+
+
+        # Copy DEM to eCog folder
+        ecog_dir = os.path.join(scene_dir, 'eCog')
+        os.makedirs(ecog_dir, exist_ok=True)
+        dem_tif = os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name']))
+        outputs.append(dem_tif)
+        shutil.copy(scene_args['dem_file'], os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name'])))
+#        # Clean up temporary files from ArcGIS step
+#        for dir in temporaries:
+#            shutil.rmtree(dir, ignore_errors=True)
+
+
+        # Make it clear / obvious we have finished
+        with open(os.path.join(scene_dir, 'data_prep_PRA2.txt'), 'w') as out:
+            out.write('Successfully finished running ArcGIS script data_prep_PRA.py')
+
+    return make.Rule(action, inputs, outputs)
+# -----------------------------------------------------------------------------
