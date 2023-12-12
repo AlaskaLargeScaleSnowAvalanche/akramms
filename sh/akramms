@@ -348,8 +348,6 @@ def locks(args):
     rqutil.query_locks()
 # ------------------------------------------------------------------
 @subcommand([
-    argument('--part', type=int, required=True,
-        help='Which segment (of 2) to run: 0 or 1.  If -1, do all parts'),
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
 def setup(args):
