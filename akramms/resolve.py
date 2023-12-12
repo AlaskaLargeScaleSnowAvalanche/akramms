@@ -379,6 +379,7 @@ def remove_duplicate_ids(akdf0):
     return pd.concat(dfs)
 
 # -------------------------------------------------------------
+
 def _hashmod_combo(combo, nparts):
     hasher = hashlib.sha256()
     hasher.update(pickle.dumps(combo))
@@ -388,7 +389,7 @@ def _hashmod_combo(combo, nparts):
 
 # hash(combo) % nparts)
 
-def filter_by_part(akdf0, part, nparts):
+def filter_by_part_usinghash(akdf0, part, nparts):
     """Divide workload between multile running instances of akramms run.
     part:
         Which instance (start with 0)
@@ -405,3 +406,11 @@ def filter_by_part(akdf0, part, nparts):
     akdf0 = akdf0[hm == part]
 
     return akdf0
+# -------------------------------------------------------------
+def part_range(nrows, part, nparts):
+    k,m = divmod(nrows, nparts)
+    return part*k+min(part, m),(part+1)*k+min(part+1, m)
+
+def filter_by_part(akdf0, part, nparts):
+    a,b = part_range(len(akdf0), part, nparts)
+    return akdf0.iloc[a:b]
