@@ -282,6 +282,8 @@ def data_prep_PRA_rule(scene_dir):
     outputs = _prepare_data_outputs(scene_dir, scene_args) + [os.path.join(scene_dir, 'arcgis_stage0.txt')]
 
     def action(tdir):
+        from akramms.util import rqutil
+
         scene_dir_rel = config.roots.relpath(scene_dir)
 
         # Assemble list of files to copy to remote Windows host
@@ -301,8 +303,10 @@ def data_prep_PRA_rule(scene_dir):
             scene_dir_rel]
 #            config.roots_w.syspath(scene_dir_rel, bash=True, as_str=True)]
 
-        harnutil.run_queued('arcgis',
-            harnutil.run_remote, inputs, cmd, tdir)
+#        harnutil.run_queued('arcgis',
+#            harnutil.run_remote, inputs, cmd, tdir)
+        with rqutil.blocking_lock('arcgis'):
+            harnutil.run_remote(inputs, cmd, tdir)
 
         # Make it clear / obvious we have finished
         with open(os.path.join(scene_dir, 'arcgis_stage0.txt'), 'w') as out:
