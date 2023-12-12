@@ -231,7 +231,7 @@ def run(akdf0):
     Cheks the cache file <x_dir>/ramms_stage1/c-L-xxxx.txt to see if it was already run."""
 
     akdf0 = complete.add_chunk_complete_cached(akdf0, ramms_stage=1)
-    akdf0 = akdf[~akdf['chunk_complete_stage1_cached']]
+    akdf0 = akdf0[~akdf0['chunk_complete_stage1_cached']]
 
     makefile = make.Makefile()
 
