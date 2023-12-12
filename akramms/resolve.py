@@ -407,10 +407,18 @@ def filter_by_part_usinghash(akdf0, part, nparts):
 
     return akdf0
 # -------------------------------------------------------------
-def part_range(nrows, part, nparts):
+def part_range_section(nrows, part, nparts):
     k,m = divmod(nrows, nparts)
     return part*k+min(part, m),(part+1)*k+min(part+1, m)
 
-def filter_by_part(akdf0, part, nparts):
+def filter_by_part_section(akdf0, part, nparts):
     a,b = part_range(len(akdf0), part, nparts)
     return akdf0.iloc[a:b]
+# -------------------------------------------------------------
+# Let's stripe it!
+def part_range(nrows, part, nparts):
+    return list(range(part,nrows,nparts)
+
+def filter_by_part_section(akdf0, part, nparts):
+    rr = part_range(len(akdf0), part, nparts)
+    return akdf0.iloc[rr]
