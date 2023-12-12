@@ -2,7 +2,7 @@ import os,sys,shutil,multiprocessing,pickle,zipfile,re
 import setuptools.sandbox
 import pandas as pd
 from uafgi.util import make,shputil,gdalutil
-from akramms import config,params,process_tree,joblib,parse,file_info,parse,resolve
+from akramms import config,params,process_tree,joblib,parse,file_info,parse,resolve,complete
 from akramms.util import paramutil,harnutil,rammsutil
 
 """Rules for RAMMS Stage 1 (with auto submit to Stage 2)"""
@@ -230,7 +230,7 @@ def run(akdf0):
     """Runs RAMM Stage 1 on a bunch of releasefiles.
     Cheks the cache file <x_dir>/ramms_stage1/c-L-xxxx.txt to see if it was already run."""
 
-    akdf0 = add_chunk_complete_cached(akdf0, ramms_stage=1)
+    akdf0 = complete.add_chunk_complete_cached(akdf0, ramms_stage=1)
     akdf0 = akdf[~akdf['chunk_complete_stage1_cached']]
 
     makefile = make.Makefile()
