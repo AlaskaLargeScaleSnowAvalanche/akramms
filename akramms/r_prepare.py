@@ -368,7 +368,7 @@ for vn in (
 
 for vn in (
     'Slope_lowerlimit_frequent', 'Slope_lowerlimit_extreme',
-    'Slope_upperlimit', 'Curv_upperlimit'):
+    'Slope_upperlimit', 'Curv_upperlimit', 'Rugged_upperlimit'):
     _arcgis_vars[vn] = _float
 
 
