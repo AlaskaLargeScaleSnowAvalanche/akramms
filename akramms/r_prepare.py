@@ -343,7 +343,7 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario):
     # Boolean Overlay Raster to PRA_raw Raster
 
     # NoForest
-    PRA_raw_NoForest = ECOG(f"{Name}__PRA_raw_{name_scenario}_NoForest.tif")
+    PRA_raw_NoForest = ECOG(f"{vv.Name}__PRA_raw_{name_scenario}_NoForest.tif")
     val = np.zeros(SlopeCurvRuggedness_in.shape)#, dtype='i')
     val[SlopeCurvRuggedness_in] = 200
     val[mask_out] = DEM_r.nodata
@@ -351,7 +351,7 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario):
 
     # Forest
     if inForest != "":
-        PRA_raw_NoForest = ECOG(f"{Name}__PRA_raw_{name_scenario}_NoForest.tif")
+        PRA_raw_NoForest = ECOG(f"{vv.Name}__PRA_raw_{name_scenario}_NoForest.tif")
         val = np.zeros(SlopeCurvRuggednessForest_in.shape)#, dtype='i')
         val[SlopeCurvRuggedness_in] = 200
         val[mask_out] = DEM_r.nodata
