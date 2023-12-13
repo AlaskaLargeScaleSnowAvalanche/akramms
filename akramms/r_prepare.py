@@ -351,7 +351,7 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
     val = np.zeros(SlopeCurvRuggedness_in.shape)#, dtype='i')
     val[SlopeCurvRuggedness_in] = 200
     val[mask_out] = onodata
-    gdalutil.write_raster(PRA_raw_NoForest, DEM.grid, val, onodata)
+    gdalutil.write_raster(PRA_raw_NoForest, Slope_r.grid, val, onodata)
 
     # Forest
     if inForest != "":
@@ -359,7 +359,7 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
         val = np.zeros(SlopeCurvRuggednessForest_in.shape)#, dtype='i')
         val[SlopeCurvRuggedness_in] = 200
         val[mask_out] = onodata
-        gdalutil.write_raster(PRA_raw_NoForest, DEM.grid, val, onodata)
+        gdalutil.write_raster(PRA_raw_NoForest, Slope_r.grid, val, onodata)
 
 
 # -----------------------------------------------------------------
