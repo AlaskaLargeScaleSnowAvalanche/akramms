@@ -235,7 +235,7 @@ def data_prep_PRA1_rule(scene_dir):
         if (param.type == 'input_file') and (param.name in scene_args):
             inputs.append(scene_args[param.name])
 
-    outputs = _prepare_data_outputs(scene_dir, scene_args) + [os.path.join(scene_dir, 'data_prep_PRA1.txt')]
+    outputs = _prepare_data_outputs(scene_dir, scene_args) + [os.path.join(scene_dir, 'data_prep_PRA1.pik')]
 
     def action(tdir):
         from akramms.util import rqutil
@@ -252,7 +252,7 @@ def data_prep_PRA1_rule(scene_dir):
             harnutil.run_remote(inputs, cmd, tdir)
 
 #        # Make it clear / obvious we have finished
-#        with open(os.path.join(scene_dir, 'data_prep_PRA1.txt'), 'w') as out:
+#        with open(os.path.join(scene_dir, 'data_prep_PRA1.pik'), 'w') as out:
 #            out.write('Successfully finished running ArcGIS script data_prep_PRA.py')
         
     return make.Rule(action, inputs, outputs)
