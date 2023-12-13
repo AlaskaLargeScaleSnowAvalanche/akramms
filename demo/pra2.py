@@ -1,4 +1,4 @@
-from akramms import r_prepare.py
+from akramms import r_prepare
 
 scene_dir = '/mnt/avalanche_sim/prj/ak/ak-ccsm-1981-1990-lapse-For-30/x-113-045'
 
