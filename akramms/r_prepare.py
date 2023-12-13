@@ -270,46 +270,44 @@ def mask_and_copy(itif, mask_out, otif, type=None):
     gdalutil.write_raster(otif, *ival, type=type)
         
 # -----------------------------------------------------------------------------
-def _data_prep_PRA2(Slope_lowerlimit, name_scenario, vars):
-
-    locals().update(vars)
+def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, vars):
 
     print("executing Scenario_" + name_scenario + "...")
 
     #-------------------------------------------------------------------------------
-    tdir = os.path.join(Workspace, f"temp_model_{name_scenario}")
+    tdir = os.path.join(vv.Workspace, f"temp_model_{name_scenario}")
     os.makedirs(tdir, exist_ok=True)
     def TDIR(leaf):
         return os.path.join(tdir, leaf)
 
     def ECOG(leaf):
-        return os.path.join(Workspace, 'eCog', leaf)
-
+        return os.path.join(vv.Workspace, 'eCog', leaf)
     #-------------------------------------------------------------------------------
+
     print("creating binary layers...")
 
     # create Slope binary 
     #     SlopeBinary = Con((arcpy.sa.Raster(Slope_tif) <
     #         float(Slope_lowerlimit)) | (arcpy.sa.Raster(Slope_tif) >
     #         float(Slope_upperlimit)), 0, 1)
-    Slope_r = gdalutil.read_raster(Slope_tif)
+    Slope_r = gdalutil.read_raster(vv.Slope_tif)
     Slope_in = np.logical_and(
         Slope_r.data >= Slope_lowerlimit,
-        Slope_r.data <= Slope_upperlimit)
+        Slope_r.data <= vv.Slope_upperlimit)
 
     # create Curvature binary
     #     CurvBinary = Con((arcpy.sa.Raster(Curv_plan) <
     #         (-1*float(Curv_upperlimit))) |
     #         (arcpy.sa.Raster(Curv_plan) > float(Curv_upperlimit)), 0, 1)
-    Curve_r = gdalutil.read_raster(Curv_plan)
+    Curve_r = gdalutil.read_raster(vv.Curv_plan)
     Curve_in = np.logical_and(
-        Curve_r.data >= -Curv_lowerlimit,
-        Curve_r.data <= -Curv_upperlimit)
+        Curve_r.data >= -vv.Curv_lowerlimit,
+        Curve_r.data <= -vv.Curv_upperlimit)
 
     # create Ruggedness binary
     # RuggednessBinary = Con((Ruggedness > float(Rugged_upperlimit)), 0, 1)
-    Ruggedness_r = gdalutil.read_raster(Ruggedness_tif)
-    Ruggedness_in = (Ruggedness_r.data <= Rugged_upperlimit)
+    Ruggedness_r = gdalutil.read_raster(vv.Ruggedness_tif)
+    Ruggedness_in = (Ruggedness_r.data <= vv.Rugged_upperlimit)
 
     # Combine all binaries
     print("combining binary layers...")
@@ -317,8 +315,8 @@ def _data_prep_PRA2(Slope_lowerlimit, name_scenario, vars):
     #-------------------------------------------------------------------------------
     if inForest != "":
         # Boolean Overlay: Slope AND Curvature AND Ruggedness AND Forest
-        Forest_r = gdalutil.read_raster(inForest)
-        Forest_in = (Forest_r != 0)
+        Forest_r = gdalutil.read_raster(vv.inForest)
+        Forest_in = (Forest_r.data != 0)
         SlopeCurvRuggednessForest_in = np.logical_and(SlopeCurvRuggedness_in, Forest_in)
 
     #-------------------------------------------------------------------------------
@@ -351,6 +349,11 @@ def _w2l(val):
     val = config.roots_l.syspath(val)
     return val
 
+def _float(val):
+    if val == '':
+        return None
+    return float(val)
+
 # Keys from ArcGIS script that represent paths
 _arcgis_vars = dict()
 for vn in (
@@ -362,6 +365,12 @@ for vn in (
     'Hillshade_eCog',
     ):
     _arcgis_vars[vn] = _w2l
+
+for vn in (
+    'Slope_lowerlimit_frequent', 'Slope_lowerlimit_extreme',
+    'Slope_upperlimit',
+    'Curv_lowerlimit', 'Curv_upperlimit'):
+    _arcgis_vars[vn] = _float
 
 
 class LVars:
@@ -376,6 +385,7 @@ class LVars:
         if vname in _arcgis_vars:
             return _arcgis_vars[vname](val)
         return val
+
 # ---------------------------------------------------------------------        
 def prepare_data2(scene_dir):
     """Called from prepare_scene.py; RUNS LOCALLY ON LINUX"""
@@ -425,16 +435,14 @@ def prepare_data2(scene_dir):
     mask_and_copy(vv.Curv_plan_eCog_temp, mask_out, vv.Curv_plan_eCog)
     mask_and_copy(MEM("Hillshade_eCog"), mask_out, vv.Hillshade_eCog)
 
-    return
+    if vv.Slope_lowerlimit_frequent is not None:
+        _data_prep_PRA2(vv, vv.Slope_lowerlimit_frequent, "frequent")
 
-    if Slope_lowerlimit_frequent != "":
-        _data_prep_PRA(Slope_lowerlimit_frequent, "frequent")
-
-    if Slope_lowerlimit_extreme != "":
-        _data_prep_PRA(Slope_lowerlimit_extreme, "extreme")
+    if vv.Slope_lowerlimit_extreme is not None:
+        _data_prep_PRA2(vv, vv.Slope_lowerlimit_extreme, "extreme")
 
 
-
+# ----------------------------------------------------------------------------
 def data_prep_PRA2_rule(scene_dir, inputs):
     """
     inputs:
