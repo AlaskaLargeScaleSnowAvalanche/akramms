@@ -299,6 +299,7 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario):
     #     CurvBinary = Con((arcpy.sa.Raster(Curv_plan) <
     #         (-1*float(Curv_upperlimit))) |
     #         (arcpy.sa.Raster(Curv_plan) > float(Curv_upperlimit)), 0, 1)
+    print('xxxxxxx ', vv.Curv_plan)
     Curve_r = gdalutil.read_raster(vv.Curv_plan)
     Curve_in = np.logical_and(
         Curve_r.data >= -vv.Curv_lowerlimit,
