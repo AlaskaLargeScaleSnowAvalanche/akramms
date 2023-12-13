@@ -302,8 +302,8 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario):
     print('xxxxxxx ', vv.Curv_plan)
     Curve_r = gdalutil.read_raster(vv.Curv_plan)
     Curve_in = np.logical_and(
-        Curve_r.data >= -vv.Curv_lowerlimit,
-        Curve_r.data <= -vv.Curv_upperlimit)
+        Curve_r.data >= -vv.Curv_upperlimit,
+        Curve_r.data <=  vv.Curv_upperlimit)
 
     # create Ruggedness binary
     # RuggednessBinary = Con((Ruggedness > float(Rugged_upperlimit)), 0, 1)
@@ -369,8 +369,7 @@ for vn in (
 
 for vn in (
     'Slope_lowerlimit_frequent', 'Slope_lowerlimit_extreme',
-    'Slope_upperlimit',
-    'Curv_lowerlimit', 'Curv_upperlimit'):
+    'Slope_upperlimit', 'Curv_upperlimit'):
     _arcgis_vars[vn] = _float
 
 
