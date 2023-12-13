@@ -307,13 +307,13 @@ def _data_prep_PRA(Slope_lowerlimit, name_scenario, vars):
 
     # Combine all binaries
     print("combining binary layers...")
-    SlopeCurvRuggedness_in = np.and(np.and(Slope_in, Curv_in), Ruggedness_in)
+    SlopeCurvRuggedness_in = np.logical_and(np.logical_and(Slope_in, Curv_in), Ruggedness_in)
     #-------------------------------------------------------------------------------
     if inForest != "":
         # Boolean Overlay: Slope AND Curvature AND Ruggedness AND Forest
         Forest_r = gdalutil.read_raster(inForest)
         Forest_in = (Forest_r != 0)
-        SlopeCurvRuggednessForest_in = np.and(SlopeCurvRuggedness_in, Forest_in)
+        SlopeCurvRuggednessForest_in = np.logical_and(SlopeCurvRuggedness_in, Forest_in)
 
     #-------------------------------------------------------------------------------
     print("writing out PRA_raw...")
