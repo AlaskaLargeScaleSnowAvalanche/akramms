@@ -366,6 +366,7 @@ def prepare_data2(scene_dir):
 
     # Make a mask based on DEM extent
     print(vars)
+    print(vars['DEM'])
     DEM_r = gdalutil.read_raster(DEM)
     mask_out = (DEM_r.data == DEM_r.nodata)
 
