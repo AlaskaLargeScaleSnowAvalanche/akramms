@@ -270,7 +270,7 @@ def mask_and_copy(itif, mask_out, otif, type=None):
     gdalutil.write_raster(otif, *ival, type=type)
         
 # -----------------------------------------------------------------------------
-def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, vars):
+def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario):
 
     print("executing Scenario_" + name_scenario + "...")
 
