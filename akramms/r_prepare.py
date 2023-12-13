@@ -270,7 +270,7 @@ def mask_and_copy(itif, mask_out, otif, type=None):
     gdalutil.write_raster(otif, *ival, type=type)
         
 # -----------------------------------------------------------------------------
-def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, onodata):
+def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
     """
     onodata:
         Nodata value to use in output files
@@ -457,10 +457,10 @@ def prepare_data2(scene_dir):
     mask_and_copy(MEM("Hillshade_eCog"), mask_out, vv.Hillshade_eCog)
 
     if vv.Slope_lowerlimit_frequent is not None:
-        _data_prep_PRA2(vv, vv.Slope_lowerlimit_frequent, "frequent", DEM_r.nodata)
+        _data_prep_PRA2(vv, vv.Slope_lowerlimit_frequent, "frequent", mask_out, DEM_r.nodata)
 
     if vv.Slope_lowerlimit_extreme is not None:
-        _data_prep_PRA2(vv, vv.Slope_lowerlimit_extreme, "extreme", DEM_r.nodata)
+        _data_prep_PRA2(vv, vv.Slope_lowerlimit_extreme, "extreme", mask_out, DEM_r.nodata)
 
 
 # ----------------------------------------------------------------------------
