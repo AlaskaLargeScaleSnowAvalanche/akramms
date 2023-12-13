@@ -2,7 +2,6 @@ import subprocess,functools
 import os,pathlib,shutil
 import netCDF4
 import numpy as np
-from osgeo import gdal
 from akramms import config,process_tree
 from akramms.util import paramutil,harnutil,arcgisutil
 from uafgi.util import make
@@ -258,7 +257,10 @@ def data_prep_PRA1_rule(scene_dir):
         
     return make.Rule(action, inputs, outputs)
 # -----------------------------------------------------------------------------
-def mask_and_copy(itif, mask_out, otif, type=gdal.GDT_Float64):
+def mask_and_copy(itif, mask_out, otif, type=None):
+    if type is None:
+        from osgeo import gdal
+        type = gdal.GDT_Float64
     print(f'Masking and writing to: {otif}')
     ival = gdalutil.read_raster(itif)
     ival.data[mask_out] = ival.nodata
