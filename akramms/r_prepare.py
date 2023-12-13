@@ -416,6 +416,8 @@ def prepare_data2(scene_dir):
     # Apply mask to files
     mask_and_copy(vv.DEM, mask_out, vv.DEM_eCog)
     mask_and_copy(vv.Slope_tif, mask_out, vv.Slope_eCog)
+    print('AA ', MEM("Aspect_sectors_N0_eCog"))
+    print('BB ', vv.Aspect_sectors_N0_eCog)
     mask_and_copy(MEM("Aspect_sectors_N0_eCog"), mask_out, vv.Aspect_sectors_N0_eCog)
     mask_and_copy(MEM("Aspect_sectors_Nmax_eCog"), mask_out, vv.Aspect_sectors_Nmax_eCog)
     mask_and_copy(vv.Curv_profile_eCog_temp, mask_out, vv.Curv_profile_eCog)
