@@ -342,17 +342,40 @@ def _data_prep_PRA2(Slope_lowerlimit, name_scenario, vars):
         gdalutil.write_raster(PRA_raw_NoForest, DEM.grid, val, DEM.nodata)
 
 
+# -----------------------------------------------------------------
+def _w2l(val):
+    if val == '':
+        return None
+
+    val = config.roots_w.relpath(val)
+    val = config.roots_l.syspath(val)
+    return val
+
+# Keys from ArcGIS script that represent paths
+_arcgis_vars = dict()
+for vn in (
+    'DEM', 'inPerimeter', 'Perimeter_Envelope_Buffer',
+    'DEM_eCog', 'Slope_tif', 'Slope_eCog', 'Aspect_sectors_N0_eCog',
+    'Aspect_sectors_Nmax_eCog', 'Curv_profile_eCog_temp',
+    'Curv_profile_eCog', 'Curv_plan_eCog_temp', 'Curv_plan_eCog',
+    'Hillshade_eCog',
+    ):
+    _arcgis_vars[vn] = _w2l
+
+
 class LVars:
-    """Convenient conversion from Windows to Linux paths"""
+    ""
+
+    "Convenient conversion from Windows to Linux paths"""
 
     def __init__(self, wvars):
         self.wvars = wvars
     def __getattr__(self, vname):
         val = self.wvars[vname]
-        val = config.roots_w.relpath(val)
-        val = config.roots_l.syspath(val)
+        if vname in _arcgis_vars:
+            return _arcgis_vars[vname](val)
         return val
-        
+# ---------------------------------------------------------------------        
 def prepare_data2(scene_dir):
     """Called from prepare_scene.py; RUNS LOCALLY ON LINUX"""
 
@@ -360,22 +383,8 @@ def prepare_data2(scene_dir):
 
     # Retrieve filenames used in data_prep_PRA.py ArcGIS script
     with open(os.path.join(scene_dir, 'data_prep_PRA1.pik'), 'rb') as fin:
-        wvars = pickle.load(fin)
-    lv = LVars(wvars)    # Convert to Linux paths
-
-    # Extract and convert variables we need
-#    DEM = vars['DEM']
-#    print(DEM)
-#
-#    DEM = config.roots_w.relpath(DEM, as_str=True)
-#    print(DEM)
-#
-#    DEM = config.roots_l.syspath(DEM)
-    print(lv.DEM)
-
-    return
-
-
+        vv = LVars(pickle.load(fin))
+    Workspace = vv.Workspace
 
     # -------------------------------------------------------------
     def MEM(leaf):
@@ -388,15 +397,13 @@ def prepare_data2(scene_dir):
     print("clipping eCog files to the same extent")
 
     # Make a mask based on DEM extent
-    print(vars)
-    print(vars['DEM'])
-    DEM_r = gdalutil.read_raster(DEM)
+    DEM_r = gdalutil.read_raster(vv.DEM)
     mask_out = (DEM_r.data == DEM_r.nodata)
 
     # Mask out areas beyond the perimeter
-    if (inPerimeter is not None) and (inPerimeter != ""):
+    if vv.inPerimeter is not None:
         # Mask based on the perimeter polygon
-        ds = ogr.GetDriverByName('ESRI Shapefile').Open(Perimeter_Envelope_Buffer)
+        ds = ogr.GetDriverByName('ESRI Shapefile').Open(vv.Perimeter_Envelope_Buffer)
         try:
             # This will be 1 inside perimeter polygon, 0 outside
             in_perimeter = rasterize.rasterize_polygons(ds, DEM_r.grid)
@@ -407,13 +414,15 @@ def prepare_data2(scene_dir):
         mask_out[np.logical_not(in_perimeter)] = True
 
     # Apply mask to files
-    mask_and_copy(DEM, mask_out, DEM_eCog)
-    mask_and_copy(Slope_tif, mask_out, Slope_eCog)
-    mask_and_copy(MEM("Aspect_sectors_N0_eCog"), mask_out, Aspect_sectors_N0_eCog)
-    mask_and_copy(MEM("Aspect_sectors_Nmax_eCog"), mask_out, Aspect_sectors_Nmax_eCog)
-    mask_and_copy(Curv_profile_eCog_temp, mask_out, Curv_profile_eCog)
-    mask_and_copy(Curv_plan_eCog_temp, mask_out, Curv_plan_eCog)
-    mask_and_copy(MEM("Hillshade_eCog"), mask_out, Hillshade_eCog)
+    mask_and_copy(vv.DEM, mask_out, vv.DEM_eCog)
+    mask_and_copy(vv.Slope_tif, mask_out, vv.Slope_eCog)
+    mask_and_copy(MEM("Aspect_sectors_N0_eCog"), mask_out, vv.Aspect_sectors_N0_eCog)
+    mask_and_copy(MEM("Aspect_sectors_Nmax_eCog"), mask_out, vv.Aspect_sectors_Nmax_eCog)
+    mask_and_copy(vv.Curv_profile_eCog_temp, mask_out, vv.Curv_profile_eCog)
+    mask_and_copy(vv.Curv_plan_eCog_temp, mask_out, vv.Curv_plan_eCog)
+    mask_and_copy(MEM("Hillshade_eCog"), mask_out, vv.Hillshade_eCog)
+
+    return
 
     if Slope_lowerlimit_frequent != "":
         _data_prep_PRA(Slope_lowerlimit_frequent, "frequent")
