@@ -314,6 +314,23 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario):
     SlopeCurvRuggedness_in = np.logical_and(np.logical_and(Slope_in, Curv_in), Ruggedness_in)
     #-------------------------------------------------------------------------------
     if vv.inForest is not None:
+
+        # Forest may not be the same geometry / resolution as DEM
+        # Forest is boolean dataset 1/0
+        iForest_r = gdalutil.read_raster(vv.inForest)
+        oForest_data = gdalutil.regrid(
+            iForest_r.data, iForest_r.grid, iForest_r.nd,
+            Slope_r.grid, iForest_r.nd)
+        iForest_r = None    # Release memory
+        Forest_in = (oForest_data != 0)
+        oForest_data = None    # Release memory
+
+        # https://stackoverflow.com/questions/10454316/how-to-project-and-resample-a-grid-to-match-another-grid-with-gdal-python
+#        iForest_ds = gdal.Open(str(vv.inFOrest))
+#        oForest_ds = gdalutil.clone_geometry('MEM', '', Slope_r.grad_info, 1, gdal.GDT_Byte)
+#gdal.ReprojectImage(src, dst, src_proj, match_proj, gdalconst.GRA_Bilinear)
+
+
         # Boolean Overlay: Slope AND Curvature AND Ruggedness AND Forest
         print('inForest ', vv.inForest)
         Forest_r = gdalutil.read_raster(vv.inForest)
