@@ -2,6 +2,7 @@ import subprocess,functools
 import os,pathlib,shutil
 import netCDF4
 import numpy as np
+from osgeo import gdal
 from akramms import config,process_tree
 from akramms.util import paramutil,harnutil,arcgisutil
 from uafgi.util import make
