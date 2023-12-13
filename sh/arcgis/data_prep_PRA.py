@@ -349,7 +349,9 @@ vnames = [
     'Workspace', 'inDEM', 'inForest', 'resampCellSize', 'inPerimeter',
     'Slope_lowerlimit_frequent', 'Slope_lowerlimit_extreme',
     'Slope_upperlimit', 'Curv_upperlimit', 'Rugged_neighborhood',
-    'Rugged_upperlimit', 'outCoordSystem', 'Weightingkernel',
+    'Rugged_upperlimit', 'Weightingkernel',
+
+    # 'outCoordSystem',   # Not included because it usees an arcpy type
 
     # Non-paths
     'Name',
