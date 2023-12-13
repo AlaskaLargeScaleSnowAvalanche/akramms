@@ -363,7 +363,7 @@ for vn in (
     'DEM_eCog', 'Slope_tif', 'Slope_eCog', 'Aspect_sectors_N0_eCog',
     'Aspect_sectors_Nmax_eCog', 'Curv_profile_eCog_temp',
     'Curv_profile_eCog', 'Curv_plan_eCog_temp', 'Curv_plan_eCog',
-    'Hillshade_eCog',
+    'Hillshade_eCog', 'Curv_plan',
     ):
     _arcgis_vars[vn] = _w2l
 
