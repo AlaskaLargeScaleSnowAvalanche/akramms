@@ -373,7 +373,7 @@ def _float(val):
     return float(val)
 
 # Keys from ArcGIS script that represent paths
-_arcgis_vars = dict()
+_arcgis_vars = {'Name': str}
 for vn in (
     'Workspace',
     'DEM', 'inPerimeter', 'Perimeter_Envelope_Buffer',
