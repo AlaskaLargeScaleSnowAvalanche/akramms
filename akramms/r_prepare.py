@@ -315,6 +315,7 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario):
     #-------------------------------------------------------------------------------
     if vv.inForest is not None:
         # Boolean Overlay: Slope AND Curvature AND Ruggedness AND Forest
+        print('inForest ', vv.inForest)
         Forest_r = gdalutil.read_raster(vv.inForest)
         Forest_in = (Forest_r.data != 0)
         SlopeCurvRuggednessForest_in = np.logical_and(SlopeCurvRuggedness_in, Forest_in)
