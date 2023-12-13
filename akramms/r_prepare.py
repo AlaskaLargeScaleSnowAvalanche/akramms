@@ -346,10 +346,9 @@ def prepare_data2(scene_dir):
     """Called from prepare_scene.py; RUNS LOCALLY ON LINUX"""
 
     scene_args = params.load(scene_dir)
-    Worksapce = scene_dir
 
     # Retrieve filenames used in data_prep_PRA.py ArcGIS script
-    with open(os.path.join(Workspace, 'data_prep_PRA1.pik'), 'rb') as fin:
+    with open(os.path.join(scene_dir, 'data_prep_PRA1.pik'), 'rb') as fin:
         vars = pickle.load(fin)
 
     # Define retrieved names as local variables in this function
