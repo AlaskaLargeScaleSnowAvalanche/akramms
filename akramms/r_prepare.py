@@ -342,6 +342,17 @@ def _data_prep_PRA2(Slope_lowerlimit, name_scenario, vars):
         gdalutil.write_raster(PRA_raw_NoForest, DEM.grid, val, DEM.nodata)
 
 
+class LVars:
+    """Convenient conversion from Windows to Linux paths"""
+
+    def __init__(self, wvars):
+        self.wvars = wvars
+    def __getattr__(self, vname):
+        val = self.wvars[vname]
+        val = config.roots_w.relpath(val)
+        val = config.roots_l.syspath(val)
+        return val
+        
 def prepare_data2(scene_dir):
     """Called from prepare_scene.py; RUNS LOCALLY ON LINUX"""
 
@@ -349,17 +360,18 @@ def prepare_data2(scene_dir):
 
     # Retrieve filenames used in data_prep_PRA.py ArcGIS script
     with open(os.path.join(scene_dir, 'data_prep_PRA1.pik'), 'rb') as fin:
-        vars = pickle.load(fin)
+        wvars = pickle.load(fin)
+    lv = LVars(wvars)    # Convert to Linux paths
 
     # Extract and convert variables we need
-    DEM = vars['DEM']
-    print(DEM)
-
-    DEM = config.roots_w.relpath(DEM, as_str=True)
-    print(DEM)
-
-    DEM = config.roots_l.syspath(DEM)
-    print(DEM)
+#    DEM = vars['DEM']
+#    print(DEM)
+#
+#    DEM = config.roots_w.relpath(DEM, as_str=True)
+#    print(DEM)
+#
+#    DEM = config.roots_l.syspath(DEM)
+    print(lv.DEM)
 
     return
 
