@@ -3,8 +3,8 @@ import os,pathlib,shutil
 import netCDF4
 import numpy as np
 from akramms import config,process_tree
-from akramms.util import paramutil,harnutil,arcgisutil,gdalutil
-from uafgi.util import make
+from akramms.util import paramutil,harnutil,arcgisutil
+from uafgi.util import make,gdalutil
 from akramms import params
 
 # TODO: Tar up
