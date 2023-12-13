@@ -354,7 +354,7 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
     gdalutil.write_raster(PRA_raw_NoForest, Slope_r.grid, val, onodata)
 
     # Forest
-    if inForest != "":
+    if vv.inForest is not None:
         PRA_raw_NoForest = ECOG(f"{vv.Name}__PRA_raw_{name_scenario}_NoForest.tif")
         val = np.zeros(SlopeCurvRuggednessForest_in.shape)#, dtype='i')
         val[SlopeCurvRuggedness_in] = 200
@@ -448,8 +448,6 @@ def prepare_data2(scene_dir):
     # Apply mask to files
     mask_and_copy(vv.DEM, mask_out, vv.DEM_eCog)
     mask_and_copy(vv.Slope_tif, mask_out, vv.Slope_eCog)
-    print('AA ', MEM("Aspect_sectors_N0_eCog"))
-    print('BB ', vv.Aspect_sectors_N0_eCog)
     mask_and_copy(MEM("Aspect_sectors_N0_eCog"), mask_out, vv.Aspect_sectors_N0_eCog)
     mask_and_copy(MEM("Aspect_sectors_Nmax_eCog"), mask_out, vv.Aspect_sectors_Nmax_eCog)
     mask_and_copy(vv.Curv_profile_eCog_temp, mask_out, vv.Curv_profile_eCog)
