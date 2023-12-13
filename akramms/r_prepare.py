@@ -270,7 +270,11 @@ def mask_and_copy(itif, mask_out, otif, type=None):
     gdalutil.write_raster(otif, *ival, type=type)
         
 # -----------------------------------------------------------------------------
-def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario):
+def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, onodata):
+    """
+    onodata:
+        Nodata value to use in output files
+    """
 
     print("executing Scenario_" + name_scenario + "...")
 
@@ -346,16 +350,16 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario):
     PRA_raw_NoForest = ECOG(f"{vv.Name}__PRA_raw_{name_scenario}_NoForest.tif")
     val = np.zeros(SlopeCurvRuggedness_in.shape)#, dtype='i')
     val[SlopeCurvRuggedness_in] = 200
-    val[mask_out] = DEM_r.nodata
-    gdalutil.write_raster(PRA_raw_NoForest, DEM.grid, val, DEM.nodata)
+    val[mask_out] = onodata
+    gdalutil.write_raster(PRA_raw_NoForest, DEM.grid, val, onodata)
 
     # Forest
     if inForest != "":
         PRA_raw_NoForest = ECOG(f"{vv.Name}__PRA_raw_{name_scenario}_NoForest.tif")
         val = np.zeros(SlopeCurvRuggednessForest_in.shape)#, dtype='i')
         val[SlopeCurvRuggedness_in] = 200
-        val[mask_out] = DEM_r.nodata
-        gdalutil.write_raster(PRA_raw_NoForest, DEM.grid, val, DEM.nodata)
+        val[mask_out] = onodata
+        gdalutil.write_raster(PRA_raw_NoForest, DEM.grid, val, onodata)
 
 
 # -----------------------------------------------------------------
@@ -453,10 +457,10 @@ def prepare_data2(scene_dir):
     mask_and_copy(MEM("Hillshade_eCog"), mask_out, vv.Hillshade_eCog)
 
     if vv.Slope_lowerlimit_frequent is not None:
-        _data_prep_PRA2(vv, vv.Slope_lowerlimit_frequent, "frequent")
+        _data_prep_PRA2(vv, vv.Slope_lowerlimit_frequent, "frequent", DEM_r.nodata)
 
     if vv.Slope_lowerlimit_extreme is not None:
-        _data_prep_PRA2(vv, vv.Slope_lowerlimit_extreme, "extreme")
+        _data_prep_PRA2(vv, vv.Slope_lowerlimit_extreme, "extreme", DEM_r.nodata)
 
 
 # ----------------------------------------------------------------------------
