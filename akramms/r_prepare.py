@@ -351,8 +351,19 @@ def prepare_data2(scene_dir):
     with open(os.path.join(scene_dir, 'data_prep_PRA1.pik'), 'rb') as fin:
         vars = pickle.load(fin)
 
-    # Define retrieved names as local variables in this function
-    locals().update(vars)
+    # Extract and convert variables we need
+    DEM = vars['DEM']
+    print(DEM)
+
+    DEM = config.roots_w.relpath(DEM)
+    print(DEM)
+
+    DEM = config.roots_l.syspath(DEM)
+    print(DEM)
+
+    return
+
+
 
     # -------------------------------------------------------------
     def MEM(leaf):
