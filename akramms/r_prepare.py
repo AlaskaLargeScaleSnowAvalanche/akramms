@@ -313,7 +313,7 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario):
     print("combining binary layers...")
     SlopeCurvRuggedness_in = np.logical_and(np.logical_and(Slope_in, Curv_in), Ruggedness_in)
     #-------------------------------------------------------------------------------
-    if inForest != "":
+    if vv.inForest is not None:
         # Boolean Overlay: Slope AND Curvature AND Ruggedness AND Forest
         Forest_r = gdalutil.read_raster(vv.inForest)
         Forest_in = (Forest_r.data != 0)
@@ -362,7 +362,7 @@ for vn in (
     'DEM_eCog', 'Slope_tif', 'Slope_eCog', 'Aspect_sectors_N0_eCog',
     'Aspect_sectors_Nmax_eCog', 'Curv_profile_eCog_temp',
     'Curv_profile_eCog', 'Curv_plan_eCog_temp', 'Curv_plan_eCog',
-    'Hillshade_eCog', 'Curv_plan', 'Ruggedness_tif',
+    'Hillshade_eCog', 'Curv_plan', 'Ruggedness_tif', 'inForest',
     ):
     _arcgis_vars[vn] = _w2l
 
