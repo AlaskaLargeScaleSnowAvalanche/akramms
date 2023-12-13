@@ -319,8 +319,8 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario):
         # Forest is boolean dataset 1/0
         iForest_r = gdalutil.read_raster(vv.inForest)
         oForest_data = gdalutil.regrid(
-            iForest_r.data, iForest_r.grid, iForest_r.nd,
-            Slope_r.grid, iForest_r.nd)
+            iForest_r.data, iForest_r.grid, iForest_r.nodata,
+            Slope_r.grid, iForest_r.nodata)
         iForest_r = None    # Release memory
         Forest_in = (oForest_data != 0)
         oForest_data = None    # Release memory
