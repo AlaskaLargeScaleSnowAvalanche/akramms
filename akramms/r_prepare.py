@@ -355,7 +355,7 @@ def prepare_data2(scene_dir):
     DEM = vars['DEM']
     print(DEM)
 
-    DEM = config.roots_w.relpath(DEM)
+    DEM = config.roots_w.relpath(DEM, as_str=True)
     print(DEM)
 
     DEM = config.roots_l.syspath(DEM)
