@@ -354,6 +354,7 @@ def _w2l(val):
 # Keys from ArcGIS script that represent paths
 _arcgis_vars = dict()
 for vn in (
+    'Workspace',
     'DEM', 'inPerimeter', 'Perimeter_Envelope_Buffer',
     'DEM_eCog', 'Slope_tif', 'Slope_eCog', 'Aspect_sectors_N0_eCog',
     'Aspect_sectors_Nmax_eCog', 'Curv_profile_eCog_temp',
