@@ -257,6 +257,9 @@ def data_prep_PRA1_rule(scene_dir):
         
     return make.Rule(action, inputs, outputs)
 # -----------------------------------------------------------------------------
+# ==============================================================================
+# Part 2: Python and GDAL
+
 def mask_and_copy(itif, mask_out, otif, type=None):
     if type is None:
         from osgeo import gdal
@@ -267,7 +270,7 @@ def mask_and_copy(itif, mask_out, otif, type=None):
     gdalutil.write_raster(otif, *ival, type=type)
         
 # -----------------------------------------------------------------------------
-def _data_prep_PRA(Slope_lowerlimit, name_scenario, vars):
+def _data_prep_PRA2(Slope_lowerlimit, name_scenario, vars):
 
     locals().update(vars)
 
