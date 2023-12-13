@@ -365,6 +365,7 @@ def prepare_data2(scene_dir):
     print("clipping eCog files to the same extent")
 
     # Make a mask based on DEM extent
+    print(vars)
     DEM_r = gdalutil.read_raster(DEM)
     mask_out = (DEM_r.data == DEM_r.nodata)
 
