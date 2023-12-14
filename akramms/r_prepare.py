@@ -492,7 +492,7 @@ def data_prep_PRA2_rule(scene_dir, inputs):
     def action(tdir):
 
         # Finish the job of the original ArcGIS script
-#        prepare_data2(scene_dir)
+        prepare_data2(scene_dir)
 
         # Make sure we have an appropriate  direcotry
         ecog_dir = os.path.join(scene_dir, 'eCog')
@@ -531,11 +531,12 @@ def data_prep_PRA2_rule(scene_dir, inputs):
         shutil.copy(scene_args['dem_file'], os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name'])))
 
 
+        # ---------------------------------------------------------------------------
         # Clean up temporary files from ArcGIS step
         for subdir in ('base_data', 'temp_model_frequent', 'temp_model_extreme', 'in_mem', 'mem'):
             folder_name = os.path.join(scene_dir, subdir)
             print('Deleting folder ', folder_name)
-            #shutil.rmtree(folder_name, ignore_errors=True)
+            shutil.rmtree(folder_name, ignore_errors=True)
 
         # Clean up extra _temp files from ArcGIS step
         _tmpRE = re.compile(r'^(.*)_temp.(tif|tfw).*$')
@@ -548,6 +549,7 @@ def data_prep_PRA2_rule(scene_dir, inputs):
                     os.remove(fname)
                 except FileNotFoundError:
                     pass
+        # ---------------------------------------------------------------------------
 
         # Make it clear / obvious we have finished
         with open(os.path.join(scene_dir, 'data_prep_PRA2.txt'), 'w') as out:
