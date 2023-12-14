@@ -355,11 +355,11 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
 
     # Forest
     if vv.inForest is not None:
-        PRA_raw_NoForest = ECOG(f"{vv.Name}__PRA_raw_{name_scenario}_NoForest.tif")
+        PRA_raw_Forest = ECOG(f"{vv.Name}__PRA_raw_{name_scenario}_Forest.tif")
         val = np.zeros(SlopeCurvRuggednessForest_in.shape)#, dtype='i')
         val[SlopeCurvRuggedness_in] = 200
         val[mask_out] = onodata
-        gdalutil.write_raster(PRA_raw_NoForest, Slope_r.grid, val, onodata)
+        gdalutil.write_raster(PRA_raw_Forest, Slope_r.grid, val, onodata)
 
 
 # -----------------------------------------------------------------
@@ -417,6 +417,10 @@ def prepare_data2(scene_dir):
     with open(os.path.join(scene_dir, 'data_prep_PRA1.pik'), 'rb') as fin:
         vv = LVars(pickle.load(fin))
     Workspace = vv.Workspace
+
+    print('Variables read from ArcGIS script:')
+    for k in vv.wvars.keys():
+        print(f'{k} = {vv.__getattr__(k)}')
 
     # -------------------------------------------------------------
     def MEM(leaf):
