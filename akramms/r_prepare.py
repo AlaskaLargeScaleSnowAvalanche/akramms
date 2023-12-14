@@ -191,10 +191,10 @@ def data_prep_PRA1_rule(scene_dir):
             scene_dir_rel]
 
         # Run it
-#        harnutil.run_queued('arcgis',
-#            harnutil.run_remote, inputs, cmd, tdir)
-        with rqutil.blocking_lock('arcgis'):
-            harnutil.run_remote(inputs, cmd, tdir)
+        harnutil.run_queued('arcgis',
+            harnutil.run_remote, inputs, cmd, tdir)
+#        with rqutil.blocking_lock('arcgis'):
+#            harnutil.run_remote(inputs, cmd, tdir)
 
 #        # Make it clear / obvious we have finished
 #        with open(os.path.join(scene_dir, 'data_prep_PRA1.pik'), 'w') as out:
