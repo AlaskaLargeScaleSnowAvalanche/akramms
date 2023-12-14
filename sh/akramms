@@ -384,21 +384,21 @@ def setup(args):
             rule()
         # -------------------------------
 
-#        makefile = make.Makefile()
-#        for _,row1 in akdf1.iterrows():
-#        #for combo,akdf1 in akdf0b.groupby('combo'):
-#            combo = row1['combo']
-#
-#            # -------------------- Step 2:
-#            # (a) Prepare DEM files, forest files
-#            # (d) Set up tile directories (AKRAMMS scenes)
-#
-#            # Add the experiment and combos
-#            # This calls through to r_prepare.prepare_scene_rule()
-##            getattr(expmod, 'add_experiment')(makefile, akdf1.combo.tolist())
-#            getattr(expmod, 'add_experiment')(makefile, [combo])
-#
-#        makefile.generate(expmod.dir / 'init_mk', run=True, ncpu=config.setup_ncpu)
+        makefile = make.Makefile()
+        for _,row1 in akdf1.iterrows():
+        #for combo,akdf1 in akdf0b.groupby('combo'):
+            combo = row1['combo']
+
+            # -------------------- Step 2:
+            # (a) Prepare DEM files, forest files
+            # (d) Set up tile directories (AKRAMMS scenes)
+
+            # Add the experiment and combos
+            # This calls through to r_prepare.prepare_scene_rule()
+#            getattr(expmod, 'add_experiment')(makefile, akdf1.combo.tolist())
+            getattr(expmod, 'add_experiment')(makefile, [combo])
+
+        makefile.generate(expmod.dir / 'init_mk', run=True, ncpu=config.setup_ncpu)
 
 
         makefile = make.Makefile()
