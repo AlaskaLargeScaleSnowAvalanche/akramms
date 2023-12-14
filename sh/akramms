@@ -410,11 +410,11 @@ def setup(args):
                 # (c) PRA-Post ArcGIS script
                 # (d) Split releasefiles and generate chunks
 
-                print(f'----- Adding Scene: {scenedir}')
+                print(f'----- Adding Scene: {cinfo.scene_dir}')
 
                 # Run ArcGIS script + companion code to prepare files for eCognition
-                prepare_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(scenedir)).outputs
-                makefile.add(r_prepare.data_prep_PRA2_rule(scenedir, prepare_outputs))
+                prepare_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(cinfo.scene_dir)).outputs
+                makefile.add(r_prepare.data_prep_PRA2_rule(cinfo.scene_dir, prepare_outputs))
                 print('Number rules ', len(makefile.rule_list))
 
 
@@ -423,18 +423,18 @@ def setup(args):
                 dem_filled_file = f'{dem_file[:-4]}_filled.tif'
 
                 # Run eCognition
-                makefile.add(r_ecog.rule(scenedir, prepare_outputs, combo.return_period, combo.forest))
+                makefile.add(r_ecog.rule(cinfo.scene_dir, prepare_outputs, combo.return_period, combo.forest))
 
                 # Post-Process eCognition Output (the pra_file)
                 # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
                 makefile.add(r_pra_post.pra_post_rule(
-                    scenedir, dem_filled_file, combo.return_period,
+                    cinfo.scene_dir, dem_filled_file, combo.return_period,
                     combo.forest, cinfo.snow_file))
 
                 # and also split into chunks.
                 for pra_size in config.allowed_pra_sizes:
                     makefile.add(r_pra_post.chunk_rule(
-                        scenedir, combo.forest, expmod.resolution,
+                        cinfo.scene_dir, combo.forest, expmod.resolution,
                         combo.return_period, pra_size))
 
 
