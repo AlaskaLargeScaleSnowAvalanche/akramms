@@ -384,45 +384,65 @@ def setup(args):
             rule()
         # -------------------------------
 
-        makefile = make.Makefile()
-        for _,row1 in akdf1.iterrows():
-        #for combo,akdf1 in akdf0b.groupby('combo'):
-            combo = row1['combo']
+        # Run make on chunks a few rows at a time
+        combo_chunk_size = config.setup_ncpu    # maybe *2
+        nrows = len(akdf1)
+        cchunk_bounds = list(range(0, nrows, combo_chunk_size)) + [combo_chunk_size]
+        for irange in zip(cchunk_bounds[:-1], cchunk_bounds[1:]):
+            akdf1b = akdf1.iloc[irange[0]:irange[1]]
 
-            # -------------------- Step 2:
-            # (a) Prepare DEM files, forest files
-            # (d) Set up tile directories (AKRAMMS scenes)
+            # Make a single Makefile for this set of combos
+            makefile = make.Makefile()
+            for _,row1 in akdf1b.iterrows():
+                combo = row1['combo']
 
-            # Add the experiment and combos
-            # This calls through to r_prepare.prepare_scene_rule()
-#            getattr(expmod, 'add_experiment')(makefile, akdf1.combo.tolist())
-            getattr(expmod, 'add_experiment')(makefile, [combo])
+                # -------------------- Step 2:
+                # (a) Prepare DEM files, forest files
+                # (d) Set up tile directories (AKRAMMS scenes)
 
-#        makefile.generate(expmod.dir / 'init_mk', run=True, ncpu=config.setup_ncpu)
+                # Add the experiment and combos
+                # This calls through to r_prepare.prepare_scene_rule()
+                getattr(expmod, 'add_experiment')(makefile, [combo])
+
+                # -------------------- Step 3
+                # (a) ArcGIS prep
+                # (b) eCognition
+                # (c) PRA-Post ArcGIS script
+                # (d) Split releasefiles and generate chunks
+
+                scenedir = expmod.combo_to_scenedir(combo)
+                scene_args = params.load(scenedir)
+
+                print(f'----- Adding Scene: {scenedir}')
+
+                # Run ArcGIS script + companion code to prepare files for eCognition
+                prepare_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(scenedir)).outputs
+                makefile.add(r_prepare.data_prep_PRA2_rule(scenedir, prepare_outputs))
+                print('Number rules ', len(makefile.rule_list))
 
 
-#        makefile = make.Makefile()
-#        for _,row1 in akdf1.iterrows():
-#            combo = row1['combo']
+                # Obtain name of neighbor1 graph file for DEM routing network
+                # (created above in add_experiment_fn())
+                dem_file = scene_args['dem_file']
+                dem_filled_file = f'{dem_file[:-4]}_filled.tif'
+
+                # Run eCognition
+                makefile.add(r_ecog.rule(scenedir, prepare_outputs, combo.return_period, combo.forest))
+
+                # Post-Process eCognition Output (the pra_file)
+                # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
+                makefile.add(r_pra_post.pra_post_rule(
+                    scenedir, dem_filled_file, combo.return_period,
+                    combo.forest, scene_args['snow_file']))
+
+                # and also split into chunks.
+                for pra_size in config.allowed_pra_sizes:
+                    makefile.add(r_pra_post.chunk_rule(
+                        scenedir, combo.forest, expmod.resolution,
+                        combo.return_period, pra_size))
 
 
-            # -------------------- Step 3
-            # (a) ArcGIS prep
-            # (b) eCognition
-            # (c) PRA-Post ArcGIS script
-            # (d) Split releasefiles and generate chunks
-
-            scenedir = expmod.combo_to_scenedir(combo)
-            scene_args = params.load(scenedir)
-
-            print(f'----- Adding Scene: {scenedir}')
-
-            # Run ArcGIS script + companion code to prepare files for eCognition
-            prepare_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(scenedir)).outputs
-            makefile.add(r_prepare.data_prep_PRA2_rule(scenedir, prepare_outputs))
-            print('Number rules ', len(makefile.rule_list))
-
-        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=config.setup_ncpu)
+            makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=config.setup_ncpu)
 
 # ------------------------------------------------------------------
 
@@ -451,28 +471,6 @@ def ramms(args):
         for _,row1 in akdf1.iterrows():
         #for combo,akdf1 in akdf0b.groupby('combo'):
             combo = row1['combo']
-
-            # Obtain name of neighbor1 graph file for DEM routing network
-            # (created above in add_experiment_fn())
-            dem_file = scene_args['dem_file']
-            dem_filled_file = f'{dem_file[:-4]}_filled.tif'
-
-            # Run eCognition
-            makefile.add(r_ecog.rule(scenedir, prepare_outputs, combo.return_period, combo.forest))
-
-            # Post-Process eCognition Output (the pra_file)
-            # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
-            makefile.add(r_pra_post.pra_post_rule(
-                scenedir, dem_filled_file, combo.return_period,
-                combo.forest, scene_args['snow_file']))
-
-            # and also split into chunks.
-            for pra_size in config.allowed_pra_sizes:
-                makefile.add(r_pra_post.chunk_rule(
-                    scenedir, combo.forest, expmod.resolution,
-                    combo.return_period, pra_size))
-
-            makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
 
 
             # -------------------- Step 4
