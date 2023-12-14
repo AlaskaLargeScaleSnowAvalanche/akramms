@@ -492,7 +492,7 @@ def data_prep_PRA2_rule(scene_dir, inputs):
     def action(tdir):
 
         # Finish the job of the original ArcGIS script
-        prepare_data2(scene_dir)
+#        prepare_data2(scene_dir)
 
         # Make sure we have an appropriate  direcotry
         ecog_dir = os.path.join(scene_dir, 'eCog')
@@ -538,7 +538,7 @@ def data_prep_PRA2_rule(scene_dir, inputs):
             #shutil.rmtree(folder_name, ignore_errors=True)
 
         # Clean up extra _temp files from ArcGIS step
-        _tmpRE = re.compile(r'^(.*)_tmp.(tif|tfw).*$')
+        _tmpRE = re.compile(r'^(.*)_temp.(tif|tfw).*$')
         for name in os.listdir(ecog_dir):
             match = _tmpRE.match(name)
             if match is not None:
