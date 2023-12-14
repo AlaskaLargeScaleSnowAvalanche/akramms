@@ -494,6 +494,10 @@ def data_prep_PRA2_rule(scene_dir, inputs):
         # Finish the job of the original ArcGIS script
         prepare_data2(scene_dir)
 
+        # Make sure we have an appropriate  direcotry
+        ecog_dir = os.path.join(scene_dir, 'eCog')
+        # os.makedirs(ecog_dir, exist_ok=True)   # ArcGIS already created
+
         # Write import...xml files 
         for freq in ('frequent', 'extreme'):
             for forest in ((True,False) if scene_args['forest_file'] else (False,)):
@@ -522,8 +526,6 @@ def data_prep_PRA2_rule(scene_dir, inputs):
 
 
         # Copy DEM to eCog folder
-        ecog_dir = os.path.join(scene_dir, 'eCog')
-        os.makedirs(ecog_dir, exist_ok=True)
         dem_tif = os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name']))
         outputs.append(dem_tif)
         shutil.copy(scene_args['dem_file'], os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name'])))
