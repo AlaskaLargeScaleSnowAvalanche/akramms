@@ -420,6 +420,7 @@ def setup(args):
 
             # Run ArcGIS script + companion code to prepare files for eCognition
             prepare_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(scenedir)).outputs
+            print('pppppppp ', '\n'.join(prepare_outputs))
             makefile.add(r_prepare.data_prep_PRA2_rule(scenedir, prepare_outputs))
 
         makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
