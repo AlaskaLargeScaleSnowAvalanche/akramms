@@ -12,8 +12,10 @@ from akramms import params
 
 __all__ = ('prepare_scene_rule', 'data_prep_PRA_rule', 'prepare_data')
 
-# -----------------------------------------------------------------------
-# ---------------------------------------------------------------------------
+
+# ========================================================================
+# Part 0: Create directories, get ready for ArcGIS script to run.
+
 def prepare_scene_rule(xscene_dir, defaults=dict(), **kwargs):
 
     """Sets up a new scene by creating a directory with all
@@ -68,68 +70,11 @@ def prepare_scene_rule(xscene_dir, defaults=dict(), **kwargs):
 
     return make.Rule(action, inputs, outputs)
 
-# ---------------------------------------------------------------------------
-#@functools.lru_cache()
-#def r_prepare_scene(scene_dir, defaults=dict(), **kwargs):
-#    def action(tdir):
-#        prepare_scene(scene_dir, defaults=defaults, **kwargs)
-#    return make.Rule(action, [], [os.path.join(scene_dir, 'scene.nc')])
 
-# ---------------------------------------------------------------------------
-import_xml_tpl = """<?xml version="1.0" encoding="UTF-8"?>
-<ImportDefinitions>
-	<ImportDefinition name="PRA_import_{freq}" description="">
-		<LcnsIds></LcnsIds>
-		<SceneSearch folders-from-file-system="yes" bdi-driver="" scene-name="{scene_name}" map-name="">
-			<TagString>{froot}_{layer}.tif</TagString>
-			<SiteInfo x-coo="decimal" y-coo="decimal">
-				<TagString></TagString>
-			</SiteInfo>
-		</SceneSearch>
-		<SceneDefinition force-fitting="0" geo-coding="from-file" scene-extent="union" scene-unit="auto" pixel-size="auto">
-			<ImageLayer channel="1" alias="Aspect_sectors_Nmax" driver="GDAL">
-				<TagString>{froot}_Aspect_sectors_Nmax.tif</TagString>
-			</ImageLayer>
-			<ImageLayer channel="1" alias="Aspect_sectors_N0" driver="GDAL">
-				<TagString>{froot}_Aspect_sectors_N0.tif</TagString>
-			</ImageLayer>
-			<ImageLayer channel="1" alias="Curv_plan" driver="GDAL">
-				<TagString>{froot}_Curv_plan.tif</TagString>
-			</ImageLayer>
-			<ImageLayer channel="1" alias="Curv_profile" driver="GDAL">
-				<TagString>{froot}_Curv_profile.tif</TagString>
-			</ImageLayer>
-			<ImageLayer channel="1" alias="DEM" driver="GDAL">
-				<TagString>{froot}_DEM.tif</TagString>
-			</ImageLayer>
-			<ImageLayer channel="1" alias="Hillshade" driver="GDAL">
-				<TagString>{froot}_Hillshade.tif</TagString>
-			</ImageLayer>
-			<ImageLayer channel="1" alias="Slope" driver="GDAL">
-				<TagString>{froot}_Slope.tif</TagString>
-			</ImageLayer>
-			<ImageLayer channel="1" alias="PRA_raw" driver="GDAL">
-				<TagString>{froot}__PRA_raw_{freq}{_Forest}.tif</TagString>
-			</ImageLayer>
-		</SceneDefinition>
-	</ImportDefinition>
-</ImportDefinitions>
-"""
-def import_xml_str(scene_args, freq, forest):
-    """Generates text for the ...import....xml file
-    freq: 'frequent' | 'extreme'
-    """
 
-    args = {
-#        'froot': os.path.join(scene_args['scene_dir'], 'eCog', scene_args['name']),
-        'froot': '/mnt/eCog/{}'.format(scene_args['name']),    # Runs on mounted drive inside Docker container
-        'scene_name': scene_args['name'],
-        'freq': freq,
-        '_Forest' : '_Forest' if forest else '_NoForest',
-        'layer': '{layer}',    # Leave this for eCognition
-    }
-    return import_xml_tpl.format(**args)
-# ---------------------------------------------------------------------------
+# ================================================================================
+# Part 1: Run the original ArcGIS script on Windows (that which still remains of it)
+
 def _prepare_data_outputs(scene_dir, scene_args):
 
     # Basic stuff
@@ -257,8 +202,8 @@ def data_prep_PRA1_rule(scene_dir):
         
     return make.Rule(action, inputs, outputs)
 # -----------------------------------------------------------------------------
-# ==============================================================================
-# Part 2: Python and GDAL
+# ================================================================================
+# Part 2: Continuation of original ArcGIS script, now in Python / GDAL on Linux
 
 def mask_and_copy(itif, mask_out, otif, type=None):
     if type is None:
@@ -395,9 +340,8 @@ for vn in (
 
 
 class LVars:
-    ""
-
-    "Convenient conversion from Windows to Linux paths"""
+    """
+    Convenient conversion from Windows to Linux paths"""
 
     def __init__(self, wvars):
         self.wvars = wvars
@@ -409,8 +353,6 @@ class LVars:
 
 # ---------------------------------------------------------------------        
 def prepare_data2(scene_dir):
-    """Called from prepare_scene.py; RUNS LOCALLY ON LINUX"""
-
     scene_args = params.load(scene_dir)
 
     # Retrieve filenames used in data_prep_PRA.py ArcGIS script
@@ -465,7 +407,64 @@ def prepare_data2(scene_dir):
         _data_prep_PRA2(vv, vv.Slope_lowerlimit_extreme, "extreme", mask_out, DEM_r.nodata)
 
 
-# ----------------------------------------------------------------------------
+# ===================================================================================
+# Part 3: Integrate Part 2 with stuff beyond the original ArcGIS script (also in Linux)
+
+import_xml_tpl = """<?xml version="1.0" encoding="UTF-8"?>
+<ImportDefinitions>
+	<ImportDefinition name="PRA_import_{freq}" description="">
+		<LcnsIds></LcnsIds>
+		<SceneSearch folders-from-file-system="yes" bdi-driver="" scene-name="{scene_name}" map-name="">
+			<TagString>{froot}_{layer}.tif</TagString>
+			<SiteInfo x-coo="decimal" y-coo="decimal">
+				<TagString></TagString>
+			</SiteInfo>
+		</SceneSearch>
+		<SceneDefinition force-fitting="0" geo-coding="from-file" scene-extent="union" scene-unit="auto" pixel-size="auto">
+			<ImageLayer channel="1" alias="Aspect_sectors_Nmax" driver="GDAL">
+				<TagString>{froot}_Aspect_sectors_Nmax.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="Aspect_sectors_N0" driver="GDAL">
+				<TagString>{froot}_Aspect_sectors_N0.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="Curv_plan" driver="GDAL">
+				<TagString>{froot}_Curv_plan.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="Curv_profile" driver="GDAL">
+				<TagString>{froot}_Curv_profile.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="DEM" driver="GDAL">
+				<TagString>{froot}_DEM.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="Hillshade" driver="GDAL">
+				<TagString>{froot}_Hillshade.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="Slope" driver="GDAL">
+				<TagString>{froot}_Slope.tif</TagString>
+			</ImageLayer>
+			<ImageLayer channel="1" alias="PRA_raw" driver="GDAL">
+				<TagString>{froot}__PRA_raw_{freq}{_Forest}.tif</TagString>
+			</ImageLayer>
+		</SceneDefinition>
+	</ImportDefinition>
+</ImportDefinitions>
+"""
+def import_xml_str(scene_args, freq, forest):
+    """Generates text for the ...import....xml file
+    freq: 'frequent' | 'extreme'
+    """
+
+    args = {
+#        'froot': os.path.join(scene_args['scene_dir'], 'eCog', scene_args['name']),
+        'froot': '/mnt/eCog/{}'.format(scene_args['name']),    # Runs on mounted drive inside Docker container
+        'scene_name': scene_args['name'],
+        'freq': freq,
+        '_Forest' : '_Forest' if forest else '_NoForest',
+        'layer': '{layer}',    # Leave this for eCognition
+    }
+    return import_xml_tpl.format(**args)
+# ---------------------------------------------------------------------------
+
 def data_prep_PRA2_rule(scene_dir, inputs):
     """
     inputs:
@@ -491,6 +490,7 @@ def data_prep_PRA2_rule(scene_dir, inputs):
 
     def action(tdir):
 
+        # Finish the job of the original ArcGIS script
         prepare_data2(scene_dir)
 
         # Write import...xml files 
@@ -526,9 +526,19 @@ def data_prep_PRA2_rule(scene_dir, inputs):
         dem_tif = os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name']))
         outputs.append(dem_tif)
         shutil.copy(scene_args['dem_file'], os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name'])))
+
+
 #        # Clean up temporary files from ArcGIS step
 #        for dir in temporaries:
 #            shutil.rmtree(dir, ignore_errors=True)
+    temporaries = [
+        os.path.join(scene_dir, 'base_data'),
+        os.path.join(scene_dir, 'temp_model_frequent'),
+        os.path.join(scene_dir, 'temp_model_extreme'),
+        os.path.join(scene_dir, 'in_mem'),
+        os.path.join(scene_dir, 'mem'),
+        os.path.join(scene_dir, 'eCog'),
+    ]
 
 
         # Make it clear / obvious we have finished
