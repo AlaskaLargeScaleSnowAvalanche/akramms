@@ -471,6 +471,7 @@ def data_prep_PRA2_rule(scene_dir, inputs):
         Outputs from data_prep_PRA1_rule
     outputs:
     """
+    scene_args = params.load(scene_dir)
     outputs = [os.path.join(scene_dir, 'data_prep_PRA2.txt')]
 
     # xml import files
