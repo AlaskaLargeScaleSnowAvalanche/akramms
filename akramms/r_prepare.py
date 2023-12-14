@@ -1,4 +1,4 @@
-import subprocess,functools,pickle
+import subprocess,functools,pickle,re
 import os,pathlib,shutil
 import netCDF4
 import numpy as np
@@ -528,18 +528,20 @@ def data_prep_PRA2_rule(scene_dir, inputs):
         shutil.copy(scene_args['dem_file'], os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name'])))
 
 
-#        # Clean up temporary files from ArcGIS step
-#        for dir in temporaries:
-#            shutil.rmtree(dir, ignore_errors=True)
-    temporaries = [
-        os.path.join(scene_dir, 'base_data'),
-        os.path.join(scene_dir, 'temp_model_frequent'),
-        os.path.join(scene_dir, 'temp_model_extreme'),
-        os.path.join(scene_dir, 'in_mem'),
-        os.path.join(scene_dir, 'mem'),
-        os.path.join(scene_dir, 'eCog'),
-    ]
+        # Clean up temporary files from ArcGIS step
+        for subdir in ('base_data', 'temp_model_frequent', 'temp_model_extreme', 'in_mem', 'mem'):
+            folder_name = os.path.join(scene_dir, subdir)
+            print('Deleting folder ', folder_name)
+            #shutil.rmtree(folder_name, ignore_errors=True)
 
+        # Clean up extra _temp files from ArcGIS step
+        _tmpRE = re.compile(r'^(.*)_tmp.(tif|tfw).*$')
+        for name in os.listdir(ecog_dir):
+            match = _tmpRE.match(name)
+            if match is not None:
+                fname = os.path.join(ecog_dir, name)
+                print('Deleting ', fname)
+                os.remove(fname, ignore_errors=True)
 
         # Make it clear / obvious we have finished
         with open(os.path.join(scene_dir, 'data_prep_PRA2.txt'), 'w') as out:

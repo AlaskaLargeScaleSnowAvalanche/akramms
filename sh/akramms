@@ -418,8 +418,9 @@ def setup(args):
 
             print(f'----- Adding Scene: {scenedir}')
 
-            # Run ArcGIS script to prepare files for eCognition
+            # Run ArcGIS script + companion code to prepare files for eCognition
             prepare_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(scenedir)).outputs
+            makefile.add(r_prepare.data_prep_PRA2_rule(scenedir, prepare_outputs)
 
         makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
 
