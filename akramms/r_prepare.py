@@ -158,7 +158,7 @@ def prepare_data(scene_dir):
 
 # ---------------------------------------------------------------------------
 
-def data_prep_PRA1_rule(scene_dir):
+def data_prep_PRA1_rule(scene_dir, inputs):
     """Runs the data_prep_PRA.py script on a scene
     TO RERUN:
         Delete arcgis_stage0.txt
@@ -173,7 +173,7 @@ def data_prep_PRA1_rule(scene_dir):
     scene_args = params.load(scene_dir)
 
     # Assemble list of files to copy to remote Windows host
-    inputs = [os.path.join(scene_dir, 'scene.nc')]
+#    inputs = [os.path.join(scene_dir, 'scene.nc')]
 
     # Input files: dem and forest
     for param in params.ALL.values():
