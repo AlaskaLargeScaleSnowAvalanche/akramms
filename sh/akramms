@@ -403,7 +403,7 @@ def setup(args):
                 # Add the experiment and combos
                 # This calls through to r_prepare.prepare_scene_rule()
                 cinfo = expmod.add_combo(makefile, combo)    # file_info.ComboInfo
-                add_combo_outputs = [cinfo.scene_dir / 'scene.nc', cinfo.dem_file, cinfo.landcover_file, cinfo.forest_file, cinfo.snow_file]
+                add_combo_outputs = [os.path.join(cinfo.scene_dir, 'scene.nc'), cinfo.dem_file, cinfo.landcover_file, cinfo.forest_file, cinfo.snow_file]
                 # -------------------- Step 3
                 # (a) ArcGIS prep
                 # (b) eCognition
