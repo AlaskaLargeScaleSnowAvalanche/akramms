@@ -402,16 +402,13 @@ def setup(args):
 
                 # Add the experiment and combos
                 # This calls through to r_prepare.prepare_scene_rule()
-                getattr(expmod, 'add_experiment')(makefile, [combo])
+                cinfo = expmod.add_combo(makefile, combo)    # file_info.ComboInfo
 
                 # -------------------- Step 3
                 # (a) ArcGIS prep
                 # (b) eCognition
                 # (c) PRA-Post ArcGIS script
                 # (d) Split releasefiles and generate chunks
-
-                scenedir = expmod.combo_to_scenedir(combo)
-                scene_args = params.load(scenedir)
 
                 print(f'----- Adding Scene: {scenedir}')
 
@@ -423,7 +420,6 @@ def setup(args):
 
                 # Obtain name of neighbor1 graph file for DEM routing network
                 # (created above in add_experiment_fn())
-                dem_file = scene_args['dem_file']
                 dem_filled_file = f'{dem_file[:-4]}_filled.tif'
 
                 # Run eCognition
@@ -433,7 +429,7 @@ def setup(args):
                 # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
                 makefile.add(r_pra_post.pra_post_rule(
                     scenedir, dem_filled_file, combo.return_period,
-                    combo.forest, scene_args['snow_file']))
+                    combo.forest, cinfo.snow_file))
 
                 # and also split into chunks.
                 for pra_size in config.allowed_pra_sizes:

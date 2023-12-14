@@ -10,6 +10,14 @@ def is_file_good(fname):
     return True
     
 # --------------------------------------------------------------------
+class ComboInfo(typing.NamedTuple):
+    """Key input files needed for a combo"""
+    scene_dir: object
+    dem_file: object
+    landcover_file: object
+    forest_file: object
+    snow_file: object
+
 # ---------------------------------------------------------------------
 class ChunkInfo(typing.NamedTuple):
     """Describe<s one chunk."""

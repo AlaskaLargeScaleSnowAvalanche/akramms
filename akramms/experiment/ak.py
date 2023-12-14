@@ -147,15 +147,18 @@ def add_combo(makefile, combo):
         scene_dir, defaults='alaska', **kwargs)
     makefile.add(rule)
 
-#    stages.add_stage0_rules(makefile, scene_dir)
-def add_experiment(makefile, combos):
-#    add_dem(makefile, 0, 0, sanity_check=False)    # Get the origin scene
-#    add_dem(makefile, 1, 0, sanity_check=False)    # Get the origin scene
-#    add_dem(makefile, 55, 0, sanity_check=False)    # Get the origin scene
-#    add_dem(makefile, 113, 0, sanity_check=False)    # Get the origin scene
-    for combo in combos:
-        print(f'----- Adding Combo: {combo}')
-        add_combo(makefile, combo)
+    # Return files produced by this experiment
+    return file_info.ComboInfo(scene_dir, dem_tif, landcover_tif, forest_tif, sx3I_tif)
+
+##    stages.add_stage0_rules(makefile, scene_dir)
+#def add_experiment(makefile, combos):
+##    add_dem(makefile, 0, 0, sanity_check=False)    # Get the origin scene
+##    add_dem(makefile, 1, 0, sanity_check=False)    # Get the origin scene
+##    add_dem(makefile, 55, 0, sanity_check=False)    # Get the origin scene
+##    add_dem(makefile, 113, 0, sanity_check=False)    # Get the origin scene
+#    for combo in combos:
+#        print(f'----- Adding Combo: {combo}')
+#        add_combo(makefile, combo)
 
 
 # -------------------------------------------------------------
