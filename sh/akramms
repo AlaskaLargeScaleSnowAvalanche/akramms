@@ -411,7 +411,6 @@ def setup(args):
             # (b) eCognition
             # (c) PRA-Post ArcGIS script
             # (d) Split releasefiles and generate chunks
-            makefile = make.Makefile()
 
             scenedir = expmod.combo_to_scenedir(combo)
             scene_args = params.load(scenedir)
