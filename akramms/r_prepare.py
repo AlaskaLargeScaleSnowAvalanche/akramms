@@ -326,7 +326,7 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
             iForest_r.data, iForest_r.grid, iForest_r.nodata,
             Slope_r.grid, iForest_r.nodata)
         iForest_r = None    # Release memory
-        Forest_in = (oForest_data != 0)
+        Forest_out = (oForest_data == 0)
         oForest_data = None    # Release memory
 
         # https://stackoverflow.com/questions/10454316/how-to-project-and-resample-a-grid-to-match-another-grid-with-gdal-python
@@ -339,7 +339,7 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
 #        print('inForest ', vv.inForest)
 #        Forest_r = gdalutil.read_raster(vv.inForest)
 #        Forest_in = (Forest_r.data != 0)
-        SlopeCurvRuggednessForest_in = np.logical_and(SlopeCurvRuggedness_in, Forest_in)
+        SlopeCurvRuggednessForest_in = np.logical_and(SlopeCurvRuggedness_in, Forest_out)
 
     #-------------------------------------------------------------------------------
     print("writing out PRA_raw...")
