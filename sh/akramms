@@ -398,12 +398,12 @@ def setup(args):
 #            getattr(expmod, 'add_experiment')(makefile, akdf1.combo.tolist())
             getattr(expmod, 'add_experiment')(makefile, [combo])
 
-        makefile.generate(expmod.dir / 'init_mk', run=True, ncpu=config.setup_ncpu)
+#        makefile.generate(expmod.dir / 'init_mk', run=True, ncpu=config.setup_ncpu)
 
 
-        makefile = make.Makefile()
-        for _,row1 in akdf1.iterrows():
-            combo = row1['combo']
+#        makefile = make.Makefile()
+#        for _,row1 in akdf1.iterrows():
+#            combo = row1['combo']
 
 
             # -------------------- Step 3
@@ -422,7 +422,7 @@ def setup(args):
             makefile.add(r_prepare.data_prep_PRA2_rule(scenedir, prepare_outputs))
             print('Number rules ', len(makefile.rule_list))
 
-        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=2)
+        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=config.setup_ncpu)
 
 # ------------------------------------------------------------------
 
