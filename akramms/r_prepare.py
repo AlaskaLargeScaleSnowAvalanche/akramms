@@ -357,7 +357,7 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
     if vv.inForest is not None:
         PRA_raw_Forest = ECOG(f"{vv.Name}__PRA_raw_{name_scenario}_Forest.tif")
         val = np.zeros(SlopeCurvRuggednessForest_in.shape)#, dtype='i')
-        val[SlopeCurvRuggedness_in] = 200
+        val[SlopeCurvRuggednessForest_in] = 200
         val[mask_out] = onodata
         gdalutil.write_raster(PRA_raw_Forest, Slope_r.grid, val, onodata)
 
