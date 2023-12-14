@@ -422,7 +422,7 @@ def setup(args):
             makefile.add(r_prepare.data_prep_PRA2_rule(scenedir, prepare_outputs))
             print('Number rules ', len(makefile.rule_list))
 
-        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
+        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=2)
 
 # ------------------------------------------------------------------
 
