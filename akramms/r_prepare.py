@@ -544,7 +544,10 @@ def data_prep_PRA2_rule(scene_dir, inputs):
             if match is not None:
                 fname = os.path.join(ecog_dir, name)
                 print('Deleting ', fname)
-                os.remove(fname, ignore_errors=True)
+                try:
+                    os.remove(fname)
+                except FileNotFoundError:
+                    pass
 
         # Make it clear / obvious we have finished
         with open(os.path.join(scene_dir, 'data_prep_PRA2.txt'), 'w') as out:
