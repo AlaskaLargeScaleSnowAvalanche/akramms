@@ -3,13 +3,18 @@ import os,pathlib,shutil
 import netCDF4
 import numpy as np
 from akramms import config
-from akramms.util import paramutil,rqutil,arcgisutil
+from akramms.util import paramutil,rqutil,harnutil,arcgisutil
 from uafgi.util import make
 from akramms import process_tree,params
 
 __all__ = ('rule',)
 
 # ---------------------------------------------------------------------------
+def _subprocess_run(msg, *args, **kwargs):
+    print(msg)
+    subprocess.run(*args, **kwargs)
+
+
 _dia_cmd_engine_usage = """
 Usage: 
 - analyze image file:  
@@ -120,10 +125,11 @@ def rule(scene_dir, scene_args, inputs, return_period, For):
 
         # Run eCognition (in Docker container)!
         print(' '.join(cmd))
-#        harnutil.run_queued('ecognition',
-#            subprocess.run, cmd, check=True)
-        with rqutil.blocking_lock('ecognition'):
-            subprocess.run(cmd, check=True)
+        msg = f'---------- Running eCog for {scene_dir}'
+        harnutil.run_queued('ecognition',
+            _subprocess_run, msg, cmd, check=True)
+#        with rqutil.blocking_lock('ecognition'):
+#            subprocess.run(cmd, check=True)
 
         # ---------------------------------------
         # eCognition writes out shapefiles with wrong projection.  Fix that
