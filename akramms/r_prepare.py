@@ -231,6 +231,7 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
         Nodata value to use in output files
     """
     from uafgi.util import gdalutil
+    from osgeo import gdal
 
     print("executing Scenario_" + name_scenario + "...")
 
