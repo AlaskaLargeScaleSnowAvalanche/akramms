@@ -413,7 +413,7 @@ def setup(args):
                 print(f'----- Adding Scene: {cinfo.scene_dir}')
 
                 # Run ArcGIS script + companion code to prepare files for eCognition
-                prepare_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(cinfo.scene_dir, scene_args, add_combo_outputs)).outputs
+                prepare_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(cinfo.scene_dir, scene_args)).outputs
                 makefile.add(r_prepare.data_prep_PRA2_rule(cinfo.scene_dir, scene_args, prepare_outputs))
                 print('Number rules ', len(makefile.rule_list))
 
