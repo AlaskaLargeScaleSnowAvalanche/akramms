@@ -216,9 +216,9 @@ def data_prep_PRA1_rule(scene_dir, scene_args):
 def mask_and_copy(itif, mask_out, otif, type=None):
     from uafgi.util import gdalutil
 
-    if type is None:
-        from osgeo import gdal
-        type = gdal.GDT_Float64
+#    if type is None:
+#        from osgeo import gdal
+#        type = gdal.GDT_Float64
     print(f'Masking and writing to: {otif}')
     ival = gdalutil.read_raster(itif)
     ival.data[mask_out] = ival.nodata
@@ -405,19 +405,19 @@ def prepare_data2(scene_dir):
         mask_out[np.logical_not(in_perimeter)] = True
 
     # Apply mask to files
-    mask_and_copy(vv.DEM, mask_out, vv.DEM_eCog)
-    mask_and_copy(vv.Slope_tif, mask_out, vv.Slope_eCog)
-    mask_and_copy(MEM("Aspect_sectors_N0_eCog"), mask_out, vv.Aspect_sectors_N0_eCog)
-    mask_and_copy(MEM("Aspect_sectors_Nmax_eCog"), mask_out, vv.Aspect_sectors_Nmax_eCog)
-    mask_and_copy(vv.Curv_profile_eCog_temp, mask_out, vv.Curv_profile_eCog)
-    mask_and_copy(vv.Curv_plan_eCog_temp, mask_out, vv.Curv_plan_eCog)
-    mask_and_copy(MEM("Hillshade_eCog"), mask_out, vv.Hillshade_eCog)
+    mask_and_copy(vv.DEM, mask_out, vv.DEM_eCog, type=gdal.GDT_Float32)
+    mask_and_copy(vv.Slope_tif, mask_out, vv.Slope_eCog, type=gdal.GDT_Float32)
+    mask_and_copy(MEM("Aspect_sectors_N0_eCog"), mask_out, vv.Aspect_sectors_N0_eCog, type=gdal.GDT_Int16)
+    mask_and_copy(MEM("Aspect_sectors_Nmax_eCog"), mask_out, vv.Aspect_sectors_Nmax_eCog, type=gdal.GDT_Int16)
+    mask_and_copy(vv.Curv_profile_eCog_temp, mask_out, vv.Curv_profile_eCog, type=gdal.GDT_Float32)
+    mask_and_copy(vv.Curv_plan_eCog_temp, mask_out, vv.Curv_plan_eCog, type=gdal.GDT_Float32)
+    mask_and_copy(MEM("Hillshade_eCog"), mask_out, vv.Hillshade_eCog, type=gdal.GDT_Byte)
 
     if vv.Slope_lowerlimit_frequent is not None:
-        _data_prep_PRA2(vv, vv.Slope_lowerlimit_frequent, "frequent", mask_out, DEM_r.nodata)
+        _data_prep_PRA2(vv, vv.Slope_lowerlimit_frequent, "frequent", mask_out, DEM_r.nodata, type=gdal.GDT_Byte)
 
     if vv.Slope_lowerlimit_extreme is not None:
-        _data_prep_PRA2(vv, vv.Slope_lowerlimit_extreme, "extreme", mask_out, DEM_r.nodata)
+        _data_prep_PRA2(vv, vv.Slope_lowerlimit_extreme, "extreme", mask_out, DEM_r.nodata, type=gdal.GDT_Byte)
 
 
 # ===================================================================================
