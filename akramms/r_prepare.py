@@ -545,23 +545,24 @@ def data_prep_PRA2_rule(scene_dir, scene_args, inputs):
 
 
         # ---------------------------------------------------------------------------
-        # Clean up temporary files from ArcGIS step
-        for subdir in ('base_data', 'temp_model_frequent', 'temp_model_extreme', 'in_mem', 'mem'):
-            folder_name = os.path.join(scene_dir, subdir)
-            print('Deleting folder ', folder_name)
-            shutil.rmtree(folder_name, ignore_errors=True)
+        if False:    # DEBUG
+            # Clean up temporary files from ArcGIS step
+            for subdir in ('base_data', 'temp_model_frequent', 'temp_model_extreme', 'in_mem', 'mem'):
+                folder_name = os.path.join(scene_dir, subdir)
+                print('Deleting folder ', folder_name)
+                shutil.rmtree(folder_name, ignore_errors=True)
 
-        # Clean up extra _temp files from ArcGIS step
-        _tmpRE = re.compile(r'^(.*)_temp.(tif|tfw).*$')
-        for name in os.listdir(ecog_dir):
-            match = _tmpRE.match(name)
-            if match is not None:
-                fname = os.path.join(ecog_dir, name)
-                print('Deleting ', fname)
-                try:
-                    os.remove(fname)
-                except FileNotFoundError:
-                    pass
+            # Clean up extra _temp files from ArcGIS step
+            _tmpRE = re.compile(r'^(.*)_temp.(tif|tfw).*$')
+            for name in os.listdir(ecog_dir):
+                match = _tmpRE.match(name)
+                if match is not None:
+                    fname = os.path.join(ecog_dir, name)
+                    print('Deleting ', fname)
+                    try:
+                        os.remove(fname)
+                    except FileNotFoundError:
+                        pass
         # ---------------------------------------------------------------------------
 
         # Make it clear / obvious we have finished
