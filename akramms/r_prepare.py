@@ -364,6 +364,7 @@ class LVars:
 
 # ---------------------------------------------------------------------        
 def prepare_data2(scene_dir):
+    from osgeo import gdal
     from uafgi.util import gdalutil
 
     scene_args = params.load(scene_dir)
