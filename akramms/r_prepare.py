@@ -4,7 +4,7 @@ import netCDF4
 import numpy as np
 from akramms import config,process_tree
 from akramms.util import paramutil,harnutil,arcgisutil
-from uafgi.util import make,gdalutil
+from uafgi.util import make
 from akramms import params
 
 # TODO: Tar up
@@ -212,6 +212,8 @@ def data_prep_PRA1_rule(scene_dir, scene_args):
 # Part 2: Continuation of original ArcGIS script, now in Python / GDAL on Linux
 
 def mask_and_copy(itif, mask_out, otif, type=None):
+    from uafgi.util import gdalutil
+
     if type is None:
         from osgeo import gdal
         type = gdal.GDT_Float64
@@ -226,6 +228,7 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
     onodata:
         Nodata value to use in output files
     """
+    from uafgi.util import gdalutil
 
     print("executing Scenario_" + name_scenario + "...")
 
@@ -359,6 +362,8 @@ class LVars:
 
 # ---------------------------------------------------------------------        
 def prepare_data2(scene_dir):
+    from uafgi.util import gdalutil
+
     scene_args = params.load(scene_dir)
 
     # Retrieve filenames used in data_prep_PRA.py ArcGIS script
