@@ -146,6 +146,12 @@ def add_combo(makefile, combo):
     rule,scene_args = r_prepare.prepare_scene_rule(
         scene_dir, defaults='alaska', **kwargs)
     makefile.add(rule)
+    print('   --- prepare inputs')
+    for inp in rule.inputs:
+        print(f'   {inp}')
+    print('   --- prepare outputs')
+    for out in rule.outputs:
+        print(f'   {out}')
 
     # Return files produced by this experiment
     return file_info.ComboInfo(scene_dir, dem_tif, landcover_tif, forest_tif, sx3I_tif), scene_args
