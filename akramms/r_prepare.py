@@ -46,7 +46,7 @@ def prepare_scene_rule(xscene_dir, defaults=dict(), **kwargs):
 
     # Get the scene name as the leaf of the scene_dir
     if 'name' not in scene_args:
-        scene_args['name'] = os.path.split(scene_dir)[1]
+        scene_args['name'] = os.path.split(xscene_dir)[1]
 
     def action(tdir):
         # Validate / fix pathnames now that the scene exists.
