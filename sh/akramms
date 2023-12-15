@@ -405,7 +405,7 @@ def setup(args):
                 # Add the experiment and combos
                 # This calls through to r_prepare.prepare_scene_rule()
                 cinfo, scene_args = expmod.add_combo(makefile, combo)    # file_info.ComboInfo
-                continue    # DEBUG
+                #continue    # DEBUG
 
 
                 scene_dir = pathlib.Path(cinfo.scene_dir).resolve()
