@@ -16,6 +16,21 @@ __all__ = ('prepare_scene_rule', 'data_prep_PRA_rule', 'prepare_data')
 # ========================================================================
 # Part 0: Create directories, get ready for ArcGIS script to run.
 
+def _make_scene_args(xscene_dir, defaults, kwargs):
+    # Assemble the scene args, using default params if provided
+    if isinstance(defaults, str):    # Lookup pre-loaded defaults
+        xdefaults = params.DEFAULTS[defaults]
+    else:
+        xdefaults = defaults
+
+    scene_args = {**xdefaults, **kwargs}
+    scene_args['scene_dir'] = xscene_dir
+
+    # Get the scene name as the leaf of the scene_dir
+    if 'name' not in scene_args:
+        scene_args['name'] = os.path.split(xscene_dir)[1]
+
+
 def prepare_scene_rule(xscene_dir, defaults=dict(), **kwargs):
 
     """Sets up a new scene by creating a directory with all
@@ -36,19 +51,10 @@ def prepare_scene_rule(xscene_dir, defaults=dict(), **kwargs):
 
     """
 
-    # Assemble the scene args, using default params if provided
-    if isinstance(defaults, str):    # Lookup pre-loaded defaults
-        xdefaults = params.DEFAULTS[defaults]
-    else:
-        xdefaults = defaults
-
-    scene_args = {**xdefaults, **kwargs}
-
-    # Get the scene name as the leaf of the scene_dir
-    if 'name' not in scene_args:
-        scene_args['name'] = os.path.split(xscene_dir)[1]
-
     def action(tdir):
+
+        scene_args = _make_scene_args(xscene_dir, defaults, kwargs)
+
         # Validate / fix pathnames now that the scene exists.
         scene_args = paramutil.validate_args(scene_args, params=params.ALL)
 
@@ -67,7 +73,7 @@ def prepare_scene_rule(xscene_dir, defaults=dict(), **kwargs):
         inputs.append(kwargs['forest_file'])
     outputs = [os.path.join(xscene_dir, 'scene.nc')]
 
-    return make.Rule(action, inputs, outputs), scene_args
+    return make.Rule(action, inputs, outputs), _make_scene_args(xscene_dir, defaults, kwargs)
 
 
 
