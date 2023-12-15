@@ -307,7 +307,7 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
     val = np.zeros(SlopeCurvRuggedness_in.shape)#, dtype='i')
     val[SlopeCurvRuggedness_in] = 200
     val[mask_out] = onodata
-    gdalutil.write_raster(PRA_raw_NoForest, Slope_r.grid, val, onodata)
+    gdalutil.write_raster(PRA_raw_NoForest, Slope_r.grid, val, onodata, type=gdal.GDT_Byte)
 
     # Forest
     if vv.inForest is not None:
@@ -315,7 +315,7 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
         val = np.zeros(SlopeCurvRuggednessForest_in.shape)#, dtype='i')
         val[SlopeCurvRuggednessForest_in] = 200
         val[mask_out] = onodata
-        gdalutil.write_raster(PRA_raw_Forest, Slope_r.grid, val, onodata)
+        gdalutil.write_raster(PRA_raw_Forest, Slope_r.grid, val, onodata, type=gdal.GDT_Byte)
 
 
 # -----------------------------------------------------------------
@@ -415,10 +415,10 @@ def prepare_data2(scene_dir):
     mask_and_copy(MEM("Hillshade_eCog"), mask_out, vv.Hillshade_eCog, type=gdal.GDT_Byte)
 
     if vv.Slope_lowerlimit_frequent is not None:
-        _data_prep_PRA2(vv, vv.Slope_lowerlimit_frequent, "frequent", mask_out, DEM_r.nodata, type=gdal.GDT_Byte)
+        _data_prep_PRA2(vv, vv.Slope_lowerlimit_frequent, "frequent", mask_out, DEM_r.nodata)
 
     if vv.Slope_lowerlimit_extreme is not None:
-        _data_prep_PRA2(vv, vv.Slope_lowerlimit_extreme, "extreme", mask_out, DEM_r.nodata, type=gdal.GDT_Byte)
+        _data_prep_PRA2(vv, vv.Slope_lowerlimit_extreme, "extreme", mask_out, DEM_r.nodata)
 
 
 # ===================================================================================
