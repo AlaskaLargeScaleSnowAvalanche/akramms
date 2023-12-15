@@ -348,6 +348,8 @@ def locks(args):
     rqutil.query_locks()
 # ------------------------------------------------------------------
 @subcommand([
+    argument('-j', type=int,
+        help='Degree of parallelism to use'),
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
 def setup(args):
@@ -403,6 +405,8 @@ def setup(args):
                 # Add the experiment and combos
                 # This calls through to r_prepare.prepare_scene_rule()
                 cinfo, scene_args = expmod.add_combo(makefile, combo)    # file_info.ComboInfo
+                continue    # DEBUG
+
 
                 scene_dir = pathlib.Path(cinfo.scene_dir).resolve()
                 scene_args['scene_dir'] = scene_dir
@@ -442,7 +446,8 @@ def setup(args):
                         combo.return_period, pra_size))
 
 
-            makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=config.setup_ncpu)
+            ncpu = config.setup_ncpu if args.j is None else args.j
+            makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=ncpu)
 
 # ------------------------------------------------------------------
 
