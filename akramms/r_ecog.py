@@ -3,7 +3,7 @@ import os,pathlib,shutil
 import netCDF4
 import numpy as np
 from akramms import config
-from akramms.util import paramutil,harnutil,arcgisutil
+from akramms.util import paramutil,rqutil,arcgisutil
 from uafgi.util import make
 from akramms import process_tree,params
 
@@ -120,8 +120,10 @@ def rule(scene_dir, scene_args, inputs, return_period, For):
 
         # Run eCognition (in Docker container)!
         print(' '.join(cmd))
-        harnutil.run_queued('ecognition',
-            subprocess.run, cmd, check=True)
+#        harnutil.run_queued('ecognition',
+#            subprocess.run, cmd, check=True)
+        with rqutil.blocking_lock('ecognition'):
+            subprocess.run(cmd, check=True)
 
         # ---------------------------------------
         # eCognition writes out shapefiles with wrong projection.  Fix that

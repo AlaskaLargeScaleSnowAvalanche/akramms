@@ -197,6 +197,8 @@ def data_prep_PRA1_rule(scene_dir, scene_args):
             scene_dir_rel]
 
         # Run it
+        # For some reason, this doesn't work with the queue, only the locks.
+        # Maybe something went wrong in pickling for the queue.
 #        harnutil.run_queued('arcgis',
 #            harnutil.run_remote, inputs, cmd, tdir)
         with rqutil.blocking_lock('arcgis'):
