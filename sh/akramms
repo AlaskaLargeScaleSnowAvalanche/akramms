@@ -420,8 +420,9 @@ def setup(args):
                 print(f'----- Adding Scene: {scene_dir}')
 
                 # Run ArcGIS script + companion code to prepare files for eCognition
-                prepare_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(scene_dir, scene_args)).outputs
-                makefile.add(r_prepare.data_prep_PRA2_rule(scene_dir, scene_args, prepare_outputs))
+                prepare1_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(scene_dir, scene_args)).outputs
+                prepare2_outputs = makefile.add(
+                    r_prepare.data_prep_PRA2_rule(scene_dir, scene_args, prepare1_outputs)).outputs
                 print('Number rules ', len(makefile.rule_list))
 
 
@@ -431,7 +432,7 @@ def setup(args):
                 dem_filled_file = f'{dem_file[:-4]}_filled.tif'
 
                 # Run eCognition
-                makefile.add(r_ecog.rule(scene_dir, scene_args, prepare_outputs, combo.return_period, combo.forest))
+                makefile.add(r_ecog.rule(scene_dir, scene_args, prepare2_outputs, combo.return_period, combo.forest))
 
                 # Post-Process eCognition Output (the pra_file)
                 # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
