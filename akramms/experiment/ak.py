@@ -143,12 +143,12 @@ def add_combo(makefile, combo):
     print(f'   scene_dir: {scene_dir}')
     for k,v in kwargs.items():
         print(f'   {k}: {v}')
-    rule = r_prepare.prepare_scene_rule(
+    rule,scene_args = r_prepare.prepare_scene_rule(
         scene_dir, defaults='alaska', **kwargs)
     makefile.add(rule)
 
     # Return files produced by this experiment
-    return file_info.ComboInfo(scene_dir, dem_tif, landcover_tif, forest_tif, sx3I_tif)
+    return file_info.ComboInfo(scene_dir, dem_tif, landcover_tif, forest_tif, sx3I_tif), scene_args
 
 ##    stages.add_stage0_rules(makefile, scene_dir)
 #def add_experiment(makefile, combos):

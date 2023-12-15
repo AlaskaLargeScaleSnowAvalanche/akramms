@@ -21,7 +21,7 @@ __all__ = ('pra_post_rule', 'chunk_rule')
 # ---------------------------------------------------------------------------------
 
 
-def pra_post_rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **kwargs):
+def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, snowI_tif, **kwargs):
     """
     scene_dir:
         Uses params: name ("site"), resample_cell_size ("res")
@@ -47,7 +47,7 @@ def pra_post_rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **k
            Margin to add around convex hull to minimum bounding rectangle.
     """
 
-    scene_args = params.load(scene_dir)
+#    scene_args = params.load(scene_dir)
 
     # Main input and output files: THESE MUST BE FIRST
     inputs = list()
@@ -150,7 +150,7 @@ def pra_post_rule(scene_dir, dem_filled_file, return_period, For, snowI_tif, **k
 
 
 # -----------------------------------------------------------------
-def chunk_rule(scene_dir, For, resolution, return_period, pra_size):
+def chunk_rule(scene_dir, scene_args, For, resolution, return_period, pra_size):
     """Generates the scenario file, which becomes key to running RAMMS.
     Also split into chunks.
 
@@ -161,7 +161,7 @@ def chunk_rule(scene_dir, For, resolution, return_period, pra_size):
         being split into chunks)
     """
 
-    scene_args = params.load(scene_dir)
+#    scene_args = params.load(scene_dir)
     scene_name = scene_dir.parts[-1]    # Eg: x-113-045
 
     # Just include overall output files

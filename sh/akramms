@@ -402,7 +402,7 @@ def setup(args):
 
                 # Add the experiment and combos
                 # This calls through to r_prepare.prepare_scene_rule()
-                cinfo = expmod.add_combo(makefile, combo)    # file_info.ComboInfo
+                cinfo, scene_args = expmod.add_combo(makefile, combo)    # file_info.ComboInfo
                 add_combo_outputs = [os.path.join(cinfo.scene_dir, 'scene.nc'), cinfo.dem_file, cinfo.landcover_file, cinfo.forest_file, cinfo.snow_file]
                 # -------------------- Step 3
                 # (a) ArcGIS prep
@@ -413,8 +413,8 @@ def setup(args):
                 print(f'----- Adding Scene: {cinfo.scene_dir}')
 
                 # Run ArcGIS script + companion code to prepare files for eCognition
-                prepare_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(cinfo.scene_dir, add_combo_outputs)).outputs
-                makefile.add(r_prepare.data_prep_PRA2_rule(cinfo.scene_dir, prepare_outputs))
+                prepare_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(cinfo.scene_dir, scene_args, add_combo_outputs)).outputs
+                makefile.add(r_prepare.data_prep_PRA2_rule(cinfo.scene_dir, scene_args, prepare_outputs))
                 print('Number rules ', len(makefile.rule_list))
 
 

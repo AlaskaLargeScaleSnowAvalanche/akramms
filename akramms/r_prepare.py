@@ -36,26 +36,24 @@ def prepare_scene_rule(xscene_dir, defaults=dict(), **kwargs):
 
     """
 
+    # Assemble the scene args, using default params if provided
+    if isinstance(defaults, str):    # Lookup pre-loaded defaults
+        xdefaults = params.DEFAULTS[defaults]
+    else:
+        xdefaults = defaults
+
+    scene_args = {**xdefaults, **kwargs}
+    scene_args = paramutil.validate_args(scene_args, params=params.ALL)
+
+    # Get the scene name as the leaf of the scene_dir
+    if 'name' not in scene_args:
+        scene_args['name'] = os.path.split(scene_dir)[1]
+
     def action(tdir):
 
         # Create the directory
         scene_dir = os.path.abspath(xscene_dir)
         os.makedirs(scene_dir, exist_ok=True)
-
-        # Assemble the scene args, using default params if provided
-        if isinstance(defaults, str):    # Lookup pre-loaded defaults
-            xdefaults = params.DEFAULTS[defaults]
-        else:
-            xdefaults = defaults
-
-        scene_args = {**xdefaults, **kwargs}
-        scene_args = paramutil.validate_args(scene_args, params=params.ALL)
-
-#        scene_args = paramutil.validate_args({**xdefaults, **kwargs}, params=params.ALL)
-
-        # Get the scene name as the leaf of the scene_dir
-        if 'name' not in scene_args:
-            scene_args['name'] = os.path.split(scene_dir)[1]
 
         # Store the overall scene parameters
         paramutil.dump_nc(os.path.join(scene_dir, 'scene.nc'), scene_args, params=params.ALL)
@@ -68,7 +66,7 @@ def prepare_scene_rule(xscene_dir, defaults=dict(), **kwargs):
         inputs.append(kwargs['forest_file'])
     outputs = [os.path.join(xscene_dir, 'scene.nc')]
 
-    return make.Rule(action, inputs, outputs)
+    return make.Rule(action, inputs, outputs), scene_args
 
 
 
@@ -158,7 +156,7 @@ def prepare_data(scene_dir):
 
 # ---------------------------------------------------------------------------
 
-def data_prep_PRA1_rule(scene_dir, inputs):
+def data_prep_PRA1_rule(scene_dir, scene_args):
     """Runs the data_prep_PRA.py script on a scene
     TO RERUN:
         Delete arcgis_stage0.txt
@@ -170,10 +168,10 @@ def data_prep_PRA1_rule(scene_dir, inputs):
     scene_dir:
         Scene dir on THIS host."""
 
-    scene_args = params.load(scene_dir)
+#    scene_args = params.load(scene_dir)
 
     # Assemble list of files to copy to remote Windows host
-#    inputs = [os.path.join(scene_dir, 'scene.nc')]
+    inputs = [os.path.join(scene_dir, 'scene.nc')]
 
     # Input files: dem and forest
     for param in params.ALL.values():
@@ -465,13 +463,13 @@ def import_xml_str(scene_args, freq, forest):
     return import_xml_tpl.format(**args)
 # ---------------------------------------------------------------------------
 
-def data_prep_PRA2_rule(scene_dir, inputs):
+def data_prep_PRA2_rule(scene_dir, scene_args, inputs):
     """
     inputs:
         Outputs from data_prep_PRA1_rule
     outputs:
     """
-    scene_args = params.load(scene_dir)
+#    scene_args = params.load(scene_dir)
     outputs = [os.path.join(scene_dir, 'data_prep_PRA2.txt')]
 
     # xml import files
