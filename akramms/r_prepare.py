@@ -56,6 +56,7 @@ def prepare_scene_rule(xscene_dir, defaults=dict(), **kwargs):
         scene_args = _make_scene_args(xscene_dir, defaults, kwargs)
 
         # Validate / fix pathnames now that the scene exists.
+        print('xxxxxxxxxxxxx ', scene_args)
         scene_args = paramutil.validate_args(scene_args, params=params.ALL)
 
         # Create the directory
