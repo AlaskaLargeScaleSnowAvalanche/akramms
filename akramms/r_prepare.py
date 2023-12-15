@@ -43,13 +43,14 @@ def prepare_scene_rule(xscene_dir, defaults=dict(), **kwargs):
         xdefaults = defaults
 
     scene_args = {**xdefaults, **kwargs}
-    scene_args = paramutil.validate_args(scene_args, params=params.ALL)
 
     # Get the scene name as the leaf of the scene_dir
     if 'name' not in scene_args:
         scene_args['name'] = os.path.split(scene_dir)[1]
 
     def action(tdir):
+        # Validate / fix pathnames now that the scene exists.
+        scene_args = paramutil.validate_args(scene_args, params=params.ALL)
 
         # Create the directory
         scene_dir = os.path.abspath(xscene_dir)
