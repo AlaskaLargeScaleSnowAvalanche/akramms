@@ -34,7 +34,7 @@ def main():
 
     df = shputil.read_df(pra_frequent_file, shape='pra')
     df = df.rename(columns={'fid': 'Id'})    # RAMMS etc. want it named "Id"
-    row = df.loc[df.Id == 4857]
+    row = df[df.Id == 4857]
     print(row)
 
     # Get list of gridcells covered by the PRA polygon (the "PRA Burn")
