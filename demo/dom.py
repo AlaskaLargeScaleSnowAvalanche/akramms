@@ -34,43 +34,49 @@ def main():
 
     df = shputil.read_df(pra_frequent_file, shape='pra')
     df = df.rename(columns={'fid': 'Id'})    # RAMMS etc. want it named "Id"
-#    row = df[df.Id == 4857].squeeze()
-    row = df[df.Id == 4856].squeeze()
-    print(row)
-    print(type(row))
-
-    # Get list of gridcells covered by the PRA polygon (the "PRA Burn")
-    pra_burn = rasterize.rasterize_polygon_compressed(row['pra'], grid_info)
-
-    print('pra_burn ', pra_burn)
-
-    # Get the domain from the PRA burn
-    args = ()
-    #        margin = margins[row['pra_size']]
-    margin = 1000.
-    kwargs = {}
-#    Optional kwargs
-#        Forwarded to d8graph.find_domain()
-#        debug: int
-#            Set to 1 to put d8graph CPP code in debug mode
-#        min_alpha: (default 18.0 degrees)
-#            Minimum "alpha" angle at which avalanche expected to continue
-#        max_runout: (default 10000.)
-#            Maximum distance avalanche can go [m]
 
 
-    ret = d8graph.find_domain(
-        dem_filled, dem_nodata, grid_info.geotransform, pra_burn,
-        debug=1, margin=margin, **kwargs)
+    for id in range(4800:4900):
 
-    seen_list,chull_list,domain_list = ret
-    print(ret)
+    #    row = df[df.Id == 4857].squeeze()    # The problem PRA
+#        row = df[df.Id == 4856].squeeze()
+        row = df[df.Id == id].squeeze()
 
-    # Determine if this is clockwise or CCW
-    # https://stackoverflow.com/questions/1165647/how-to-determine-if-a-list-of-polygon-points-are-in-clockwise-order
-    sum = 0
-    for edge in zip(domain_list[:-1], domain_list[1:]):
-        sum += (edge[1][0] - edge[0][0]) * (edge[1][1] + edge[1][0])
-    print('CW/CCW sum: ', sum)
+        print(row)
+        print(type(row))
+
+        # Get list of gridcells covered by the PRA polygon (the "PRA Burn")
+        pra_burn = rasterize.rasterize_polygon_compressed(row['pra'], grid_info)
+
+        print('pra_burn ', pra_burn)
+
+        # Get the domain from the PRA burn
+        args = ()
+        #        margin = margins[row['pra_size']]
+        margin = 1000.
+        kwargs = {}
+    #    Optional kwargs
+    #        Forwarded to d8graph.find_domain()
+    #        debug: int
+    #            Set to 1 to put d8graph CPP code in debug mode
+    #        min_alpha: (default 18.0 degrees)
+    #            Minimum "alpha" angle at which avalanche expected to continue
+    #        max_runout: (default 10000.)
+    #            Maximum distance avalanche can go [m]
+
+
+        ret = d8graph.find_domain(
+            dem_filled, dem_nodata, grid_info.geotransform, pra_burn,
+            debug=1, margin=margin, **kwargs)
+
+        seen_list,chull_list,domain_list = ret
+        print(ret)
+
+        # Determine if this is clockwise or CCW
+        # https://stackoverflow.com/questions/1165647/how-to-determine-if-a-list-of-polygon-points-are-in-clockwise-order
+        sum = 0
+        for edge in zip(domain_list[:-1], domain_list[1:]):
+            sum += (edge[1][0] - edge[0][0]) * (edge[1][1] + edge[1][0])
+        print(f'{id}: CW/CCW sum = {sum}')
 
 main()
