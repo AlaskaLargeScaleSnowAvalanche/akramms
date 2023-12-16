@@ -27,7 +27,7 @@ def main():
     setuptools.sandbox.run_setup(setup_py, cmd)
     # ------------
 
-    from akramms import d8graph
+    import d8graph
 
     # (grid_info includes the domain margin)
     grid_info, dem_filled, dem_nodata = gdalutil.read_raster(dem_filled_file)
