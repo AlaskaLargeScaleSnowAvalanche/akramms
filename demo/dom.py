@@ -66,4 +66,11 @@ def main():
     seen_list,chull_list,domain_list = ret
     print(ret)
 
+    # Determine if this is clockwise or CCW
+    # https://stackoverflow.com/questions/1165647/how-to-determine-if-a-list-of-polygon-points-are-in-clockwise-order
+    sum = 0
+    for edge in zip(domain_list[:-1], domain_list[1:]):
+        sum += (edge[1][0] - edge[0][0]) * (edge[1][1] + edge[1][0])
+    print('CW/CCW sum: ', sum)
+
 main()
