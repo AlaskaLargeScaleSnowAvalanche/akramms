@@ -36,7 +36,7 @@ def main():
     df = df.rename(columns={'fid': 'Id'})    # RAMMS etc. want it named "Id"
 
 
-    for id in range(4800:4900):
+    for id in range(4800,4900):
 
     #    row = df[df.Id == 4857].squeeze()    # The problem PRA
 #        row = df[df.Id == 4856].squeeze()
