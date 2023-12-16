@@ -37,11 +37,10 @@ def main():
     row = df.loc[df.Id == 4857]
     print(row)
 
-    return
-
-
     # Get list of gridcells covered by the PRA polygon (the "PRA Burn")
     pra_burn = rasterize.rasterize_polygon_compressed(row['pra'], grid_info)
+
+    print('pra_burn ', pra_burn)
 
     # Get the domain from the PRA burn
     args = ()
