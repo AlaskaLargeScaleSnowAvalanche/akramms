@@ -1279,6 +1279,14 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
             std::array<double,2>{x+dx,y-dy},
             std::array<double,2>{x-dx,y-dy}};
         ret_mbr = polygon_to_python(mbr);
+
+        if (debug) {
+            return PyTuple_Pack(3, ret_seen, ret_mbr, ret_mbr);
+        } else {
+            return ret_mbr;
+        }
+
+
     }
 
     if (debug) {
