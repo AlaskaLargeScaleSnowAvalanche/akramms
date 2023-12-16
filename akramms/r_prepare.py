@@ -226,8 +226,11 @@ def mask_and_copy(itif, mask_out, otif, type=None):
     # Write ESRI PAM ("sidecar") files
     # https://rasterio.groups.io/g/main/topic/writing_esri_sidecar_files/32233363
     # https://gdal.org/drivers/raster/gtiff.html
-    options = ['COMPRESS=LZW', 'TFW=YES', 'GDAL_PAM_ENABLED=YES', 'ESRI_XML_PAM=YES']
-    gdalutil.write_raster(otif, *ival, type=type, options=options)
+    # options = ['COMPRESS=LZW', 'TFW=YES', 'GDAL_PAM_ENABLED=YES', 'ESRI_XML_PAM=YES']
+    # NOTE: eCognition does not actually need the sidecar files.
+    #       Plus, the PAM options above aren't supported by GTiff driver.
+    # To get them if neeeded use command line: gdalinfo -stats xyz.tif
+    gdalutil.write_raster(otif, *ival, type=type)#, options=options)
         
 # -----------------------------------------------------------------------------
 def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
@@ -309,16 +312,15 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
     # Boolean Overlay Raster to PRA_raw Raster
 
     # Write ESRI PAM ("sidecar") files
-    # https://rasterio.groups.io/g/main/topic/writing_esri_sidecar_files/32233363
-    # https://gdal.org/drivers/raster/gtiff.html
-    options = ['COMPRESS=LZW', 'TFW=YES', 'GDAL_PAM_ENABLED=YES', 'ESRI_XML_PAM=YES']
+    # See note above (search for "PAM")
+#    options = ['COMPRESS=LZW', 'TFW=YES', 'GDAL_PAM_ENABLED=YES', 'ESRI_XML_PAM=YES']
 
     # NoForest
     PRA_raw_NoForest = ECOG(f"{vv.Name}__PRA_raw_{name_scenario}_NoForest.tif")
     val = np.zeros(SlopeCurvRuggedness_in.shape)#, dtype='i')
     val[SlopeCurvRuggedness_in] = 200
     val[mask_out] = onodata
-    gdalutil.write_raster(PRA_raw_NoForest, Slope_r.grid, val, onodata, type=gdal.GDT_Byte, options=options)
+    gdalutil.write_raster(PRA_raw_NoForest, Slope_r.grid, val, onodata, type=gdal.GDT_Byte)#, options=options)
 
     # Forest
     if vv.inForest is not None:
@@ -326,7 +328,7 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
         val = np.zeros(SlopeCurvRuggednessForest_in.shape)#, dtype='i')
         val[SlopeCurvRuggednessForest_in] = 200
         val[mask_out] = onodata
-        gdalutil.write_raster(PRA_raw_Forest, Slope_r.grid, val, onodata, type=gdal.GDT_Byte, options=options)
+        gdalutil.write_raster(PRA_raw_Forest, Slope_r.grid, val, onodata, type=gdal.GDT_Byte)#, options=options)
 
 
 # -----------------------------------------------------------------

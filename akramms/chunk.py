@@ -325,7 +325,15 @@ def add_dom(rdf, dem_filled, dem_nodata, grid_info, margins, **kwargs):
             domain_list = _empty_list
         else:
             _,chull_list,domain_list = ret
-        chulls.append(shapely.geometry.Polygon(chull_list))
+        try:
+            chull_poly = shapely.geometry.Polygon(chull_list)
+        except ValueError:
+            print('Error on PRA')
+            print(row)
+            print(chull_list)
+            raise
+
+        chulls.append(chull_poly)
         doms.append(shapely.geometry.Polygon(domain_list))
 
     rdf['chull'] = chulls
