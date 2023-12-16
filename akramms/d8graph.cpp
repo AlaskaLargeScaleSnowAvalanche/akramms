@@ -1275,7 +1275,8 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
         std::vector<std::array<double,2>> mbr {
             std::array<double,2>{x-dx,y-dy},
             std::array<double,2>{x-dx,y+dy},
-            std::array<double,2>{x-dx,y-dy},
+            std::array<double,2>{x+dx,y+dy},
+            std::array<double,2>{x+dx,y-dy},
             std::array<double,2>{x-dx,y-dy}};
         ret_mbr = polygon_to_python(mbr);
     }
