@@ -36,6 +36,7 @@ def main():
     df = df.rename(columns={'fid': 'Id'})    # RAMMS etc. want it named "Id"
     row = df[df.Id == 4857]
     print(row)
+    print(type(row))
 
     # Get list of gridcells covered by the PRA polygon (the "PRA Burn")
     pra_burn = rasterize.rasterize_polygon_compressed(row['pra'], grid_info)
