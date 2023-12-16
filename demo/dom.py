@@ -1,7 +1,7 @@
 import setuptools.sandbox
 import pathlib
 import os
-from uafgi.util import gdalutil, rasterize
+from uafgi.util import gdalutil, rasterize, shputil
 
 #dir = pathlib.Path('/Users/eafischer2/tmp/maps')
 
