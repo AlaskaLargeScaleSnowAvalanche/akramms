@@ -62,6 +62,7 @@ def main():
         dem_filled, dem_nodata, grid_info.geotransform, pra_burn,
         debug=1, margin=margin, **kwargs)
 
+     seen_list,chull_list,domain_list = ret
     print(ret)
 
 main()

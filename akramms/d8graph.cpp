@@ -1267,7 +1267,17 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
         std::vector<std::array<double,2>> mbr(akramms::mbr_chull(chull_xy, margin));
         ret_mbr = polygon_to_python(mbr);
     } else {
-        ret_mbr = PyList_New(0);
+        // Degenerate convex hull.  Make something non-degenerate.
+        double x = chull_xy[0][0];
+        double y = chull_xy[0][1];
+        double dx = gt[1];
+        double dy = gt[5];
+        std::vector<std::array<double,2>> mbr {
+            std::array<double,2>{x-dx,y-dx},
+            std::array<double,2>{x-dx,y+dx},
+            std::array<double,2>{x-dx,y-dx},
+            std::array<double,2>{x-dx,y-dx}};
+        ret_mbr = polygon_to_python(mbr);
     }
 
     if (debug) {
