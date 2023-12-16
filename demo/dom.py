@@ -47,6 +47,17 @@ def main():
     args = ()
     #        margin = margins[row['pra_size']]
     margin = 1000.
+    kwargs = {}
+#    Optional kwargs
+#        Forwarded to d8graph.find_domain()
+#        debug: int
+#            Set to 1 to put d8graph CPP code in debug mode
+#        min_alpha: (default 18.0 degrees)
+#            Minimum "alpha" angle at which avalanche expected to continue
+#        max_runout: (default 10000.)
+#            Maximum distance avalanche can go [m]
+
+
     ret = d8graph.find_domain(
         dem_filled, dem_nodata, grid_info.geotransform, pra_burn,
         debug=1, margin=margin, **kwargs)
