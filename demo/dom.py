@@ -34,7 +34,7 @@ def main():
 
     df = shputil.read_df(pra_frequent_file, shape='pra')
     df = df.rename(columns={'fid': 'Id'})    # RAMMS etc. want it named "Id"
-    row = df[df.Id == 4857]
+    row = df[df.Id == 4857].squeeze()
     print(row)
     print(type(row))
 
