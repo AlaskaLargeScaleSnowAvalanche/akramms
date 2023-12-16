@@ -1,4 +1,4 @@
-import setuptools
+import setuptools.sandbox
 import pathlib
 import os
 from uafgi.util import gdalutil, rasterize
@@ -27,7 +27,7 @@ def main():
     setuptools.sandbox.run_setup(setup_py, cmd)
     # ------------
 
-    import d8graph
+    from akramms import d8graph
 
     # (grid_info includes the domain margin)
     grid_info, dem_filled, dem_nodata = gdalutil.read_raster(dem_filled_file)
