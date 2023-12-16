@@ -1259,15 +1259,17 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     }
 
     PyObject *ret_chull_xy = nullptr;
-    if (debug) ret_chull_xy = polygon_to_python(chull_xy);
 
     // Compute minimum bounding rectangle (MBR) on the convex hull
     PyObject *ret_mbr = nullptr;
     if (chull_xy.size() >= 3) {
         std::vector<std::array<double,2>> mbr(akramms::mbr_chull(chull_xy, margin));
+        if (debug) ret_chull_xy = polygon_to_python(chull_xy);
         ret_mbr = polygon_to_python(mbr);
     } else {
         // Degenerate convex hull.  Make something non-degenerate.
+        // It doesn't matte whether this is "correct" because the PRA is
+        // quite small and the margin (1km) added to it will be MUCH larger.
         double x = chull_xy[0][0];
         double y = chull_xy[0][1];
         double dx = gt[1];
@@ -1278,15 +1280,9 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
             std::array<double,2>{x+dx,y+dy},
             std::array<double,2>{x+dx,y-dy},
             std::array<double,2>{x-dx,y-dy}};
+
+        if (debug) ret_chull_xy = polygon_to_python(mbr);
         ret_mbr = polygon_to_python(mbr);
-
-        if (debug) {
-            return PyTuple_Pack(3, ret_seen, ret_mbr, ret_mbr);
-        } else {
-            return ret_mbr;
-        }
-
-
     }
 
     if (debug) {
