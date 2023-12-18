@@ -118,7 +118,7 @@ def commonsuffix(strs):
 
 def scenedir_to_chunknames(scenedir):
     """Returns a dataframe.
-    Yields: (pra_size, chunkid, pathname)
+    Yields: dataframe(pra_size, chunkid, name)
     """
 
     scene_args = params.load(scenedir)
@@ -151,19 +151,19 @@ def trialdir_to_scenedirs(trialdir, scenetype='x'):
     return rets
 
 # -----------------------------------------------------------
-def xdir_to_chunkdirs(scenedir, chunk_stage=0):
-
-    # Read list of chunks
-    chunk_rfs = list()    # Names of release files for each CHUNK
-    for name in os.listdir(scenedir / 'stage0'):
-        if not name.endswith('_chunks.csv'):
-            continue
-        df = pd.read_csv(stage0dir / name)
-        if config.max_chunks is not None:    # Testing
-            df = df[df['segment'] < config.max_chunks]    # Cut down based on config
-
-        for chunk_name in df['chunk_name'].unique():
-            chunkdir = scenedir / f'CHUNKS{chunk_stage}' / chunk_name    # <scene>/CHUNKS/x-.....For_10m
+#def xdir_to_chunkdirs(scenedir, chunk_stage=0):
+#
+#    # Read list of chunks
+#    chunk_rfs = list()    # Names of release files for each CHUNK
+#    for name in os.listdir(scenedir / 'stage0'):
+#        if not name.endswith('_chunks.csv'):
+#            continue
+#        df = pd.read_csv(stage0dir / name)
+#        if config.max_chunks is not None:    # Testing
+#            df = df[df['segment'] < config.max_chunks]    # Cut down based on config
+#
+#        for chunk_name in df['chunk_name'].unique():
+#            chunkdir = scenedir / f'CHUNKS{chunk_stage}' / chunk_name    # <scene>/CHUNKS/x-.....For_10m
 
 
 def chunkdir_to_releasefile(chunkdir):

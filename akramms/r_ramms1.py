@@ -124,7 +124,118 @@ def striped_chunks(l, n):
     for i in range(0, n):
         yield l[i::n]
 # -----------------------------------------------------------------
-def rule(release_file, dem_file, inputs, dry_run=False, submit=False):
+def chunk_control_file(crf):
+    return crf.scene_dir / 'ramms_stage1' / f'{crf.chunk_name}.txt'
+
+def combo_control_file(scene_dir):
+    return crf.scene_dir / 'ramms_stage1.txt'
+
+# -----------------------------------------------------------------
+def run_chunk(crf, gridI, submit=False):
+    done_output = chunk_control_file(crf)
+
+#    crf = file_info.parse_chunk_release_file(release_file)
+    # ---------------------------------------------------------
+    # From former rammsdir rule
+
+    # ---------------------------------------------------------
+
+    # Copy files from previous RAMMS Stage 1, to speed things up
+    tmap = tiffmap(crf)
+    for fname0,fname1 in tmap:
+        if (not os.path.exists(fname0)) and os.path.exists(fname1):
+            dir0 = os.path.dirname(fname0)
+            os.makedirs(dir0, exist_ok=True)
+            shutil.copy(fname1, fname0)
+
+    chunk_dir_rel = config.roots.relpath(crf.chunk_dir)
+    cmd = ['sh', 
+        config.roots_w.join('HARNESS', 'akramms', 'sh', 'run_ramms.sh', bash=True),
+        '--ramms-version', config.ramms_version,
+        config.roots_w.syspath(chunk_dir_rel, bash=True), '1']    # '1'=stage 1
+
+    # RAMMS Stage 1 accepts inputs on stdin
+    # rammsdist.run_on_windows_stage() calls read_inputs()
+    dynamic_outputs = list()
+    harnutil.run_queued('idl',
+        harnutil.run_remote, inputs, cmd, tdir, write_inputs=True)
+
+    # Copy .tif files to be reused by later RAMMS Stage 1
+    for fname0,fname1 in tmap:
+        dir1 = os.path.dirname(fname1)
+        os.makedirs(dir1, exist_ok=True)
+        if not os.path.exists(fname1):
+            shutil.copy(fname0, fname1)
+
+        # Do NOT remove, we will need for Stage 2 (the .exe file).
+        # os.remove(fname0)
+
+    # Obtain raster grid and geotransform info
+#    gridI = gdalutil.read_grid(dem_file)
+
+    # Compress Avalanche inputs, ready for Docker container
+    df = shputil.read_df(release_file, read_shapes=False)
+    all_ids = list(df['Id'])
+    procs = list()
+    for ids in striped_chunks(all_ids, config.ncpu_compress):
+        proc = multiprocessing.Process(
+            target=lambda: compress_avalanche_inputs(crf, gridI, ids))
+        proc.start()
+        procs.append(proc)
+    for proc in procs:
+        proc.join()
+
+    # Check final outputs
+    missing = list()
+    avalanche_dir = crf.avalanche_dir
+    for id in all_ids:    # Avalanche ID
+        in_zip = crf.avalanche_dir / f'{crf.slope_name}_{crf.avalanche_name}_{id}.in.zip'
+
+        if not os.path.exists(in_zip):
+            missing.append(in_zip)
+    if len(missing) > 0:
+        for x in missing:
+            print('Missing: ', x)
+        raise ValueError('Missing avalanche input files')
+
+
+    # Submit the individual avalanche runs immediately so we can
+    # get going while preparing more RAMMS directories.
+    if submit:
+
+        parseds = [parse.parse_chunk_releasefile(release_file)]
+        akdf = resolve.resolve_to(parseds, 'id', stage='in', realized=True)
+        joblib.submit_jobs(akdf)
+
+    # Write output files
+    done_output = chunk_control_file(crf)
+    os.makedirs(os.path.dirname(done_output), exist_ok=True)
+    with open(done_output, 'w') as out:
+        out.write('Finished RAMMS Stage 1\n')
+
+
+    return dynamic_outputs
+
+# -----------------------------------------------------------------
+def run_combo(scene_dir, dem_file):
+    
+    df = level.scenedir_to_chunknames(scene_dir)    # pra_size, chunkid, name
+    gridI = gdalutil.read_grid(dem_file)
+    for tup in df.itertuple(index=False):
+        chunkdir = scene_dir / 'CHUNKS' / tup.name
+        release_file = chunkdir_to_releasefile(chunkdir)
+        crf = file_info.parse_chunk_release_file(release_file)
+
+        # Avoid recomputing unnecessarily
+        if not os.path.exists(chunk_control_file(crf)):
+            run_chunk(crf, gridI, submit=submit)
+
+    # Don't do this because there might be overruns.
+    # Finished with all chunks, mark it!
+    with open(combo_control_file(scene_dir)) as out:
+        out.write('Done running initial RAMMS Stage 1 for all chunks in the combo (not including overruns).\n')
+# -----------------------------------------------------------------
+def releasefile_rule(release_file, dem_file, inputs, dry_run=False, submit=False):
     """Runs Stage 1 of RAMMS for one chunk
     (IDL code prepares individual avalanche runs)
 
@@ -139,125 +250,63 @@ def rule(release_file, dem_file, inputs, dry_run=False, submit=False):
         All input files for the RAMMS run (superset of release_files)
     """
 
-    crf = file_info.parse_chunk_release_file(release_file)
-    done_output = crf.scene_dir / 'ramms_stage1' / f'{crf.chunk_name}.txt'
+#    done_output = crf.scene_dir / 'ramms_stage1' / f'{crf.chunk_name}.txt'
+    done_output = chunk_control_file(crf)
 
     def action(tdir):
-        # ---------------------------------------------------------
-        # From former rammsdir rule
-
-        # ---------------------------------------------------------
-
-        # Copy files from previous RAMMS Stage 1, to speed things up
-        tmap = tiffmap(crf)
-        for fname0,fname1 in tmap:
-            if (not os.path.exists(fname0)) and os.path.exists(fname1):
-                dir0 = os.path.dirname(fname0)
-                os.makedirs(dir0, exist_ok=True)
-                shutil.copy(fname1, fname0)
-
-        chunk_dir_rel = config.roots.relpath(crf.chunk_dir)
-        cmd = ['sh', 
-            config.roots_w.join('HARNESS', 'akramms', 'sh', 'run_ramms.sh', bash=True),
-            '--ramms-version', config.ramms_version,
-            config.roots_w.syspath(chunk_dir_rel, bash=True), '1']    # '1'=stage 1
-
-        # RAMMS Stage 1 accepts inputs on stdin
-        # rammsdist.run_on_windows_stage() calls read_inputs()
-        dynamic_outputs = list()
-        harnutil.run_queued('idl',
-            harnutil.run_remote, inputs, cmd, tdir, write_inputs=True)
-
-        # Copy .tif files to be reused by later RAMMS Stage 1
-        for fname0,fname1 in tmap:
-            dir1 = os.path.dirname(fname1)
-            os.makedirs(dir1, exist_ok=True)
-            if not os.path.exists(fname1):
-                shutil.copy(fname0, fname1)
-
-            # Do NOT remove, we will need for Stage 2 (the .exe file).
-            # os.remove(fname0)
-
-        # Obtain raster grid and geotransform info
+        crf = file_info.parse_chunk_release_file(release_file)
         gridI = gdalutil.read_grid(dem_file)
 
-        # Compress Avalanche inputs, ready for Docker container
-        df = shputil.read_df(release_file, read_shapes=False)
-        all_ids = list(df['Id'])
-        procs = list()
-        for ids in striped_chunks(all_ids, config.ncpu_compress):
-            proc = multiprocessing.Process(
-                target=lambda: compress_avalanche_inputs(crf, gridI, ids))
-            proc.start()
-            procs.append(proc)
-        for proc in procs:
-            proc.join()
-
-        # Check final outputs
-        missing = list()
-        avalanche_dir = crf.avalanche_dir
-        for id in all_ids:    # Avalanche ID
-            in_zip = crf.avalanche_dir / f'{crf.slope_name}_{crf.avalanche_name}_{id}.in.zip'
-
-            if not os.path.exists(in_zip):
-                missing.append(in_zip)
-        if len(missing) > 0:
-            for x in missing:
-                print('Missing: ', x)
-            raise ValueError('Missing avalanche input files')
-
-
-        # Submit the individual avalanche runs immediately so we can
-        # get going while preparing more RAMMS directories.
-        if submit:
-
-            parseds = [parse.parse_chunk_releasefile(release_file)]
-            akdf = resolve.resolve_to(parseds, 'id', stage='in', realized=True)
-            joblib.submit_jobs(akdf)
-
-        # Write output files
-        os.makedirs(os.path.dirname(done_output), exist_ok=True)
-        with open(done_output, 'w') as out:
-            out.write('Finished RAMMS Stage 1\n')
-
-
-        return dynamic_outputs
+        # Avoid recomputing unnecessarily
+        if not os.path.exists(chunk_control_file(crf)):
+            run_chunk(crf, gridI, submit=submit)
 
     return make.Rule(action, inputs, [done_output])
 
 # --------------------------------------------------------
-def run(akdf0):
-    """Runs RAMM Stage 1 on a bunch of releasefiles.
-    Cheks the cache file <x_dir>/ramms_stage1/c-L-xxxx.txt to see if it was already run."""
+def combo_rule(scene_dir, dem_file, inputs, dry_run=False, submit=False):
 
-    akdf0 = complete.add_chunk_complete_cached(akdf0, ramms_stage=1)
-    akdf0 = akdf0[~akdf0['chunk_complete_stage1_cached']]
+    done_output = combo_control_file(scene_dir)
 
-    makefile = make.Makefile()
+    def action(tdir):
+        run_combo(scene_dir, dem_file)
 
-    for exp,akdf1 in akdf0.groupby('exp'):
-        expmod = parse.load_expmod(exp)
-        for releasefile in akdf1.releasefile.tolist():
+    return make.Rule(action, inputs, [done_output])
 
-            print('------ releasefile ', releasefile)
-
-            # Identify the scene this is part of and find the DEM file
-            chunkdir = releasefile.parents[1]
-            scenedir = chunkdir.parents[1]
-            print('ax chunkdir ', chunkdir)
-            print('ax scenedir ', scenedir)
-            scene_args = params.load(scenedir)
-            demfile = scene_args['dem_file']
-
-            chunkname = releasefile.parts[-1][:-8]
-            domainfile = chunkdir / 'DOMAIN' / f'{chunkname}_dom.shp'
-
-            makefile.add(rule(
-                releasefile, demfile,
-                [releasefile, demfile, domainfile],
-                dry_run=False, submit=config.auto_submit))
-
-        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
-
-    return akdf0
-
+# --------------------------------------------------------
+#def run(akdf0):
+#    """Runs RAMM Stage 1 on a bunch of releasefiles.
+#    Cheks the cache file <x_dir>/ramms_stage1/c-L-xxxx.txt to see if it was already run."""
+#
+#    akdf0 = complete.add_chunk_complete_cached(akdf0, ramms_stage=1)
+#    akdf0 = akdf0[~akdf0['chunk_complete_stage1_cached']]
+#
+#    makefile = make.Makefile()
+#
+#    for exp,akdf1 in akdf0.groupby('exp'):
+#        expmod = parse.load_expmod(exp)
+#        for releasefile in akdf1.releasefile.tolist():
+#
+#            print('------ releasefile ', releasefile)
+#
+#            # Identify the scene this is part of and find the DEM file
+#            chunkdir = releasefile.parents[1]
+#            scenedir = chunkdir.parents[1]
+#            print('ax chunkdir ', chunkdir)
+#            print('ax scenedir ', scenedir)
+#            scene_args = params.load(scenedir)
+#            demfile = scene_args['dem_file']
+#
+#            chunkname = releasefile.parts[-1][:-8]
+#            domainfile = chunkdir / 'DOMAIN' / f'{chunkname}_dom.shp'
+#
+#            makefile.add(rule(
+#                releasefile, demfile,
+#                [releasefile, demfile, domainfile],
+#                dry_run=False, submit=config.auto_submit))
+#
+#        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
+#
+#    return akdf0
+#
+#

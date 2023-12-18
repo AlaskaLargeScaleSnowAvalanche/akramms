@@ -352,7 +352,7 @@ def locks(args):
         help='Degree of parallelism to use'),
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
-def setup(args):
+def run(args):
     """Steps 1-4"""
 
     import setuptools
@@ -441,10 +441,16 @@ def setup(args):
                     combo.forest, cinfo.snow_file))
 
                 # and also split into chunks.
+                ramms1_inputs = list()
                 for pra_size in config.allowed_pra_sizes:
-                    makefile.add(r_pra_post.chunk_rule(
+                    ramms1_inputs += makefile.add(r_pra_post.chunk_rule(
                         scene_dir, scene_args, combo.forest, expmod.resolution,
-                        combo.return_period, pra_size))
+                        combo.return_period, pra_size)).outputs
+
+                # Run RAMMS Stage 1 (main chunks, no overruns)
+                r_ramms.combo_rule(scene_dir, scene_info.dem_file, ramms1_inputs, submit=config.auto_submit)
+
+TODO: Add overrun processing!
 
 
             ncpu = config.setup_ncpu if args.j is None else args.j
