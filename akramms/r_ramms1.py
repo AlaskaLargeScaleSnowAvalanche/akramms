@@ -269,6 +269,7 @@ def releasefile_rule(release_file, dem_file, inputs, dry_run=False, at_front=Fal
     """
 
 #    done_output = crf.scene_dir / 'ramms_stage1' / f'{crf.chunk_name}.txt'
+    crf = file_info.parse_chunk_release_file(release_file)
     done_output = chunk_control_file(crf)
 
     def action(tdir):
