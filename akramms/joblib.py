@@ -435,9 +435,15 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
     """akdf:
         Resolved to combo level (theoretical, i.e. realized=False)
     """
+
+    print('AA1')
+
     # Make it idempotent
     if 'combo_status' in akdf0.columns:
         return akdf0
+
+    print('AA2')
+    print('ignore_statuses ', ignore_statuses)
 
     dfs = list()
 
@@ -481,6 +487,8 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         combo_status = \
             iddf1[['combo','id_status']].groupby('combo').agg(lambda x: agg_status(x,ignore_statuses)) \
             .rename(columns={'id_status': 'combo_status'})
+        print('combo_status         xxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
+        print(combo_status)
         akdf1 = akdf1.merge(combo_status, how='left', left_on='combo', right_index=True)
         akdf1['combo_status'] = akdf1.combo_status.fillna(JobStatus.NOINPUT).astype(int)
 
