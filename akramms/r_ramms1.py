@@ -134,7 +134,7 @@ def combo_control_file(scene_dir):
 def run_if_remote(control_file, *args, **kwargs):
     """Runs remotely, but ONLY if a control file does not yet exist"""
     if not os.path.exists(control_file):
-        run_remote(*args, **kwargs)
+        harnutil.run_remote(*args, **kwargs)
 
 def run_chunk(release_file, crf, gridI, at_front=False, submit=False):
     done_output = chunk_control_file(crf)
