@@ -419,7 +419,18 @@ def add_chunk_status(akdf, realized=True, update=True):
     return pd.concat(dfs)
 
 # ------------------------------------------------------------
-def add_combo_status(akdf0, realized=True, update=True, dry_run=False):
+def agg_status(statuses, ignore_statuses={}):
+    """Finds the minimu status in a Series, ignoring Statuses in ignores
+    statuses: pd.Series
+    ignores:
+        Statuses to ignore
+    """
+    counts = statuses.value_counts().to_dict()    # {Status.xyz: <n>, ...}
+    counts = {k:v for k,v in counts.items() if k not in ignore_statuses}
+    return min(status for status in counts.keys())
+
+
+def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_statuses={}):
     """akdf:
         Resolved to combo level (theoretical, i.e. realized=False)
     """
@@ -465,7 +476,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False):
         # Aggregate id status back to combo level and add to akdf1
         # (Now we know whether the combo has fully finished)
         combo_status = \
-            iddf1[['combo','id_status']].groupby('combo').min() \
+            iddf1[['combo','id_status']].groupby('combo').agg(lambda x: agg_status(x,ignore_statuses)) \
             .rename(columns={'id_status': 'combo_status'})
         akdf1 = akdf1.merge(combo_status, how='left', left_on='combo', right_index=True)
         akdf1['combo_status'] = akdf1.combo_status.fillna(JobStatus.NOINPUT).astype(int)

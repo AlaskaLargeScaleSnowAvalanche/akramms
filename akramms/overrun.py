@@ -8,7 +8,7 @@ from uafgi.util import shapelyutil
 """Handle avalanches that overrun"""
 
 
-def resubmit(akdf0, check_running=True, update=True, dry_run=False, block=True):
+def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run=False, block=True):
     """Creates new chunks for avalanches that have overrun.
     akdf:
         Resolved to combo
@@ -26,7 +26,7 @@ def resubmit(akdf0, check_running=True, update=True, dry_run=False, block=True):
 
     # Poll until RAMMS Stage 2 is done running for these combos
     while True:
-        akdf0 = joblib.add_combo_status(akdf0, realized=False, update=update, dry_run=dry_run)
+        akdf0 = joblib.add_combo_status(akdf0, realized=False, update=update, dry_run=dry_run, ignore_statuses=ignore_statuses)
 
         if block:
             mask = (akdf0.combo_status == joblib.JobStatus.INPROCESS)

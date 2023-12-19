@@ -466,6 +466,8 @@ def ps(args):
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
     argument('--block', action='store_true',
         help="Wait for combos to finish running then submit overruns (rather than quitting without submitting)"),
+    argument('--ignore',
+        help="Run resubmit process even if some avalanches have NOINPUT status (because RAMMS Stage 1 failed to process them)"),
     argument('--force', action='store_true',
         help="Run overrun processing even if combo is not yet finished."),
     argument('--dry-run', action='store_true',
@@ -477,10 +479,15 @@ def xoverrun(args):
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=False, scenetypes={'x', 'arc'})
 
+    if args.ignore is not None:
+        ignore_statuses = {joblib.JobStatus._member_map_[x] for x in args.ignore.split(',')}
+    else:
+        ignore_status = {}
+
     # Process overruns one combo at a time for lower latency on large experiments
     for ix in range(len(akdf0)):
         akdf1 = akdf0.iloc[[ix],:]    # akdf1 is just one row of akdf0
-        overrun.resubmit(akdf1, dry_run=args.dry_run, block=args.block)
+        overrun.resubmit(akdf1, dry_run=args.dry_run, block=args.block, ignore_statuses=ignore_statuses)
 # ------------------------------------------------------------------
 #@subcommand([
 #    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
