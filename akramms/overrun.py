@@ -36,7 +36,7 @@ def resubmit(akdf0, check_running=True, update=True, dry_run=False, block=True):
                 break
             else:
                 # Not everything is done running, sleep for a while and try again
-                print('Combos still computing, sleeping until they are done')
+                print(f'Combos still computing, sleeping {config.poll_period}s until they are done')
                 print(inprocess[['combo', 'combo_status']])
                 time.sleep(config.poll_period)
         else:
