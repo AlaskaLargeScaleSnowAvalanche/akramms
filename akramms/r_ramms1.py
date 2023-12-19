@@ -227,7 +227,7 @@ def run_combo(scene_dir, dem_file):
         crf = file_info.parse_chunk_release_file(release_file)
 
         # For debugging
-        if crf.pra_size not in config.pra_sizes:
+        if crf.pra_size not in config.allowed_pra_sizes:
             continue
 
         # Avoid recomputing unnecessarily
