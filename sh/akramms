@@ -482,7 +482,7 @@ def xoverrun(args):
     if args.ignore is not None:
         ignore_statuses = {joblib.JobStatus._member_map_[x] for x in args.ignore.split(',')}
     else:
-        ignore_status = {}
+        ignore_statuses = {}
 
     # Process overruns one combo at a time for lower latency on large experiments
     for ix in range(len(akdf0)):
