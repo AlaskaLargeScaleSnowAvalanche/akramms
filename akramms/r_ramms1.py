@@ -223,12 +223,19 @@ def run_combo(scene_dir, dem_file):
     gridI = gdalutil.read_grid(dem_file)
     for tup in df.itertuples(index=False):
         chunkdir = scene_dir / 'CHUNKS' / tup.name
-        release_file = chunkdir_to_releasefile(chunkdir)
+        release_file = level.chunkdir_to_releasefile(chunkdir)
         crf = file_info.parse_chunk_release_file(release_file)
 
+        # For debugging
+        if crf.pra_size not in config.pra_sizes:
+            continue
+
         # Avoid recomputing unnecessarily
-        if not os.path.exists(chunk_control_file(crf)):
-            run_chunk(crf, gridI, submit=submit)
+        if os.path.exists(chunk_control_file(crf)):
+            continue
+
+        # OK do it.
+        run_chunk(crf, gridI, submit=submit)
 
     # Don't do this because there might be overruns.
     # Finished with all chunks, mark it!
