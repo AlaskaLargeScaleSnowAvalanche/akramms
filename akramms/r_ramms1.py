@@ -163,8 +163,8 @@ def run_chunk(release_file, crf, gridI, submit=False):
     inputs = [release_file]
 
     print(f'Running RAMMS Stage 1 {crf.chunk_dir}')
-#    harnutil.run_queued('idl',
-#        harnutil.run_remote, inputs, cmd, None, write_inputs=True)
+    harnutil.run_queued('idl',
+        harnutil.run_remote, inputs, cmd, None, write_inputs=True)
 
     # Copy .tif files to be reused by later RAMMS Stage 1
     for fname0,fname1 in tmap:
