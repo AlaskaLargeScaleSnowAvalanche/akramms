@@ -448,53 +448,12 @@ def run(args):
                         combo.return_period, pra_size)).outputs
 
                 # Run RAMMS Stage 1 (main chunks, no overruns)
-                r_ramms.combo_rule(scene_dir, scene_info.dem_file, ramms1_inputs, submit=config.auto_submit)
-
-TODO: Add overrun processing!
-
+                makefile.add(r_ramms1.combo_rule(
+                    scene_dir, scene_info.dem_file, ramms1_inputs, submit=config.auto_submit))
 
             ncpu = config.setup_ncpu if args.j is None else args.j
             makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=ncpu)
 
-# ------------------------------------------------------------------
-
-@subcommand([
-    argument('--part', type=int, required=True,
-        help='Which segment (of 2) to run: 0 or 1.  If -1, do all parts'),
-    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
-])
-def ramms(args):
-    """Steps 4"""
-
-    from akramms.util import harnutil
-    from akramms import r_pra_post
-
-    parseds = akramms.parse.parse_args(args.spec)
-    akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
-    nparts = 2
-    akdf0 = resolve.filter_by_part(akdf0, args.part, nparts)
-    akdf0 = akdf0.reset_index(drop=True)
-
-    print(akdf0['combo'])
-
-    for exp,akdf1 in akdf0.groupby('exp'):
-        expmod = akramms.parse.load_expmod(exp)
-
-        for _,row1 in akdf1.iterrows():
-        #for combo,akdf1 in akdf0b.groupby('combo'):
-            combo = row1['combo']
-
-
-            # -------------------- Step 4
-            # (a) RAMMS Stage 1
-            # (b) RAMMS Stage 1 post-processing to generate .in.zip files
-            # (c) Auto-submit avalanches
-            makefile = make.Makefile()
-
-            akdf2 = pd.DataFrame([row1.to_dict()])
-            akdf2 = resolve.resolve_chunk(akdf1, scenetypes={'x'}, realized=True)
-
-            r_ramms1.run(akdf2)
 # ------------------------------------------------------------------
 @subcommand([
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
@@ -509,77 +468,6 @@ def submit(args):
     akdf = joblib.submit_jobs(akdf)    # Only submits jobs that need submitting
 
     print(f'{len(akdf)} jobs submitted')
-# ------------------------------------------------------------------
-#@subcommand([
-#    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
-#    argument('--realized', action='store_true',
-#        help='Only check avalanches with .in.zip / .out.zip files'),
-#])
-#def finish_chunks(args):
-#    """Mark chunks as finished if all avalanches are complete."""
-#
-#    parseds = akramms.parse.parse_args(args.spec)
-#
-#    # Original set of combos --- only look at combos NOT YET archived.
-#    akdf = resolve.resolve_to(parseds, 'combo')
-#    akdf = complete.add_combo_archived_cached(akdf)
-#    akdf = akdf[~akdf['combo_archived_cached']]
-#
-#    # -----------------------------------------------------------------
-#    # Move to chunk level
-#    akdf = resolve.resolve_chunk(akdf, 'chunk', realized=True, stage='in')
-#
-#    # Get releasefiles (chunks) that are not yet complete (as per cache)
-#    akdf = akdf.add_chunk_complete_cached(akdf, 2)    # chunk_complete_stage2_cached
-#    noncached = akdf[~akdf['chunk_complete_stage2_cached']]
-#
-#    # Get releasefiles that are complete in practice but not cached; or ACTUALLY incomplete
-#    noncached = complete.add_chunk_complete_stage2(noncached, realized=args.realized)
-#    mask = noncached['chunk_complete_stage2']
-#    complete_df0 = noncached[mask]
-#    incomplete_df = noncached[~mask]
-#
-#    # For chunks that are complete in practice but not cached:
-#    #     --> Write out the "complete" cache entry
-#    for (exp,combo),complete_df1 in complete_df0.groupby(['exp', 'combo']):
-#        expmod = parse.load_expmod(exp)
-#        xdir = expmod.comb_to_scenedir(combo, 'x')
-#
-#        for tup in complete_df1.reset_index(drop=True).itertuples():
-#            fname = xdir / 'ramms_stage2' / f'{tup.chunkname}.txt'
-#            with open(fname, w) as out:
-#                out.write(fname, 'complete.txt\n')
-#
-#    # For chunks that are not yet complete:
-#    # Explain they are not yet complete and recommend running `akramms submit`
-#    if len(incomplete_df) > 0:
-#        print('The following chunks are not yet complete, try `akramms submit`')
-#        print(incomplete_df1)
-#
-#        raise ValueError('Not all chunks complete')
-#
-# ------------------------------------------------------------------
-# def overrun(...):
-
-
-            # -----------------
-            # TODO: Wait until .out.zip files are all complete.
-
-            # ----------------- Step 5
-            # (a) Identify and re-submit overruns
-            # Use the redis queue here to interleave with original submissions in other combos
-
-            # -----------------
-            # TODO: Wait until resubmit .out.zip files are all complete.
-
-
-
-# ------------------------------------------------------------------
-#def archive(args):
-    # -------------------------------------------------------------------
-    # All chunks are complete, now we can archive combos
-    # Go back to combo level (akdf)
-
 # ------------------------------------------------------------------
 @subcommand([
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
@@ -606,7 +494,6 @@ def xoverrun(args):
     """Resubmits overruns"""
     # Find the overruns
     parseds = akramms.parse.parse_args(args.spec)
-#    akdf0 = resolve.resolve_to(parseds, 'id', realized=True, stage='out', scenetypes={'x'})
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=False, scenetypes={'x', 'arc'})
 
     # Process overruns one combo at a time for lower latency on large experiments
