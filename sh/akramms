@@ -464,7 +464,7 @@ def ps(args):
 # ------------------------------------------------------------------
 @subcommand(name='overrun', args=[
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
-    argument('--sync', action='store_true',
+    argument('--block', action='store_true',
         help="Wait for combos to finish running then submit overruns (rather than quitting without submitting)"),
     argument('--force', action='store_true',
         help="Run overrun processing even if combo is not yet finished."),
@@ -480,7 +480,7 @@ def xoverrun(args):
     # Process overruns one combo at a time for lower latency on large experiments
     for ix in range(len(akdf0)):
         akdf1 = akdf0.iloc[[ix],:]    # akdf1 is just one row of akdf0
-        overrun.resubmit(akdf1, dry_run=args.dry_run, sync=args.sync)
+        overrun.resubmit(akdf1, dry_run=args.dry_run, block=args.block)
 # ------------------------------------------------------------------
 #@subcommand([
 #    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
