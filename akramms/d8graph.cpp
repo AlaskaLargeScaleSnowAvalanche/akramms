@@ -1270,7 +1270,7 @@ if (trace) printf("BB4\n");
 
     PyObject *ret_chull_xy = nullptr;
 
-if (trace) printf("BB5\n");
+if (trace) printf("BB5 %ld\n", chull_xy.size());
     // Compute minimum bounding rectangle (MBR) on the convex hull
     PyObject *ret_mbr = nullptr;
     if (chull_xy.size() >= 3) {
