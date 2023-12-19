@@ -123,7 +123,7 @@ def resubmit(akdf0, check_running=True, update=True, dry_run=False, sync=False, 
 
             # Run RAMMS Stage 1 (and auto-submit)
             releasefile = chunk_dir / 'RELEASE' / f'{jb.slope_name}_{jb.avalanche_name}_rel.shp'
-            rule = r_ramms1.rule(releasefile, scene_args['dem_file'], [releasefile], dry_run=dry_run, submit=True)
+            rule = r_ramms1.releasefile_rule(releasefile, scene_args['dem_file'], [releasefile], dry_run=dry_run, submit=True)
             if dry_run:
                 print(f'Except for --dry-run, I would be running RAMMS on the releasefile {releasefile}')
             else:
