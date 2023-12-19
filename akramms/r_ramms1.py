@@ -217,7 +217,7 @@ def run_chunk(crf, gridI, submit=False):
     return dynamic_outputs
 
 # -----------------------------------------------------------------
-def run_combo(scene_dir, dem_file):
+def run_combo(scene_dir, dem_file, submit=True):
     
     df = level.scenedir_to_chunknames(scene_dir)    # pra_size, chunkid, name
     gridI = gdalutil.read_grid(dem_file)
@@ -276,7 +276,7 @@ def combo_rule(scene_dir, dem_file, inputs, dry_run=False, submit=False):
     done_output = combo_control_file(scene_dir)
 
     def action(tdir):
-        run_combo(scene_dir, dem_file)
+        run_combo(scene_dir, dem_file, submit=auto_submit)
 
     return make.Rule(action, inputs, [done_output])
 
