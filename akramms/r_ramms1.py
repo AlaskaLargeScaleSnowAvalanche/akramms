@@ -250,7 +250,7 @@ def run_combo(scene_dir, dem_file, submit=True):
 
     # Don't do this because there might be overruns.
     # Finished with all chunks, mark it!
-    with open(combo_control_file(scene_dir)) as out:
+    with open(combo_control_file(scene_dir), 'w') as out:
         out.write('Done running initial RAMMS Stage 1 for all chunks in the combo (not including overruns).\n')
 # -----------------------------------------------------------------
 def releasefile_rule(release_file, dem_file, inputs, dry_run=False, at_front=False, submit=False):
