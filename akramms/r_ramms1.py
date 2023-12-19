@@ -239,14 +239,11 @@ def run_combo(scene_dir, dem_file, submit=True):
     
     df = level.scenedir_to_chunknames(scene_dir)    # pra_size, chunkid, name
     df = df.sort_values('name')
-#    print('xxxxxxxxxxxxxxxxxxxxx')
-#    print(df)
-#    return
 
     gridI = gdalutil.read_grid(dem_file)
     for tup in df.itertuples(index=False):
-        print('xxxxxxxxxx ', tup)
-        continue
+#        print('xxxxxxxxxx ', tup)
+#        continue
 
         chunkdir = scene_dir / 'CHUNKS' / tup.name
         release_file = level.chunkdir_to_releasefile(chunkdir)
@@ -262,8 +259,6 @@ def run_combo(scene_dir, dem_file, submit=True):
 
         # OK do it.
         run_chunk(release_file, crf, gridI, submit=submit)
-
-    return
 
     # Don't do this because there might be overruns.
     # Finished with all chunks, mark it!
