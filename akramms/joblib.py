@@ -426,11 +426,9 @@ def agg_status(statuses, ignore_statuses={}):
         Statuses to ignore
     """
     counts = statuses.value_counts().to_dict()    # {Status.xyz: <n>, ...}
-    print('counts ', counts)
     counts = {k:v for k,v in counts.items() if k not in ignore_statuses}
 
     ret = min(status for status in counts.keys())
-    print('ret ', ret)
     return ret
 
 
@@ -439,14 +437,9 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         Resolved to combo level (theoretical, i.e. realized=False)
     """
 
-    print('AA1')
-
     # Make it idempotent
     if 'combo_status' in akdf0.columns:
         return akdf0
-
-    print('AA2')
-    print('ignore_statuses ', ignore_statuses)
 
     dfs = list()
 
@@ -473,8 +466,6 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         rfdf1 = resolve.resolve_chunk(akdf1)
         iddf1 = resolve.resolve_id(rfdf1, realized=realized)
         iddf1 = add_id_status(iddf1)
-#        print('iiiiiiiiiiiddddddddddd')
-#        print(iddf1[iddf1.id_status == JobStatus.OVERRUN])
 
         # Replace older avalanches runs with newer runs of the same ID
         # (which presumably have fixed overrun problems)
@@ -487,13 +478,9 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
 
         # Aggregate id status back to combo level and add to akdf1
         # (Now we know whether the combo has fully finished)
-        print('iddf1 xxxxxxxxxxxxxxxxxxxxxx')
-        print(iddf1[['combo','id_status']])
         combo_status = \
             iddf1[['combo','id_status']].groupby('combo').agg(lambda x: agg_status(x,ignore_statuses)) \
             .rename(columns={'id_status': 'combo_status'})
-        print('combo_status         xxxxxxxxxxxxxxxxxxxxxxxxxxxxx')
-        print(combo_status)
         akdf1 = akdf1.merge(combo_status, how='left', left_on='combo', right_index=True)
         akdf1['combo_status'] = akdf1.combo_status.fillna(JobStatus.NOINPUT).astype(int)
 
