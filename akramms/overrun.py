@@ -22,14 +22,12 @@ def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run
         Dataframe of resubmitted avalanches
     """
 
-    print('ignore_statuses ', ignore_statuses)
-    return
-
     # ------------------ Work at the combo level
 
     # Poll until RAMMS Stage 2 is done running for these combos
     while True:
         akdf0 = joblib.add_combo_status(akdf0, realized=False, update=update, dry_run=dry_run, ignore_statuses=ignore_statuses)
+        print('xxxxxxxx ', akdf0[akdf0.combo_status == joblib.JobStatus.NOINPUT])
 
         if block:
             mask = (akdf0.combo_status == joblib.JobStatus.INPROCESS)
