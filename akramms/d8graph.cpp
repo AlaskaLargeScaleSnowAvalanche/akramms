@@ -1252,7 +1252,7 @@ if (trace) printf("BB3 seen=%ld\n", seen.size());
         ij_points.push_back(std::array{i,j});
     }
     std::vector<std::array<int,2>> chull_ij(akramms::convex_hull(ij_points));
-    ij_points.clear();    // Free memory
+    // ij_points.clear();    // Free memory  (we need this below if degenerate)
 
 if (trace) printf("BB4\n");
     // Convert convex hull to geographic coordinates by applying the geotransform
@@ -1281,10 +1281,19 @@ if (trace) printf("BB5 %ld\n", chull_xy.size());
         // Degenerate convex hull.  Make something non-degenerate.
         // It doesn't matte whether this is "correct" because the PRA is
         // quite small and the margin (1km) added to it will be MUCH larger.
-        double x = chull_xy[0][0];
-        double y = chull_xy[0][1];
-        double dx = gt[1];
-        double dy = gt[5];
+
+        // Go back to one of our original seen points.
+        // (We know there's at least one point, see code above if seen.size()==0)
+        ix_t i = ij_points[0][0]
+        ix_t j = ij_points[0][1]
+
+        // Convert to x,y coordinates
+        double const x = gt[0] + i*gt[1] + j*gt[2];
+        double const y = gt[3] + i*gt[4] + j*gt[5];
+
+        // Make a dummy but small MBR around that one gridcell.
+        double const dx = gt[1];
+        double const dy = gt[5];
         std::vector<std::array<double,2>> mbr {
             std::array<double,2>{x-dx,y-dy},
             std::array<double,2>{x-dx,y+dy},
