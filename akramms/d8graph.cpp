@@ -1284,8 +1284,8 @@ if (trace) printf("BB5 %ld\n", chull_xy.size());
 
         // Go back to one of our original seen points.
         // (We know there's at least one point, see code above if seen.size()==0)
-        ix_t i = ij_points[0][0]
-        ix_t j = ij_points[0][1]
+        ix_t i = ij_points[0][0];
+        ix_t j = ij_points[0][1];
 
         // Convert to x,y coordinates
         double const x = gt[0] + i*gt[1] + j*gt[2];
