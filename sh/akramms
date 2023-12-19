@@ -487,6 +487,8 @@ def ps(args):
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
     argument('--sync', action='store_true',
         help="Wait for combos to finish running then submit overruns (rather than quitting without submitting)"),
+    argument('--force', action='store_true',
+        help="Run overrun processing even if combo is not yet finished."),
     argument('--dry-run', action='store_true',
         help="Don't actually do the work"),
 ])
