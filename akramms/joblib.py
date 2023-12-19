@@ -349,7 +349,7 @@ def submit_jobs(akdf):
 
     return akdf
 # ------------------------------------------------------------
-def add_chunk_status(akdf, realized=True, update=True):
+def add_chunk_status(akdf, realized=True, update=True, ignore_statuses={}):
     """Determins a status for each releasefile (chunk)
 
     akdf:
@@ -396,7 +396,7 @@ def add_chunk_status(akdf, realized=True, update=True):
 
         # Aggregate id status back to releasefile level and add to akdf1
         chunk_status = \
-            iddf1[['releasefile','id_status']].groupby('releasefile').agg(agg_status) \
+            iddf1[['releasefile','id_status']].groupby('releasefile').agg(lambda x: agg_status(x,ignore_statuses)) \
             .rename(columns={'id_status': 'chunk_status'})
         akdf1 = rfdf1.merge(chunk_status, how='left', left_on='releasefile', right_index=True)
 
@@ -426,7 +426,7 @@ def agg_status(statuses, ignore_statuses={}):
         Statuses to ignore
     """
     counts = statuses.value_counts().to_dict()    # {Status.xyz: <n>, ...}
-    print('counts ', counts)
+#    print('counts ', counts)
     counts = {k:v for k,v in counts.items() if k not in ignore_statuses}
     return min(status for status in counts.keys())
 
@@ -464,8 +464,8 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         rfdf1 = resolve.resolve_chunk(akdf1)
         iddf1 = resolve.resolve_id(rfdf1, realized=realized)
         iddf1 = add_id_status(iddf1)
-        print('iiiiiiiiiiiddddddddddd')
-        print(iddf1[iddf1.id_status == JobStatus.OVERRUN])
+#        print('iiiiiiiiiiiddddddddddd')
+#        print(iddf1[iddf1.id_status == JobStatus.OVERRUN])
 
         # Replace older avalanches runs with newer runs of the same ID
         # (which presumably have fixed overrun problems)
@@ -530,7 +530,7 @@ def add_status(akdf, level, realized=True, update=True, dry_run=False, ignore_st
         akdf = add_id_status(akdf)
 
     elif level == 'chunk':
-        akdf = add_chunk_status(akdf, realized=realized, update=update)
+        akdf = add_chunk_status(akdf, realized=realized, update=update, ignore_statuses=ignore_statuses)
 
     elif level == 'combo':
         akdf = add_combo_status(akdf, realized=realized, update=update, dry_run=dry_run, ignore_statuses=ignore_statuses)
