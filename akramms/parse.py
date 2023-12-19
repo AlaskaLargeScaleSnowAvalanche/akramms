@@ -256,7 +256,8 @@ def parse_dir(dir):
 #
 #    return ret
 # -------------------------------------------------------
-def parse_chunk_releasefile(releasefile):
+# NOTE: HELPER FUNCTION.  See also file_info.parse_chunk_release_file
+def _parse_chunk_releasefile(releasefile):
     """Parses names of CHUNK-level release files.
 
     releasefile: Eg:

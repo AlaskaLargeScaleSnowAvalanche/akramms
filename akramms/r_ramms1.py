@@ -131,7 +131,7 @@ def combo_control_file(scene_dir):
     return scene_dir / 'ramms_stage1.txt'
 
 # -----------------------------------------------------------------
-def run_chunk(crf, gridI, submit=False):
+def run_chunk(release_file, crf, gridI, submit=False):
     done_output = chunk_control_file(crf)
 
 #    crf = file_info.parse_chunk_release_file(release_file)
@@ -160,7 +160,7 @@ def run_chunk(crf, gridI, submit=False):
 
     # We don't need inputs anymore for run_remote; (but there MUST be
     # at least one input for RAMMS Windows interface to work)
-    inputs = [crf['releasefile']]
+    inputs = [release_file]
 
     print(f'Running RAMMS Stage 1 {crf.chunk_dir}')
     harnutil.run_queued('idl',
@@ -242,7 +242,7 @@ def run_combo(scene_dir, dem_file, submit=True):
             continue
 
         # OK do it.
-        run_chunk(crf, gridI, submit=submit)
+        run_chunk(release_file, crf, gridI, submit=submit)
 
     # Don't do this because there might be overruns.
     # Finished with all chunks, mark it!
@@ -273,7 +273,7 @@ def releasefile_rule(release_file, dem_file, inputs, dry_run=False, submit=False
 
         # Avoid recomputing unnecessarily
         if not os.path.exists(chunk_control_file(crf)):
-            run_chunk(crf, gridI, submit=submit)
+            run_chunk(release_file, crf, gridI, submit=submit)
 
     return make.Rule(action, inputs, [done_output])
 
