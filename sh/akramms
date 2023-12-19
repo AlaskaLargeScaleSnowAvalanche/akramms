@@ -189,15 +189,22 @@ def parse(args):
         help='Only check avalanches with .in.zip / .out.zip files'),
     argument('--update', action='store_true',
         help='Update markers of completion?'),
+    argument('--ignore',
+        help="Run resubmit process even if some avalanches have NOINPUT status (because RAMMS Stage 1 failed to process them)"),
     argument('--dry-run', action='store_true',
         help="Don't actually do the work inside combo archive"),
 ])
 def status(args):
     """Test out parsing and resolving to different levels"""
 
+    if args.ignore is not None:
+        ignore_statuses = {joblib.JobStatus._member_map_[x] for x in args.ignore.split(',')}
+    else:
+        ignore_statuses = {}
+
     parseds = akramms.parse.parse_args(args.spec)
     akdf = resolve.resolve_to(parseds, args.level, realized=False)
-    akdf = joblib.add_status(akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run)
+    akdf = joblib.add_status(akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run, ignore_statuses=ignore_statuses)
     joblib.print_status(akdf, args.level)
 # ---------------------------------------------------------------------
 def get_exp_dir(exp_mod):
