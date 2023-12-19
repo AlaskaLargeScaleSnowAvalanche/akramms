@@ -123,6 +123,8 @@ def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run
                 print(f'Except for --dry-run, I would be writing chunk to directory {chunk_dir}')
             else:
                 chunk.write_chunk(scene_args, jb, akdf2, {})
+                with open(chunk_dir / 'overrun.txt', 'w') as out:
+                    out.write('This chunk resubmits avalanches that overran in a previous chunk')
 
             # Run RAMMS Stage 1 (and auto-submit)
             releasefile = chunk_dir / 'RELEASE' / f'{jb.slope_name}_{jb.avalanche_name}_rel.shp'
