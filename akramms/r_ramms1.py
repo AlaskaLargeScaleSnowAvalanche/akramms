@@ -157,6 +157,7 @@ def run_chunk(crf, gridI, submit=False):
     # RAMMS Stage 1 accepts inputs on stdin
     # rammsdist.run_on_windows_stage() calls read_inputs()
     dynamic_outputs = list()
+    inputs = []    # We don't need inputs anymore for run_remote
     harnutil.run_queued('idl',
         harnutil.run_remote, inputs, cmd, tdir, write_inputs=True)
 
