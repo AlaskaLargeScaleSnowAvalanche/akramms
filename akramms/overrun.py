@@ -41,8 +41,8 @@ def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run
                 print(inprocess[['combo', 'combo_status']])
                 now = datetime.datetime.now()
                 wake_time = now + datetime.timedelta(seconds=config.poll_period)
-                print(f'Current time is {now:%H:%m:%s}')
-                print(f'Sleeping until {wake_time:%H:%m:%s}')
+                print(f'Current time is {now}')
+                print(f'Sleeping until {wake_time}')
                 time.sleep(config.poll_period)
         else:
             # We're not doing synchronous.
