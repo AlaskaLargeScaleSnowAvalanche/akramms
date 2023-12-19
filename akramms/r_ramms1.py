@@ -92,7 +92,7 @@ def compress_avalanche_inputs(crf, gridI, ids):
         if (not os.path.exists(crf.avalanche_dir / f'{base}.in.zip')) and \
             all(file_info.is_file_good(x) for x in files):
 
-            print(f'Compressing {zip_file}')
+#            print(f'Compressing {zip_file}')
 
             # Compress Avalanche intput files into a Zipfile
             with zipfile.ZipFile(
@@ -199,10 +199,13 @@ def run_chunk(release_file, crf, gridI, submit=False):
 
         if not os.path.exists(in_zip):
             missing.append(in_zip)
+
     if len(missing) > 0:
         for x in missing:
             print('Missing: ', x)
-        raise ValueError('Missing avalanche input files')
+
+        # Don't stop the show here.  We can figure out later on that things are missing and act appropriately.
+        # raise ValueError('Missing avalanche input files')
 
 
     # Submit the individual avalanche runs immediately so we can

@@ -22,7 +22,7 @@ class QueueRunner:
             result = rq.results.Result.fetch_latest(job, serializer=job.serializer, timeout=timeout)
             if result.type == result.Type.SUCCESSFUL: 
                 ret = result.return_value
-                print('Success ', ret)
+                print('Success')
                 return ret
             else: 
                 print('Failure ', result.exc_string)
