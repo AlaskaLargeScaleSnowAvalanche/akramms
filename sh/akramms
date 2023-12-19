@@ -375,7 +375,7 @@ def run(args):
         # Run make on chunks a few rows at a time
         combo_chunk_size = config.setup_ncpu    # maybe *2
         nrows = len(akdf1)
-        cchunk_bounds = list(range(0, nrows, combo_chunk_size)) + [norws]
+        cchunk_bounds = list(range(0, nrows, combo_chunk_size)) + [nrows]
         print('cchunk_bounds ', cchunk_bounds)
         return
 
