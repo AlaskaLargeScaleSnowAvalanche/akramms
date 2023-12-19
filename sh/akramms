@@ -376,6 +376,9 @@ def run(args):
         combo_chunk_size = config.setup_ncpu    # maybe *2
         nrows = len(akdf1)
         cchunk_bounds = list(range(0, nrows, combo_chunk_size)) + [combo_chunk_size]
+        print('cchunk_bounds ', cchunk_bounds)
+        return
+
         for irange in zip(cchunk_bounds[:-1], cchunk_bounds[1:]):
             akdf1b = akdf1.iloc[irange[0]:irange[1]]
 
