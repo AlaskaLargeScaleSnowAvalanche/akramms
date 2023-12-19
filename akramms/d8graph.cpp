@@ -1130,6 +1130,7 @@ static PyObject *polygon_to_python(std::vector<std::array<double,2>> const &mbr)
 }
 // ----------------------------------------------------------------------------------------
 static int ncall = 0;
+static bool trace = false;
 
 static char const *d8graph_find_domain_docstring =
 R"(Given indices of starting nodes, "rolls a marble downhill."  Returns
@@ -1166,6 +1167,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     double max_runout = 10000.;    // Maximum distance avalanche can go [m]
 
     printf("BEGIN d8graph_find_domain: %d\n", ncall);
+    trace = (ncall == 438);
     ++ncall;
 
     // Parse args and kwargs
@@ -1196,7 +1198,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     // int const nj = PyArray_DIM(dem_filled,0);
     int const ni = PyArray_DIM(dem_filled,1);
 
-
+if (trace) printf("BB1\n");
     // ============================ Run the Core Computation
     // Run the flood fill algorithm, result in a set of 1D indices
     std::unordered_set<ix_t> seen(
@@ -1214,6 +1216,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     // No domain possible if we left the DEM domain in the runout.
     if (seen.size() == 0) { Py_INCREF(Py_None); return Py_None; }
 
+if (trace) printf("BB2\n");
     // ================ Return raw results of the flood fill
     PyArrayObject *ret_seen = nullptr;
     if (debug) {
@@ -1231,6 +1234,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
         // ========================================================
     }
 
+if (trace) printf("BB3\n");
     // Compute Convex Hull
     // Compute convex hull in integer coordinate space
     // (because we can, and we avoid computational geometry
@@ -1250,6 +1254,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     std::vector<std::array<int,2>> chull_ij(akramms::convex_hull(ij_points));
     ij_points.clear();    // Free memory
 
+if (trace) printf("BB4\n");
     // Convert convex hull to geographic coordinates by applying the geotransform
     // https://gdal.org/tutorials/geotransforms_tut.html
     std::vector<std::array<double,2>> chull_xy;
@@ -1265,6 +1270,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
 
     PyObject *ret_chull_xy = nullptr;
 
+if (trace) printf("BB5\n");
     // Compute minimum bounding rectangle (MBR) on the convex hull
     PyObject *ret_mbr = nullptr;
     if (chull_xy.size() >= 3) {
@@ -1290,13 +1296,14 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
         ret_mbr = polygon_to_python(mbr);
     }
 
+    printf("END d8graph_find_domain\n");
+
     if (debug) {
         return PyTuple_Pack(3, ret_seen, ret_chull_xy, ret_mbr);
     } else {
         return ret_mbr;
     }
 
-    printf("END d8graph_find_domain\n");
 }
 
 // ============================================================
