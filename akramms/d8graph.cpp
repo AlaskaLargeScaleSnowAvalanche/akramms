@@ -1234,7 +1234,7 @@ if (trace) printf("BB2\n");
         // ========================================================
     }
 
-if (trace) printf("BB3\n");
+if (trace) printf("BB3 seen=%ld\n", seen.size());
     // Compute Convex Hull
     // Compute convex hull in integer coordinate space
     // (because we can, and we avoid computational geometry
