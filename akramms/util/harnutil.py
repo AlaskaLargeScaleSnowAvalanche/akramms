@@ -1,4 +1,4 @@
-import os,subprocess,re,sys,contextlib
+import os,subprocess,re,sys,contextlib,time
 from akramms import config
 
 HARNESS = config.HARNESS    # Alias
@@ -154,6 +154,10 @@ def run_remote(inputs, cmd, tdir, write_inputs=False):
 
     # Outputs as local filenames
     outputs = [config.roots.syspath(x) for x in outputs_rel]
+
+    # Try to avoid race conditions
+    time.sleep(2)
+
     return outputs
 
 def run_queued(qname, fn, *args, at_front=False, **kwargs):
