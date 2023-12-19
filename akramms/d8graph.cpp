@@ -1129,6 +1129,8 @@ static PyObject *polygon_to_python(std::vector<std::array<double,2>> const &mbr)
     return mbr_list;
 }
 // ----------------------------------------------------------------------------------------
+static int ncall = 0;
+
 static char const *d8graph_find_domain_docstring =
 R"(Given indices of starting nodes, "rolls a marble downhill."  Returns
 j (N-S) and i (E-W) gridcell coordinates of all nodes touched.
@@ -1162,6 +1164,9 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     int debug = 0;    // bool
     double min_alpha = 18.;    // Minimum "alpha" angle at which avalanche expected to continue
     double max_runout = 10000.;    // Maximum distance avalanche can go [m]
+
+    printf("BEGIN d8graph_find_domain: %d\n", ncall);
+    ++ncall;
 
     // Parse args and kwargs
     static char const *kwlist[] = {
@@ -1290,6 +1295,8 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
     } else {
         return ret_mbr;
     }
+
+    printf("END d8graph_find_domain\n");
 }
 
 // ============================================================
