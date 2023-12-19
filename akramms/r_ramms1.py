@@ -276,7 +276,7 @@ def combo_rule(scene_dir, dem_file, inputs, dry_run=False, submit=False):
     done_output = combo_control_file(scene_dir)
 
     def action(tdir):
-        run_combo(scene_dir, dem_file, submit=auto_submit)
+        run_combo(scene_dir, dem_file, submit=config.auto_submit)
 
     return make.Rule(action, inputs, [done_output])
 
