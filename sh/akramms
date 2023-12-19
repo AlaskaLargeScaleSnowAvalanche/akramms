@@ -74,27 +74,6 @@ def initcopy(args):
 
 # ------------------------------------------------------------------------
 
-_chunktypeRE = re.compile('CHUNKS(\d+)?')
-@subcommand([
-    argument('query', nargs='*', help='Avalanche query, resolved to ID level'),
-])
-def enlarge(args):
-
-    # Obtain df of relevant Avalanche IDs in original chunks
-    parseds = akramms.parse.parse_args(args.query)
-    r_ramms.enlarge_domains(parseds)
-
-
-    query_fname = args.query[0]
-
-    # Read release dataframe from ALL size classes
-    with open(query_fname, 'rb') as fin:
-        scene_dir = pickle.load(fin)
-        release_df = pickle.load(fin)
-
-    r_ramms.enlarge_domains(scene_dir, release_df)
-
-
 @subcommand([
     argument('ramms', help='RAMMS directory or release file to inspect'),
     argument('ids', type=int, nargs='*', help='ID of avalanche in run_dir to inspect')])

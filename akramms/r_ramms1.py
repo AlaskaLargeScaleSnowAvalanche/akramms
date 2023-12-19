@@ -131,7 +131,7 @@ def combo_control_file(scene_dir):
     return scene_dir / 'ramms_stage1.txt'
 
 # -----------------------------------------------------------------
-def run_chunk(release_file, crf, gridI, submit=False):
+def run_chunk(release_file, crf, gridI, at_front=False, submit=False):
     done_output = chunk_control_file(crf)
 
 #    crf = file_info.parse_chunk_release_file(release_file)
@@ -164,7 +164,8 @@ def run_chunk(release_file, crf, gridI, submit=False):
 
     print(f'Running RAMMS Stage 1 {crf.chunk_dir}')
     harnutil.run_queued('idl',
-        harnutil.run_remote, inputs, cmd, None, write_inputs=True)
+        harnutil.run_remote, inputs, cmd, None, write_inputs=True,
+        at_front=True)
 
     # Copy .tif files to be reused by later RAMMS Stage 1
     for fname0,fname1 in tmap:
@@ -252,7 +253,7 @@ def run_combo(scene_dir, dem_file, submit=True):
     with open(combo_control_file(scene_dir)) as out:
         out.write('Done running initial RAMMS Stage 1 for all chunks in the combo (not including overruns).\n')
 # -----------------------------------------------------------------
-def releasefile_rule(release_file, dem_file, inputs, dry_run=False, submit=False):
+def releasefile_rule(release_file, dem_file, inputs, dry_run=False, at_front=False, submit=False):
     """Runs Stage 1 of RAMMS for one chunk
     (IDL code prepares individual avalanche runs)
 
@@ -276,7 +277,7 @@ def releasefile_rule(release_file, dem_file, inputs, dry_run=False, submit=False
 
         # Avoid recomputing unnecessarily
         if not os.path.exists(chunk_control_file(crf)):
-            run_chunk(release_file, crf, gridI, submit=submit)
+            run_chunk(release_file, crf, gridI, at_front=at_front, submit=submit)
 
     return make.Rule(action, inputs, [done_output])
 
