@@ -22,6 +22,9 @@ def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run
         Dataframe of resubmitted avalanches
     """
 
+    print('ignore_statuses ', ignore_statuses)
+    return
+
     # ------------------ Work at the combo level
 
     # Poll until RAMMS Stage 2 is done running for these combos
