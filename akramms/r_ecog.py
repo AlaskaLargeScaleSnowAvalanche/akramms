@@ -126,10 +126,10 @@ def rule(scene_dir, scene_args, inputs, return_period, For):
         # Run eCognition (in Docker container)!
         print(' '.join(cmd))
         msg = f'---------- Running eCog for {scene_dir}'
-        harnutil.run_queued('ecognition',
-            _subprocess_run, msg, cmd, check=True)
-#        with rqutil.blocking_lock('ecognition'):
-#            subprocess.run(cmd, check=True)
+#        harnutil.run_queued('ecognition',
+#            _subprocess_run, msg, cmd, check=True)
+        with rqutil.blocking_lock('ecognition'):
+            subprocess.run(cmd, check=True)
 
         # ---------------------------------------
         # eCognition writes out shapefiles with wrong projection.  Fix that
