@@ -156,7 +156,7 @@ def run_remote(inputs, cmd, tdir, write_inputs=False):
     outputs = [config.roots.syspath(x) for x in outputs_rel]
     return outputs
 
-def run_queued(qname, fn, at_front=False, *args, **kwargs):
+def run_queued(qname, fn, *args, at_front=False, **kwargs):
     if config.queue[qname]:
         from akramms.util import rqutil
         return rqutil.queue(qname).run(fn, *args, at_front=at_front, **kwargs)
