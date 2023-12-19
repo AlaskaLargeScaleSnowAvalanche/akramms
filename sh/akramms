@@ -190,7 +190,7 @@ def parse(args):
     argument('--update', action='store_true',
         help='Update markers of completion?'),
     argument('--ignore',
-        help="Run resubmit process even if some avalanches have NOINPUT status (because RAMMS Stage 1 failed to process them)"),
+        help="Disregard these status codes when aggregating (comma-separated status codes)"),
     argument('--dry-run', action='store_true',
         help="Don't actually do the work inside combo archive"),
 ])
