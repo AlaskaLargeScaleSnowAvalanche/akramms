@@ -128,7 +128,8 @@ def rule(scene_dir, scene_args, inputs, return_period, For):
         msg = f'---------- Running eCog for {scene_dir}'
 #        harnutil.run_queued('ecognition',
 #            _subprocess_run, msg, cmd, check=True)
-        with rqutil.blocking_lock('ecognition'):
+#        with rqutil.blocking_lock('ecognition'):
+        if True:
             subprocess.run(cmd, check=True)
 
         # ---------------------------------------
