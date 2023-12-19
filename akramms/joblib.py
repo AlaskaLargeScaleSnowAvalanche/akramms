@@ -396,7 +396,7 @@ def add_chunk_status(akdf, realized=True, update=True):
 
         # Aggregate id status back to releasefile level and add to akdf1
         chunk_status = \
-            iddf1[['releasefile','id_status']].groupby('releasefile').min() \
+            iddf1[['releasefile','id_status']].groupby('releasefile').agg(agg_status) \
             .rename(columns={'id_status': 'chunk_status'})
         akdf1 = rfdf1.merge(chunk_status, how='left', left_on='releasefile', right_index=True)
 
