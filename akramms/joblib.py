@@ -426,9 +426,12 @@ def agg_status(statuses, ignore_statuses={}):
         Statuses to ignore
     """
     counts = statuses.value_counts().to_dict()    # {Status.xyz: <n>, ...}
-#    print('counts ', counts)
+    print('counts ', counts)
     counts = {k:v for k,v in counts.items() if k not in ignore_statuses}
-    return min(status for status in counts.keys())
+
+    ret = min(status for status in counts.keys())
+    print('ret ', ret)
+    return ret
 
 
 def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_statuses={}):
