@@ -221,7 +221,7 @@ def run_combo(scene_dir, dem_file):
     
     df = level.scenedir_to_chunknames(scene_dir)    # pra_size, chunkid, name
     gridI = gdalutil.read_grid(dem_file)
-    for tup in df.itertuple(index=False):
+    for tup in df.itertuples(index=False):
         chunkdir = scene_dir / 'CHUNKS' / tup.name
         release_file = chunkdir_to_releasefile(chunkdir)
         crf = file_info.parse_chunk_release_file(release_file)
