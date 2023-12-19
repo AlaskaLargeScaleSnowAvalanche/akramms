@@ -258,7 +258,7 @@ def parse_dir(dir):
 # -------------------------------------------------------
 # NOTE: HELPER FUNCTION.  See also file_info.parse_chunk_release_file
 def _parse_chunk_releasefile(releasefile):
-    """Parses names of CHUNK-level release files.
+    """Parses names of CHUNK-level release files into a dict suitable for making dataframes.
 
     releasefile: Eg:
         ###.../x-113-045/RELEASE/x-113-045For_10m_30L_rel.shp

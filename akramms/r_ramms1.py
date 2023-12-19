@@ -209,7 +209,7 @@ def run_chunk(release_file, crf, gridI, submit=False):
     # get going while preparing more RAMMS directories.
     if submit:
 
-        parseds = [file_info.parse_chunk_release_file(release_file)]
+        parseds = [parse._parse_chunk_releasefile(release_file)]
         akdf = resolve.resolve_to(parseds, 'id', stage='in', realized=True)
         joblib.submit_jobs(akdf)
 
