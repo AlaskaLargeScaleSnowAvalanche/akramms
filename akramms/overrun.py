@@ -1,4 +1,4 @@
-import os,time
+import os,time,datetime
 import pandas as pd
 from akramms import file_info,chunk,level,joblib,config
 from akramms import r_ramms1,parse,params,resolve
@@ -38,7 +38,9 @@ def resubmit(akdf0, check_running=True, update=True, dry_run=False, block=True):
                 # Not everything is done running, sleep for a while and try again
                 print('The following combos are still computing:')
                 print(inprocess[['combo', 'combo_status']])
-                print(f'Combos still computing, sleeping {config.poll_period}s until they are done')
+                now = datetime.now()
+                wake_time = now + datetime.timedelta(config.poll_period)
+                print(f'Combos still computing, sleeping until {wake_time:%H:%m:%s}')
                 time.sleep(config.poll_period)
         else:
             # We're not doing synchronous.
