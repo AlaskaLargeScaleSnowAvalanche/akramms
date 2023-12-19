@@ -449,7 +449,7 @@ def run(args):
 
                 # Run RAMMS Stage 1 (main chunks, no overruns)
                 makefile.add(r_ramms1.combo_rule(
-                    scene_dir, scene_info.dem_file, ramms1_inputs, submit=config.auto_submit))
+                    scene_dir, scene_args['dem_file'], ramms1_inputs, submit=config.auto_submit))
 
             ncpu = config.setup_ncpu if args.j is None else args.j
             makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=ncpu)
