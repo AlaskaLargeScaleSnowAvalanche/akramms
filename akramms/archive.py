@@ -379,7 +379,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
             with zipfile.ZipFile(out_zip, 'r') as ozip:
                 overrun = is_overrun(ozip)
             if (not archive_overrun) and overrun:
-                print(f'Not archiving overrun: {out_zip}')
+                # print(f'Not archiving overrun: {out_zip}')
                 continue
 
             # Determine if the avalanche was already archived
@@ -391,7 +391,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
                     ncv_dtime = datetime.datetime.fromisoformat(ncv.avalanche_timestamp)
 
                     if out_zip_dtime <= ncv_dtime:
-                        print(f'Not archiving based on timestamp: {out_zip}')
+                        # print(f'Not archiving based on timestamp: {out_zip}')
                         continue
 
 #                arc_mtime = os.path.getmtime(arc_fname)
