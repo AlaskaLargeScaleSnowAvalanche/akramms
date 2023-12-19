@@ -16,7 +16,7 @@ def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run
     check_running:
         Check if any IDs are running (or should be running); and
         if so, aborts.
-    sync:
+    block:
         If True, poll and wait for chunks to finish running before making decisions.
     Returns: akdf
         Dataframe of resubmitted avalanches
