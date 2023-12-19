@@ -128,7 +128,7 @@ def chunk_control_file(crf):
     return crf.scene_dir / 'ramms_stage1' / f'{crf.chunk_name}.txt'
 
 def combo_control_file(scene_dir):
-    return crf.scene_dir / 'ramms_stage1.txt'
+    return scene_dir / 'ramms_stage1.txt'
 
 # -----------------------------------------------------------------
 def run_chunk(crf, gridI, submit=False):
