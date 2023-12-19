@@ -40,7 +40,7 @@ def resubmit(akdf0, check_running=True, update=True, dry_run=False, block=True):
                 print(inprocess[['combo', 'combo_status']])
                 now = datetime.datetime.now()
                 wake_time = now + datetime.timedelta(config.poll_period)
-                print('Current time is {now:%H:%m:%s}')
+                print(f'Current time is {now:%H:%m:%s}')
                 print(f'Sleeping until {wake_time:%H:%m:%s}')
                 time.sleep(config.poll_period)
         else:
