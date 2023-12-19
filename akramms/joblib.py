@@ -426,6 +426,7 @@ def agg_status(statuses, ignore_statuses={}):
         Statuses to ignore
     """
     counts = statuses.value_counts().to_dict()    # {Status.xyz: <n>, ...}
+    print('counts ', counts)
     counts = {k:v for k,v in counts.items() if k not in ignore_statuses}
     return min(status for status in counts.keys())
 
