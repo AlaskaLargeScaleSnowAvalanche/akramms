@@ -169,7 +169,7 @@ def run_chunk(release_file, crf, gridI, at_front=False, submit=False):
 
     print(f'Running RAMMS Stage 1 {crf.chunk_dir}')
     harnutil.run_queued('idl',
-        run_if_remote, done_output, inputs, cmd, None, writes_inputs=True,
+        run_if_remote, done_output, inputs, cmd, None, write_inputs=True,
         at_front=False)
 
 #        harnutil.run_remote, inputs, cmd, None, write_inputs=True,
