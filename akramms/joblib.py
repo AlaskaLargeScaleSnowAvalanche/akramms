@@ -487,6 +487,8 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
 
         # Aggregate id status back to combo level and add to akdf1
         # (Now we know whether the combo has fully finished)
+        print('iddf1 xxxxxxxxxxxxxxxxxxxxxx')
+        print(iddf1[['combo','id_status']])
         combo_status = \
             iddf1[['combo','id_status']].groupby('combo').agg(lambda x: agg_status(x,ignore_statuses)) \
             .rename(columns={'id_status': 'combo_status'})
