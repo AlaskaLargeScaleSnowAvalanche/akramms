@@ -159,7 +159,7 @@ def run_chunk(crf, gridI, submit=False):
     dynamic_outputs = list()
     inputs = []    # We don't need inputs anymore for run_remote
     harnutil.run_queued('idl',
-        harnutil.run_remote, inputs, cmd, tdir, write_inputs=True)
+        harnutil.run_remote, inputs, cmd, None, write_inputs=True)
 
     # Copy .tif files to be reused by later RAMMS Stage 1
     for fname0,fname1 in tmap:
