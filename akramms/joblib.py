@@ -465,7 +465,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         iddf1 = resolve.resolve_id(rfdf1, realized=realized)
         iddf1 = add_id_status(iddf1)
         print('iiiiiiiiiiiddddddddddd')
-        print(iddf1[iddf1.status == Status.OVERRUN])
+        print(iddf1[iddf1.id_status == Status.OVERRUN])
 
         # Replace older avalanches runs with newer runs of the same ID
         # (which presumably have fixed overrun problems)
