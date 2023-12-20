@@ -336,6 +336,7 @@ def xreset(args):
 
     # Refuse to reset things that are still running
     status_col = f'{args.level}_status'
+    print(akdf.columns)
     if joblib.JobStatus.INPROCESS in set(akdf[status_col]):
         df = akdf[akdf[status_col] == joblib.JobStatus.INPROCESS]
         print('The following items are still running, cannot reset for now')
