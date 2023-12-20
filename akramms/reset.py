@@ -39,6 +39,7 @@ def _deletes_chunk_ramms1(chunkdir):
         scenedir / 'ramms_stage1' / f'{chunkname}.txt']
 
 # ----------------------------------------------------------------------
+# ----------------------------------------------------------------------
 def _deletes_chunk_ramms2(chunkdir):
     scenedir = chunkdir.parents[1]
     chunkname = chunkdir.parts[-1]

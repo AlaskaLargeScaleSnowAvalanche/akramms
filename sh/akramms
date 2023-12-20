@@ -12,7 +12,7 @@ import argparse,itertools,os,subprocess,sys,io,codecs,re,pickle
 from akramms import r_experiment
 from akramms.util import rammsutil,exputil
 from uafgi.util import ioutil,make
-from akramms import r_domain_builder, r_ramms1, resolve,joblib, avalquery, overrun,reset
+from akramms import r_domain_builder, r_ramms1, resolve,joblib, avalquery, overrun
 # ------------------------------------------------------------------------
 # https://mike.depalatis.net/blog/simplifying-argparse.html
 # https://gist.github.com/mivade/384c2c41c3a29c637cb6c603d4197f9f
@@ -322,13 +322,31 @@ def step4(args):
 @subcommand(name='reset', [
     argument('level', help='What to resolve to', default='chunk'),
     argument('step', help='Which step of computation to reset'),
+    argument('--status', type=lambda x: joblib.JobStatus._value2member_map_[x],
+        default=joblib.JobStatus.FAILED,
+        help='Reset only items with this status (or below)'),
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
 def xreset(args):
     """Reset locks, or parts of the computation"""
+    from akramms import reset
 
     parseds = akramms.parse.parse_args(args.spec)
     akdf = resolve.resolve_to(parseds, args.level, realized=False)
+
+    # Refuse to reset things that are still running
+    status_col = f'{args.level}_status'
+    if joblib.JobStatus.INPROCESS in set(akdf[status_col]):
+        df = akdf[akdf[status_col] == joblib.JobStatus.INPROCESS]
+        print('The following items are still running, cannot reset for now')
+        print(df)
+        return
+
+    # Filter by status
+    akdf = akdf[akdf[status_col] <= args.status]
+    print('Ready to reset:')
+    print(akdf)
+
     reset.reset(akdf, args.level, args.step)
 # ------------------------------------------------------------------
 @subcommand([
