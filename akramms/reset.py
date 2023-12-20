@@ -70,10 +70,10 @@ def rm_all(deletes):
 #            print('# Path does not exist: {f}')
             pass
         elif os.path.isdir(f):
-            print('rm -rf {f}')
+            print(f'rm -rf {f}')
         else:
             # Treat it like a file
-            print('rm {f}')
+            print(f'rm {f}')
 
 
 # ----------------------------------------------------------------------
