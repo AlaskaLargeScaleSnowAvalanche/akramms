@@ -319,7 +319,7 @@ def step4(args):
     print('akdf0 ', akdf0)
 
 # ------------------------------------------------------------------
-@subcommand(name='reset', [
+@subcommand(name='reset', args=[
     argument('level', help='What to resolve to', default='chunk'),
     argument('step', help='Which step of computation to reset'),
     argument('--status', type=lambda x: joblib.JobStatus._value2member_map_[x],
