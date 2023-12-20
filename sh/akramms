@@ -355,7 +355,7 @@ def xreset(args):
     # Filter by status
     akdf = akdf[akdf[status_col] <= args.status]
     print('Ready to reset:')
-    print(akdf)
+    joblib.print_status(akdf, args.level)
 
     reset.reset(akdf, args.level, args.step)
 # ------------------------------------------------------------------
