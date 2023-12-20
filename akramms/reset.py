@@ -1,4 +1,5 @@
 import glob,sys
+from akramms import parse
 
 # Reset steps in the computation
 
@@ -66,8 +67,9 @@ def _deletes_combo_ramms2(scenedir):
 def rm_all(deletes):
     for f in deletes:
         if not os.path.exists(f):
-            print('# Path does not exist: {f}')
-        if os.path.isdir(f):
+#            print('# Path does not exist: {f}')
+            pass
+        elif os.path.isdir(f):
             print('rm -rf {f}')
         else:
             # Treat it like a file
