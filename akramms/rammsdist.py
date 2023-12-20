@@ -173,10 +173,10 @@ class LineProcessor1:
         if not self.var_begin:
             return True
 
-        # If >30 seconds have passed, check to see if the number of VAR
+        # If >120 seconds have passed, check to see if the number of VAR
         # files has increased.
         t1 = time.time()
-        if t1 - self.t0 < 30:
+        if t1 - self.t0 < 120:
             return True
 
         self.t0 = t1
