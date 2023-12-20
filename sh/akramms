@@ -12,7 +12,7 @@ import argparse,itertools,os,subprocess,sys,io,codecs,re,pickle
 from akramms import r_experiment
 from akramms.util import rammsutil,exputil
 from uafgi.util import ioutil,make
-from akramms import r_domain_builder, r_ramms1, resolve,joblib, avalquery, overrun
+from akramms import r_domain_builder, r_ramms1, resolve,joblib, avalquery, overrun,reset
 # ------------------------------------------------------------------------
 # https://mike.depalatis.net/blog/simplifying-argparse.html
 # https://gist.github.com/mivade/384c2c41c3a29c637cb6c603d4197f9f
@@ -319,10 +319,23 @@ def step4(args):
     print('akdf0 ', akdf0)
 
 # ------------------------------------------------------------------
+@subcommand(name='reset', [
+    argument('level', help='What to resolve to', default='chunk'),
+    argument('step', help='Which step of computation to reset'),
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+])
+def xreset(args):
+    """Reset locks, or parts of the computation"""
+
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf = resolve.resolve_to(parseds, args.level, realized=False)
+    reset.reset(akdf, args.level, args.step)
+# ------------------------------------------------------------------
 @subcommand([
 ])
-def reset(args):
-    """Reset locks"""
+def unlock(args)
+    """Reset locks, or parts of the computation"""
+
     from akramms.util import rqutil
     rqutil.clear_locks()
 
@@ -440,6 +453,8 @@ def run(args):
 
             ncpu = config.setup_ncpu if args.j is None else args.j
             makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=ncpu)
+
+# ------------------------------------------------------------------
 
 # ------------------------------------------------------------------
 @subcommand([
