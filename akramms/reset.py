@@ -23,7 +23,7 @@ def _deletes_combo_ramms1(scenedir):
     return [
         scenedir / 'ramms_stage1.txt',
         scenedir / 'ramms_stage1',
-        scenedir / 'CHUNKS',
+        scenedir / 'CHUNKS']
 # ----------------------------------------------------------------------
 def _deletes_chunk_ramms1(chunkdir):
     """After reset, akramms run will re-run RAMMS Stage 1
