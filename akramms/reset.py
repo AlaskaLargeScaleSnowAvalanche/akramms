@@ -1,4 +1,4 @@
-import glob,sys
+import glob,sys,os
 from akramms import parse
 
 # Reset steps in the computation
