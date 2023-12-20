@@ -351,7 +351,7 @@ def xreset(args):
 # ------------------------------------------------------------------
 @subcommand([
 ])
-def unlock(args)
+def unlock(args):
     """Reset locks, or parts of the computation"""
 
     from akramms.util import rqutil
