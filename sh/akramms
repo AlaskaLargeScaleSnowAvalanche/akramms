@@ -322,6 +322,8 @@ def step4(args):
 @subcommand(name='reset', args=[
     argument('level', help='What to resolve to', default='chunk'),
     argument('step', help='Which step of computation to reset'),
+    argument('--ignore',
+        help="Disregard these status codes when aggregating (comma-separated status codes)"),
     argument('--status', type=lambda x: joblib.JobStatus._value2member_map_[x],
         default=joblib.JobStatus.FAILED,
         help='Reset only items with this status (or below)'),
@@ -331,12 +333,19 @@ def xreset(args):
     """Reset locks, or parts of the computation"""
     from akramms import reset
 
+    if args.ignore is not None:
+        ignore_statuses = {joblib.JobStatus._member_map_[x] for x in args.ignore.split(',')}
+    else:
+        ignore_statuses = {}
+
     parseds = akramms.parse.parse_args(args.spec)
     akdf = resolve.resolve_to(parseds, args.level, realized=False)
+    akdf = joblib.add_status(akdf, args.level,
+        realized=False, update=False, ignore_statuses=ignore_statuses)
 
     # Refuse to reset things that are still running
     status_col = f'{args.level}_status'
-    print(akdf.columns)
+#    print(akdf.columns)
     if joblib.JobStatus.INPROCESS in set(akdf[status_col]):
         df = akdf[akdf[status_col] == joblib.JobStatus.INPROCESS]
         print('The following items are still running, cannot reset for now')
