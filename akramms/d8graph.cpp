@@ -1291,17 +1291,19 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
         double const x = gt[0] + i*gt[1] + j*gt[2];
         double const y = gt[3] + i*gt[4] + j*gt[5];
 
-        // Make a dummy but small MBR around that one gridcell.
+        // Make a dummy but small "convex hull" around that one gridcell.
         double const dx = gt[1];
         double const dy = gt[5];
-        std::vector<std::array<double,2>> mbr {
+        std::vector<std::array<double,2>> chull_xy2 {
             std::array<double,2>{x-dx,y-dy},
             std::array<double,2>{x-dx,y+dy},
             std::array<double,2>{x+dx,y+dy},
             std::array<double,2>{x+dx,y-dy},
             std::array<double,2>{x-dx,y-dy}};
+        if (debug) ret_chull_xy2 = polygon_to_python(chull_xy2);
 
-        if (debug) ret_chull_xy = polygon_to_python(mbr);
+        // Create the domain ("mbr" is a misnomer) by adding a margin
+        std::vector<std::array<double,2>> mbr(akramms::mbr_chull(chull_xy2, margin));
         ret_mbr = polygon_to_python(mbr);
     }
 
