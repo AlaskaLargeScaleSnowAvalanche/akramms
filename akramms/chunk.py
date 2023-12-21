@@ -590,8 +590,12 @@ def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
 
     ci = chunk_info
 
-    chunk_dir = scene_args['scene_dir'] / 'CHUNKS' / f'{ci.chunk_name}.tmp'    # Temporary while we write it
+#    chunk_dir_final = scene_args['scene_dir'] / 'CHUNKS' / ci.chunk_name    # Final atomically written location
+#    chunk_dir = scene_args['scene_dir'] / 'CHUNKS' / f'{ci.chunk_name}.tmp'    # Temporary while we write it
+
     chunk_dir_final = scene_args['scene_dir'] / 'CHUNKS' / ci.chunk_name    # Final atomically written location
+    chunk_dir = chunk_dir_final
+
     slope_dir = chunk_dir / 'RESULTS' / ci.slope_name
     avalanche_dir = slope_dir / ci.avalanche_name
 
@@ -615,7 +619,7 @@ def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
     _dfx = dfc.reset_index()[['Id', 'dom']]
     shputil.write_df(_dfx, 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
 
-    os.rename(chunk_dir, chunk_dir_final)
+#    os.rename(chunk_dir, chunk_dir_final)
     return chunk_dir_final
 # Commented out because these files differ from the (by definition
 # correct) versions created by RAMMS.
