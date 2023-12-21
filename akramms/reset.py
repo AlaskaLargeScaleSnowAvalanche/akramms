@@ -23,7 +23,7 @@ def _deletes_combo_ecog(scenedir):
 def _deletes_combo_pra(scenedir):
 
     """Forces rerun of pra_post but not eCognition.  Does NOT force
-    rerun of RAMMS1 (for chunks that were previously successful)"""
+    rerun of RAMMS1 (for chunks that were previously successful)."""
 
     return [
         scenedir / 'RELEASE',
@@ -36,13 +36,14 @@ def _deletes_combo_ramms1(scenedir):
         scenedir / 'ramms_stage1',
         scenedir / 'CHUNKS']
 # ----------------------------------------------------------------------
-def _deletes_chunk_chunk(chunkdir):
-    """Removes the entire chunk"""
-    return [chunkdir]
-
+#def _deletes_chunk_chunk(chunkdir):
+#    """Removes the entire chunk"""
+#    return [chunkdir]
+# Bad idea, then akramms just ignores the chunk thereafter.
 # ----------------------------------------------------------------------
 def _deletes_chunk_ramms1(chunkdir):
-    """After reset, akramms run will re-run RAMMS Stage 1
+    """After reset, akramms run will re-run RAMMS Stage 1.
+    Follow with `akramms reset chunk chunk` to fully reset the chunks
 
     akdf:
         Resolved to  chunk level
