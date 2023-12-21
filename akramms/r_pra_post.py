@@ -102,8 +102,9 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
         # ---------------------------------------------------------------
         # Split into segments based on PRA size, and save
 
-        # Remove PRAs of elevation <150m
-        df =  df[df['Mean_DEM'] >= 150.]            
+        # Remove PRAs of elevation <150m and area < 100 m^2
+        keep = ((df['Mean_DEM'] >= 150.) & (df['area_m2'] >= 1000.))
+        df =  df[keep]
 
         # Clip to the non-margin part of the local grid (subdomain)
         df = chunk.clip(df, scene_args['domain'])
