@@ -330,7 +330,7 @@ def step4(args):
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
 def xreset(args):
-    """Reset locks, or parts of the computation"""
+    """Reset parts of the computation"""
     from akramms import reset
 
     if args.ignore is not None:

@@ -20,6 +20,13 @@ def _deletes_combo_ecog(scenedir):
         _deletes_combo_ramms1(scenedir) + \
         [scenedir / 'eCog']
 # ----------------------------------------------------------------------
+def _deletes_combo_pra(scenedir):
+    """Forces rerun of pra_post but not eCognition"""
+    return [
+        scenedir / 'RELEASE',
+        scenedir / 'DOMAIN',
+    ]
+# ----------------------------------------------------------------------
 def _deletes_combo_ramms1(scenedir):
     return [
         scenedir / 'ramms_stage1.txt',
