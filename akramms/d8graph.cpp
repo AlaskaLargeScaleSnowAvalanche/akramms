@@ -1300,7 +1300,7 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
             std::array<double,2>{x+dx,y+dy},
             std::array<double,2>{x+dx,y-dy},
             std::array<double,2>{x-dx,y-dy}};
-        if (debug) ret_chull_xy2 = polygon_to_python(chull_xy2);
+        if (debug) ret_chull_xy = polygon_to_python(chull_xy2);
 
         // Create the domain ("mbr" is a misnomer) by adding a margin
         std::vector<std::array<double,2>> mbr(akramms::mbr_chull(chull_xy2, margin));
