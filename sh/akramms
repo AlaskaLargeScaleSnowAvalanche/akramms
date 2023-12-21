@@ -324,7 +324,7 @@ def step4(args):
     argument('step', help='Which step of computation to reset'),
     argument('--ignore',
         help="Disregard these status codes when aggregating (comma-separated status codes)"),
-    argument('--status', type=lambda x: joblib.JobStatus.[x],
+    argument('--status', type=lambda x: joblib.JobStatus[x],
         default=joblib.JobStatus.FAILED,
         help='Reset only items with this status (or below)'),
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
