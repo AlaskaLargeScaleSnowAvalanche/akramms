@@ -88,7 +88,7 @@ def _deletes_combo_archive(xdir):
     """Make akramms reconsider archiving parts of a combo"""
     xleaf = xdir.parts[-1]
     arcdir = xdir.parents[0] / ('arc' + xleaf[1:])
-    return [arcdir / 'archive.txt']
+    return [arcdir / 'archived.txt']
 # ----------------------------------------------------------------------
 # ========================================================================
 # ----------------------------------------------------------------------
@@ -130,7 +130,6 @@ def reset(akdf0, level, step):
             for combo in akdf1.combo:
                 scenedir = expmod.combo_to_scenedir(combo, 'x')
                 deletes += deletes_fn(scenedir)
-                print('deletes ', deletes)
         else:
             raise ValueError(f'Illegal level {level}')
 
