@@ -88,6 +88,7 @@ def _deletes_combo_archive(xdir):
     """Make akramms reconsider archiving parts of a combo"""
     xleaf = xdir.parts[-1]
     arcdir = xdir.parts[:-1] / 'arc' + xleaf[1:]
+    return [arcdir / 'archive.txt']
 # ----------------------------------------------------------------------
 # ========================================================================
 # ----------------------------------------------------------------------
