@@ -489,13 +489,8 @@ def add_combo_status(akdf0, realized=True, update=True, archive_overruns=False, 
             # Mark combos that have fully finished
             mask = (akdf1.combo_status == JobStatus.FINISHED)
             for tup in akdf1[mask].itertuples(index=False):
-                arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
-                ofname = arcdir / 'archived.txt'
-                if dry_run:
-                    print(f'If not for dry_run, I would be writing the file {ofname}')
-                else:
-                    with open(ofname, 'w') as out:
-                        out.write('Combo archived\n')
+                archive.finish_combo(expmod, combo, dry_run=dry_run)
+
         dfs.append(akdf1)
 
         # ------------------------------------------

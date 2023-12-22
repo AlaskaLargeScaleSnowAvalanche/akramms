@@ -503,6 +503,30 @@ def archive_ids(expmod, akdf, debug=False, dry_run=False, archive_overruns=False
 
     return archived_out_zips
 # ----------------------------------------------------------
+def finish_combo(expmod, combo, dry_run=False):
+    xdir = expmod.combo_to_scenedir(tup.combo, scenetype='x')
+    arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
+
+    
+    ofname = arcdir / 'archived.txt'
+    if dry_run:
+        print(f'If not for dry_run, I would be writing the file {ofname}')
+        return
+
+    # Copy relevant Combo-related metadata
+    for leaf in ('RELEASE', 'DOMAIN'):
+        shutil.rmtree(arcdir / leaf, ignore_errors=True)
+        shutil.copytree(xdir / leaf, arcdir / leaf)
+    for leaf in ('scene.nc', 'scene.cdl'):
+        shutil.copy2(xdir / leaf, arcdir / leaf)
+
+    # Write the control file
+    with open(ofname, 'w') as out:
+        out.write('Combo archived\n')
+
+
+
+# ----------------------------------------------------------
 #def archive_combos(akdf_combo, debug=False, dry_run=False, archive_overruns=False):
 #    """
 #    akdf:
