@@ -128,6 +128,7 @@ def reset(akdf0, level, step):
                 deletes += deletes_fn(chunkdir)
         elif level == 'combo':
             for combo in akdf1.combo:
+                print('combo ', combo)
                 scenedir = expmod.combo_to_scenedir(combo, 'x')
                 deletes += deletes_fn(scenedir)
         else:
