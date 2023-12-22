@@ -189,6 +189,8 @@ def parse(args):
         help='Only check avalanches with .in.zip / .out.zip files'),
     argument('--update', action='store_true',
         help='Update markers of completion?'),
+    argument('--overruns', action='store_true',
+        help='If archiving via --update, archive overruns too?')
     argument('--ignore',
         help="Disregard these status codes when aggregating (comma-separated status codes)"),
     argument('--dry-run', action='store_true',

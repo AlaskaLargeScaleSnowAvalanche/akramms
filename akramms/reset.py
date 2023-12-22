@@ -43,7 +43,7 @@ def _deletes_chunk_chunk(chunkdir):
     chunk until you regenerate it via `akramms reset combo pra`"""
 
     return [
-        chunkdir
+        chunkdir,
         scenedir / 'ramms_stage1.txt',    # We must re-run RAMMS Stage 1
     ]
 # ----------------------------------------------------------------------
