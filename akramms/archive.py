@@ -339,7 +339,7 @@ def ramms_to_nc0(out_zip, ncout):
 
 
 # ----------------------------------------------------------
-def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=False, archive_overrun=False):
+def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=False, archive_overruns=False):
     """Archives a bunch of work on a single thread
     akdf0:
         Must contain cols: exp, combo, releasefile, chunkid, ic
@@ -378,7 +378,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
             # Avoid archiving overrun files
             with zipfile.ZipFile(out_zip, 'r') as ozip:
                 overrun = is_overrun(ozip)
-            if (not archive_overrun) and overrun:
+            if (not archive_overruns) and overrun:
                 # print(f'Not archiving overrun: {out_zip}')
                 continue
 
@@ -458,11 +458,11 @@ def _git_commit(dir):
     return proc.stdout.readline().strip()    # We just want head -1
 
 # -----------------------------------------------------------------
-def archive_ids(expmod, akdf, debug=False, dry_run=False, archive_overrun=False):
+def archive_ids(expmod, akdf, debug=False, dry_run=False, archive_overruns=False):
     """Archives in multi-thread
     akdf:
         Resolved to id leavel
-    archive_overrun:
+    archive_overruns:
         Should we archive overrun avalanches?
     """
 
@@ -490,12 +490,12 @@ def archive_ids(expmod, akdf, debug=False, dry_run=False, archive_overrun=False)
         futures = [ex.submit(_archive_single_threaded,
             akdfs[0], status_attrs,
             print_output=True, dry_run=dry_run,
-            archive_overrun=archive_overrun)]
+            archive_overruns=archive_overruns)]
 
         futures += [ex.submit(_archive_single_threaded,
             akdf, status_attrs,
             print_output=False, dry_run=dry_run,
-            archive_overrun=archive_overrun)
+            archive_overruns=archive_overruns)
             for akdf in akdfs[1:]]
 
         for future in futures:
@@ -503,7 +503,7 @@ def archive_ids(expmod, akdf, debug=False, dry_run=False, archive_overrun=False)
 
     return archived_out_zips
 # ----------------------------------------------------------
-#def archive_combos(akdf_combo, debug=False, dry_run=False, archive_overrun=False):
+#def archive_combos(akdf_combo, debug=False, dry_run=False, archive_overruns=False):
 #    """
 #    akdf:
 #        Resolved to combo level

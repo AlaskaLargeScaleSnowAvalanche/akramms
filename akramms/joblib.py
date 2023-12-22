@@ -432,7 +432,7 @@ def agg_status(statuses, ignore_statuses={}):
     return ret
 
 
-def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_statuses={}):
+def add_combo_status(akdf0, realized=True, update=True, archive_overruns=False, dry_run=False, ignore_statuses={}):
     """akdf:
         Resolved to combo level (theoretical, i.e. realized=False)
     """
@@ -474,7 +474,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         if update:
             # Archive avalanches that have finished
             mask = (iddf1.id_status == JobStatus.FINISHED)
-            archive.archive_ids(expmod, iddf1[mask], dry_run=dry_run)
+            archive.archive_ids(expmod, iddf1[mask], dry_run=dry_run, archive_overruns=archive_overruns)
 
         # Aggregate id status back to combo level and add to akdf1
         # (Now we know whether the combo has fully finished)

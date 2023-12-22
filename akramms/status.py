@@ -77,11 +77,11 @@ def add_combo_status(akdf0, realized=True, update=True):
     """akdf:
         Resolved to combo level (theoretical, i.e. realized=False)
     """
-    print('zzzzzzzzzz1')
+#    print('zzzzzzzzzz1')
     # Make it idempotent
     if 'combo_status' in akdf0.columns:
         return akdf0
-    print('zzzzzzzzzz2')
+#    print('zzzzzzzzzz2')
 
     dfs = list()
 
@@ -89,7 +89,7 @@ def add_combo_status(akdf0, realized=True, update=True):
         akdf0['combo_status'] = JobStatus.TODO
         return akdf0
 
-    print('zzzzzzzzzz3')
+#    print('zzzzzzzzzz3')
 
     for exp,akdf1 in akdf0.reset_index(drop=True).groupby('exp'):
         expmod = parse.load_expmod(exp)

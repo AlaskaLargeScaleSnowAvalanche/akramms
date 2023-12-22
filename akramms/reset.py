@@ -28,6 +28,7 @@ def _deletes_combo_pra(scenedir):
     return [
         scenedir / 'RELEASE',
         scenedir / 'DOMAIN',
+        scenedir / 'ramms_stage1.txt',
     ]
 # ----------------------------------------------------------------------
 def _deletes_combo_ramms1(scenedir):
@@ -36,10 +37,15 @@ def _deletes_combo_ramms1(scenedir):
         scenedir / 'ramms_stage1',
         scenedir / 'CHUNKS']
 # ----------------------------------------------------------------------
-#def _deletes_chunk_chunk(chunkdir):
-#    """Removes the entire chunk"""
-#    return [chunkdir]
-# Bad idea, then akramms just ignores the chunk thereafter.
+def _deletes_chunk_chunk(chunkdir):
+
+    """Removes the entire chunk.  After this, akramms will ignore the
+    chunk until you regenerate it via `akramms reset combo pra`"""
+
+    return [
+        chunkdir
+        scenedir / 'ramms_stage1.txt',    # We must re-run RAMMS Stage 1
+    ]
 # ----------------------------------------------------------------------
 def _deletes_chunk_ramms1(chunkdir):
     """After reset, akramms run will re-run RAMMS Stage 1.
@@ -77,6 +83,11 @@ def _deletes_combo_ramms2(scenedir):
 
     return ret
 
+# ----------------------------------------------------------------------
+def _deletes_combo_archive(xdir):
+    """Make akramms reconsider archiving parts of a combo"""
+    xleaf = xdir.parts[-1]
+    arcdir = xdir.parts[:-1] / 'arc' + xleaf[1:]
 # ----------------------------------------------------------------------
 # ========================================================================
 # ----------------------------------------------------------------------
