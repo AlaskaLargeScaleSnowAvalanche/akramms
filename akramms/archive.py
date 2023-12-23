@@ -505,6 +505,11 @@ def archive_ids(expmod, akdf, debug=False, dry_run=False, archive_overruns=False
 
     return archived_out_zips
 # ----------------------------------------------------------
+_zip_dir(idir, ofname):
+    with zipfile.ZipFile(ofname, 'w', compression=zipfile.ZIP_DEFLATD) as ozip:
+        for leaf in os.listdir(idir):
+            ozip.write(idir / leaf, arcname=leaf) #, compress_type=zipfile.ZIP_DEFLATD)
+
 def finish_combo(expmod, combo, dry_run=False):
     xdir = expmod.combo_to_scenedir(tup.combo, scenetype='x')
     arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
@@ -517,8 +522,10 @@ def finish_combo(expmod, combo, dry_run=False):
 
     # Copy relevant Combo-related metadata
     for leaf in ('RELEASE', 'DOMAIN'):
-        shutil.rmtree(arcdir / leaf, ignore_errors=True)
-        shutil.copytree(xdir / leaf, arcdir / leaf)
+        _zip_dir(xdir / leaf, arcdir / f'{leaf}.zip')
+#        shutil.rmtree(arcdir / leaf, ignore_errors=True)
+#        shutil.copytree(xdir / leaf, arcdir / leaf)
+
     for leaf in ('scene.nc', 'scene.cdl'):
         shutil.copy2(xdir / leaf, arcdir / leaf)
 
