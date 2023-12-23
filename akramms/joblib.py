@@ -437,6 +437,9 @@ def add_combo_status(akdf0, realized=True, update=True, archive_overruns=False, 
         Resolved to combo level (theoretical, i.e. realized=False)
     """
 
+    print('AA1 archive_overruns ', archive_overruns)
+    raise ValueError('17')
+
     # Make it idempotent
     if 'combo_status' in akdf0.columns:
         return akdf0
