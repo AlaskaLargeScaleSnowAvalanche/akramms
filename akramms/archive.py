@@ -504,7 +504,7 @@ def archive_ids(expmod, akdf, debug=False, dry_run=False, archive_overruns=False
     return archived_out_zips
 # ----------------------------------------------------------
 def _zip_dir(idir, ofname):
-    with zipfile.ZipFile(ofname, 'w', compression=zipfile.ZIP_DEFLATD) as ozip:
+    with zipfile.ZipFile(ofname, 'w', compression=zipfile.ZIP_DEFLATED) as ozip:
         for leaf in os.listdir(idir):
             ozip.write(idir / leaf, arcname=leaf) #, compress_type=zipfile.ZIP_DEFLATD)
 
