@@ -1,4 +1,4 @@
-import os,re,itertools,struct,pickle,zipfile,io
+import os,re,itertools,struct,pickle,zipfile,io,shutil
 import contextlib,sys,datetime,subprocess
 import concurrent.futures
 import numpy as np
