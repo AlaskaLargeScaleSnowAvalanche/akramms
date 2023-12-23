@@ -206,7 +206,7 @@ def status(args):
 
     parseds = akramms.parse.parse_args(args.spec)
     akdf = resolve.resolve_to(parseds, args.level, realized=False)
-    akdf = joblib.add_status(akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run, ignore_statuses=ignore_statuses)
+    akdf = joblib.add_status(akdf, args.level, realized=args.realized, update=args.update, archive_overruns=args.overruns, dry_run=args.dry_run, ignore_statuses=ignore_statuses)
     joblib.print_status(akdf, args.level)
 # ---------------------------------------------------------------------
 def get_exp_dir(exp_mod):
