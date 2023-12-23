@@ -190,9 +190,6 @@ def add_id_status(akdf0):
 
     statuses = list()
 
-#    print('xxxxxxxxxxx ')
-#    print(akdf0)
-#    print(akdf0.columns)
     for exp,akdf1 in akdf0.groupby('exp'):
         expmod = parse.load_expmod(exp)
 

@@ -466,8 +466,6 @@ def archive_ids(expmod, akdf, debug=False, dry_run=False, archive_overruns=False
         Should we archive overrun avalanches?
     """
 
-    print('xxxxxxxxxxxxxx archive_overruns ', archive_overruns)
-
     # Don't need this column, and it breaks pickle / multiprocessing...
     if 'parsed' in akdf.columns:
         akdf = akdf.drop('parsed', axis=1)
@@ -511,8 +509,8 @@ def _zip_dir(idir, ofname):
             ozip.write(idir / leaf, arcname=leaf) #, compress_type=zipfile.ZIP_DEFLATD)
 
 def finish_combo(expmod, combo, dry_run=False):
-    xdir = expmod.combo_to_scenedir(tup.combo, scenetype='x')
-    arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
+    xdir = expmod.combo_to_scenedir(combo, scenetype='x')
+    arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
 
     
     ofname = arcdir / 'archived.txt'
