@@ -523,7 +523,7 @@ def add_combo_status(akdf0, realized=True, update=True, archive_overruns=False, 
 
     return pd.concat(dfs)
 # ------------------------------------------------------------
-def add_status(akdf, level, realized=True, update=True, dry_run=False, ignore_statuses={}):
+def add_status(akdf, level, realized=True, update=True, archve_overruns=archive_overruns, dry_run=False, ignore_statuses={}):
     if level == 'id':
         akdf = add_id_status(akdf)
 
@@ -531,7 +531,7 @@ def add_status(akdf, level, realized=True, update=True, dry_run=False, ignore_st
         akdf = add_chunk_status(akdf, realized=realized, update=update, ignore_statuses=ignore_statuses)
 
     elif level == 'combo':
-        akdf = add_combo_status(akdf, realized=realized, update=update, dry_run=dry_run, ignore_statuses=ignore_statuses)
+        akdf = add_combo_status(akdf, realized=realized, update=update, archive_overruns=archive_overruns, dry_run=dry_run, ignore_statuses=ignore_statuses)
 
     return akdf
 
