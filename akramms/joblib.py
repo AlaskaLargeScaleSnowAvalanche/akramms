@@ -169,7 +169,7 @@ def is_overrun(out_zip):
 # --------------------------------------------------------------------
 
 _subsceneRE = re.compile(r'x-(\d+-\d+)')
-def add_id_status(akdf0, update=True):
+def add_id_status(akdf0, update=True, dry_run=False):
     """Determines status of ALL Condor jobs for a RAMMS run.
     akdf0:
         Avalanche dataframe, resolved to the ID level with scenetype='x' and index='id'
@@ -343,7 +343,7 @@ def submit_jobs(akdf):
 
     return akdf
 # ------------------------------------------------------------
-def add_chunk_status(akdf, realized=True, update=True, ignore_statuses={}):
+def add_chunk_status(akdf, realized=True, update=True, ignore_statuses={}, dry_run=False):
     """Determins a status for each releasefile (chunk)
 
     akdf:
@@ -386,7 +386,7 @@ def add_chunk_status(akdf, realized=True, update=True, ignore_statuses={}):
         # Pick up job statuses
         rfdf1 = resolve.resolve_chunk(akdf1, scenetypes={'x'})
         iddf1 = resolve.resolve_id(rfdf1, realized=realized)
-        iddf1 = add_id_status(iddf1, update=update)
+        iddf1 = add_id_status(iddf1, update=update, dry_run=dry_run)
 
         # Aggregate id status back to releasefile level and add to akdf1
         chunk_status = \
@@ -459,7 +459,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         # Get jobstatus at id level
         rfdf1 = resolve.resolve_chunk(akdf1)
         iddf1 = resolve.resolve_id(rfdf1, realized=realized)
-        iddf1 = add_id_status(iddf1, update=update)
+        iddf1 = add_id_status(iddf1, update=update, dry_run=dry_run)
 
         # Replace older avalanches runs with newer runs of the same ID
         # (which presumably have fixed overrun problems)
@@ -511,10 +511,10 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
 # ------------------------------------------------------------
 def add_status(akdf, level, realized=True, update=True, dry_run=False, ignore_statuses={}):
     if level == 'id':
-        akdf = add_id_status(akdf, update=update)
+        akdf = add_id_status(akdf, update=update, dry_run=dry_run)
 
     elif level == 'chunk':
-        akdf = add_chunk_status(akdf, realized=realized, update=update, ignore_statuses=ignore_statuses)
+        akdf = add_chunk_status(akdf, realized=realized, update=update, ignore_statuses=ignore_statuses, dry_run=dry_run)
 
     elif level == 'combo':
         akdf = add_combo_status(akdf, realized=realized, update=update, dry_run=dry_run, ignore_statuses=ignore_statuses)
