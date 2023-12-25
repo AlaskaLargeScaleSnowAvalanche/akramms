@@ -210,6 +210,7 @@ def is_overrun(ozip):
         Open zipfile of <xyz>.out.zip
     """
     arcnames = [os.path.split(x)[1] for x in ozip.namelist()]
+    print(f'is_overrun {arcnames}')
     overrun = any(x.endswith('.out.overrun') for x in arcnames)
 
     return overrun
