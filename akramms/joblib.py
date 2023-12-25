@@ -266,10 +266,10 @@ def add_id_status(akdf0, update=True):
 
     akdf0 = akdf0.merge(df.reset_index(drop=True), how='left', left_on=['combo', 'chunkid', 'id'], right_on=['combo', 'chunkid', 'id'])
 
-        if update:
-            # Archive avalanches that have finished
-            mask = (akdf0.id_status == JobStatus.FINISHED)
-            archive.archive_ids(expmod, akdf0[mask], dry_run=dry_run)
+    if update:
+        # Archive avalanches that have finished
+        mask = (akdf0.id_status == JobStatus.FINISHED)
+        archive.archive_ids(expmod, akdf0[mask], dry_run=dry_run)
 
     return akdf0
 # --------------------------------------------------------
