@@ -1,4 +1,4 @@
-import os,subprocess,functools,re,typing,zipfile,enum,sys
+import os,subprocess,functools,re,typing,zipfile,sys
 import htcondor
 import pandas as pd
 from akramms import config,file_info,parse,level,complete,resolve,archive,overrun

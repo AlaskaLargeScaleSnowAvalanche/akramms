@@ -1,4 +1,4 @@
-import typing,re,os
+import typing,re,os,enum
 
 class JobStatus(enum.IntEnum):
     TODO = 0         # Ready to submit to HTCondor but no evidence that has been done
