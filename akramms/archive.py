@@ -459,16 +459,21 @@ def _git_commit(dir):
     return proc.stdout.readline().strip()    # We just want head -1
 
 # -----------------------------------------------------------------
-def archive_ids(expmod, akdf, debug=False, dry_run=False):
+def archive_ids(akdf0, debug=False, dry_run=False):
     """Archives in multi-thread
     akdf:
         Resolved to id level.  Also must have id_status set (at least for id_status=OVERRUN)
     """
 
+    archived_out_zips = list()
+
+    # Only archive avalanches that have finished
+    mask = (akdf0.id_status == JobStatus.FINISHED)
+    akdf0 = akdf0[mask]
 
     # Don't need this column, and it breaks pickle / multiprocessing...
-    if 'parsed' in akdf.columns:
-        akdf = akdf.drop('parsed', axis=1)
+    if 'parsed' in akdf0.columns:
+        akdf0 = akdf0.drop('parsed', axis=1)
 
 
     # Status attributes to write into all the NetCDF files
@@ -478,11 +483,8 @@ def archive_ids(expmod, akdf, debug=False, dry_run=False):
         akramms_commit = _git_commit(os.path.join(config.HARNESS, 'akramms')),
         uafgi_commit = _git_commit(os.path.join(config.HARNESS, 'uafgi')))
 
+    akdfs = np.array_split(akdf0, config.ncpu_archive)
 
-
-    akdfs = np.array_split(akdf, config.ncpu_archive)
-
-    archived_out_zips = list()
     with contextlib.ExitStack() as stack:
         ex = stack.enter_context(concurrent.futures.ThreadPoolExecutor(1)) if debug \
             else concurrent.futures.ProcessPoolExecutor(config.ncpu_archive)
@@ -492,9 +494,9 @@ def archive_ids(expmod, akdf, debug=False, dry_run=False):
             print_output=True, dry_run=dry_run)]
 
         futures += [ex.submit(_archive_single_threaded,
-            akdf, status_attrs,
+            akdfx, status_attrs,
             print_output=False, dry_run=dry_run)
-            for akdf in akdfs[1:]]
+            for akdfx in akdfs[1:]]
 
         for future in futures:
             archived_out_zips += future.result()
