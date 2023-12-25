@@ -377,8 +377,9 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
                 continue
 
             # Avoid archiving overrun files
-            with zipfile.ZipFile(out_zip, 'r') as ozip:
-                overrun = is_overrun(ozip)
+#            with zipfile.ZipFile(out_zip, 'r') as ozip:
+#                overrun = is_overrun(ozip)
+            overrun = (tup.id_status == file_info.JobStatus.OVERRUN)
             if overrun:
                 print(f'overrun: {out_zip}')
             if (not archive_overruns) and overrun:
@@ -464,7 +465,7 @@ def _git_commit(dir):
 def archive_ids(expmod, akdf, debug=False, dry_run=False, archive_overruns=False):
     """Archives in multi-thread
     akdf:
-        Resolved to id leavel
+        Resolved to id level.  Also must have id_status set (at least for id_status=OVERRUN)
     archive_overruns:
         Should we archive overrun avalanches?
     """

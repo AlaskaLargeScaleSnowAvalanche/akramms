@@ -1,5 +1,17 @@
 import typing,re,os
 
+class JobStatus(enum.IntEnum):
+    TODO = 0         # Ready to submit to HTCondor but no evidence that has been done
+    INPROCESS = 1    # HTCondor is dealing with it
+    NOINPUT = 2         # No RAMMS input files exist
+    INCOMPLETE = 3   # Some but not all RAMMS input files exist
+    FAILED = 4       # The job finished but did not produce full / correct output
+    OVERRUN = 5      # Avalanche overran the boundary; auto-resubmit
+    FINISHED = 6     # The avalanche (or chunk or combo) has finished, and it's successful
+    MARKED_FINISHED = 7       # Chunk or combo has finished, and has been marked as such (shortcut)
+    ARCHIVED = 8    # For combos: It's been fully archived to an arc directory
+
+
 # ---------------------------------------------------------------------
 def is_file_good(fname):
     # Make sure file exists in non-zero length

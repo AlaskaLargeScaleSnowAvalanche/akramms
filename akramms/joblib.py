@@ -5,16 +5,8 @@ from akramms import config,file_info,parse,level,complete,resolve,archive,overru
 
 # Categorize each job int one of four sets
 #job_status_labels = ('noinput', 'incomplete', 'todo', 'inprocess', 'finished', 'overrun', 'failed')
-class JobStatus(enum.IntEnum):
-    TODO = 0         # Ready to submit to HTCondor but no evidence that has been done
-    INPROCESS = 1    # HTCondor is dealing with it
-    NOINPUT = 2         # No RAMMS input files exist
-    INCOMPLETE = 3   # Some but not all RAMMS input files exist
-    FAILED = 4       # The job finished but did not produce full / correct output
-    OVERRUN = 5      # Avalanche overran the boundary; auto-resubmit
-    FINISHED = 6     # The avalanche (or chunk or combo) has finished, and it's successful
-    MARKED_FINISHED = 7       # Chunk or combo has finished, and has been marked as such (shortcut)
-    ARCHIVED = 8    # For combos: It's been fully archived to an arc directory
+
+JobStatus = file_info.JobStatus    # Alias
 
 # =========================================================================================
 # ===== RAMMS Stage 2: Manage avalanche jobs
@@ -177,7 +169,7 @@ def is_overrun(out_zip):
 # --------------------------------------------------------------------
 
 _subsceneRE = re.compile(r'x-(\d+-\d+)')
-def add_id_status(akdf0):
+def add_id_status(akdf0, update=True, archive_overruns=False):
     """Determines status of ALL Condor jobs for a RAMMS run.
     akdf0:
         Avalanche dataframe, resolved to the ID level with scenetype='x' and index='id'
@@ -272,7 +264,14 @@ def add_id_status(akdf0):
     # df = df.sort_values(['combo', 'id', 'chunkid'])    # Not needed
 #    df.drop_duplicates(['combo', 'id'], keep='last', inplace=True)
 
-    return akdf0.merge(df.reset_index(drop=True), how='left', left_on=['combo', 'chunkid', 'id'], right_on=['combo', 'chunkid', 'id'])
+    akdf0 = akdf0.merge(df.reset_index(drop=True), how='left', left_on=['combo', 'chunkid', 'id'], right_on=['combo', 'chunkid', 'id'])
+
+        if update:
+            # Archive avalanches that have finished
+            mask = (akdf0.id_status == JobStatus.FINISHED)
+            archive.archive_ids(expmod, akdf0[mask], dry_run=dry_run, archive_overruns=archive_overruns)
+
+    return akdf0
 # --------------------------------------------------------
 _include_statuses = {JobStatus.NOINPUT, JobStatus.INCOMPLETE, JobStatus.TODO, JobStatus.INPROCESS, JobStatus.OVERRUN, JobStatus.FAILED}
 def print_job_statuses(akdf0):
@@ -468,11 +467,6 @@ def add_combo_status(akdf0, realized=True, update=True, archive_overruns=False, 
         # (which presumably have fixed overrun problems)
         iddf1 = overrun.drop_duplicates(iddf1)
 
-        if update:
-            # Archive avalanches that have finished
-            mask = (iddf1.id_status == JobStatus.FINISHED)
-            archive.archive_ids(expmod, iddf1[mask], dry_run=dry_run, archive_overruns=archive_overruns)
-
         # Aggregate id status back to combo level and add to akdf1
         # (Now we know whether the combo has fully finished)
         combo_status = \
@@ -519,7 +513,7 @@ def add_combo_status(akdf0, realized=True, update=True, archive_overruns=False, 
 # ------------------------------------------------------------
 def add_status(akdf, level, realized=True, update=True, archive_overruns=False, dry_run=False, ignore_statuses={}):
     if level == 'id':
-        akdf = add_id_status(akdf)
+        akdf = add_id_status(akdf, update=update, archive_overruns=archive_overruns)
 
     elif level == 'chunk':
         akdf = add_chunk_status(akdf, realized=realized, update=update, ignore_statuses=ignore_statuses)
