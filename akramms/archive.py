@@ -366,6 +366,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
         rdf = rdf.set_index('Id')
 
         for tup in akdf1.reset_index(drop=True).itertuples(index=False):
+            print(f'archive ', tup)
             inout = file_info.inout_name(jb, tup.chunkid, tup.id)
             out_zip = jb.avalanche_dir / f'{inout}.out.zip'
             out_zip_mtime = os.path.getmtime(out_zip)
