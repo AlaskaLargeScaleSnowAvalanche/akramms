@@ -189,8 +189,6 @@ def parse(args):
         help='Only check avalanches with .in.zip / .out.zip files'),
     argument('--update', action='store_true',
         help='Update markers of completion?'),
-    argument('--overruns', action='store_true',
-        help='If archiving via --update, archive overruns too?'),
     argument('--ignore',
         help="Disregard these status codes when aggregating (comma-separated status codes)"),
     argument('--dry-run', action='store_true',
@@ -206,7 +204,7 @@ def status(args):
 
     parseds = akramms.parse.parse_args(args.spec)
     akdf = resolve.resolve_to(parseds, args.level, realized=False)
-    akdf = joblib.add_status(akdf, args.level, realized=args.realized, update=args.update, archive_overruns=args.overruns, dry_run=args.dry_run, ignore_statuses=ignore_statuses)
+    akdf = joblib.add_status(akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run, ignore_statuses=ignore_statuses)
     joblib.print_status(akdf, args.level)
 # ---------------------------------------------------------------------
 def get_exp_dir(exp_mod):
