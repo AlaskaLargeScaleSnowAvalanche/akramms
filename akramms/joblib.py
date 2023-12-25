@@ -388,7 +388,7 @@ def add_chunk_status(akdf, realized=True, update=True, ignore_statuses={}):
         # Pick up job statuses
         rfdf1 = resolve.resolve_chunk(akdf1, scenetypes={'x'})
         iddf1 = resolve.resolve_id(rfdf1, realized=realized)
-        iddf1 = add_id_status(iddf1)
+        iddf1 = add_id_status(iddf1, update=update)
 
         # Aggregate id status back to releasefile level and add to akdf1
         chunk_status = \
@@ -461,7 +461,7 @@ def add_combo_status(akdf0, realized=True, update=True, archive_overruns=False, 
         # Get jobstatus at id level
         rfdf1 = resolve.resolve_chunk(akdf1)
         iddf1 = resolve.resolve_id(rfdf1, realized=realized)
-        iddf1 = add_id_status(iddf1)
+        iddf1 = add_id_status(iddf1, update=update)
 
         # Replace older avalanches runs with newer runs of the same ID
         # (which presumably have fixed overrun problems)
