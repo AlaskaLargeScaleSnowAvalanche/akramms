@@ -378,6 +378,8 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
             # Avoid archiving overrun files
             with zipfile.ZipFile(out_zip, 'r') as ozip:
                 overrun = is_overrun(ozip)
+            if overrun:
+                print(f'overrun: {out_zip}')
             if (not archive_overruns) and overrun:
                 # print(f'Not archiving overrun: {out_zip}')
                 continue
