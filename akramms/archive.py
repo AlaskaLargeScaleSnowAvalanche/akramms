@@ -465,6 +465,8 @@ def archive_ids(akdf0, debug=False, dry_run=False):
         Resolved to id level.  Also must have id_status set (at least for id_status=OVERRUN)
     """
 
+    print('BEGIN archive_ids')
+
     archived_out_zips = list()
 
     # Only archive avalanches that have finished
