@@ -466,6 +466,11 @@ def archive_ids(expmod, akdf, debug=False, dry_run=False, archive_overruns=False
         Should we archive overrun avalanches?
     """
 
+
+    print('archive_ids: archive_overruns= ' ,archive_overruns)
+
+
+
     # Don't need this column, and it breaks pickle / multiprocessing...
     if 'parsed' in akdf.columns:
         akdf = akdf.drop('parsed', axis=1)
