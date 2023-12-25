@@ -468,7 +468,7 @@ def archive_ids(akdf0, debug=False, dry_run=False):
     archived_out_zips = list()
 
     # Only archive avalanches that have finished
-    mask = (akdf0.id_status == JobStatus.FINISHED)
+    mask = (akdf0.id_status == file_info.JobStatus.FINISHED)
     akdf0 = akdf0[mask]
 
     # Don't need this column, and it breaks pickle / multiprocessing...
