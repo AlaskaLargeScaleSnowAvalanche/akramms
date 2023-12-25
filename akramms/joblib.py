@@ -169,7 +169,7 @@ def is_overrun(out_zip):
 # --------------------------------------------------------------------
 
 _subsceneRE = re.compile(r'x-(\d+-\d+)')
-def add_id_status(akdf0, update=True, archive_overruns=False):
+def add_id_status(akdf0, update=True):
     """Determines status of ALL Condor jobs for a RAMMS run.
     akdf0:
         Avalanche dataframe, resolved to the ID level with scenetype='x' and index='id'
@@ -269,7 +269,7 @@ def add_id_status(akdf0, update=True, archive_overruns=False):
         if update:
             # Archive avalanches that have finished
             mask = (akdf0.id_status == JobStatus.FINISHED)
-            archive.archive_ids(expmod, akdf0[mask], dry_run=dry_run, archive_overruns=archive_overruns)
+            archive.archive_ids(expmod, akdf0[mask], dry_run=dry_run)
 
     return akdf0
 # --------------------------------------------------------
@@ -428,7 +428,7 @@ def agg_status(statuses, ignore_statuses={}):
     return ret
 
 
-def add_combo_status(akdf0, realized=True, update=True, archive_overruns=False, dry_run=False, ignore_statuses={}):
+def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_statuses={}):
     """akdf:
         Resolved to combo level (theoretical, i.e. realized=False)
     """
@@ -511,15 +511,15 @@ def add_combo_status(akdf0, realized=True, update=True, archive_overruns=False, 
 
     return pd.concat(dfs)
 # ------------------------------------------------------------
-def add_status(akdf, level, realized=True, update=True, archive_overruns=False, dry_run=False, ignore_statuses={}):
+def add_status(akdf, level, realized=True, update=True, dry_run=False, ignore_statuses={}):
     if level == 'id':
-        akdf = add_id_status(akdf, update=update, archive_overruns=archive_overruns)
+        akdf = add_id_status(akdf, update=update)
 
     elif level == 'chunk':
         akdf = add_chunk_status(akdf, realized=realized, update=update, ignore_statuses=ignore_statuses)
 
     elif level == 'combo':
-        akdf = add_combo_status(akdf, realized=realized, update=update, archive_overruns=archive_overruns, dry_run=dry_run, ignore_statuses=ignore_statuses)
+        akdf = add_combo_status(akdf, realized=realized, update=update, dry_run=dry_run, ignore_statuses=ignore_statuses)
 
     return akdf
 

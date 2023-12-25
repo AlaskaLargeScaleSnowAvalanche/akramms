@@ -340,7 +340,7 @@ def ramms_to_nc0(out_zip, ncout):
 
 
 # ----------------------------------------------------------
-def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=False, archive_overruns=False):
+def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=False):
     """Archives a bunch of work on a single thread
     akdf0:
         Must contain cols: exp, combo, releasefile, chunkid, ic
@@ -382,9 +382,6 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
             overrun = (tup.id_status == file_info.JobStatus.OVERRUN)
             if overrun:
                 print(f'overrun: {out_zip}')
-            if (not archive_overruns) and overrun:
-                # print(f'Not archiving overrun: {out_zip}')
-                continue
 
             # Determine if the avalanche was already archived
             Overrun = 'overrun' if overrun else ''
@@ -462,17 +459,11 @@ def _git_commit(dir):
     return proc.stdout.readline().strip()    # We just want head -1
 
 # -----------------------------------------------------------------
-def archive_ids(expmod, akdf, debug=False, dry_run=False, archive_overruns=False):
+def archive_ids(expmod, akdf, debug=False, dry_run=False):
     """Archives in multi-thread
     akdf:
         Resolved to id level.  Also must have id_status set (at least for id_status=OVERRUN)
-    archive_overruns:
-        Should we archive overrun avalanches?
     """
-
-
-    print('archive_ids: archive_overruns= ' ,archive_overruns)
-
 
 
     # Don't need this column, and it breaks pickle / multiprocessing...
@@ -498,13 +489,11 @@ def archive_ids(expmod, akdf, debug=False, dry_run=False, archive_overruns=False
 
         futures = [ex.submit(_archive_single_threaded,
             akdfs[0], status_attrs,
-            print_output=True, dry_run=dry_run,
-            archive_overruns=archive_overruns)]
+            print_output=True, dry_run=dry_run)]
 
         futures += [ex.submit(_archive_single_threaded,
             akdf, status_attrs,
-            print_output=False, dry_run=dry_run,
-            archive_overruns=archive_overruns)
+            print_output=False, dry_run=dry_run)
             for akdf in akdfs[1:]]
 
         for future in futures:
