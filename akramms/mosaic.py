@@ -36,8 +36,6 @@ def read_reldom(akdf0, tdir):
         reldf = df.merge(reldf, how='left', left_on='id', right_on='Id')
         reldf = reldf.drop('id', axis=1)
         reldf['pra_size'] = reldf['pra_size'].astype('string')
-        print('ddddddddddddddddddddddddtype ', reldf.pra_size.dtype)
-        print(reldf[reldf.pra_size.isna()])
         reldfs.append(reldf)
 
         domdf = df.merge(domdf, how='left', left_on='id', right_on='Id')
@@ -182,7 +180,8 @@ def mosaic_avals(gridM, akdf, ofname_zip, tdir,
         for cname in reldf.columns:
             print(f"{cname}: {reldf[cname].dtype}")
         shputil.write_df(reldf, 'pra', 'Polygon', dir / 'rel.shp', wkt=gridM.wkt)
-        ozip_write(ozip, dir / 'rel.shp')
+        for ext in ('shp','dbf','shx','prj'):
+            ozip_write(ozip, dir / f'rel.{ext}')
 
         #reldf = archive.read_reldom(arcdir, 'dom')
         shputil.write_df(domdf, 'dom', 'Polygon', dir / 'dom.shp', wkt=gridM.wkt)
