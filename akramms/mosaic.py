@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from osgeo import gdal
 import zipfile,netCDF4
-from uafgi.util import gdalutil,cfutil
+from uafgi.util import gdalutil,cfutil,shputil
 from akramms import experiment,archive
 import _mosaic
 
