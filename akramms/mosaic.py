@@ -131,6 +131,7 @@ def mosaic_avals(gridM, akdf, ofname_zip, tdir,
 
 #    for aval_i,fname in enumerate(avals):
     for tup in akdf.itertuples(index=False):
+        arcdir = tup.releasefile
         if not os.path.isfile(tup.avalfile):
             print(f'Missing avalanche file: {tup.avalfile}')
             continue
@@ -169,11 +170,11 @@ def mosaic_avals(gridM, akdf, ofname_zip, tdir,
         box_poly = gridM.bounding_box
 
         # Shapefiles
-        reldf = archive.read_reldom(akdf, 'rel')
+        reldf = archive.read_reldom(arcdir, 'rel')
         shputil.write_df(reldf, 'pra', 'Polygon', dir / 'rel.shp', wkt=gridM.wkt)
         ozip_write(ozip, dir / 'rel.shp')
 
-        reldf = archive.read_reldom(akdf, 'dom')
+        reldf = archive.read_reldom(arcdir, 'dom')
         shputil.write_df(domdf, 'dom', 'Polygon', dir / 'dom.shp', wkt=gridM.wkt)
         ozip_write(ozip, dir / 'dom.shp')
 
