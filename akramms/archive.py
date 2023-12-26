@@ -557,6 +557,7 @@ def read_reldom(arcdir, ext, **kwargs):
     dfs = list()
     restr = rf'^(.*)_{ext}\.shp$'
     print('restr ', restr)
+    print('arcdir ', arcdir)
     fileRE = re.compile(restr)
     with zipfile.ZipFile(arcdir / 'RELEASE.zip') as izip:
         for info in izip.infolist():
