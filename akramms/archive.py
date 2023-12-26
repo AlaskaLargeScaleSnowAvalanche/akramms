@@ -574,6 +574,7 @@ def read_reldom(arcdir, ext, tdir, **kwargs):
         print('fname ', fname)
         df = shputil.read_df(fname, **kwargs)
         dfs.append(df)
+    print('dfs ', dfs)
     return pd.concat(dfs)
 
 
