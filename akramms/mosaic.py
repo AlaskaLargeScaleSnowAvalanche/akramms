@@ -177,7 +177,7 @@ def mosaic_avals(gridM, akdf, ofname_zip, tdir,
         print('xxxxxxxxxx reldf ', reldf.columns)
         print(reldf[['pra_size']])
         for cname in reldf.columns:
-            print(f"{cname}: {reldf.cname.dtype}")
+            print(f"{cname}: {reldf[cname].dtype}")
         shputil.write_df(reldf, 'pra', 'Polygon', dir / 'rel.shp', wkt=gridM.wkt)
         ozip_write(ozip, dir / 'rel.shp')
 
