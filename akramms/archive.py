@@ -365,7 +365,6 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
         # info into the NetCDF file.
         rdf = shputil.read_df(releasefile, read_shapes=False)
         rdf = rdf.set_index('Id')
-        rdf['pra_size'] = rdf['pra_size'].astype(str)
 
         for tup in akdf1.reset_index(drop=True).itertuples(index=False):
             if tup.id == 6570:
@@ -574,6 +573,7 @@ def read_reldom(arcdir_zip, ext, tdir, **kwargs):
     for fname in fnames:
         print('fname ', fname)
         df = shputil.read_df(fname, **kwargs)
+        rdf['pra_size'] = rdf['pra_size'].astype(str)
         dfs.append(df)
 
     return pd.concat(dfs)
