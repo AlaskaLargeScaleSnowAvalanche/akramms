@@ -564,7 +564,8 @@ def read_reldom(arcdir, ext, **kwargs):
             match = fileRE.match(info.filename)
             print('xxxxxxxxx ', info.filename, match)
             if match is not None:
-                fname = f'/vsizip{arcdir}/RELEASE.zip/{info.filename}'
+                fname = f'/vsizip/{arcdir}/RELEASE.zip/{info.filename}'
+                print('fname ', fname)
                 df = shputil.read_df(fname, **kwargs)
                 dfs.append(df)
     return pd.concat(dfs)
