@@ -185,7 +185,8 @@ def mosaic_avals(gridM, akdf, ofname_zip, tdir,
 
         #reldf = archive.read_reldom(arcdir, 'dom')
         shputil.write_df(domdf, 'dom', 'Polygon', dir / 'dom.shp', wkt=gridM.wkt)
-        ozip_write(ozip, dir / 'dom.shp')
+        for ext in ('shp','dbf','shx','prj'):
+            ozip_write(ozip, dir / f'dom.{ext}')
 
 
         # Other variables
