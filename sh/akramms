@@ -606,6 +606,10 @@ def _parse_statuses(sstat):
         help="Designation of extent of final mosiac: tile, aval, <listed in experiment>, or coordinates"),
     argument('--margin', '-m', type=int, required=False,
         help="Margin to add to extent [m]"),
+    argument('--dem', action='store_true',
+        help="Include original DEM in the output?"),
+    argument('--landcover', action='store_true',
+        help="Include original landcover in the output?"),
     argument('--dry-run', action='store_true',
         help="Don't actually do the work"),
 ])
@@ -658,9 +662,13 @@ def xmosaic(args):
     if not ofname.endswith('.zip'):
         raise ValueError('--output must specify a .zip file')
 
-
+    kwargs = dict()
+    if args.dem:
+        kwargs['dem_fn'] = expmod.extract_dem
+    if args.landcover:
+        kwargs['landcover_fn'] = expmod.extract_landcover
     with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
-        mosaic.mosaic_avals(gridM, akdf.avalfile.tolist(), args.output, tdir)
+        mosaic.mosaic_avals(gridM, akdf.avalfile.tolist(), args.output, tdir, **kwargs)
 
 
 #Ways to choose the extent:
