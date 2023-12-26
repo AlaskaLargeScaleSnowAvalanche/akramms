@@ -467,6 +467,7 @@ def archive_ids(akdf0, debug=False, dry_run=False):
     """
 
     print('BEGIN archive_ids')
+    raise ValueError(17)
 
     archived_out_zips = list()
 
