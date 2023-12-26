@@ -150,17 +150,18 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
         # Land Cover
         if landcover_fn is not None:
             ofn = os.path.join(tdir.location, 'landcover.tif')
-            landcover_fn(box_poly, os.path.join(tdir.location, 'landcover.tif'))
+            landcover_fn(box_poly, ofn)
             ozip_write(ozip, ofn)
             ozip_write(ozip, os.path.join(tdir.location, 'landcover.tif.aux.xml'))
             ozip_write(ozip, os.path.join(tdir.location, 'landcover.tfw'))
 
         # DEM
+        dir = tdir.location
         if dem_fn is not None:
-            ofn = os.path.join(tdir.location, 'dem.tif')
-            dem_fn(box_poly, ofn)
-            ozip_write(ozip, ofn)
-            ozip_write(ozip, os.path.join(tdir.location, 'dem.tfw'))
+            dem_fn(box_poly, dir / 'dem0.tif')
+            gdal.Warp(dir / 'dem.tif', dir / 'dem0.tif', xRes=30, yRes=30)
+            ozip_write(ozip, dir / 'dem.tif')
+            ozip_write(ozip, os.path.join(dir, 'dem.tfw'))
 
     # TODO: Create a RELEASE file, for avalanches with aspecs
 
