@@ -298,7 +298,7 @@ def resolve_id(akdf, realized=True, stage='out', status_col=False):
         # Add those IDs
         if realized:
             # Match releasefile against what's on disk
-            avalfiles = _realized_ids(tup.scenetype, tup.releasefile, stage, include_overruns=include_overruns)
+            avalfiles = _realized_ids(tup.scenetype, tup.releasefile, stage)
 #            print('avalfiles ', avalfiles)
 
             if ids is None:    # Archive-type directory, no releasefile
