@@ -555,7 +555,7 @@ def read_reldom(arcdir, ext, **kwargs):
         Name to call final shape column
     """
     dfs = list()
-    restr = rf'$(.*)_{ext}\.shp^'
+    restr = rf'^(.*)_{ext}\.shp$'
     print('restr ', restr)
     fileRE = re.compile(restr)
     with zipfile.ZipFile(arcdir / 'RELEASE.zip') as izip:
