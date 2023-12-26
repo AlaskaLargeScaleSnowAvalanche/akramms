@@ -2,6 +2,7 @@ import os,re,itertools,struct,pickle,zipfile,io,shutil
 import contextlib,sys,datetime,subprocess
 import concurrent.futures
 import numpy as np
+import pandas as pd
 import netCDF4
 import pyproj
 from uafgi.util import gdalutil,shputil,ncutil
