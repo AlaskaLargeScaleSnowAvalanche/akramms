@@ -266,8 +266,11 @@ def add_id_status(akdf0, update=True, dry_run=False):
 
     akdf0 = akdf0.merge(df.reset_index(drop=True), how='left', left_on=['combo', 'chunkid', 'id'], right_on=['combo', 'chunkid', 'id'])
 
-    if update:
-        archive.archive_ids(akdf0, dry_run=dry_run)
+    print('xxxxxxxxxxxxxxx 6570')
+    print(akdf0[akdf0.id==6570])
+    
+#    if update:
+#        archive.archive_ids(akdf0, dry_run=dry_run)
 
     return akdf0
 # --------------------------------------------------------
