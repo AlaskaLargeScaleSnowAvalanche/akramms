@@ -473,7 +473,7 @@ def archive_ids(akdf0, debug=False, dry_run=False):
     archived_out_zips = list()
 
     # Only archive avalanches that have finished running
-    mask = (akdf0.id_status.isin([file_info.JobStatus.FINISHED, file_info.JobStatus.OVERRUN])
+    mask = akdf0.id_status.isin([file_info.JobStatus.FINISHED, file_info.JobStatus.OVERRUN])
     akdf0 = akdf0[mask]
 
     # Don't need this column, and it breaks pickle / multiprocessing...
