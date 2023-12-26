@@ -557,9 +557,9 @@ def read_reldom(arcdir, ext, **kwargs):
     fileRE = re.compile(r'$(.*)_{ext}\.shp')
     with zipfile.ZipFile(arcdir / 'RELEASE.zip') as izip:
         for info in izip.infolist():
-            match = fileRE.match(info.name)
+            match = fileRE.match(info.filename)
             if match is not None:
-                fname = f'/vsizip/{arcdir}/RELEASE.zip/{info.name}'
+                fname = f'/vsizip/{arcdir}/RELEASE.zip/{info.filename}'
                 df = shputil.read_df(fname, **kwargs)
                 dfs.append(df)
     return pd.concat(dfs)
