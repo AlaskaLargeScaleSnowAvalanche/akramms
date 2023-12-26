@@ -30,7 +30,7 @@ def read_reldom(akdf0, tdir):
         domdf = archive.read_reldom(arcdir/'DOMAIN.zip', 'dom', tdir, shape='dom')
 
         # Filter down to just what we need
-        df = akdf1['id']
+        df = akdf1[['id']]
 
         reldf = df.join(reldf, how='left', left_on='id', right_on='Id')
         reldf = reldf.drop('id', axis=1)
