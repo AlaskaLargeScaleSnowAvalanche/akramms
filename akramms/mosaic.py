@@ -159,7 +159,7 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
         dir = pathlib.Path(tdir.location)
         if dem_fn is not None:
             dem_fn(box_poly, dir / 'dem0.tif')
-            gdal.Warp(dir / 'dem.tif', dir / 'dem0.tif', xRes=30, yRes=30)
+            gdal.Warp(str(dir / 'dem.tif'), str(dir / 'dem0.tif'), xRes=30, yRes=30)
             ozip_write(ozip, dir / 'dem.tif')
             ozip_write(ozip, os.path.join(dir, 'dem.tfw'))
 
