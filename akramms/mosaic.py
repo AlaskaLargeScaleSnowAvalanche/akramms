@@ -26,8 +26,8 @@ def read_reldom(akdf0, tdir):
     domdfs = list()
     for arcdir,akdf1 in akdf0.groupby('releasefile'):
         # Read all _rel / _dom data in the archive dir
-        reldf = archive.read_reldom(arcdir, 'rel', tdir, shape='pra')
-        domdf = archive.read_reldom(arcdir, 'dom', tdir, shape='dom')
+        reldf = archive.read_reldom(arcdir/'RELEASE.zip', 'rel', tdir, shape='pra')
+        domdf = archive.read_reldom(arcdir/'DOMAIN.zip', 'dom', tdir, shape='dom')
 
         # Filter down to just what we need
         df = akdf1['id']

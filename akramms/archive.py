@@ -540,7 +540,7 @@ def finish_combo(expmod, combo, dry_run=False):
 
 
 # ----------------------------------------------------------
-def read_reldom(arcdir, ext, tdir, **kwargs):
+def read_reldom(arcdir_zip, ext, tdir, **kwargs):
     """Reads all _rel/_dom files in an archive directory
     ext: 'rel' or 'dom' or 'chull'
 
@@ -559,7 +559,7 @@ def read_reldom(arcdir, ext, tdir, **kwargs):
     restr = rf'^(.*)_{ext}\.(...)$'
     fnames = list()     # *.shp files to read
     fileRE = re.compile(restr)
-    with zipfile.ZipFile(arcdir / 'RELEASE.zip') as izip:
+    with zipfile.ZipFile(arcdir_zip) as izip:
         for info in izip.infolist():
             match = fileRE.match(info.filename)
             if match is not None:
@@ -574,7 +574,7 @@ def read_reldom(arcdir, ext, tdir, **kwargs):
         print('fname ', fname)
         df = shputil.read_df(fname, **kwargs)
         dfs.append(df)
-    print('dfs ', dfs)
+
     return pd.concat(dfs)
 
 
