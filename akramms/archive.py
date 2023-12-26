@@ -575,10 +575,6 @@ def read_reldom(arcdir_zip, ext, tdir, **kwargs):
         df = shputil.read_df(fname, **kwargs)
         dfs.append(df)
 
-    if ext == 'rel':
-        df['pra_size'] = df['pra_size'].astype(str)
-
-
     return pd.concat(dfs)
 
 

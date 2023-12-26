@@ -35,6 +35,8 @@ def read_reldom(akdf0, tdir):
 
         reldf = df.merge(reldf, how='left', left_on='id', right_on='Id')
         reldf = reldf.drop('id', axis=1)
+        reldf['pra_size'] = reldf['pra_size'].astype(str)
+        print('ddddddddddddddddddddddddtype ', reldf.pra_size.dtype
         reldfs.append(reldf)
 
         domdf = df.merge(domdf, how='left', left_on='id', right_on='Id')
