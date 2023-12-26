@@ -377,6 +377,8 @@ def locks(args):
 @subcommand([
     argument('-j', type=int,
         help='Degree of parallelism to use'),
+    argument('--step', type=int, default=999,
+        help='Run through this step number'),
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
 def run(args):
@@ -387,12 +389,13 @@ def run(args):
     from akramms import r_prepare,r_ecog,r_pra_post
 
     # ------------
-    # Make sure the domain finder C++ code is compiled. (needed for RAMMS Stage 1)
-    setup_py = os.path.join(harnutil.HARNESS, 'akramms', 'setup.py')
-    prefix = os.path.join(harnutil.HARNESS, 'akramms', 'inst')
-    cmd = ['install', '--prefix', prefix]
-    print('setup.py ', cmd)
-    setuptools.sandbox.run_setup(setup_py, cmd)
+    if args.step >= 3:
+        # Make sure the domain finder C++ code is compiled. (needed for RAMMS Stage 1)
+        setup_py = os.path.join(harnutil.HARNESS, 'akramms', 'setup.py')
+        prefix = os.path.join(harnutil.HARNESS, 'akramms', 'inst')
+        cmd = ['install', '--prefix', prefix]
+        print('setup.py ', cmd)
+        setuptools.sandbox.run_setup(setup_py, cmd)
     # ------------
 
     parseds = akramms.parse.parse_args(args.spec)
@@ -412,6 +415,9 @@ def run(args):
         if not all(os.path.isfile(x) for x in rule.outputs):
             rule()
         # -------------------------------
+
+        if args.step <= 1:
+            continue
 
         # Run make on chunks a few rows at a time
         combo_chunk_size = config.setup_ncpu    # maybe *2
@@ -433,13 +439,15 @@ def run(args):
                 # Add the experiment and combos
                 # This calls through to r_prepare.prepare_scene_rule()
                 cinfo, scene_args = expmod.add_combo(makefile, combo)    # file_info.ComboInfo
-                #continue    # DEBUG
 
+                if args.step <= 2:
+                    continue
 
                 scene_dir = pathlib.Path(cinfo.scene_dir).resolve()
                 scene_args['scene_dir'] = scene_dir
                 add_combo_outputs = [os.path.join(scene_dir, 'scene.nc'), cinfo.dem_file, cinfo.landcover_file, cinfo.forest_file, cinfo.snow_file]
-                # -------------------- Step 3
+
+                # -------------------- Step 3-6
                 # (a) ArcGIS prep
                 # (b) eCognition
                 # (c) PRA-Post ArcGIS script
@@ -449,9 +457,14 @@ def run(args):
 
                 # Run ArcGIS script + companion code to prepare files for eCognition
                 prepare1_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(scene_dir, scene_args)).outputs
+                if args.step <= 3:
+                    continue
+
                 prepare2_outputs = makefile.add(
                     r_prepare.data_prep_PRA2_rule(scene_dir, scene_args, prepare1_outputs)).outputs
-                print('Number rules ', len(makefile.rule_list))
+                #print('Number rules ', len(makefile.rule_list))
+                if args.step <= 4:
+                    continue
 
 
                 # Obtain name of neighbor1 graph file for DEM routing network
@@ -461,12 +474,17 @@ def run(args):
 
                 # Run eCognition
                 makefile.add(r_ecog.rule(scene_dir, scene_args, prepare2_outputs, combo.return_period, combo.forest))
+                if args.step <= 5:
+                    continue
 
                 # Post-Process eCognition Output (the pra_file)
                 # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
                 makefile.add(r_pra_post.pra_post_rule(
                     scene_dir, scene_args, dem_filled_file, combo.return_period,
                     combo.forest, cinfo.snow_file))
+
+                if args.step <= 6:
+                    continue
 
                 # and also split into chunks.
                 ramms1_inputs = list()
@@ -475,9 +493,15 @@ def run(args):
                         scene_dir, scene_args, combo.forest, expmod.resolution,
                         combo.return_period, pra_size)).outputs
 
+                if args.step <= 7:
+                    continue
+
                 # Run RAMMS Stage 1 (main chunks, no overruns)
                 makefile.add(r_ramms1.combo_rule(
                     scene_dir, scene_args['dem_file'], ramms1_inputs, submit=config.auto_submit))
+
+                if args.step <= 8:
+                    continue
 
             ncpu = config.setup_ncpu if args.j is None else args.j
             makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=ncpu)

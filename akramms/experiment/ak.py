@@ -168,15 +168,18 @@ def add_combo(makefile, combo):
 
 
 # -------------------------------------------------------------
+def all_domains():
+    domains_margin_shp = os.path.join(dir, 'domains_margin.shp')
+    domains_df = shputil.read_df(domains_margin_shp).setindex(['ix', 'iy'])
+    domains_ij = [(row.i,row.j) for row in domains_df.iterrows()]
+    return domains_ij
+
 # Different subsets of combos to try when running the experiment
 def full():
     """Yields the combos for the FULL experiment.
     REQUIRES: domains.shp and domains_margin.shp
     """
-
-    domains_margin_shp = os.path.join(dir, 'domains_margin.shp')
-    domains_df = shputil.read_df(domains_margin_shp).setindex(['ix', 'iy'])
-    domains_ij = [(row.i,row.j) for row in domains_df.iterrows()]
+    domains_ij = all_domains()
 
     # Generate set of trials
     snow = 'ccsm'
