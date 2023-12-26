@@ -420,7 +420,8 @@ def run(args):
             continue
 
         # Run make on chunks a few rows at a time
-        combo_chunk_size = config.setup_ncpu    # maybe *2
+        ncpu = config.setup_ncpu if args.j is None else args.j
+        combo_chunk_size = ncpu * 2 # config.setup_ncpu    # maybe *2
         nrows = len(akdf1)
         cchunk_bounds = list(range(0, nrows, combo_chunk_size)) + [nrows]
 
@@ -503,7 +504,6 @@ def run(args):
                 if args.step <= 8:
                     continue
 
-            ncpu = config.setup_ncpu if args.j is None else args.j
 #            print(f'ncpu = {ncpu}')
             makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=ncpu)
 
