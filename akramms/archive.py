@@ -573,8 +573,11 @@ def read_reldom(arcdir_zip, ext, tdir, **kwargs):
     for fname in fnames:
         print('fname ', fname)
         df = shputil.read_df(fname, **kwargs)
-        df['pra_size'] = df['pra_size'].astype(str)
         dfs.append(df)
+
+    if ext == 'rel':
+        df['pra_size'] = df['pra_size'].astype(str)
+
 
     return pd.concat(dfs)
 
