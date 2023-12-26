@@ -2,7 +2,7 @@ import os,collections,re,itertools,functools
 import netCDF4
 import pandas as pd
 from uafgi.util import shputil
-from akramms import archive,avalparse,avalfilter,parse,resolve
+from akramms import archive,avalparse,avalfilter,parse,resolve,file_info
 from akramms.util import exputil
 
 # =======================================================================
