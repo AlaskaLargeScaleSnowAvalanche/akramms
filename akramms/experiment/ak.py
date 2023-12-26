@@ -172,7 +172,7 @@ def all_domains():
     domains_margin_shp = os.path.join(dir, 'ak_domains_margin.shp')
     domains_df = shputil.read_df(domains_margin_shp)
     domains_df = domains_df.set_index(['idom', 'jdom'])
-    domains_ij = [(row.idom,row.jdom) for row in domains_df.iterrows()]
+    domains_ij = [(row.idom, row.jdom) for row in domains_df.itertuples(index=False)]
     return domains_ij
 
 # Different subsets of combos to try when running the experiment
