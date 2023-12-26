@@ -169,9 +169,11 @@ def mosaic_avals(gridM, akdf, ofname_zip, tdir,
         box_poly = gridM.bounding_box
 
         # Shapefiles
-        reldf,domdf = archive.read_reldom(akdf)
+        reldf = archive.read_reldom(akdf, 'rel')
         shputil.write_df(reldf, 'pra', 'Polygon', dir / 'rel.shp', wkt=gridM.wkt)
         ozip_write(ozip, dir / 'rel.shp')
+
+        reldf = archive.read_reldom(akdf, 'dom')
         shputil.write_df(domdf, 'dom', 'Polygon', dir / 'dom.shp', wkt=gridM.wkt)
         ozip_write(ozip, dir / 'dom.shp')
 
