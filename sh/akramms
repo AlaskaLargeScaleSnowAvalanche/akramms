@@ -667,6 +667,9 @@ def xmosaic(args):
         kwargs['dem_fn'] = expmod.extract_dem
     if args.landcover:
         kwargs['landcover_fn'] = expmod.extract_landcover
+    print(akdf)
+    return
+
     with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
         mosaic.mosaic_avals(gridM, akdf.avalfile.tolist(), args.output, tdir, **kwargs)
 
