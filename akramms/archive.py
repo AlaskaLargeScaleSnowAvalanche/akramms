@@ -540,7 +540,7 @@ def finish_combo(expmod, combo, dry_run=False):
 
 
 # ----------------------------------------------------------
-def read_reldom(arcdir, ext, **kwargs):
+def read_reldom(arcdir, ext, tdir, **kwargs):
     """Reads all _rel/_dom files in an archive directory
     ext: 'rel' or 'dom' or 'chull'
 
@@ -555,16 +555,21 @@ def read_reldom(arcdir, ext, **kwargs):
         Name to call final shape column
     """
     dfs = list()
-    restr = rf'^(.*)_{ext}\.shp$'
-    print('restr ', restr)
-    print('arcdir ', arcdir)
+#    restr = rf'^(.*)_{ext}\.(...)$'
+#    print('restr ', restr)
+#    print('arcdir ', arcdir)
     fileRE = re.compile(restr)
     with zipfile.ZipFile(arcdir / 'RELEASE.zip') as izip:
         for info in izip.infolist():
             match = fileRE.match(info.filename)
-            print('xxxxxxxxx ', info.filename, match)
             if match is not None:
-                fname = f'/vsizip/{arcdir}/RELEASE.zip/{info.filename}'
+                izip.extract(info, path=tdir.location)
+                fname = os.path.join(tdir.location, info.filename)
+
+#            print('xxxxxxxxx ', info.filename, match)
+#            if match is not None:
+#                # Doesn't work because shputil.read() doesn't use GDAL
+#                # fname = f'/vsizip/{arcdir}/RELEASE.zip/{info.filename}'
                 print('fname ', fname)
                 df = shputil.read_df(fname, **kwargs)
                 dfs.append(df)

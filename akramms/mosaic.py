@@ -12,7 +12,7 @@ import _mosaic
 # ===================================================================
 
 # ----------------------------------------------------------
-def read_reldom(akdf0):
+def read_reldom(akdf0, tdir):
     """
     akdf0:
         Avalanches (in scenetype='arc') to mosiac
@@ -22,13 +22,12 @@ def read_reldom(akdf0):
         Dataframes with columns as read from _rel and _dom shapefiles.
         Rows same as akdf0
     """
-
     reldfs = list()
     domdfs = list()
     for arcdir,akdf1 in akdf0.gropuby('releasefile'):
         # Read all _rel / _dom data in the archive dir
-        reldf = archive.read_reldom(arcdir, 'rel', shape='pra')
-        domdf = archive.read_reldom(arcdir, 'dom', shape='dom')
+        reldf = archive.read_reldom(arcdir, 'rel', tdir, shape='pra')
+        domdf = archive.read_reldom(arcdir, 'dom', tdir, shape='dom')
 
         # Filter down to just what we need
         df = akdf1['id']
@@ -169,12 +168,15 @@ def mosaic_avals(gridM, akdf, ofname_zip, tdir,
 
         box_poly = gridM.bounding_box
 
+
+
         # Shapefiles
-        reldf = archive.read_reldom(arcdir, 'rel')
+        reldf, domdf = read_reldom(akdf, tdir)
+        #reldf = read_reldom(arcdir, 'rel')
         shputil.write_df(reldf, 'pra', 'Polygon', dir / 'rel.shp', wkt=gridM.wkt)
         ozip_write(ozip, dir / 'rel.shp')
 
-        reldf = archive.read_reldom(arcdir, 'dom')
+        #reldf = archive.read_reldom(arcdir, 'dom')
         shputil.write_df(domdf, 'dom', 'Polygon', dir / 'dom.shp', wkt=gridM.wkt)
         ozip_write(ozip, dir / 'dom.shp')
 
