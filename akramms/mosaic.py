@@ -24,7 +24,7 @@ def read_reldom(akdf0, tdir):
     """
     reldfs = list()
     domdfs = list()
-    for arcdir,akdf1 in akdf0.gropuby('releasefile'):
+    for arcdir,akdf1 in akdf0.groupby('releasefile'):
         # Read all _rel / _dom data in the archive dir
         reldf = archive.read_reldom(arcdir, 'rel', tdir, shape='pra')
         domdf = archive.read_reldom(arcdir, 'dom', tdir, shape='dom')
