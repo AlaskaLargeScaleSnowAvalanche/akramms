@@ -539,6 +539,31 @@ def finish_combo(expmod, combo, dry_run=False):
 
 
 # ----------------------------------------------------------
+def read_reldom(arcdir, ext, **kwargs):
+    """Reads all _rel/_dom files in an archive directory
+    ext: 'rel' or 'dom' or 'chull'
+
+    read_shapes:
+        Should the acutal shapes be read?  Or just the metadata?
+    wkt:
+        Projection (CRS) to use, overrides one in shapefile
+    shape0:
+        Name to call the "shape0" columns when all is said and done
+        (i.e. the original shape, before it was reprojected)
+    shape:
+        Name to call final shape column
+    """
+    dfs = list()
+    fileRE = re.compile(r'$(.*)_{ext}\.shp')
+    with zipfile.ZipFile(arcdir / 'RELEASE.zip') as izip:
+        for info in izip.infolist():
+            match = fileRE.match(info.name)
+            if match is not None:
+                fname = f'/vsizip/{arcdir}/RELEASE.zip/{info.name}'
+                df = shputil.read_df(fname, **kwargs)
+                dfs.append(df)
+    return pd.concat(dfs)
+# ----------------------------------------------------------
 #def archive_combos(akdf_combo, debug=False, dry_run=False, archive_overruns=False):
 #    """
 #    akdf:

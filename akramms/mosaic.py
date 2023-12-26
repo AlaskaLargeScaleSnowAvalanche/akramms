@@ -11,6 +11,41 @@ import _mosaic
 
 # ===================================================================
 
+# ----------------------------------------------------------
+def read_reldom(akdf0):
+    """
+    akdf0:
+        Avalanches (in scenetype='arc') to mosiac
+        Resolved to the id level
+        Must contain columns: releasefile (actually arcdir), avalfile, id
+    returns: reldf, domdf
+        Dataframes with columns as read from _rel and _dom shapefiles.
+        Rows same as akdf0
+    """
+
+    reldfs = list()
+    domdfs = list()
+    for arcdir,akdf1 in akdf0.gropuby('releasefile'):
+        # Read all _rel / _dom data in the archive dir
+        reldf = archive.read_reldom(arcdir, 'rel', shape='pra')
+        domdf = archive.read_reldom(arcdir, 'dom', shape='dom')
+
+        # Filter down to just what we need
+        df = akdf1['id']
+
+        reldf = df.join(reldf, how='left', left_on='id', right_on='Id')
+        reldf = reldf.drop('id', axis=1)
+        reldfs.append(reldf)
+
+        domdf = df.join(domdf, how='left', left_on='id', right_on='Id')
+        domdf = domdf.drop('id', axis=1)
+        domdfs.append(domdf)
+
+    reldf = pd.concat(reldfs)
+    domdf = pd.concat(domdfs)
+
+    return reldf, domdf
+# ----------------------------------------------------------
 _mosaic_metadata = {
     'dem': (gdal.GDT_Float32, {
         'description': 'IFSAR Digital elevation model',
@@ -53,7 +88,7 @@ def ozip_write(ozip, fname):
     """Writes with truncated arcname"""
     ozip.write(fname, arcname=os.path.split(fname)[1])
 
-def mosaic_avals(gridM, avals, ofname_zip, tdir,
+def mosaic_avals(gridM, akdf, ofname_zip, tdir,
     rho=300, vars=_mosaic_keys,
     dem_fn=None, landcover_fn=None):
 
@@ -63,6 +98,10 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
         Sub-grid (of global gridG) defining the extent of our mosaic domain
     avals:
         Generator of NetDCDF avalanche filenames to mosaic
+    akdf:
+        Avalanches (in scenetype='arc') to mosiac
+        Resolved to the id level
+        Must contain columns: releasefile (actually arcdir), avalfile, id
     ofname_zip:
         Name of output .zip filename where mutlipe geoTIFFs will be stored
     tdir:
@@ -78,6 +117,7 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
         Typically taken from exp_mod
         Include these if you want DEM and landcover files added to the output.
     """
+    dir = pathlib.Path(tdir.location)
     vars_set = set(vars)
 
     shapeM = (gridM.ny, gridM.nx)
@@ -89,13 +129,14 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
         domain_count=np.zeros(shapeM, dtype='i2'),
         avalanche_count=np.zeros(shapeM, dtype='i2'))
 
-    for aval_i,fname in enumerate(avals):
-        if not os.path.isfile(fname):
-            print(f'Missing avalanche file: {fname}')
+#    for aval_i,fname in enumerate(avals):
+    for tup in akdf.itertuples(index=False):
+        if not os.path.isfile(tup.avalfile):
+            print(f'Missing avalanche file: {tup.avalfile}')
             continue
 
-        print(f'mosaic: {fname}')
-        with netCDF4.Dataset(fname) as nc:
+        print(f'mosaic: {tup.avalfile}')
+        with netCDF4.Dataset(tup.avalfile) as nc:
             nc.set_always_mask(False)
 
             # "gridA" = Avalanche's local grid (it will be one of the subdomains), WITH MARGIN
@@ -127,6 +168,13 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
 
         box_poly = gridM.bounding_box
 
+        # Shapefiles
+        reldf,domdf = archive.read_reldom(akdf)
+        shputil.write_df(reldf, 'pra', 'Polygon', dir / 'rel.shp', wkt=gridM.wkt)
+        ozip_write(ozip, dir / 'rel.shp')
+        shputil.write_df(domdf, 'dom', 'Polygon', dir / 'dom.shp', wkt=gridM.wkt)
+        ozip_write(ozip, dir / 'dom.shp')
+
 
         # Other variables
 #        print('vars ', vars)
@@ -156,7 +204,6 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
             ozip_write(ozip, os.path.join(tdir.location, 'landcover.tfw'))
 
         # DEM
-        dir = pathlib.Path(tdir.location)
         if dem_fn is not None:
             dem_fn(box_poly, dir / 'dem0.tif')
             gdal.Warp(str(dir / 'dem.tif'), str(dir / 'dem0.tif'), xRes=30, yRes=30)
