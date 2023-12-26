@@ -148,7 +148,7 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
 
         # These are last so they appear as lower layers in QGIS
         # Land Cover
-        if 'landcover' in vars_set:
+        if landcover_fn is not None:
             ofn = os.path.join(tdir.location, 'landcover.tif')
             landcover_fn(box_poly, os.path.join(tdir.location, 'landcover.tif'))
             ozip_write(ozip, ofn)
@@ -156,7 +156,7 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
             ozip_write(ozip, os.path.join(tdir.location, 'landcover.tfw'))
 
         # DEM
-        if 'dem' in vars_set:
+        if dem_fn is not None:
             ofn = os.path.join(tdir.location, 'dem.tif')
             dem_fn(box_poly, ofn)
             ozip_write(ozip, ofn)
