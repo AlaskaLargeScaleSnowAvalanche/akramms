@@ -366,7 +366,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
         rdf = rdf.set_index('Id')
 
         for tup in akdf1.reset_index(drop=True).itertuples(index=False):
-            print(f'archive ', tup)
+#            print(f'archive ', tup)
             inout = file_info.inout_name(jb, tup.chunkid, tup.id)
             out_zip = jb.avalanche_dir / f'{inout}.out.zip'
             out_zip_mtime = os.path.getmtime(out_zip)
@@ -467,7 +467,7 @@ def archive_ids(akdf0, debug=False, dry_run=False):
     """
 
     print('BEGIN archive_ids')
-    raise ValueError(17)
+#    raise ValueError(17)
 
     archived_out_zips = list()
 
