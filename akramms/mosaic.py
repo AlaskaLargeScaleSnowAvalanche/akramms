@@ -1,4 +1,4 @@
-import os
+import os,pathlib
 import numpy as np
 from osgeo import gdal
 import zipfile,netCDF4
