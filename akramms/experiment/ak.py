@@ -171,8 +171,7 @@ def add_combo(makefile, combo):
 def all_domains():
     domains_margin_shp = os.path.join(dir, 'ak_domains_margin.shp')
     domains_df = shputil.read_df(domains_margin_shp)
-    print('dddddd ', domains_df)
-    domains_df = domains_df.set_index(['ix', 'iy'])
+    domains_df = domains_df.set_index(['idom', 'jdom'])
     domains_ij = [(row.i,row.j) for row in domains_df.iterrows()]
     return domains_ij
 
