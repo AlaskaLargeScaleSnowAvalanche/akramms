@@ -156,7 +156,7 @@ def mosaic_avals(gridM, avals, ofname_zip, tdir,
             ozip_write(ozip, os.path.join(tdir.location, 'landcover.tfw'))
 
         # DEM
-        dir = tdir.location
+        dir = pathlib.Path(tdir.location)
         if dem_fn is not None:
             dem_fn(box_poly, dir / 'dem0.tif')
             gdal.Warp(dir / 'dem.tif', dir / 'dem0.tif', xRes=30, yRes=30)
