@@ -164,7 +164,8 @@ def extent_by_avalanches(expmod, akdf):
     return extent
 
 # ---------------------------------------------------------------------
-def query(akdf0, sextent, include_overruns=False, scenetypes={'x', 'arc'}, margin=None):
+def query(akdf0, sextent, include_overruns=False, scenetypes={'x', 'arc'},
+    statuses=[file_info.JobStatus.OVERRUN, file_info.JobStatus.FINISHED], margin=None):
 
     """akdf:
         Resolved to the combo level (or should work at id level too)
@@ -219,8 +220,8 @@ def query(akdf0, sextent, include_overruns=False, scenetypes={'x', 'arc'}, margi
         # --------- Move to the avalanche (id) level
         # Resolve to individual avalanches
         akdf1 = resolve.resolve_chunk(akdf1, scenetypes=scenetypes)
-        akdf1 = resolve.resolve_id(akdf1, include_overruns=include_overruns, realized=True)
-
+        akdf1 = resolve.resolve_id(akdf1, realized=True, status_col=True)
+        akdf1 = akdf1[akdf1.id_status.isin(statuses)]
 
         # Resovle the extent to numeric
         if extent == 'tile':

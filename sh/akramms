@@ -589,6 +589,9 @@ def all_equal(iterable):
     g = groupby(iterable)
     return next(g, True) and not next(g, False)
 
+def _parse_statuses(sstat):
+    return [joblib.JobStatus[x] for x in sstat.split(',')]
+
 @subcommand(name='mosaic', args=[
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser.'),
     argument('-s', '--save', help='Name of query file to write to'),
@@ -596,8 +599,8 @@ def all_equal(iterable):
     argument('-o', '--output', required=True, help='Name of Mosaic output file to write'),
     argument('--limit', type=int,
         help='Limit number of avalanches processed (for DEBUGGING)'),
-    argument('--overrun', action='store_true',
-        help="Mosaic archived overrun avalanches?"),
+    argument('--status', type=_parse_statuses,
+        help="Comma-separated statuses to plot: OVERRUN,FINISHED"),
     argument('--extent', '-e', required=False,
         help="Designation of extent of final mosiac"),
     argument('--margin', '-m', type=int, required=False,
@@ -621,7 +624,7 @@ def xmosaic(args):
         assert all(x == akdf.exp[0] for x in akdf.exp)
         expmod = akramms.parse.load_expmod(akdf.exp[0])
 
-        extent,akdf = avalquery.query(akdf, args.extent, include_overruns=args.overrun, scenetypes='arc', margin=args.margin)
+        extent,akdf = avalquery.query(akdf, args.extent, statuses=args.status, scenetypes='arc', margin=args.margin)
 
         if args.save is not None:
             with open(args.save, 'wb') as out:

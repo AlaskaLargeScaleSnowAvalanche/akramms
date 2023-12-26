@@ -207,7 +207,8 @@ def _realized_ids(scenetype, releasefile, stage, include_overruns=False):
 
     include_overruns:
         Only makes sense with scenetype='arc'
-
+    stage: 'in' or 'out'
+        Whether we are looking for .in.zip files or .out.zip
     Returns: {id: filename}
     """
 
@@ -220,37 +221,39 @@ def _realized_ids(scenetype, releasefile, stage, include_overruns=False):
 
     stage_zipRE = re.compile(r'(.*)_(\d+)\.' + stage + r'\.zip$')
 
-    avalfiles = dict()
+    avalfiles = list()
 
     # Find the IDs that exist on disk
     if scenetype == 'x':
 #TODO: Apply proper comparisons to avoid race conditions
         resultsdir = releasefile.parents[1] / 'RESULTS'
-#        print('resultsdir ', resultsdir)
         for out_zip in glob.iglob(str(resultsdir / '*' / '*' / f'*.{stage}.zip')):
             if not file_info.is_file_good(out_zip):
                 continue
             match = stage_zipRE.match(os.path.split(out_zip)[1])
             id = int(match.group(2))
-            avalfiles[id] = out_zip
+            # Do not provide info on whether the avalanche finished or overran
+            avalfiles.append((id, out_zip, None))
     elif scenetype == 'arc':
         avaldir = releasefile
-        avalfiles = dict()
         for name in os.listdir(avaldir):
             match = _avalRE.match(name)
             if match is not None:
-                if (not include_overruns) and (match.group(3) == 'overrun'):
-                    continue
-                avalfiles[int(match.group(2))] = avaldir / name
+                # There could be >1 avalanche of the same name: overrun and (final) not overrun.
+                overrun = (match.group(3) == 'overrun')    # Overrun info encoded in name
+                id_status = file_info.JobStatus.OVERRUN if overrun else file_info.JobStatus.FINISHED
+                avalfiles.append((int(match.group(2)), avaldir / name, id_status))
     else:
         assert False
 
     return avalfiles
 
-def resolve_id(akdf, realized=True, stage='out', include_overruns=False):
+def resolve_id(akdf, realized=True, stage='out', status_col=False):
     """
     stage:
         If realized, are we looking for avalanche IDs with .in.zip or .out.zip?
+    status_col:
+        Include status column?
     """
 
 
@@ -263,8 +266,12 @@ def resolve_id(akdf, realized=True, stage='out', include_overruns=False):
     akdf = akdf.reset_index(drop=True)
     for tup in akdf.itertuples(index=False):
 #        print(tup)
-        if tup.scenetype == 'arc' and not realized:
-            raise ValueError('Must have realized=True when resolving IDs for archived scenes')
+        if tup.scenetype == 'arc':
+            if not realized:
+                raise ValueError('Must have realized=True when resolving IDs for archived scenes')
+        else:
+            if status_col:
+                raise ValueError("Cannot provide status column for scene_type=='x'")
 
 #        print('resolve_id tup ', realized, tup)
         parsed = tup.parsed
@@ -272,7 +279,7 @@ def resolve_id(akdf, realized=True, stage='out', include_overruns=False):
         # See if a single avalanche ID was already specified
         if parsed['type'] == 'arcfile':
             orows.append(itertools.chain(tup,
-                [ parsed['id'], parsed['arcfile'] ]))
+                [ parsed['id'], parsed['arcfile'], parsed['id_status'] ]))
             continue
 
         # Get list of IDs to include
@@ -295,13 +302,15 @@ def resolve_id(akdf, realized=True, stage='out', include_overruns=False):
 #            print('avalfiles ', avalfiles)
 
             if ids is None:    # Archive-type directory, no releasefile
-                for id,fname in avalfiles.items():
-                    orows.append(itertools.chain(tup, (id, fname)))
+                for x in avalfiles:    # (id, fname, id_status)
+                    orows.append(itertools.chain(tup, x))
             else:
                 #print('avalfiles ', tup.combo, len(avalfiles), len(ids))
+                avalfile_set = {id: (fname, id_status) for id,fname,id_status in avalfiles}
                 for id in ids:
                     try:
-                        orows.append(itertools.chain(tup, (id, avalfiles[id])))
+                        fname, id_status = avalfiles_set[id]
+                        orows.append(itertools.chain(tup, (id, fname, id_status)))
                     except KeyError:
                         # ID from releasefile was not realized, ignore it
                         pass
@@ -310,12 +319,15 @@ def resolve_id(akdf, realized=True, stage='out', include_overruns=False):
             # User can fill in avalfile column later if desired.
             if ids is not None:
                 for id in ids:
-                    orows.append(itertools.chain(tup, (id, None)))
+                    orows.append(itertools.chain(tup, (id, None, None)))
 
 
-    return pd.DataFrame(orows, columns=tuple(
-        itertools.chain(akdf.columns, ['id', 'avalfile'])))
+    df = pd.DataFrame(orows, columns=tuple(
+        itertools.chain(akdf.columns, ['id', 'avalfile', 'id_status'])))
 #        itertools.chain(type(tup)._fields, ['id', 'avalfile'])))
+    if not status_col:
+        df = df.drop('status_col', axis=1)
+    return df
 
 # ------------------------------------------------------------
 def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out', include_overruns=False):

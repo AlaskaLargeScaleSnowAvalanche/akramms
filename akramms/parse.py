@@ -289,21 +289,25 @@ def _parse_chunk_releasefile(releasefile):
 
 # ----------------------------------------------------------------------
 # TODO: Read all info from INSIDE the arcfile, allowing it to be named anything.  We can tell it's an arcfile because it ends in .nc
-_avalRE = re.compile(r'aval-([TSML])-(\d+)')
+#_avalRE = re.compile(r'aval-([TSML])-(\d+)')
+_avalRE = re.compile(r'^aval-([TSML])-(\d+)-([^-]*).nc$')
 def parse_arcfile(arcfile):
     match = _avalRE.match(arcfile.parts[-1])
     if match is None:
         raise ValueError(f'Not an archived avalanche file: {arcfile}')
 
     pra_size = match.group(1)
+    overrun = (match.group(3) == 'overrun')    # Overrun info encoded in name
 
     with netCDF4.Dataset(arcfile) as nc:
         statusv = nc.variables['status']
         # TODO: Change to exp in the NetCDF file
         exp = statusv.getncattr('exp_mod')
 
-
-    ret = {'exp': exp, 'type': 'arcfile', 'pra_size': pra_size, 'arcfile': arcfile, 'id': int(match.group(2)) }
+    ret = {
+        'exp': exp, 'type': 'arcfile', 'pra_size': pra_size,
+        'arcfile': arcfile, 'id': int(match.group(2)),
+        'id_status': (file_info.JobStatus.OVERRUN if overrun else file_info.JobStatus.FINISHED) }
     return ret
 # ----------------------------------------------------------------------
 def parse_file(file):

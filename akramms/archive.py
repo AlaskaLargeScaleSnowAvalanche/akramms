@@ -372,7 +372,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
             out_zip = jb.avalanche_dir / f'{inout}.out.zip'
             out_zip_mtime = os.path.getmtime(out_zip)
             out_zip_dtime = datetime.datetime.fromtimestamp(out_zip_mtime)
-            arc_leafbase = f'aval-{jb.pra_size}-{tup.id}'
+            arc_leafbase = f'aval-{jb.pra_size}-{tup.id:05d}'
 
             # Avoid archiving bad files
             if not file_info.is_file_good(out_zip):
@@ -382,8 +382,8 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
 #            with zipfile.ZipFile(out_zip, 'r') as ozip:
 #                overrun = is_overrun(ozip)
             overrun = (tup.id_status == file_info.JobStatus.OVERRUN)
-            if overrun:
-                print(f'overrun: {out_zip}')
+#            if overrun:
+#                print(f'overrun: {out_zip}')
 
             # Determine if the avalanche was already archived
             Overrun = 'overrun' if overrun else ''
