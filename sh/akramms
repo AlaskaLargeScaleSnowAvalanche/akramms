@@ -668,6 +668,7 @@ def xmosaic(args):
     if args.landcover:
         kwargs['landcover_fn'] = expmod.extract_landcover
     print(akdf)
+    print(akdf.columns)
     return
 
     with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
