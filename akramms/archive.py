@@ -559,6 +559,7 @@ def read_reldom(arcdir, ext, **kwargs):
     with zipfile.ZipFile(arcdir / 'RELEASE.zip') as izip:
         for info in izip.infolist():
             match = fileRE.match(info.filename)
+            print('xxxxxxxxx ', info.filename, match)
             if match is not None:
                 fname = f'/vsizip/{arcdir}/RELEASE.zip/{info.filename}'
                 df = shputil.read_df(fname, **kwargs)
