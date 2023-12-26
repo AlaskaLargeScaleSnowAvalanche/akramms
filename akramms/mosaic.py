@@ -32,11 +32,11 @@ def read_reldom(akdf0, tdir):
         # Filter down to just what we need
         df = akdf1[['id']]
 
-        reldf = df.join(reldf, how='left', left_on='id', right_on='Id')
+        reldf = df.merge(reldf, how='left', left_on='id', right_on='Id')
         reldf = reldf.drop('id', axis=1)
         reldfs.append(reldf)
 
-        domdf = df.join(domdf, how='left', left_on='id', right_on='Id')
+        domdf = df.merge(domdf, how='left', left_on='id', right_on='Id')
         domdf = domdf.drop('id', axis=1)
         domdfs.append(domdf)
 
