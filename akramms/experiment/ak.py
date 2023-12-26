@@ -135,7 +135,7 @@ def add_combo(makefile, combo):
         forests=((1 if combo.forest=='For' else 0),),
         dem_file=dem_tif,
         snow_file=sx3I_tif)
-    if combo.forest:
+    if combo.forest == 'For':
         kwargs['forest_file'] = forest_tif
 
     # Print out what we've got!
