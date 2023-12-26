@@ -675,7 +675,7 @@ def xmosaic(args):
 #    return
 
     with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
-        mosaic.mosaic_avals(gridM, akdf.avalfile.tolist(), args.output, tdir, **kwargs)
+        mosaic.mosaic_avals(gridM, akdf, args.output, tdir, **kwargs)
 
 
 #Ways to choose the extent:
