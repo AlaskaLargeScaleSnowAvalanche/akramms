@@ -555,7 +555,7 @@ def read_reldom(arcdir, ext, tdir, **kwargs):
         Name to call final shape column
     """
     dfs = list()
-#    restr = rf'^(.*)_{ext}\.(...)$'
+    restr = rf'^(.*)_{ext}\.(...)$'
 #    print('restr ', restr)
 #    print('arcdir ', arcdir)
     fileRE = re.compile(restr)
