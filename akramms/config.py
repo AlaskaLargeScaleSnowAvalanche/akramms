@@ -54,7 +54,8 @@ auto_submit = True
 #ramms_version = '230210'
 #ramms_version = '230321'
 #ramms_version = '230401'
-ramms_version = '230423'
+#ramms_version = '230423'
+ramms_version = '240111'
 #docker_container_version = f'${ramms_version}.0'
 
 # Maximum number of PRAs in a RAMMS run
