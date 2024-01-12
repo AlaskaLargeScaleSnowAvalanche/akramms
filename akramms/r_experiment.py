@@ -204,6 +204,8 @@ def r_snow(exp_mod, snow_dataset, downscale_algo, year0, year1, idom, jdom):
     if year1 is None or year1 == year0:
         sx3_file = config.roots.join('DATA', 'lader', 'sx3', f'{snow_dataset}_sx3_{year0}.nc')
     else:
+TODO: Read single-year files directly, do not use the DATA/output/sx3 directory.
+See av/akramms/downscale/reformat_sx3.py for how to do this.
         sx3_file = config.roots.join('DATA', 'outputs', 'sx3', f'{snow_dataset}_sx3_{year0}_{year1}.nc')
 
     domains_margin_shp = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains_margin.shp')
