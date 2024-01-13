@@ -206,3 +206,6 @@ def simple():
 
 def elizabeth():
     yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 47)    # A Juneau-close box
+
+def edge():
+    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 111, 42)    # Tile borders with Canada

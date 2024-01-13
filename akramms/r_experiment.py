@@ -201,16 +201,14 @@ def r_snow(exp_mod, snow_dataset, downscale_algo, year0, year1, idom, jdom):
 
     # Determine input filenames
     geo_nc = config.roots.join('DATA', 'lader', 'sx3', 'geo_southeast.nc')
-    if year1 is None or year1 == year0:
-        sx3_file = config.roots.join('DATA', 'lader', 'sx3', f'{snow_dataset}_sx3_{year0}.nc')
-    else:
-TODO: Read single-year files directly, do not use the DATA/output/sx3 directory.
-See av/akramms/downscale/reformat_sx3.py for how to do this.
-        sx3_file = config.roots.join('DATA', 'outputs', 'sx3', f'{snow_dataset}_sx3_{year0}_{year1}.nc')
+
+    sx3_files = list()
+    for year in range(year0,year1+1):
+        sx3_files += config.roots.join('DATA', 'lader', 'sx3', f'{snow_dataset}_sx3_{year0}.nc')
 
     domains_margin_shp = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains_margin.shp')
     dem_tif = r_ifsar(exp_mod, idom, jdom).outputs[0]
-    inputs = [dem_tif, domains_margin_shp, geo_nc, sx3_file]
+    inputs = [dem_tif, domains_margin_shp, geo_nc] + sx3_files
 
     if downscale_algo == 'lapse':
         dfcA_tif = r_dfcA(exp_mod).outputs[0]
@@ -223,7 +221,7 @@ See av/akramms/downscale/reformat_sx3.py for how to do this.
     def action(tdir):
         if downscale_algo == 'lapse':
             downscale_snow.downscale_sx3_with_lapse(
-                sx3_file, geo_nc,
+                sx3_files, geo_nc,
                 dfcA_tif, dem_tif,
                 ofname)
         else:

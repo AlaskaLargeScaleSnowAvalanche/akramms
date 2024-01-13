@@ -217,10 +217,11 @@ def lapse_by_distance_from_coast(cdistA):
 
 
 # -----------------------------------------------------------------
-def downscale_sx3_with_lapse(sx3_file, geo_nc, distance_from_coastA_tif, dem_tif, ofname):
+def downscale_sx3_with_lapse(sx3_files, geo_nc, distance_from_coastA_tif, dem_tif, ofname):
     """
-    sx3_file: (gridA)
-        The WRF output file containing sx3 snow variable
+    sx3_files: (gridA)
+        The WRF output files containing sx3 snow variable for many different years.
+        We will read all of them and take a max...
     geo_nc: (gridA)
         The WRF output file describing the CRS and geotransform
     distance_from_coastA_tif: (gridA)
@@ -230,9 +231,13 @@ def downscale_sx3_with_lapse(sx3_file, geo_nc, distance_from_coastA_tif, dem_tif
     ofname:
         Name of the output file
     """
-    # Read input from WRF
+    # Read input from WRF: Take the max of an entire year range.
     gridA = wrfutil.wrf_info(geo_nc)
-    sx3A,sx3A_nd = wrfutil.read_raw(sx3_file, 'sx3', fill_holes=True)    # NOTE: All gridcells are expected to have data
+    sx3A,sx3A_nd = wrfutil.read_raw(sx3_files[0], 'sx3', fill_holes=True, keep_time=True)    # NOTE: All gridcells are expected to have data
+    for sx3_file in sx3_files[1:]:
+        sx3x,_ = wrfutil.read_raw(sx3_file, 'sx3', fill_holes=True, keep_time=True)
+        sx3A = np.maximum(sx3A, sx3x)
+
     if len(sx3A.shape) == 3:
         sx3A = sx3A[0,:]    # Get rid of Time dimension
 
