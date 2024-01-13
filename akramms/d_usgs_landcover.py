@@ -4,7 +4,9 @@ from uafgi.util import gdalutil
 
 # There needs to be a symlink to the ACTUAL location of the ifsar data
 landcover_dir = config.roots.syspath('{DATA}/LandCover')
-landcover_img = os.path.join(landcover_dir, 'ak_nlcd_2011_landcover_1_15_15.img')
+#landcover_img = os.path.join(landcover_dir, 'OlderVersions', 'ak_nlcd_2011_landcover_1_15_15.img')
+landcover_img = os.path.join(landcover_dir, 'NLCD_2016_Land_Cover_AK_20200724', 'NLCD_2016_Land_Cover_AK_20200724.img')
+
 
 # ------------------------------------------------------------------
 def extract(poly, ofname):
