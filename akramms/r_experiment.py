@@ -204,7 +204,7 @@ def r_snow(exp_mod, snow_dataset, downscale_algo, year0, year1, idom, jdom):
 
     sx3_files = list()
     for year in range(year0,year1+1):
-        sx3_files += config.roots.join('DATA', 'lader', 'sx3', f'{snow_dataset}_sx3_{year0}.nc')
+        sx3_files.append(config.roots.join('DATA', 'lader', 'sx3', f'{snow_dataset}_sx3_{year0}.nc'))
 
     domains_margin_shp = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains_margin.shp')
     dem_tif = r_ifsar(exp_mod, idom, jdom).outputs[0]
