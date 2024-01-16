@@ -309,7 +309,7 @@ def resolve_id(akdf, realized=True, stage='out', status_col=False):
                 avalfile_set = {id: (fname, id_status) for id,fname,id_status in avalfiles}
                 for id in ids:
                     try:
-                        fname, id_status = avalfiles_set[id]
+                        fname, id_status = avalfile_set[id]
                         orows.append(itertools.chain(tup, (id, fname, id_status)))
                     except KeyError:
                         # ID from releasefile was not realized, ignore it
