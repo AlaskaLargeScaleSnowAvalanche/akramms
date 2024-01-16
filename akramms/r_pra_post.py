@@ -113,7 +113,7 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
         df =  df[keep]
 
         # Clip to the non-margin part of the local grid (subdomain)
-        gridI,dem_mask,_ = gdalutil.read_grid(dem_mask_tif)
+        gridI,dem_mask,_ = gdalutil.read_raster(dem_mask_tif)
         df = chunk.clip(df, gridI,dem_mask, scene_args['domain'])
 
         # Add PRA size designation of T,S,M,L
