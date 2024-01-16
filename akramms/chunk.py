@@ -252,6 +252,10 @@ def _in_domain(gridI, dem_mask, xmin,ymin,xmax,ymax, pra):
     if not ((x >= xmin) and (x < xmax) and (y >= ymin) and (y < ymax)):
         return False
 
+    # No domain mask provided
+    if dem_mask is None:
+        return True
+
     # See if it's in a gridcell marked as margin
     i,j = gridI.to_ij(x,y)
     return (dem_mask[j,i] == domain_mask.Value.MASK_IN)
@@ -262,6 +266,9 @@ def clip(rdf, gridI,dem_mask, clip_domain):
     rdf:
         Release file(s) as dataframe
         REQUIRED cols: pra
+    gridI,dem_mask:
+        The domain mask (as calculated in domain_mask.py)
+        Or None if we are not using it to clip...
     clip_domain: [x0,y0, x1,y1, ...]
         Coordinates of clip domain.
         Eg: scene_args['domain']

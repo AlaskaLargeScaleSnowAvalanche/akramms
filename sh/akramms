@@ -487,7 +487,7 @@ def run(args):
                 # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
                 makefile.add(r_pra_post.pra_post_rule(
                     scene_dir, scene_args, dem_filled_file, combo.return_period,
-                    combo.forest, cinfo.snow_file))
+                    combo.forest, cinfo.snow_file, clip_margin=False))    # clip_margin=False: Allow "overruns" up to Canadian border
 
                 if args.step <= 6:
                     continue

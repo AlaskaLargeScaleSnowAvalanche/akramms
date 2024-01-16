@@ -22,7 +22,7 @@ __all__ = ('pra_post_rule', 'chunk_rule')
 # ---------------------------------------------------------------------------------
 
 
-def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, snowI_tif, **kwargs):
+def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, snowI_tif, clip_margin=False, **kwargs):
     """
     scene_dir:
         Uses params: name ("site"), resample_cell_size ("res")
@@ -38,7 +38,9 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
         Whether we are doing with / without forest
     snowI_tif: str
         Name of the snowdepth file, in local scene coordinates, that we will use.
-
+    clip_margin: bool
+        Should we use the domain mask to clip marginal cells?
+        (If not, some "overruns" might just running into the Canadian border...)
     kwargs forwarded to d8graph.find_domain():
         min_alpha: [deg]
             Minimum slope that "avalanche" can continue in domain finder

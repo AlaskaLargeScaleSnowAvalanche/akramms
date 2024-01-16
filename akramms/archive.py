@@ -152,6 +152,69 @@ def nc_xy_coord(ncout, gridI, coord_attrs, izip, arcname):
     return ivec,jvec
 
 # --------------------------------------------------------------
+class OverrunChecker:
+
+    def __init__(self, dem_mask_tif):
+        self.gridI,mask,_ = gdalutil.read_raster(dem_mask_tif)
+
+        # Determine border: the set of gridcells that are NOT masked
+        # out (i.e. avalanches could run there), but they are NEXT TO
+        # a masked-out gridcell.  Avalanches that "overrun" to these
+        # gridcells are NOT considered overruns.
+
+        maskX = mask.copy()
+        maskX[:,:-1] = mask[:,1:]    # Shift west by 1 pixel
+        border = np.logical_and(
+            mask  != domain_mask.Value.MASK_OUT,
+            maskX == domain_mask.Value.MASK_OUT)
+
+        maskX = mask.copy()
+        maskX[:,1:] = mask[:,:-1] # Shift east by 1 pixel
+        border = np.logical_or(border, np.logical_and(
+            mask  != domain_mask.Value.MASK_OUT,
+            maskX == domain_mask.Value.MASK_OUT))
+
+
+        maskX = mask.copy()
+        maskX[:-1,:] = mask[1:,:]    # Shift south by 1 pixel
+        border = np.logical_or(border, np.logical_and(
+            mask  != domain_mask.Value.MASK_OUT,
+            maskX == domain_mask.Value.MASK_OUT))
+
+        maskX = mask.copy()
+        maskX[1:,:] = mask[:-1,:]    # Shift north by 1 pixel
+        border = np.logical_or(border, np.logical_and(
+            mask  != domain_mask.Value.MASK_OUT,
+            maskX == domain_mask.Value.MASK_OUT))
+
+        self.border = border
+
+
+    def is_overrun(self, out_zip):
+        """Determines whether a RAMMS result is overrun"""
+        with zipfile.ZipFile(out_zip, 'r') as ozip:
+            arcnames = [os.path.split(x)[1] for x in ozip.namelist()]
+        if not any(x.endswith('.out.overrun') for x in arcnames):
+            return False
+
+        # RAMMS thinks it overran.  Inspect the domain mask further to
+        # determine whether it in fact overran.
+        base = str(out_zip)[:-8]    # Remove .out.zip
+        leaf = os.path.split(base)[1]
+
+        with zipfile.ZipFile(f'{base}.in.zip', 'r') as in_zip:
+          with zipfile.ZipFile(f'{base}.out.zip', 'r') as out_zip:
+$$$$$$$$$$$$
+
+
+        with zipfile.ZipFile(arcdir_zip) as izip:
+            with izip.open(f'{leaf}.xy-coord', 'r') as fin:
+                ivec, jvec = parse_xy_coord(gridI, fin)
+
+
+# --------------------------------------------------------------
+
+
 
 def parse_out(fin):
     """Read the .out file"""
