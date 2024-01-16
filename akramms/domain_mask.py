@@ -1,7 +1,7 @@
 import functools
 import enum
 import numpy as np
-from uafgi.util import gdalutil
+from uafgi.util import gdalutil, make
 from osgeo import osr,gdal,gdal_array
 from osgeo import gdalconst
 from akramms import r_experiment
@@ -88,7 +88,7 @@ def rule(exp_mod, idom, jdom):
         dmaskI = domain_mask(gridI, mask_outI, max(exp_mod.domain_margin))
         gdalutil.write_raster(dem_mask_tif, gridI, dmaskI, int(Value.MASK_OUT))
 
-    return action
+    return make.Rule(action, inputs, outputs)
 
 
 #def main():
