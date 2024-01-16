@@ -119,7 +119,7 @@ def r_ifsar(exp_mod, idom, jdom, sanity_check=True):
     """
 
     #ifsar_vrt = d_ifsar.r_vrt(type).outputs[0]
-    ofname = os.path.join(exp_mod.dir, 'dem', f'{exp_mod.name}_dem_{idom:03d}_{jdom:03d}.tif')
+    ofname = exp_mod.dir / 'dem' / f'{exp_mod.name}_dem_{idom:03d}_{jdom:03d}.tif'
 
     def action(tdir):
         poly = exp_mod.gridD.poly(idom, jdom, margin=True)
