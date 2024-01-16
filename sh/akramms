@@ -525,9 +525,7 @@ def submit(args):
     parseds = akramms.parse.parse_args(args.spec)
 
     akdf = resolve.resolve_to(parseds, 'id', realized=True, stage='in', status_col=True)
-    print('aaaaaaaaaaaa ', akdf)
-    print(akdf.iloc[0])
-#    akdf = joblib.submit_jobs(akdf)    # Only submits jobs that need submitting
+    akdf = joblib.submit_jobs(akdf)    # Only submits jobs that need submitting
 
     print(f'{len(akdf)} jobs submitted')
 # ------------------------------------------------------------------

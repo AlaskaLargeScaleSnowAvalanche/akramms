@@ -336,6 +336,9 @@ def _submit_jobs(akdf):
 
 def submit_jobs(akdf):
     akdf = add_id_status(akdf)
+    print(akdf)
+    print(akdf.iloc[0])
+    return
 
     # Only submit jobs that are ready to go and not in process or completed or something.
     akdf = akdf[akdf.id_status == JobStatus.TODO]
