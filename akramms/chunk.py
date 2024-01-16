@@ -254,7 +254,7 @@ def _in_domain(gridI, dem_mask, xmin,ymin,xmax,ymax, pra):
 
     # See if it's in a gridcell marked as margin
     i,j = gridI.to_ij(x,y)
-    return (dem_mask[j,i] == domain_mask.Type.MASK_IN)
+    return (dem_mask[j,i] == domain_mask.Value.MASK_IN)
 
 
 def clip(rdf, gridI,dem_mask, clip_domain):
