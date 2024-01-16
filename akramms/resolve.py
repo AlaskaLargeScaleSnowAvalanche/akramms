@@ -325,8 +325,9 @@ def resolve_id(akdf, realized=True, stage='out', status_col=False):
     df = pd.DataFrame(orows, columns=tuple(
         itertools.chain(akdf.columns, ['id', 'avalfile', 'id_status'])))
 #        itertools.chain(type(tup)._fields, ['id', 'avalfile'])))
-    if (not status_col) and ('status_col' in df.columns):
-        df = df.drop('status_col', axis=1)
+
+    if not status_col:
+        df = df.drop('id_status', axis=1)
     return df
 
 # ------------------------------------------------------------
