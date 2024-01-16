@@ -99,8 +99,8 @@ def add_combo(makefile, combo):
 
     # DTM and Forest (landcover==42)
     dem_tif = add_dem(makefile, combo.idom, combo.jdom)  #makefile.add(r_experiment.r_ifsar(exp_mod, combo.idom, combo.jdom, resolution=resolution)).outputs[0]
-    dem_filled_file,sinks_file,neighbor1_file = makefile.add(r_domain_builder.neighbor1_rule(
-        dem_tif, os.path.split(dem_tif)[0], fill_sinks=True)).outputs
+#    dem_filled_file,sinks_file,neighbor1_file = makefile.add(r_domain_builder.neighbor1_rule(
+#        dem_tif, os.path.split(dem_tif)[0], fill_sinks=True)).outputs
 
     # Forest File
     if combo.forest == 'For':

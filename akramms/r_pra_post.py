@@ -1,3 +1,4 @@
+import pathlib
 import scipy.spatial
 import pandas as pd
 import shapely
@@ -59,6 +60,11 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
     pra_file = process_tree.pra_file(scene_args, return_period, For)
     inputs.append(pra_file)    # This rule does NOT use the burn files for domains...
 
+    # Use the DEM mask
+    dem_tif = pathlib.Path(scene_args['dem_file'])
+    dem_mask_tif = dem_tif.parents[0] / (dem_tif.parts[-1][:-4] + '_mask.tif')
+    inputs.append(dem_mask_tif)
+
     # Full pathnames of initial release files generated from this (scene_name, return_period, forest) combo
     # Initial release files are in the top-level RELEASE/ directory, before chopping into chunks.
 #    ramms_names = list()
@@ -107,7 +113,8 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
         df =  df[keep]
 
         # Clip to the non-margin part of the local grid (subdomain)
-        df = chunk.clip(df, scene_args['domain'])
+        gridI,dem_mask,_ = gdalutil.read_grid(dem_mask_tif)
+        df = chunk.clip(df, gridI,dem_mask, scene_args['domain'])
 
         # Add PRA size designation of T,S,M,L
         # Adds column: pra_size

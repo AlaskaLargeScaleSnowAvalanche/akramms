@@ -441,6 +441,11 @@ def run(args):
                 # This calls through to r_prepare.prepare_scene_rule()
                 cinfo, scene_args = expmod.add_combo(makefile, combo)    # file_info.ComboInfo
 
+                dem_mask_tif = makefile.add(domain_mask.rule(expmod, combo.idom, combo.jdom)).outputs[0]
+                dem_filled_file,sinks_file,neighbor1_file = makefile.add(r_domain_builder.neighbor1_rule(
+                    cinfo.dem_file, os.path.split(cinfo.dem_file)[0], fill_sinks=True)).outputs
+
+
                 if args.step <= 2:
                     continue
 

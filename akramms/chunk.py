@@ -243,15 +243,21 @@ def add_corrections(df, return_period):
 
         return df
 # -----------------------------------------------------------
-def _in_domain(xmin,ymin,xmax,ymax, pra):
+def _in_domain(gridI, dem_mask, xmin,ymin,xmax,ymax, pra):
     """Returns True if the PRA is >50% in the domain"""
     centroid = pra.centroid
     x,y = centroid.x, centroid.y
-    return (x >= xmin) and (x < xmax) and (y >= ymin) and (y < ymax)
+
+    # See if it's in the natural margin
+    if not ((x >= xmin) and (x < xmax) and (y >= ymin) and (y < ymax)):
+        return False
+
+    # See if it's in a gridcell marked as margin
+    i,j = gridI.to_ij(x,y)
+    return (dem_mask[j,i] == domain_mask.Type.MASK_IN)
 
 
-
-def clip(rdf, clip_domain):
+def clip(rdf, gridI,dem_mask, clip_domain):
     """Removes PRAs outside a given range
     rdf:
         Release file(s) as dataframe
@@ -274,7 +280,7 @@ def clip(rdf, clip_domain):
     ymax = max(y0,y1)
     #clip_domain = shapely.geometry.Polygon(_xy.reshape((len(_xy)//2,2)))
     #in_domain_fn = lambda pra: in_domain(domain, pra)
-    in_domain_fn = lambda pra: _in_domain(xmin,ymin,xmax,ymax, pra)
+    in_domain_fn = lambda pra: _in_domain(gridI,dem_mask, xmin,ymin,xmax,ymax, pra)
 
     return rdf[rdf['pra'].map(in_domain_fn)]
 
