@@ -476,7 +476,7 @@ def run(args):
                 # Obtain name of neighbor1 graph file for DEM routing network
                 # (created above in add_experiment_fn())
                 dem_file = scene_args['dem_file']
-                dem_filled_file = f'{dem_file[:-4]}_filled.tif'
+                dem_filled_file = dem_file.parents[0] / (dem_file.parts[-1][:-4] + '_filled.tif')
 
                 # Run eCognition
                 makefile.add(r_ecog.rule(scene_dir, scene_args, prepare2_outputs, combo.return_period, combo.forest))
