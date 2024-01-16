@@ -253,7 +253,7 @@ def resolve_id(akdf, realized=True, stage='out', status_col=False):
     stage:
         If realized, are we looking for avalanche IDs with .in.zip or .out.zip?
     status_col:
-        Include status column?
+        Include status column? (overrun status)
     """
 
 
@@ -330,7 +330,7 @@ def resolve_id(akdf, realized=True, stage='out', status_col=False):
     return df
 
 # ------------------------------------------------------------
-def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out', include_overruns=False):
+def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out', status_col=False):
     """level: exp|combo|chunk|id
         Which level of detail to generate for this query.
         NOTE: level='id' is only used for QUERYING results, not for
@@ -338,8 +338,8 @@ def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out', inc
               genderated one combo at a time, so things are resolved
               to level='combo' and then chunk.read_rel() or
               chunk.read_reldom() is used to load the releasefile.
-    include_overruns:
-        List overrun avalanches?  (Only affects for 'arc' scenetype)
+    status_col:
+        Include status column? (overrun status)
     """
 
     akdf = initial(parseds)
@@ -357,7 +357,7 @@ def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out', inc
     if level == 'chunk':
         return akdf
 
-    akdf = resolve_id(akdf, realized=realized, stage=stage, include_overruns=include_overruns)
+    akdf = resolve_id(akdf, realized=realized, stage=stage, status_col=status_col)
 #    print('resolve_id ', akdf)
     if level == 'id':
         return akdf
