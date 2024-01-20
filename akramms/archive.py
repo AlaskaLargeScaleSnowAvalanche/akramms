@@ -152,6 +152,57 @@ def nc_xy_coord(ncout, gridI, coord_attrs, izip, arcname):
     return ivec,jvec
 
 # --------------------------------------------------------------
+def parse_out(fin):
+    """Read the .out file"""
+
+    # ncells: long
+    fmt = '<L'
+    buf = fin.read(struct.calcsize(fmt))
+    ncells = struct.unpack(fmt, buf)[0]
+#    print('ncells ', ncells)
+
+    buf = fin.read(ncells * 4)
+    max_vel = np.frombuffer(buf, dtype='<f4')
+    buf = fin.read(ncells * 4)
+    max_height = np.frombuffer(buf, dtype='<f4')
+    buf = fin.read(ncells * 4)
+    depo = np.frombuffer(buf, dtype='<f4')
+
+
+    return (
+        ('max_vel', max_vel, {'units': 'm s-1'}),
+        ('max_height', max_height, {'units': 'm'}),
+        ('depo', depo,  {'units': 'm'}))
+
+def nc_out(ncout, izip, arcname, attrs={}):
+    """
+    Returns: {name: val}
+        Value of variables read
+        (max_vel, max_height, depo)
+    """
+    # Read the values from the .out file
+#    with open(fname, 'rb') as fin:
+    with izip.open(arcname, 'r') as fin:
+        namevals = parse_out(fin)
+
+    # Create and populate the variables
+    ncvs = list()
+    for vname, val, vattrs in namevals:
+        ncv = ncout.createVariable(vname, 'd', ('ncells',), compression='zlib')
+        for k,v in attrs.items():
+            setattr(ncv, k, v)
+        for k,v in vattrs.items():
+            setattr(ncv, k, v)
+        ncvs.append(ncv)
+    ret = dict()
+    for (name, val,_),ncv in zip(namevals, ncvs):
+        ncv[:] = val
+        ret[name] = val
+
+    return ret
+
+
+# ----------------------------------------------------------
 class OverrunChecker:
 
     def __init__(self, dem_mask_tif):
@@ -159,8 +210,8 @@ class OverrunChecker:
 
         # Determine border: the set of gridcells that are NOT masked
         # out (i.e. avalanches could run there), but they are NEXT TO
-        # a masked-out gridcell.  Avalanches that "overrun" to these
-        # gridcells are NOT considered overruns.
+        # a masked-out gridcell.  Avalanches that "overrun" ONLY to
+        # these gridcells are NOT considered overruns.
 
         maskX = mask.copy()
         maskX[:,:-1] = mask[:,1:]    # Shift west by 1 pixel
@@ -213,60 +264,6 @@ $$$$$$$$$$$$
 
 
 # --------------------------------------------------------------
-
-
-
-def parse_out(fin):
-    """Read the .out file"""
-
-    # ncells: long
-    fmt = '<L'
-    buf = fin.read(struct.calcsize(fmt))
-    ncells = struct.unpack(fmt, buf)[0]
-#    print('ncells ', ncells)
-
-    buf = fin.read(ncells * 4)
-    max_vel = np.frombuffer(buf, dtype='<f4')
-    buf = fin.read(ncells * 4)
-    max_height = np.frombuffer(buf, dtype='<f4')
-    buf = fin.read(ncells * 4)
-    depo = np.frombuffer(buf, dtype='<f4')
-
-
-    return (
-        ('max_vel', max_vel, {'units': 'm s-1'}),
-        ('max_height', max_height, {'units': 'm'}),
-        ('depo', depo,  {'units': 'm'}))
-
-def nc_out(ncout, izip, arcname, attrs={}):
-    """
-    Returns: {name: val}
-        Value of variables read
-        (max_vel, max_height, depo)
-    """
-    # Read the values from the .out file
-#    with open(fname, 'rb') as fin:
-    with izip.open(arcname, 'r') as fin:
-        namevals = parse_out(fin)
-
-    # Create and populate the variables
-    ncvs = list()
-    for vname, val, vattrs in namevals:
-        ncv = ncout.createVariable(vname, 'd', ('ncells',), compression='zlib')
-        for k,v in attrs.items():
-            setattr(ncv, k, v)
-        for k,v in vattrs.items():
-            setattr(ncv, k, v)
-        ncvs.append(ncv)
-    ret = dict()
-    for (name, val,_),ncv in zip(namevals, ncvs):
-        ncv[:] = val
-        ret[name] = val
-
-    return ret
-
-
-# ----------------------------------------------------------
 def is_overrun(ozip):
     """See if this avalanche overran its domain
 
