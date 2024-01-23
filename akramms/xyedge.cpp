@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <string>
 #include <algorithm>    // std::max
+#include <memory>
 
 #include "nputil.hpp"
 
