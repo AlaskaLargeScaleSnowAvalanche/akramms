@@ -93,7 +93,7 @@ void xyedge(
 
     // Apply the condition to determine which gridcells are on a
     // domain edge that would be solved if we enlarge the domain.
-    int const gridA_nxy = gridA_nx * gridA_ny;
+//    int const gridA_nxy = gridA_nx * gridA_ny;
     for (int k=0; k<ngridA; ++k) {
         int const jj = jAs[k] - j0;
         int const ii = iAs[k] - i0;
@@ -243,7 +243,7 @@ static struct PyModuleDef moduledef = {
 //}
 
 
-PyMODINIT_FUNC PyInit__xyedge(void)
+PyMODINIT_FUNC PyInit_xyedge(void)
 {
 //    // TODO: Disable this in production so it doesn't interfere with
 //    // Python interpreter in general.
