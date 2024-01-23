@@ -44,6 +44,12 @@ _mosaic_mod = Extension('_mosaic',
     extra_compile_args=['-std=c++17']
 )
 
+xyedge_mod = Extension('xyedge',
+    sources=['akramms/xyedge.cpp'],
+    include_dirs=[numpy.get_include(), '.'],
+    extra_compile_args=['-std=c++17']
+)
+
 setup(name = 'akramms',
         description='Alaska Large Scale Avalanche Simulations',
-        ext_modules = [d8graph_mod, smoother_mod, _mosaic_mod])
+        ext_modules = [d8graph_mod, smoother_mod, _mosaic_mod, xyedge_mod])

@@ -1,5 +1,18 @@
+#include <Python.h>
+#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
+#include <numpy/arrayobject.h>
+//#include "structmember.h"    // Map C struct members to Python attributes
 
+#include <cstdint>
+#include <string>
+#include <algorithm>    // std::max
 
+static char module_docstring[] = 
+"Determine Avalanche gridcells that constitute overrun";
+
+namespace akramms {
+
+// Must match domain_mask.py
 enum DomainMaskValue {
     MASK_OUT = 0,      // Not part of the domain
     MARGIN = 1,        // Avalanches can flow in here, but not start here
@@ -20,7 +33,7 @@ enum DomainMaskValue {
   This designates the set of cells that, if the avalanche ended in,
   then an overrun should be declared.
 */
-void _xyedge_xyedge(
+void xyedge(
     // Info on the gridcells within gridA represented by RAMMS
     int const ngridA,    // Number of gridcells for this avalanche
     int32_t *iAs,    // 
@@ -33,30 +46,30 @@ void _xyedge_xyedge(
     char *domain_maskA,
 
     // OUTPUT: same dimension as iA/jA
-    char *oedge)    // Is it an edge gridcell matching (a) and (b) criteria?
+    char *oedgeA)    // Is it an edge gridcell matching (a) and (b) criteria?
 {
 
-    // Determine limits of gridcells used.
+    // Determine limits of gridcells used so we can create a subgrid for them.
     int mini=0, minj=0;
     int maxi=std::numeric_limits<int>::max();
     int maxj=std::numeric_limits<int>::max();
     for (int k=0; k<ngridA; ++k) {
-        mini = std::min(min_i, iAs[k]);
-        maxi = std::max(max_i, iAs[k]);
-        minj = std::min(min_j, jAs[k]);
-        maxj = std::max(max_j, jAs[k]);
+        mini = std::min(mini, iAs[k]);
+        maxi = std::max(maxi, iAs[k]);
+        minj = std::min(minj, jAs[k]);
+        maxj = std::max(maxj, jAs[k]);
     }
 
     // Creates subgrid S with just those limits (and one gridcell margin)
     int const i0 = mini - 1;
-    int const i1 = maxi + 2;
+    int const i1 = maxi + 2;    // Range is [i0, i1)
     int const ni = i1-i0;
     int const j0 = minj - 1;
-    int const j1 = maxj + 1;
+    int const j1 = maxj + 2;
     int const nj = j1-j0;
 
     // Create 0/1 raster on subgrid indicating which gridcells are in the Avalanche domain.
-    std::unique_ptr<char> xygrid(new bool[nj*ni]);
+    std::unique_ptr<char[]> xygrid(new char[nj*ni]);
     for (int k=0; k<nj*ni; ++k) xygrid[k] = 0;
     for (int k=0; k<ngridA; ++k) {
         int const jj = jAs[k] - j0;
@@ -64,8 +77,8 @@ void _xyedge_xyedge(
         xygrid[jj*ni + ii] = 1;
     }
 
-    // Compute the number of neighbors of each gridcell (0-4)
-    std::unique_ptr<char> nneighbor(new bool[nj*ni]);
+    // Compute the number of neighbors (0-4) of each gridcell in A
+    std::unique_ptr<char[]> nneighbor(new char[nj*ni]);
     for (int k=0; k<nj*ni; ++k) nneighbor[k] = 0;
     for (int k=0; k<ngridA; ++k) {
         int const jj = jAs[k] - j0;
@@ -83,23 +96,158 @@ void _xyedge_xyedge(
         int const ii = iAs[k] - i0;
         int const ix = jj*ni + ii;
 
-        oedge[k] = false;
+        oedgeA[k] = 0;
 
-        // It's an interior cell
+        // It's an interior cell of the Avalanche sub-grid ==> NOT an oedge
         if (nneighbor[ix] == 4) continue;
 
         // Look at the domain mask
         int const dix = jAs[k]*gridA_nx + iAs[k];
         int[] const offset = [1, -1, gridA_nx, -gridA_nx];
-        for (int kk=0; i<4; ++i) {
-            int const off = offset[kk];
-            ix1 = ix + off;
+        for (int kk=0; kk<4; ++kk) {
+            ix1 = ix + offset[kk];
             // Check "neighbor" ix1 is on the grid
             if ((ix1 < 0) || (ix1 > gridA_nx * gridA_ny)) continue;
 
+            // If any neighbor is masked out (Canada), this is NOT an oedge.
+            // Because if Canada weren't there, the Avalanche domain could extend
+            // further
             if (domain_mask[ix1] == DomainMaskValue::MASK_OUT) goto continue_outer;
         }
-        oedge[k] = true;
+
+        // This gridcell IS an oedge: meaning, if you touch this gridcell then you have
+        // a genuine overrun.
+        oedgeA[k] = 1;
+
     continue_outer: ;
     }
 }
+
+} // namespace
+// =====================================================================
+// Python Interface
+
+using namespace akramms;
+
+// -----------------------------------------------------------------
+static char const *xyedge_xyedge_docstring =
+R"(Identifies the gridcells for a local avalanche run that:
+
+  a) Have fewer than 4 neighbors (meaning, they are on the edge of the
+     local avalanche domain).
+
+       and
+
+  b) In the wider tile domain for the scene, they do NOT border a
+     masked-out gridcell (eg. Canada).
+
+  This designates the set of cells that, if the avalanche ended in,
+  then an overrun should be declared.)";
+static PyObject *xyedge_xyedge(PyObject *module, PyObject *args, PyObject *kwargs)
+{
+    // Info on the gridcells within gridA represented by RAMMS
+    //int ngridA;    // Number of gridcells for this avalanche
+    PyArrayObject *iAs;    // Diff-encoded (i,j) of those gridcells
+    PyArrayObject *jAs;    // (0-based, this was determined from (x,y) values)
+
+    // Info on subdomain tile the avalanche ran in
+    int gridA_nx, gridA_ny;
+
+
+    // The domain mask
+    PyArrayObject *domain_maskA;
+
+    // OUTPUT: mosaic variables [gridM_ny, gridM_nx]
+    // PyArrayObject *oedgeA;
+
+    // Parse args and kwargs
+    static char const *kwlist[] = {
+        // *args
+        "iAs", "jAs",
+        "gridA_nx", "gridA_ny",
+        "domain_maskA",
+        // **kwargs
+        NULL};
+    if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!iiO!|",
+        (char **)kwlist,
+
+            &PyArray_Type, &iAs,
+            &PyArray_Type, &jAs,
+
+        &gridA_nx, &gridA_ny,
+
+            &PyArray_Type, &comain_maskA,
+        )) return NULL;
+
+    // -------------------------- Typecheck and Bounds Check
+    int const ngridA = PyArray_SIZE(iAs);
+    if (!check_array(i_diff, "iAs", NPY_INT, "NPY_INT", ngridA)) return NULL;
+    if (!check_array(j_diff, "jAs", NPY_INT, "NPY_INT", ngridA)) return NULL;
+
+    if (!check_array(domain_maskA, "max_velA", NPY_BYTE, "NPY_BYTE", ngridA)) return NULL;
+
+    PyArrayObject *oedgeA = np_new_1d((npy_intp)ngridA, NPY_BYTE);
+
+    // ------------------------------------------------------------------------
+    xyedge(
+        ngridA,
+            (int32_t *)PyArray_DATA(iAs),
+            (int32_t *)PyArray_DATA(jAs),
+        gridA_nx, gridA_ny,
+            (char *)PyArray_DATA(domain_maskA),
+            (char *)PyArray_DATA(oedgeA));
+
+    return oedgeA;
+}
+
+// ============================================================
+// Random other Python C Extension Stuff
+static PyMethodDef _XyedgeMethods[] = {
+    {"xyedge",
+        (PyCFunction)xyedge_xyedge,
+        METH_VARARGS | METH_KEYWORDS, xyedge_xyedge_docstring},
+
+    // Sentinel
+    {NULL, NULL, 0, NULL}
+};
+
+
+/* This initiates the module using the above definitions. */
+static struct PyModuleDef moduledef = {
+    PyModuleDef_HEAD_INIT,
+    "xyedge",    // Name of module
+    module_docstring,    // Per-module docstring
+    -1,  /* size of per-interpreter state of the module,
+                 or -1 if the module keeps state in global variables. */
+    _XyedgeMethods,    // Functions
+    NULL,
+    NULL,
+    NULL,
+    NULL
+};
+
+//extern "C" void handler(int sig) {
+//  void *array[10];
+//  size_t size;
+//
+//  // get void*'s for all entries on the stack
+//  size = backtrace(array, 10);
+//
+//  // print out all the frames to stderr
+//  PySys_WriteStderr("Error: signal %d:\n", sig);
+//  backtrace_symbols_fd(array, size, STDERR_FILENO);
+//  exit(1);
+//}
+
+
+PyMODINIT_FUNC PyInit__xyedge(void)
+{
+//    // TODO: Disable this in production so it doesn't interfere with
+//    // Python interpreter in general.
+//    signal(SIGSEGV, handler);   // install our handler
+
+    import_array();    // Needed for Numpy
+
+    return PyModule_Create(&moduledef);
+}
+

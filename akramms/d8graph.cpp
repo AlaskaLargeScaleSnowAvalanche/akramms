@@ -27,6 +27,8 @@
 #include <akramms/chull.hpp>
 #include <akramms/mbr.hpp>
 
+#include "nputil.hpp"
+
 using namespace akramms;
 
 // #define OPTIMIZE_D8        // Adds complication, only speeds things up a little bit.
@@ -38,26 +40,6 @@ typedef float dem_t;    // The Digital Elevation Model is single prceision
 typedef int ix_t;
 
 
-// ----------------------------------------------------------------------------------------
-/** Simple allocation of 1D Numpy array
-shape0:
-    Length of array
-typenum:
-    Type to allocation, eg NPY_INT, NPY_DOUBLE
-    https://numpy.org/devdocs/reference/c-api/dtype.html#c.NPY_TYPES
-*/
-PyArrayObject *np_new_1d(npy_intp shape0, int typenum)
-{
-    PyArray_Descr *tdescr = PyArray_DescrFromType(typenum);
-    npy_intp dims[] = {shape0};
-    npy_intp strides[] = {tdescr->elsize};
-    return (PyArrayObject*) PyArray_NewFromDescr(&PyArray_Type, 
-        tdescr, 1,    // rank 1
-        dims, strides,
-        NULL,        // Allocate new memory
-        // PyArray_FLAGS(dem), ...
-        NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED, NULL);
-}
 // ----------------------------------------------------------------------------------------
 static bool ff_check_input_int(PyArrayObject *dem, char const *name, int rank)
 {

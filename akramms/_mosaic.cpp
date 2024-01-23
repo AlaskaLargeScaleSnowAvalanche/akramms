@@ -7,6 +7,8 @@
 #include <string>
 #include <algorithm>    // std::max
 
+#include "nputil.hpp"
+
 static char module_docstring[] = 
 "Core AKRAMMS Mosaic Code";
 
@@ -87,35 +89,6 @@ void mosaic_mosaic(
 using namespace akramms;
 
 // -----------------------------------------------------------------
-static bool check_array(PyArrayObject *_arr, std::string const &name, int type_num, std::string const &stype_num, int const nxy)
-{
-    char msg[256];    // Error message
-
-    // Check storage
-    if (!PyArray_ISCARRAY_RO(_arr)) {
-        snprintf(msg, 256, "Parameter %s must be C-style, contiguous array.", name.c_str());
-        PyErr_SetString(PyExc_TypeError, msg);
-        return false;
-    }
-
-    // Check type
-    if (PyArray_DESCR(_arr)->type_num != type_num) {    // Eg: NPY_DOUBLE
-        snprintf(msg, 256, "Parameter %s must have dtype %s.", name.c_str(), stype_num.c_str());
-        PyErr_SetString(PyExc_TypeError, msg);
-        return false;
-    }
-
-    // Check total number of elements (we will flatten to 1D in C++)
-    if ((nxy >= 0) && (PyArray_SIZE(_arr) != nxy)) {
-        snprintf(msg, 256, "Parameter %s must have %d elements.", name.c_str(), nxy);
-        PyErr_SetString(PyExc_TypeError, msg);
-        return false;
-    }
-
-    return true;
-
-}
-// ---------------------------------------------------------
 static char const *_mosaic_mosaic_docstring =
 R"(_Mosaic Function Docstring
 )";
