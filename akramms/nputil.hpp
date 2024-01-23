@@ -1,6 +1,6 @@
 #pragma once
 
-namespace akramms {
+//namespace akramms {
 
 /** Simple allocation of 1D Numpy array
 shape0:
@@ -53,5 +53,5 @@ static bool check_array(PyArrayObject *_arr, std::string const &name, int type_n
 }
 // ---------------------------------------------------------
 
-}    // namespace
+//}    // namespace
 

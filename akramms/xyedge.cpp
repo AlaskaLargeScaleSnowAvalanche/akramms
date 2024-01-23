@@ -7,6 +7,8 @@
 #include <string>
 #include <algorithm>    // std::max
 
+#include "nputil.hpp"
+
 static char module_docstring[] = 
 "Determine Avalanche gridcells that constitute overrun";
 
@@ -17,7 +19,7 @@ enum DomainMaskValue {
     MASK_OUT = 0,      // Not part of the domain
     MARGIN = 1,        // Avalanches can flow in here, but not start here
     MASK_IN = 2        // Avalanches can start here
-}
+};
 
 
 /** Identifies the gridcells for a local avalanche run that:
@@ -40,7 +42,7 @@ void xyedge(
     int32_t *jAs,    // (0-based, this was determined from (x,y) values)
 
     // Info on subdomain tile the avalanche ran in
-    int gridA_nx, gridA_ny,
+    int gridA_nx, int gridA_ny,
 
     // The domain mask
     char *domain_maskA,
@@ -103,16 +105,16 @@ void xyedge(
 
         // Look at the domain mask
         int const dix = jAs[k]*gridA_nx + iAs[k];
-        int[] const offset = [1, -1, gridA_nx, -gridA_nx];
+        const int offset[] = {1, -1, gridA_nx, -gridA_nx};
         for (int kk=0; kk<4; ++kk) {
-            ix1 = ix + offset[kk];
-            // Check "neighbor" ix1 is on the grid
-            if ((ix1 < 0) || (ix1 > gridA_nx * gridA_ny)) continue;
+            int const dix1 = dix + offset[kk];
+            // Check "neighbor" dix1 is on the grid
+            if ((dix1 < 0) || (dix1 > gridA_nx * gridA_ny)) continue;
 
             // If any neighbor is masked out (Canada), this is NOT an oedge.
             // Because if Canada weren't there, the Avalanche domain could extend
             // further
-            if (domain_mask[ix1] == DomainMaskValue::MASK_OUT) goto continue_outer;
+            if (domain_maskA[dix1] == DomainMaskValue::MASK_OUT) goto continue_outer;
         }
 
         // This gridcell IS an oedge: meaning, if you touch this gridcell then you have
@@ -176,13 +178,13 @@ static PyObject *xyedge_xyedge(PyObject *module, PyObject *args, PyObject *kwarg
 
         &gridA_nx, &gridA_ny,
 
-            &PyArray_Type, &comain_maskA,
+            &PyArray_Type, &domain_maskA
         )) return NULL;
 
     // -------------------------- Typecheck and Bounds Check
     int const ngridA = PyArray_SIZE(iAs);
-    if (!check_array(i_diff, "iAs", NPY_INT, "NPY_INT", ngridA)) return NULL;
-    if (!check_array(j_diff, "jAs", NPY_INT, "NPY_INT", ngridA)) return NULL;
+    if (!check_array(iAs, "iAs", NPY_INT, "NPY_INT", ngridA)) return NULL;
+    if (!check_array(jAs, "jAs", NPY_INT, "NPY_INT", ngridA)) return NULL;
 
     if (!check_array(domain_maskA, "max_velA", NPY_BYTE, "NPY_BYTE", ngridA)) return NULL;
 
@@ -197,7 +199,7 @@ static PyObject *xyedge_xyedge(PyObject *module, PyObject *args, PyObject *kwarg
             (char *)PyArray_DATA(domain_maskA),
             (char *)PyArray_DATA(oedgeA));
 
-    return oedgeA;
+    return (PyObject *)oedgeA;
 }
 
 // ============================================================
