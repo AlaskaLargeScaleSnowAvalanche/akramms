@@ -36,7 +36,7 @@ enum DomainMaskValue {
   This designates the set of cells that, if the avalanche ended in,
   then an overrun should be declared.
 */
-void xyedge(
+void oedge(
     // Info on the gridcells within gridA represented by RAMMS
     int const ngridA,    // Number of gridcells for this avalanche
     int32_t *iAs,    // 
@@ -133,7 +133,7 @@ void xyedge(
 using namespace akramms;
 
 // -----------------------------------------------------------------
-static char const *xyedge_xyedge_docstring =
+static char const *xyedge_oedge_docstring =
 R"(Identifies the gridcells for a local avalanche run that:
 
   a) Have fewer than 4 neighbors (meaning, they are on the edge of the
@@ -146,7 +146,7 @@ R"(Identifies the gridcells for a local avalanche run that:
 
   This designates the set of cells that, if the avalanche ended in,
   then an overrun should be declared.)";
-static PyObject *xyedge_xyedge(PyObject *module, PyObject *args, PyObject *kwargs)
+static PyObject *xyedge_oedge(PyObject *module, PyObject *args, PyObject *kwargs)
 {
     // Info on the gridcells within gridA represented by RAMMS
     //int ngridA;    // Number of gridcells for this avalanche
@@ -207,8 +207,8 @@ static PyObject *xyedge_xyedge(PyObject *module, PyObject *args, PyObject *kwarg
 // Random other Python C Extension Stuff
 static PyMethodDef _XyedgeMethods[] = {
     {"xyedge",
-        (PyCFunction)xyedge_xyedge,
-        METH_VARARGS | METH_KEYWORDS, xyedge_xyedge_docstring},
+        (PyCFunction)xyedge_oedge,
+        METH_VARARGS | METH_KEYWORDS, xyedge_oedge_docstring},
 
     // Sentinel
     {NULL, NULL, 0, NULL}

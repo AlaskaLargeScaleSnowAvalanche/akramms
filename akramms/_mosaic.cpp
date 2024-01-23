@@ -27,6 +27,7 @@ void mosaic_mosaic(
     float *max_velA,
     float *max_heightA,
     float *depoA,
+    char *oedgeA,
 
     // Constants
     double const rho,
@@ -41,6 +42,7 @@ void mosaic_mosaic(
     float *max_velocityM,
     float *max_pressureM,
     int16_t *domain_countM,
+    int8_t *oedgeM,
     int16_t *avalanche_countM)
 {
     int const deltai = -(gridM_x0 - gridA_x0) / gridM_dx + 0.5;
@@ -65,6 +67,7 @@ void mosaic_mosaic(
 
         // Update variables for all gridcells in the avalanche domain
         domain_countM[jiM] += 1;
+        oedgeM[jiM] |= oedgeA[kA];
 
         // Update variables for only used gridcells in avalanche domain
         if (max_velA[kA] > 0) {
@@ -106,6 +109,7 @@ static PyObject *_mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwar
     PyArrayObject *max_velA;
     PyArrayObject *max_heightA;
     PyArrayObject *depoA;
+    PyArrayObject *oedgeA;
 
     // Constants
     double rho;
@@ -120,6 +124,7 @@ static PyObject *_mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwar
     PyArrayObject *max_velocityM;
     PyArrayObject *max_pressureM;
     PyArrayObject *domain_countM;
+    PyArrayObject *oedgeM;
     PyArrayObject *avalanche_countM;
 
     // Parse args and kwargs
@@ -127,11 +132,11 @@ static PyObject *_mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwar
         // *args
         /*"ngridA",*/ "i_diff", "j_diff",
         "gridA_x0", "gridA_y0",
-        "max_velA", "max_heightA", "depoA",
+        "max_velA", "max_heightA", "depoA", "oedgeA",
         "rho",
         "gridM_nx", "gridM_x0", "gridM_dx",
         "gridM_ny", "gridM_y0", "gridM_dy",
-        "depositionM", "max_heightM", "max_velocityM", "max_pressureM", "domain_countM", "avalanche_countM",
+        "depositionM", "max_heightM", "max_velocityM", "max_pressureM", "domain_countM", "oedgeM", "avalanche_countM",
         // **kwargs
         NULL};
     if(!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!ddO!O!O!diddiddO!O!O!O!O!O!|",
@@ -146,6 +151,7 @@ static PyObject *_mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwar
             &PyArray_Type, &max_velA,
             &PyArray_Type, &max_heightA,
             &PyArray_Type, &depoA,
+            &PyArray_Type, &oedgeA,
 
         &rho,
 
@@ -157,6 +163,7 @@ static PyObject *_mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwar
             &PyArray_Type, &max_velocityM,
             &PyArray_Type, &max_pressureM,
             &PyArray_Type, &domain_countM,
+            &PyArray_Type, &oedgeM,
             &PyArray_Type, &avalanche_countM
         )) return NULL;
 
@@ -168,6 +175,7 @@ static PyObject *_mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwar
     if (!check_array(max_velA, "max_velA", NPY_FLOAT, "NPY_FLOAT", ngridA)) return NULL;
     if (!check_array(max_heightA, "max_heightA", NPY_FLOAT, "NPY_FLOAT", ngridA)) return NULL;
     if (!check_array(depoA, "depoA", NPY_FLOAT, "NPY_FLOAT", ngridA)) return NULL;
+    if (!check_array(oedgeA, "oedgeA", NPY_INT8, "NPY_INT8", ngridA)) return NULL;
 
     int const nxyM = gridM_nx * gridM_ny;
     if (!check_array(depositionM, "depositionM", NPY_FLOAT, "NPY_FLOAT", nxyM)) return NULL;
@@ -175,6 +183,7 @@ static PyObject *_mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwar
     if (!check_array(max_velocityM, "max_velocityM", NPY_FLOAT, "NPY_FLOAT", nxyM)) return NULL;
     if (!check_array(max_pressureM, "max_pressureM", NPY_FLOAT, "NPY_FLOAT", nxyM)) return NULL;
     if (!check_array(domain_countM, "domain_countM", NPY_INT16, "NPY_INT16", nxyM)) return NULL;
+    if (!check_array(oedgeM, "oedgeM", NPY_INT8, "NPY_INT8", nxyM)) return NULL;
     if (!check_array(avalanche_countM, "avalanche_countM", NPY_INT16, "NPY_INT16", nxyM)) return NULL;
 
     // ------------------------------------------------------------------------
@@ -186,6 +195,7 @@ static PyObject *_mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwar
             (float *)PyArray_DATA(max_velA),
             (float *)PyArray_DATA(max_heightA),
             (float *)PyArray_DATA(depoA),
+            (float *)PyArray_DATA(oedgeA),
         rho,
         gridM_nx, gridM_x0, gridM_dx,
         gridM_ny, gridM_y0, gridM_dy,
@@ -194,6 +204,7 @@ static PyObject *_mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwar
             (float *)PyArray_DATA(max_velocityM),
             (float *)PyArray_DATA(max_pressureM),
             (int16_t *)PyArray_DATA(domain_countM),
+            (int8_t *)PyArray_DATA(oedgeM),
             (int16_t *)PyArray_DATA(avalanche_countM));
 
     Py_RETURN_NONE;
