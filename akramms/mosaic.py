@@ -81,9 +81,6 @@ _mosaic_metadata = {
     'domain_count': (gdal.GDT_Int16, {
         'description': 'Number of avalanches hitting this gridcell',
     }),
-    'oedge': (gdal.GDT_Int8, {
-        'description': 'Indicates whether gridcell is edge of the Avalanche domain',
-    }),
 }
 _avoid = ('dem', 'landcover')    # Only include these if user provides fetch fn
 _mosaic_keys = list(x for x in _mosaic_metadata.keys() if x not in _avoid)
@@ -131,7 +128,6 @@ def mosaic_avals(gridM, akdf, ofname_zip, tdir,
         max_velocity=np.zeros(shapeM, dtype='f4'),
         max_pressure=np.zeros(shapeM, dtype='f4'),
         domain_count=np.zeros(shapeM, dtype='i2'),
-        oedge=np.zeros(shapeM, dtype='i1'),
         avalanche_count=np.zeros(shapeM, dtype='i2'))
 
 #    for aval_i,fname in enumerate(avals):
@@ -158,7 +154,6 @@ def mosaic_avals(gridM, akdf, ofname_zip, tdir,
                 nc.variables['max_vel'][:].astype('f4'),
                 nc.variables['max_height'][:].astype('f4'),
                 nc.variables['depo'][:].astype('f4'),
-                nc.variables['oedge'][:].astype('i1'),
                 rho,
                 gridM.nx, gridM.x0, gridM.dx,
                 gridM.ny, gridM.y0, gridM.dy,
@@ -167,7 +162,6 @@ def mosaic_avals(gridM, akdf, ofname_zip, tdir,
                 vals['max_velocity'],
                 vals['max_pressure'],
                 vals['domain_count'],
-                vals['oedge'],
                 vals['avalanche_count'])
             _mosaic.mosaic(*args)
 

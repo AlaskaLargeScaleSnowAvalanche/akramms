@@ -117,7 +117,7 @@ def parse_xy_coord(gridI, fin):
     return ivec, jvec
 
 
-def nc_xy_coord(dem_mask, ncout, gridI, coord_attrs, izip, arcname):
+def nc_xy_coord(ncout, gridI, coord_attrs, izip, arcname):
     """
     izip, arcname:
         File .xy-coord file to read (from inside a zip)
@@ -146,14 +146,8 @@ def nc_xy_coord(dem_mask, ncout, gridI, coord_attrs, izip, arcname):
     for k,v in coord_attrs['Y'].items():
         setattr(ncvj, k, v)
 
-    ncoedge = ncout.createVariable('oedge', 'i1', ('ncells',), compression='zlib')
-    ncoedge.description = "Map of gridcells that form the edge of the Avalanche domain.  Does NOT include gridcells bordering on Canada (eg dem_mask.MASK_OUT)"
-
     ncvi[:] = divec
     ncvj[:] = djvec
-
-    oedge = xyedge.oedge(ivec, jvec, gridI.nx, gridI.ny, dem_mask)
-    ncoedge[:] = oedge
 
     return ivec,jvec
 
@@ -222,27 +216,27 @@ class OverrunChecker:
         maskX = mask.copy()
         maskX[:,:-1] = mask[:,1:]    # Shift west by 1 pixel
         border = np.logical_and(
-            mask  != dem_mask.Value.MASK_OUT,
-            maskX == dem_mask.Value.MASK_OUT)
+            mask  != domain_mask.Value.MASK_OUT,
+            maskX == domain_mask.Value.MASK_OUT)
 
         maskX = mask.copy()
         maskX[:,1:] = mask[:,:-1] # Shift east by 1 pixel
         border = np.logical_or(border, np.logical_and(
-            mask  != dem_mask.Value.MASK_OUT,
-            maskX == dem_mask.Value.MASK_OUT))
+            mask  != domain_mask.Value.MASK_OUT,
+            maskX == domain_mask.Value.MASK_OUT))
 
 
         maskX = mask.copy()
         maskX[:-1,:] = mask[1:,:]    # Shift south by 1 pixel
         border = np.logical_or(border, np.logical_and(
-            mask  != dem_mask.Value.MASK_OUT,
-            maskX == dem_mask.Value.MASK_OUT))
+            mask  != domain_mask.Value.MASK_OUT,
+            maskX == domain_mask.Value.MASK_OUT))
 
         maskX = mask.copy()
         maskX[1:,:] = mask[:-1,:]    # Shift north by 1 pixel
         border = np.logical_or(border, np.logical_and(
-            mask  != dem_mask.Value.MASK_OUT,
-            maskX == dem_mask.Value.MASK_OUT))
+            mask  != domain_mask.Value.MASK_OUT,
+            maskX == domain_mask.Value.MASK_OUT))
 
         self.border = border
 
@@ -282,7 +276,7 @@ def is_overrun(ozip):
 
     return overrun
 # ----------------------------------------------------------
-def ramms_to_nc0(dem_mask, out_zip, ncout):
+def ramms_to_nc0(out_zip, ncout):
     """
     base:
         Base name of avalanche, including full pathname.
@@ -321,7 +315,7 @@ def ramms_to_nc0(dem_mask, out_zip, ncout):
         ncout.variables['status'].overrun = 1 if overrun else 0
 #        ncout.variables['status'].overrun = 'True' if overrun else 'False'
 
-        # Get the grid (which ultimately came from the DEM file)
+        # Get the grid
         gridI = pickle.loads(in_zip.read('grid.pik'))
 
         # http://cfconventions.org/cf-conventions/cf-conventions.html#coordinate-system
@@ -371,7 +365,7 @@ def ramms_to_nc0(dem_mask, out_zip, ncout):
         # The .xyz file (SKIP)
 
         # The .xy-coord file
-        ivec,jvec = nc_xy_coord(dem_mask, ncout, gridI, coord_attrs, in_zip, f'{leaf}.xy-coord')
+        ivec,jvec = nc_xy_coord(ncout, gridI, coord_attrs, in_zip, f'{leaf}.xy-coord')
 
         # The .out file
         vars = nc_out(ncout, out_zip, f'{leaf}.out',
@@ -403,7 +397,6 @@ def ramms_to_nc0(dem_mask, out_zip, ncout):
         ncv[:] = np.array([
             [min(x0,x1), min(y0,y1)],
             [max(x0,x1) + gridI.dx*np.sign(gridI.dx), max(y0,y1) + gridI.dy*np.sign(gridI.dy) ]])
-
     return overrun
 
 
@@ -424,9 +417,6 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
         arc_dir = expmod.combo_to_scenedir(combo, scenetype='arc')
 #        print('arc-dir ', arc_dir)
         x_dir = expmod.combo_to_scenedir(combo, scenetype='x')
-
-        dem_mask_tif = exp.dir / 'dem' / f'ak_dem_{combo.idom:-3}_{combo.jdom:03}_mask.tif'
-        gridI,dem_mask = gdalutil.read_raster(dem_mask_tif)
 
         jb = file_info.parse_chunk_release_file(releasefile)
 #        arc_dir = jb.scene_dir
@@ -505,7 +495,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
                     ncv.combo = '{exp}-{scombo}'
                     ncv.releasefile_timestamp = releasefile_timestamp
                     ncv.avalanche_timestamp = out_zip_dtime.isoformat()
-                    ramms_to_nc0(dem_mask, out_zip, ncout)
+                    ramms_to_nc0(out_zip, ncout)
 
                     # Add info from scene that created this avalanche
                     with netCDF4.Dataset(os.path.join(x_dir, 'scene.nc')) as ncin:
