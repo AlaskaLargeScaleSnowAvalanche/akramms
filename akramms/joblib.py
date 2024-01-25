@@ -161,55 +161,6 @@ def query_condor(expmod):
 
 
 # --------------------------------------------------------------------
-class OverrunChecker:
-
-    def __init__(self, dem_mask_tif):
-        self.gridI,mask,_ = gdalutil.read_raster(dem_mask_tif)
-
-        # Determine border: the set of gridcells that are NOT masked
-        # out (i.e. avalanches could run there), but they are NEXT TO
-        # a masked-out gridcell.  Avalanches that "overrun" to these
-        # gridcells are NOT considered overruns.
-
-        maskX = mask.copy()
-        maskX[:,:-1] = mask[:,1:]    # Shift west by 1 pixel
-        border = np.logical_and(
-            mask  != domain_mask.Value.MASK_OUT,
-            maskX == domain_mask.Value.MASK_OUT)
-
-        maskX = mask.copy()
-        maskX[:,1:] = mask[:,:-1] # Shift east by 1 pixel
-        border = np.logical_or(border, np.logical_and(
-            mask  != domain_mask.Value.MASK_OUT,
-            maskX == domain_mask.Value.MASK_OUT))
-
-
-        maskX = mask.copy()
-        maskX[:-1,:] = mask[1:,:]    # Shift south by 1 pixel
-        border = np.logical_or(border, np.logical_and(
-            mask  != domain_mask.Value.MASK_OUT,
-            maskX == domain_mask.Value.MASK_OUT))
-
-        maskX = mask.copy()
-        maskX[1:,:] = mask[:-1,:]    # Shift north by 1 pixel
-        border = np.logical_or(border, np.logical_and(
-            mask  != domain_mask.Value.MASK_OUT,
-            maskX == domain_mask.Value.MASK_OUT))
-
-
-
-    def is_overrun(self, out_zip):
-        """Determines whether a RAMMS result is overrun"""
-        with zipfile.ZipFile(out_zip, 'r') as ozip:
-            arcnames = [os.path.split(x)[1] for x in ozip.namelist()]
-        if not any(x.endswith('.out.overrun') for x in arcnames):
-            return False
-
-        # RAMMS thinks it overran.  Inspect the domain mask further to
-        # determine whether it in fact overran.
-
-
-# --------------------------------------------------------------------
 
 _subsceneRE = re.compile(r'x-(\d+-\d+)')
 def add_id_status(akdf0, update=True, dry_run=False):
@@ -236,7 +187,7 @@ def add_id_status(akdf0, update=True, dry_run=False):
             scene_args = params.load(scenedir)
             dem_tif = pathlib.Path(scene_args['dem_file'])
             dem_mask_tif = dem_tif.parents[0] / (dem_tif.parts[-1][:-4] + '_mask.tif')
-            check_overruns = OverrunChecker(dem_mask_tif)
+            check_overruns = archive.OverrunChecker(dem_mask_tif)
 
             # Corresponding archive location
             arcdir = xdir.parents[0] / ('arc' + xdir.parts[-1][1:])
@@ -297,9 +248,11 @@ def add_id_status(akdf0, update=True, dry_run=False):
                         # We tentatively think the job is finished.  But let's
                         # look inside the zip file to make sure the domain
                         # wasn't overrun.
-                        statuses.append(
-                            (combo, chunkid, tup.id,
-                            JobStatus.OVERRUN if is_overrun(out_zip) else JobStatus.FINISHED) )
+                        with zipfile.ZipFile(f'{base}.in.zip', 'r') as izip:
+                          with zipfile.ZipFile(f'{base}.out.zip', 'r') as ozip:
+                            statuses.append(
+                                (combo, chunkid, tup.id,
+                                JobStatus.OVERRUN if check_overruns.is_overrun(inzip, ozip) else JobStatus.FINISHED) )
                         continue
 
                     # Default to TODO

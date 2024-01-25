@@ -13,6 +13,7 @@ from akramms import config,parse,file_info,resolve,overrun
 __all__ = ('archive',)
 
 # ------------------------------------------------------------------
+# ------------------------------------------------------------------
 # NOTE: Similar to rammsutil.read_polygon_from_zip()
 _all_spaceRE = re.compile(r'$\s*^')
 def _read_polygon(izip, poly_file):
@@ -206,45 +207,18 @@ def nc_out(ncout, izip, arcname, attrs={}):
 class OverrunChecker:
 
     def __init__(self, dem_mask_tif):
-        self.gridI,mask,_ = gdalutil.read_raster(dem_mask_tif)
-
-        # Determine border: the set of gridcells that are NOT masked
-        # out (i.e. avalanches could run there), but they are NEXT TO
-        # a masked-out gridcell.  Avalanches that "overrun" ONLY to
-        # these gridcells are NOT considered overruns.
-
-        maskX = mask.copy()
-        maskX[:,:-1] = mask[:,1:]    # Shift west by 1 pixel
-        border = np.logical_and(
-            mask  != domain_mask.Value.MASK_OUT,
-            maskX == domain_mask.Value.MASK_OUT)
-
-        maskX = mask.copy()
-        maskX[:,1:] = mask[:,:-1] # Shift east by 1 pixel
-        border = np.logical_or(border, np.logical_and(
-            mask  != domain_mask.Value.MASK_OUT,
-            maskX == domain_mask.Value.MASK_OUT))
+        self.gridI,self.dem_mask,_ = gdalutil.read_raster(dem_mask_tif)
 
 
-        maskX = mask.copy()
-        maskX[:-1,:] = mask[1:,:]    # Shift south by 1 pixel
-        border = np.logical_or(border, np.logical_and(
-            mask  != domain_mask.Value.MASK_OUT,
-            maskX == domain_mask.Value.MASK_OUT))
+    def is_overrun(self, in_zip, out_zip):
+        """Determines whether a RAMMS result is overrun
 
-        maskX = mask.copy()
-        maskX[1:,:] = mask[:-1,:]    # Shift north by 1 pixel
-        border = np.logical_or(border, np.logical_and(
-            mask  != domain_mask.Value.MASK_OUT,
-            maskX == domain_mask.Value.MASK_OUT))
+        in_zip, out_zip:
+            Already-open zip files
+        """
 
-        self.border = border
-
-
-    def is_overrun(self, out_zip):
-        """Determines whether a RAMMS result is overrun"""
-        with zipfile.ZipFile(out_zip, 'r') as ozip:
-            arcnames = [os.path.split(x)[1] for x in ozip.namelist()]
+        # If RAMMS did not detect an overrun, we are fine.
+        arcnames = [os.path.split(x)[1] for x in out_zip.namelist()]
         if not any(x.endswith('.out.overrun') for x in arcnames):
             return False
 
@@ -253,30 +227,24 @@ class OverrunChecker:
         base = str(out_zip)[:-8]    # Remove .out.zip
         leaf = os.path.split(base)[1]
 
-        with zipfile.ZipFile(f'{base}.in.zip', 'r') as in_zip:
-          with zipfile.ZipFile(f'{base}.out.zip', 'r') as out_zip:
-$$$$$$$$$$$$
+        # Identify oedge, the set of gridcells that, if the avalanche hits them,
+        # constitute an overrun.
+        with in_zip.open(arcname, 'r') as fin:
+            ivec, jvec = parse_xy_coord(gridI, fin)
+            oedge = xyedge.oedge(ivec, jvec, self.gridI.nx, self.gridI.ny, self.dem_mask)
 
+        # See if we hit any of the oedge gridcells
+        with out_zip.open(arcname, 'r') as fin:
+            namevals = parse_out(fin)
+            vals = {name:val for name,val,_ in namevals}
 
-        with zipfile.ZipFile(arcdir_zip) as izip:
-            with izip.open(f'{leaf}.xy-coord', 'r') as fin:
-                ivec, jvec = parse_xy_coord(gridI, fin)
+        return np.any(np.logical_and(oedge != 0, vals['max_height'] > 0))
 
 
 # --------------------------------------------------------------
-def is_overrun(ozip):
-    """See if this avalanche overran its domain
 
-    ozip: zipfile.ZipFile
-        Open zipfile of <xyz>.out.zip
-    """
-    arcnames = [os.path.split(x)[1] for x in ozip.namelist()]
-    print(f'is_overrun {arcnames}')
-    overrun = any(x.endswith('.out.overrun') for x in arcnames)
 
-    return overrun
-# ----------------------------------------------------------
-def ramms_to_nc0(out_zip, ncout):
+def ramms_to_nc0(out_zip, id_status, ncout):
     """
     base:
         Base name of avalanche, including full pathname.
@@ -299,6 +267,8 @@ def ramms_to_nc0(out_zip, ncout):
 
 
     """
+    check_overruns = archive.OverrunChecker(dem_mask_tif)
+
     base = str(out_zip)[:-8]    # Remove .out.zip
     leaf = os.path.split(base)[1]
     with zipfile.ZipFile(f'{base}.in.zip', 'r') as in_zip:
@@ -308,12 +278,11 @@ def ramms_to_nc0(out_zip, ncout):
         out_infos = out_zip.infolist()
 
         # See if this avalanche overran its domain
-        overrun = is_overrun(out_zip)
+        overrun = (id_status == file_info.JobStatus.OVERRUN)
 
         if 'status' not in ncout.variables:
             ncv = ncout.createVariable('status', 'i')
         ncout.variables['status'].overrun = 1 if overrun else 0
-#        ncout.variables['status'].overrun = 'True' if overrun else 'False'
 
         # Get the grid
         gridI = pickle.loads(in_zip.read('grid.pik'))
@@ -418,6 +387,12 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
 #        print('arc-dir ', arc_dir)
         x_dir = expmod.combo_to_scenedir(combo, scenetype='x')
 
+#        # Load up dem_mask to help us check for overruns
+#        scene_args = params.load(x_dir)
+#        dem_tif = pathlib.Path(scene_args['dem_file'])
+#        dem_mask_tif = dem_tif.parents[0] / (dem_tif.parts[-1][:-4] + '_mask.tif')
+#        check_overruns = archive.OverrunChecker(dem_mask_tif)
+
         jb = file_info.parse_chunk_release_file(releasefile)
 #        arc_dir = jb.scene_dir
 
@@ -427,8 +402,8 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
         rdf = rdf.set_index('Id')
 
         for tup in akdf1.reset_index(drop=True).itertuples(index=False):
-            if tup.id == 6570:
-                print(f'archive ', tup)
+#            if tup.id == 6570:
+#                print(f'archive ', tup)
             inout = file_info.inout_name(jb, tup.chunkid, tup.id)
             out_zip = jb.avalanche_dir / f'{inout}.out.zip'
             out_zip_mtime = os.path.getmtime(out_zip)
@@ -439,15 +414,8 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
             if not file_info.is_file_good(out_zip):
                 continue
 
-            # Avoid archiving overrun files
-#            with zipfile.ZipFile(out_zip, 'r') as ozip:
-#                overrun = is_overrun(ozip)
-            overrun = (tup.id_status == file_info.JobStatus.OVERRUN)
-#            if overrun:
-#                print(f'overrun: {out_zip}')
-
             # Determine if the avalanche was already archived
-            Overrun = 'overrun' if overrun else ''
+            Overrun = 'overrun' if (tup.id_status == file_info.JobStatus.OVERRUN) else ''
             arc_fname = arc_dir / f'{arc_leafbase}-{Overrun}.nc'
             if os.path.exists(arc_fname):
                 with netCDF4.Dataset(arc_fname) as nc:
@@ -495,7 +463,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
                     ncv.combo = '{exp}-{scombo}'
                     ncv.releasefile_timestamp = releasefile_timestamp
                     ncv.avalanche_timestamp = out_zip_dtime.isoformat()
-                    ramms_to_nc0(out_zip, ncout)
+                    ramms_to_nc0(out_zip, tup.id_status, ncout)
 
                     # Add info from scene that created this avalanche
                     with netCDF4.Dataset(os.path.join(x_dir, 'scene.nc')) as ncin:
