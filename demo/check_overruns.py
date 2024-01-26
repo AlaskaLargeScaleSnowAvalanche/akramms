@@ -1,4 +1,4 @@
-import pathlib
+import pathlib,re,os
 from akramms import joblib
 
 prj = pathlib.Path('/home/efischer/prj/ak')
@@ -8,7 +8,18 @@ avaldir = prj / 'ak-ccsm-1981-1990-lapse-For-30/x-111-042/CHUNKS/c-M-00000/RESUL
 ids = (2432, 3255)
 
 
+baseRE = re.compile(r'c-M-(\d+)For_10m_30M_(\d+).out.zip')
 def main():
+
+    ids = list()
+    for name in os.listdir(avaldir):
+        match = baseRE.match(name)
+        if match is None:
+            continue
+        ids.append(int(match.group(2)))
+
+    print('ids ', ids)
+
     check_overruns = joblib.OverrunChecker(dem_mask_tif)
     for id in ids:
         base_leaf = f'c-M-00000For_10m_30M_{id}'
