@@ -5,7 +5,7 @@ prj = pathlib.Path('/home/efischer/prj/ak')
 dem_mask_tif = prj / 'dem' / 'ak_dem_111_042_mask.tif'
 avaldir = prj / 'ak-ccsm-1981-1990-lapse-For-30/x-111-042/CHUNKS/c-M-00000/RESULTS/c-M-00000For_10m/30M'
 
-ids = (2423, 3255)
+ids = (2432, 3255)
 
 
 def main():
