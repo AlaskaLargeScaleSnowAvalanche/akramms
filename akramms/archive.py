@@ -229,7 +229,7 @@ class OverrunChecker:
                 stack.enter_context(out_zip)
 
 
-            out_names = {ext: name for ext,name = 
+            out_names = {ext: name for ext,name in
                 (name.split('.',1) for name in out_zip.namelist())}
 
 
