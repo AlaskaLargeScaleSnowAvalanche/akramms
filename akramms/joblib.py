@@ -202,6 +202,7 @@ class OverrunChecker:
             with in_zip.open(arcname, 'r') as fin:
                 ivec, jvec = parse_xy_coord(gridI, fin)
                 oedge = xyedge.oedge(ivec, jvec, self.gridI.nx, self.gridI.ny, self.dem_mask)
+                print('oedge ', np.sum(oedge))
 
             # See if we hit any of the oedge gridcells
             with out_zip.open(arcname, 'r') as fin:
