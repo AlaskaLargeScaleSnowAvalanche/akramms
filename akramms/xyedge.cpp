@@ -192,7 +192,7 @@ static PyObject *xyedge_oedge(PyObject *module, PyObject *args, PyObject *kwargs
     PyArrayObject *oedgeA = np_new_1d((npy_intp)ngridA, NPY_BYTE);
 
     // ------------------------------------------------------------------------
-    xyedge(
+    oedge(
         ngridA,
             (int32_t *)PyArray_DATA(iAs),
             (int32_t *)PyArray_DATA(jAs),
