@@ -206,7 +206,7 @@ def nc_out(ncout, izip, arcname, attrs={}):
 # ----------------------------------------------------------
 def names_by_ext(izip):
     names = izip.namelist()
-    exts = (name.split('.',1)[0] for name in names)
+    exts = (name.split('.',1)[1] for name in names)
     return dict(zip(exts,names))
 
 class OverrunChecker:
