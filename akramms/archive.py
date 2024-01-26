@@ -204,6 +204,11 @@ def nc_out(ncout, izip, arcname, attrs={}):
 
 
 # ----------------------------------------------------------
+def names_by_ext(izip):
+    names = izip.namelist()
+    exts = (name.split('.',1)[0] for name in names)
+    return dict(zip(exts,names))
+
 class OverrunChecker:
 
     def __init__(self, dem_mask_tif):
@@ -229,16 +234,13 @@ class OverrunChecker:
                 stack.enter_context(out_zip)
 
 
-            out_names = {ext: name for ext,name in
-                (name.split('.',1) for name in out_zip.namelist())}
-
+            out_names = names_by_ext(out_zip)
 
             # If RAMMS did not detect an overrun, we are fine.
 #            if 'out.overrun' not in out_names:
 #                return False
 
-            in_names = {ext: name for ext,name in 
-                (name.split('.',1) for name in in_zip.namelist())}
+            in_names = names_by_ext(in_zip)
 
             # RAMMS thinks it overran.  Inspect the domain mask further to
             # determine whether it in fact overran.
