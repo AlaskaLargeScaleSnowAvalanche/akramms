@@ -67,6 +67,8 @@ printf("%p %p %p %p\n", iAs, jAs, domain_maskA, oedgeA);
         maxj = std::max(maxj, jAs[k]);
     }
 
+printf("AA2\n");
+
     // Creates subgrid S with just those limits (and one gridcell margin)
     int const i0 = mini - 1;
     int const i1 = maxi + 2;    // Range is [i0, i1)
@@ -75,6 +77,7 @@ printf("%p %p %p %p\n", iAs, jAs, domain_maskA, oedgeA);
     int const j1 = maxj + 2;
     int const nj = j1-j0;
 
+printf("AA3\n");
     // Create 0/1 raster on subgrid indicating which gridcells are in the Avalanche domain.
     std::unique_ptr<char[]> xygrid(new char[nj*ni]);
     for (int k=0; k<nj*ni; ++k) xygrid[k] = 0;
@@ -84,6 +87,7 @@ printf("%p %p %p %p\n", iAs, jAs, domain_maskA, oedgeA);
         xygrid[jj*ni + ii] = 1;
     }
 
+printf("AA4\n");
     // Compute the number of neighbors (0-4) of each gridcell in A
     std::unique_ptr<char[]> nneighbor(new char[nj*ni]);
     for (int k=0; k<nj*ni; ++k) nneighbor[k] = 0;
@@ -95,6 +99,7 @@ printf("%p %p %p %p\n", iAs, jAs, domain_maskA, oedgeA);
     }
 
 
+printf("AA5\n");
     // Apply the condition to determine which gridcells are on a
     // domain edge that would be solved if we enlarge the domain.
 //    int const gridA_nxy = gridA_nx * gridA_ny;
@@ -128,6 +133,9 @@ printf("%p %p %p %p\n", iAs, jAs, domain_maskA, oedgeA);
 
     continue_outer: ;
     }
+
+printf("AA6\n");
+
 }
 
 } // namespace
