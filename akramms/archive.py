@@ -255,7 +255,7 @@ class OverrunChecker:
             # constitute an overrun.
             print(list(in_names.values()))
             with in_zip.open(in_names['xy-coord'], 'r') as fin:
-                ivec, jvec = parse_xy_coord(gridI, fin)
+                ivec, jvec = parse_xy_coord(self.gridI, fin)
                 oedge = xyedge.oedge(ivec, jvec, self.gridI.nx, self.gridI.ny, self.dem_mask)
                 print('oedge ', np.sum(oedge))
 
