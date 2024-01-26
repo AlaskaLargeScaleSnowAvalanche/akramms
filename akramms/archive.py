@@ -234,8 +234,8 @@ class OverrunChecker:
 
 
             # If RAMMS did not detect an overrun, we are fine.
-            if 'out.overrun' not in out_names:
-                return False
+#            if 'out.overrun' not in out_names:
+#                return False
 
             in_names = {ext: name for ext,name in 
                 (name.split('.',1) for name in out_zip.namelist())}
