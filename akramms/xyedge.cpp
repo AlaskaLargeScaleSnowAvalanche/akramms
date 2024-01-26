@@ -206,7 +206,7 @@ static PyObject *xyedge_oedge(PyObject *module, PyObject *args, PyObject *kwargs
 // ============================================================
 // Random other Python C Extension Stuff
 static PyMethodDef _XyedgeMethods[] = {
-    {"xyedge",
+    {"oedge",
         (PyCFunction)xyedge_oedge,
         METH_VARARGS | METH_KEYWORDS, xyedge_oedge_docstring},
 
