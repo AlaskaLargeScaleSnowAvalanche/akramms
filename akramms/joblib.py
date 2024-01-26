@@ -187,10 +187,10 @@ class OverrunChecker:
                 stack.enter_context(out_zip)
 
 
-            # If RAMMS did not detect an overrun, we are fine.
-            arcnames = [os.path.split(x)[1] for x in out_zip.namelist()]
-            if not any(x.endswith('.out.overrun') for x in arcnames):
-                return False
+#            # If RAMMS did not detect an overrun, we are fine.
+#            arcnames = [os.path.split(x)[1] for x in out_zip.namelist()]
+#            if not any(x.endswith('.out.overrun') for x in arcnames):
+#                return False
 
             # RAMMS thinks it overran.  Inspect the domain mask further to
             # determine whether it in fact overran.
