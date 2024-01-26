@@ -238,7 +238,7 @@ class OverrunChecker:
 #                return False
 
             in_names = {ext: name for ext,name in 
-                (name.split('.',1) for name in out_zip.namelist())}
+                (name.split('.',1) for name in in_zip.namelist())}
 
             # RAMMS thinks it overran.  Inspect the domain mask further to
             # determine whether it in fact overran.
