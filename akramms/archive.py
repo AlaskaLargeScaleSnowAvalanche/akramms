@@ -7,6 +7,7 @@ import netCDF4
 import pyproj
 from uafgi.util import gdalutil,shputil,ncutil
 from akramms import config,parse,file_info,resolve,overrun
+import xyedge
 
 # Convert Avalanche outputs to NetCDF
 
