@@ -54,7 +54,7 @@ void oedge(
 
 
 printf("AA1\n");
-printf("%lx %lx %lx %lx\n", iAs, jAs, domain_maskA, oedgeA);
+printf("%p %p %p %p\n", iAs, jAs, domain_maskA, oedgeA);
 
     // Determine limits of gridcells used so we can create a subgrid for them.
     int mini=0, minj=0;
