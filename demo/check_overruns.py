@@ -1,5 +1,5 @@
 import pathlib,re,os
-from akramms import joblib
+from akramms import archive
 
 prj = pathlib.Path('/home/efischer/prj/ak')
 dem_mask_tif = prj / 'dem' / 'ak_dem_111_042_mask.tif'
@@ -20,7 +20,7 @@ def main():
 
     print('ids ', ids)
 
-    check_overruns = joblib.OverrunChecker(dem_mask_tif)
+    check_overruns = archive.OverrunChecker(dem_mask_tif)
     for id in ids:
         base_leaf = f'c-M-00000For_10m_30M_{id}'
         in_zip = avaldir / (base_leaf + '.in.zip')

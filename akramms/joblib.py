@@ -158,59 +158,6 @@ def query_condor(expmod):
 
     return condor_statuses
 
-
-
-# --------------------------------------------------------------------
-
-class OverrunChecker:
-
-    def __init__(self, dem_mask_tif):
-        self.gridI,self.dem_mask,_ = gdalutil.read_raster(dem_mask_tif)
-
-
-    def is_overrun(self, in_zip, out_zip):
-        """Determines whether a RAMMS result is overrun
-
-        in_zip, out_zip:
-            Already-open zip files
-        """
-
-        with contextlib.ExitStack() as stack:
-
-            # Open .in.zip and .out.zip files if not already open
-            if not isinstance(in_zip, zipfile.ZipFile):
-                in_zip = zipfile.ZipFile(in_zip, 'r')
-                stack.enter_context(in_zip)
-
-            if not isinstance(out_zip, zipfile.ZipFile):
-                out_zip = zipfile.ZipFile(out_zip, 'r')
-                stack.enter_context(out_zip)
-
-
-#            # If RAMMS did not detect an overrun, we are fine.
-#            arcnames = [os.path.split(x)[1] for x in out_zip.namelist()]
-#            if not any(x.endswith('.out.overrun') for x in arcnames):
-#                return False
-
-            # RAMMS thinks it overran.  Inspect the domain mask further to
-            # determine whether it in fact overran.
-            base = str(out_zip)[:-8]    # Remove .out.zip
-            leaf = os.path.split(base)[1]
-
-            # Identify oedge, the set of gridcells that, if the avalanche hits them,
-            # constitute an overrun.
-            with in_zip.open(arcname, 'r') as fin:
-                ivec, jvec = parse_xy_coord(gridI, fin)
-                oedge = xyedge.oedge(ivec, jvec, self.gridI.nx, self.gridI.ny, self.dem_mask)
-                print('oedge ', np.sum(oedge))
-
-            # See if we hit any of the oedge gridcells
-            with out_zip.open(arcname, 'r') as fin:
-                namevals = parse_out(fin)
-                vals = {name:val for name,val,_ in namevals}
-
-            return np.any(np.logical_and(oedge != 0, vals['max_height'] > 0))
-
 # --------------------------------------------------------------
 _subsceneRE = re.compile(r'x-(\d+-\d+)')
 def add_id_status(akdf0, update=True, dry_run=False):
