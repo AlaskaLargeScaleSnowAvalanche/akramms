@@ -178,11 +178,11 @@ class OverrunChecker:
         with contextlib.ExitStack() as stack:
 
             # Open .in.zip and .out.zip files if not already open
-            if not (in_zip instanceof zipfile.ZipFile):
+            if not isinstance(in_zip, zipfile.ZipFile):
                 in_zip = zipfile.ZipFile(in_zip, 'r')
                 stack.enter_context(in_zip)
 
-            if not (out_zip instanceof zipfile.ZipFile):
+            if not isinstance(out_zip, zipfile.ZipFile):
                 out_zip = zipfile.ZipFile(out_zip, 'r')
                 stack.enter_context(out_zip)
 
