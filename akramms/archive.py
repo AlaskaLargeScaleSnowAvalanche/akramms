@@ -247,6 +247,7 @@ class OverrunChecker:
 
             # Identify oedge, the set of gridcells that, if the avalanche hits them,
             # constitute an overrun.
+            print(list(in_names.values()))
             with in_zip.open(in_names['out'], 'r') as fin:
                 ivec, jvec = parse_xy_coord(gridI, fin)
                 oedge = xyedge.oedge(ivec, jvec, self.gridI.nx, self.gridI.ny, self.dem_mask)
