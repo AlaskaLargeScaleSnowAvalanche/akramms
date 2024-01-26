@@ -187,7 +187,7 @@ static PyObject *xyedge_oedge(PyObject *module, PyObject *args, PyObject *kwargs
     if (!check_array(iAs, "iAs", NPY_INT, "NPY_INT", ngridA)) return NULL;
     if (!check_array(jAs, "jAs", NPY_INT, "NPY_INT", ngridA)) return NULL;
 
-    if (!check_array(domain_maskA, "domain_maskA", NPY_BYTE, "NPY_BYTE", ngridA)) return NULL;
+    if (!check_array(domain_maskA, "domain_maskA", NPY_BYTE, "NPY_BYTE", gridA_nx*gridA_ny)) return NULL;
 
     PyArrayObject *oedgeA = np_new_1d((npy_intp)ngridA, NPY_BYTE);
 
