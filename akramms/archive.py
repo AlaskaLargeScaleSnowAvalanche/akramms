@@ -215,7 +215,7 @@ class OverrunChecker:
     def __init__(self, dem_mask_tif):
         self.gridI,dem_mask,_ = gdalutil.read_raster(dem_mask_tif)
         self.dem_mask = dem_mask.astype(np.byte)
-        print('dddddddddddd ', self.dem_mask.dtype)
+        print('dddddddddddd ', self.dem_mask.dtype, self.dem_mask.shape)
 
     def is_overrun(self, in_zip, out_zip):
         """Determines whether a RAMMS result is overrun
