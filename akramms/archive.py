@@ -242,8 +242,12 @@ class OverrunChecker:
 
             # RAMMS thinks it overran.  Inspect the domain mask further to
             # determine whether it in fact overran.
-            base = str(out_zip)[:-8]    # Remove .out.zip
-            leaf = os.path.split(base)[1]
+#            base = str(out_zip)[:-8]    # Remove .out.zip
+#            leaf = os.path.split(base)[1]
+
+            print(in_names)
+            print(out_names)
+
 
             # Identify oedge, the set of gridcells that, if the avalanche hits them,
             # constitute an overrun.
