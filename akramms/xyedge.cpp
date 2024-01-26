@@ -163,6 +163,7 @@ static PyObject *xyedge_oedge(PyObject *module, PyObject *args, PyObject *kwargs
     // OUTPUT: mosaic variables [gridM_ny, gridM_nx]
     // PyArrayObject *oedgeA;
 
+print("AA1\n");
     // Parse args and kwargs
     static char const *kwlist[] = {
         // *args
@@ -182,6 +183,7 @@ static PyObject *xyedge_oedge(PyObject *module, PyObject *args, PyObject *kwargs
             &PyArray_Type, &domain_maskA
         )) return NULL;
 
+print("AA2\n");
     // -------------------------- Typecheck and Bounds Check
     int const ngridA = PyArray_SIZE(iAs);
     if (!check_array(iAs, "iAs", NPY_INT, "NPY_INT", ngridA)) return NULL;
@@ -191,6 +193,7 @@ static PyObject *xyedge_oedge(PyObject *module, PyObject *args, PyObject *kwargs
 
     PyArrayObject *oedgeA = np_new_1d((npy_intp)ngridA, NPY_BYTE);
 
+print("AA3\n");
     // ------------------------------------------------------------------------
     oedge(
         ngridA,
@@ -199,6 +202,7 @@ static PyObject *xyedge_oedge(PyObject *module, PyObject *args, PyObject *kwargs
         gridA_nx, gridA_ny,
             (char *)PyArray_DATA(domain_maskA),
             (char *)PyArray_DATA(oedgeA));
+print("AA4\n");
 
     return (PyObject *)oedgeA;
 }
