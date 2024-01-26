@@ -52,6 +52,10 @@ void oedge(
     char *oedgeA)    // Is it an edge gridcell matching (a) and (b) criteria?
 {
 
+
+printf("AA1\n");
+printf("%lx %lx %lx %lx\n", iAs, jAs, domain_maskA, oedgeA);
+
     // Determine limits of gridcells used so we can create a subgrid for them.
     int mini=0, minj=0;
     int maxi=std::numeric_limits<int>::max();
@@ -163,7 +167,6 @@ static PyObject *xyedge_oedge(PyObject *module, PyObject *args, PyObject *kwargs
     // OUTPUT: mosaic variables [gridM_ny, gridM_nx]
     // PyArrayObject *oedgeA;
 
-printf("AA1\n");
     // Parse args and kwargs
     static char const *kwlist[] = {
         // *args
@@ -183,7 +186,6 @@ printf("AA1\n");
             &PyArray_Type, &domain_maskA
         )) return NULL;
 
-printf("AA2\n");
     // -------------------------- Typecheck and Bounds Check
     int const ngridA = PyArray_SIZE(iAs);
     if (!check_array(iAs, "iAs", NPY_INT, "NPY_INT", ngridA)) return NULL;
@@ -193,7 +195,6 @@ printf("AA2\n");
 
     PyArrayObject *oedgeA = np_new_1d((npy_intp)ngridA, NPY_BYTE);
 
-printf("AA3\n");
     // ------------------------------------------------------------------------
     oedge(
         ngridA,
@@ -202,7 +203,6 @@ printf("AA3\n");
         gridA_nx, gridA_ny,
             (char *)PyArray_DATA(domain_maskA),
             (char *)PyArray_DATA(oedgeA));
-printf("AA4\n");
 
     return (PyObject *)oedgeA;
 }
