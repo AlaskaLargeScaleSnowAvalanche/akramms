@@ -80,11 +80,16 @@ printf("AA2\n");
 printf("AA3\n");
     // Create 0/1 raster on subgrid indicating which gridcells are in the Avalanche domain.
     std::unique_ptr<char[]> xygrid(new char[nj*ni]);
+printf("AA3.1\n");
     for (int k=0; k<nj*ni; ++k) xygrid[k] = 0;
+printf("AA3.2\n");
     for (int k=0; k<ngridA; ++k) {
         int const jj = jAs[k] - j0;
         int const ii = iAs[k] - i0;
-        xygrid[jj*ni + ii] = 1;
+        int const ix = jj*ni + ii;
+        if ((ix < 0) || (ix >= nj*ni))
+            printf("ix out of bounds %d\n", ix);
+        xygrid[ix] = 1;
     }
 
 printf("AA4\n");
