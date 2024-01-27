@@ -92,7 +92,7 @@ def rule(exp_mod, idom, jdom):
         else:
             # No margin on the Canadian border.
             mask_outI = (elevI == elevI_nd).astype(int)
-            dmaskI = np.zeros(mask_inI.shape, dtype=np.byte) + int(Value.MASK_IN)
+            dmaskI = np.zeros(mask_outI.shape, dtype=np.byte) + int(Value.MASK_IN)
             dmaskI[mask_outI] = int(Value.MASK_OUT)
 
         gdalutil.write_raster(dem_mask_tif, gridI, dmaskI, int(Value.MASK_OUT))
