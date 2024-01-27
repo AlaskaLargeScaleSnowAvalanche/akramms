@@ -246,20 +246,13 @@ class OverrunChecker:
 
             # RAMMS thinks it overran.  Inspect the domain mask further to
             # determine whether it in fact overran.
-#            base = str(out_zip)[:-8]    # Remove .out.zip
-#            leaf = os.path.split(base)[1]
-
-#            print(in_names)
-#            print(out_names)
 
 
             # Identify oedge, the set of gridcells that, if the avalanche hits them,
             # constitute an overrun.
-#            print(list(in_names.values()))
             with in_zip.open(in_names['xy-coord'], 'r') as fin:
                 ivec, jvec = parse_xy_coord(self.gridI, fin)
                 oedge = xyedge.oedge(ivec, jvec, self.gridI.nx, self.gridI.ny, self.dem_mask)
-#                print('oedge ', np.sum(oedge))
 
             # See if we hit any of the oedge gridcells
             with out_zip.open(out_names['out'], 'r') as fin:

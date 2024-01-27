@@ -11,7 +11,7 @@ class Value(enum.IntEnum):
     MARGIN = 1        # Avalanches can flow in here, but not start here
     MASK_IN = 2       # Avalanches can start here
 
-def domain_mask(gridA, srcA, maxdist):
+def domain_mask_with_margin(gridA, srcA, maxdist):
 
     """Uses GDAL's ComputeProximity() to assign a domain mask value to
     each gridcell, based on its distance from the edge of the domain
@@ -23,7 +23,7 @@ def domain_mask(gridA, srcA, maxdist):
       MARGIN: We have data for the gridcell, but it is too close to
              the edge of the domain to allow for avalanche iniitiation.
 
-      MASK_INT: The main part of the domain, where PRAs may form.
+      MASK_IN: The main part of the domain, where PRAs may form.
 
     NOTE: Domains (tiles) typically have an 8km margin in the current
          experiment.  Gridcells in this "standard" margin are NOT set
@@ -84,8 +84,17 @@ def rule(exp_mod, idom, jdom):
         #ddf = shputil.read_df(domains_shp, read_shapes=True)
         #mdf = shputil.read_df(domains_margin_shp, read_shapes=True)
 
-        mask_outI = (elevI == elevI_nd).astype(int)
-        dmaskI = domain_mask(gridI, mask_outI, max(exp_mod.domain_margin))
+        if False:
+            # Set up a margin close to Canada where avalanaches are
+            # not allowed to start.
+            mask_outI = (elevI == elevI_nd).astype(int)
+            dmaskI = domain_mask_with_margin(gridI, mask_outI, max(exp_mod.domain_margin))
+        else:
+            # No margin on the Canadian border.
+            mask_outI = (elevI == elevI_nd).astype(int)
+            dmaskI = np.zeros(mask_inI.shape, dtype=np.byte) + int(Value.MASK_IN)
+            dmaskI[mask_outI] = int(Value.MASK_OUT)
+
         gdalutil.write_raster(dem_mask_tif, gridI, dmaskI, int(Value.MASK_OUT))
 
     return make.Rule(action, inputs, outputs)
