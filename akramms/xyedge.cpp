@@ -61,6 +61,7 @@ printf("%p %p %p %p\n", iAs, jAs, domain_maskA, oedgeA);
     int maxi=std::numeric_limits<int>::max();
     int maxj=std::numeric_limits<int>::max();
     for (int k=0; k<ngridA; ++k) {
+        print("ffff %d %d\n", iAs[k], jAs[k]);
         mini = std::min(mini, iAs[k]);
         maxi = std::max(maxi, iAs[k]);
         minj = std::min(minj, jAs[k]);
