@@ -77,7 +77,7 @@ printf("AA2\n");
     int const j1 = maxj + 2;
     int const nj = j1-j0;
 
-printf("AA3\n");
+printf("AA3 %d %d %d %d %d %d\n", i0, i1, ni, j0, j1, nj);
     // Create 0/1 raster on subgrid indicating which gridcells are in the Avalanche domain.
     std::unique_ptr<char[]> xygrid(new char[nj*ni]);
 printf("AA3.1\n");
