@@ -28,6 +28,7 @@ def main():
 
         is_overrun = check_overruns.is_overrun(in_zip, out_zip)
 
-        print(f'{base_leaf}: {is_overrun}')
+        if is_overrun:
+            print(f'{base_leaf}: {is_overrun}')
 
 main()
