@@ -268,7 +268,7 @@ class OverrunChecker:
 
             return \
                    np.any(np.logical_and(oedge != 0, vals['max_height'] > 0)) \
-                or np.any(np.logical_and(oedge != 0, vals['max_val'] > 0)) \
+                or np.any(np.logical_and(oedge != 0, vals['max_vel'] > 0)) \
                 or np.any(np.logical_and(oedge != 0, vals['depo'] > 0))
 # -------------------------------------------------------------
 def ramms_to_nc0(out_zip, id_status, ncout):
