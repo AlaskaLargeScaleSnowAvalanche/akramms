@@ -266,7 +266,10 @@ class OverrunChecker:
                 namevals = parse_out(fin)
                 vals = {name:val for name,val,_ in namevals}
 
-            return np.any(np.logical_and(oedge != 0, vals['max_height'] > 0))
+            return \
+                   np.any(np.logical_and(oedge != 0, vals['max_height'] > 0)) \
+                or np.any(np.logical_and(oedge != 0, vals['max_val'] > 0)) \
+                or np.any(np.logical_and(oedge != 0, vals['depo'] > 0))
 # -------------------------------------------------------------
 def ramms_to_nc0(out_zip, id_status, ncout):
     """
