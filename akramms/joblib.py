@@ -249,7 +249,7 @@ def add_id_status(akdf0, update=True, dry_run=False):
                           with zipfile.ZipFile(out_zip, 'r') as ozip:
                             statuses.append(
                                 (combo, chunkid, tup.id,
-                                JobStatus.OVERRUN if check_overruns.is_overrun(inzip, ozip) else JobStatus.FINISHED) )
+                                JobStatus.OVERRUN if check_overruns.is_overrun(izip, ozip) else JobStatus.FINISHED) )
                         continue
 
                     # Default to TODO
