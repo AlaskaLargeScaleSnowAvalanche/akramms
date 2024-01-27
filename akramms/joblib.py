@@ -245,8 +245,8 @@ def add_id_status(akdf0, update=True, dry_run=False):
                         # We tentatively think the job is finished.  But let's
                         # look inside the zip file to make sure the domain
                         # wasn't overrun.
-                        with zipfile.ZipFile(f'{base}.in.zip', 'r') as izip:
-                          with zipfile.ZipFile(f'{base}.out.zip', 'r') as ozip:
+                        with zipfile.ZipFile(in_zip, 'r') as izip:
+                          with zipfile.ZipFile(out_zip, 'r') as ozip:
                             statuses.append(
                                 (combo, chunkid, tup.id,
                                 JobStatus.OVERRUN if check_overruns.is_overrun(inzip, ozip) else JobStatus.FINISHED) )

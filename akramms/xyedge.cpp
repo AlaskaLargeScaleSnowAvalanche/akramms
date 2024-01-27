@@ -78,12 +78,9 @@ void oedge(
     int const j1 = maxj + 2;
     int const nj = j1-j0;
 
-//printf("AA3 %d %d %d %d %d %d\n", i0, i1, ni, j0, j1, nj);
     // Create 0/1 raster on subgrid indicating which gridcells are in the Avalanche domain.
     std::unique_ptr<char[]> xygrid(new char[nj*ni]);
-//printf("AA3.1\n");
     for (int k=0; k<nj*ni; ++k) xygrid[k] = 0;
-//printf("AA3.2\n");
     for (int k=0; k<ngridA; ++k) {
         int const jj = jAs[k] - j0;
         int const ii = iAs[k] - i0;
@@ -93,7 +90,6 @@ void oedge(
         xygrid[ix] = 1;
     }
 
-//printf("AA4\n");
     // Compute the number of neighbors (0-4) of each gridcell in A
     std::unique_ptr<char[]> nneighbor(new char[nj*ni]);
     for (int k=0; k<nj*ni; ++k) nneighbor[k] = 0;
@@ -105,10 +101,8 @@ void oedge(
     }
 
 
-//printf("AA5\n");
     // Apply the condition to determine which gridcells are on a
     // domain edge that would be solved if we enlarge the domain.
-//    int const gridA_nxy = gridA_nx * gridA_ny;
     for (int k=0; k<ngridA; ++k) {
         int const jj = jAs[k] - j0;
         int const ii = iAs[k] - i0;
