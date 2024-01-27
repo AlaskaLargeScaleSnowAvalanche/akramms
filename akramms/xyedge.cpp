@@ -57,9 +57,9 @@ printf("AA1 %d\n", ngridA);
 printf("%p %p %p %p\n", iAs, jAs, domain_maskA, oedgeA);
 
     // Determine limits of gridcells used so we can create a subgrid for them.
-    int mini=0, minj=0;
-    int maxi=std::numeric_limits<int>::max();
-    int maxj=std::numeric_limits<int>::max();
+    int maxi=0, maxj=0;
+    int mini=std::numeric_limits<int>::max();
+    int minj=std::numeric_limits<int>::max();
     for (int k=0; k<ngridA; ++k) {
 printf("ffff %d %d\n", iAs[k], jAs[k]);
         mini = std::min(mini, iAs[k]);
