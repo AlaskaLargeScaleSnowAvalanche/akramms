@@ -215,7 +215,7 @@ class OverrunChecker:
     def __init__(self, dem_mask_tif):
         self.gridI,dem_mask,_ = gdalutil.read_raster(dem_mask_tif)
         self.dem_mask = dem_mask.astype(np.byte)
-        print('dddddddddddd ', self.dem_mask.dtype, self.dem_mask.shape)
+#        print('dddddddddddd ', self.dem_mask.dtype, self.dem_mask.shape)
 
     def is_overrun(self, in_zip, out_zip):
         """Determines whether a RAMMS result is overrun
@@ -249,17 +249,17 @@ class OverrunChecker:
 #            base = str(out_zip)[:-8]    # Remove .out.zip
 #            leaf = os.path.split(base)[1]
 
-            print(in_names)
-            print(out_names)
+#            print(in_names)
+#            print(out_names)
 
 
             # Identify oedge, the set of gridcells that, if the avalanche hits them,
             # constitute an overrun.
-            print(list(in_names.values()))
+#            print(list(in_names.values()))
             with in_zip.open(in_names['xy-coord'], 'r') as fin:
                 ivec, jvec = parse_xy_coord(self.gridI, fin)
                 oedge = xyedge.oedge(ivec, jvec, self.gridI.nx, self.gridI.ny, self.dem_mask)
-                print('oedge ', np.sum(oedge))
+#                print('oedge ', np.sum(oedge))
 
             # See if we hit any of the oedge gridcells
             with out_zip.open(out_names['out'], 'r') as fin:
