@@ -1,4 +1,4 @@
-import os,subprocess,functools,re,typing,zipfile,sys,contextlib
+import os,subprocess,functools,re,typing,zipfile,sys,contextlib,pathlib
 import htcondor
 import pandas as pd
 from uafgi.util import gdalutil
