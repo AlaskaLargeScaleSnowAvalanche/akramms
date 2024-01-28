@@ -563,6 +563,24 @@ def _zip_dir(idir, ofname):
         for leaf in os.listdir(idir):
             ozip.write(idir / leaf, arcname=leaf) #, compress_type=zipfile.ZIP_DEFLATD)
 
+def copy_shapefiles(expmod, combo, dry_run=False):
+    xdir = expmod.combo_to_scenedir(combo, scenetype='x')
+    arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
+
+    
+    # Copy relevant Combo-related metadata
+    for leaf in ('RELEASE', 'DOMAIN'):
+        with ioutil.WriteIfDifferent(arcdir / f'{leaf}.zip') as owid:
+            _zip_dir(xdir / leaf, owid.tmpefile)
+#        shutil.rmtree(arcdir / leaf, ignore_errors=True)
+#        shutil.copytree(xdir / leaf, arcdir / leaf)
+
+    for leaf in ('scene.nc', 'scene.cdl'):
+        with ioutil.WriteIfDifferent(arcdir / leaf) as owid:
+            shutil.copy2(xdir / leaf, owid.tmpfile)
+
+
+
 def finish_combo(expmod, combo, dry_run=False):
     xdir = expmod.combo_to_scenedir(combo, scenetype='x')
     arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
@@ -572,15 +590,6 @@ def finish_combo(expmod, combo, dry_run=False):
     if dry_run:
         print(f'If not for dry_run, I would be writing the file {ofname}')
         return
-
-    # Copy relevant Combo-related metadata
-    for leaf in ('RELEASE', 'DOMAIN'):
-        _zip_dir(xdir / leaf, arcdir / f'{leaf}.zip')
-#        shutil.rmtree(arcdir / leaf, ignore_errors=True)
-#        shutil.copytree(xdir / leaf, arcdir / leaf)
-
-    for leaf in ('scene.nc', 'scene.cdl'):
-        shutil.copy2(xdir / leaf, arcdir / leaf)
 
     # Write the control file
     with open(ofname, 'w') as out:
