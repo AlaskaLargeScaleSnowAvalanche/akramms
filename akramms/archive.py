@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import netCDF4
 import pyproj
-from uafgi.util import gdalutil,shputil,ncutil
+from uafgi.util import gdalutil,shputil,ncutil,ioutil
 from akramms import config,parse,file_info,resolve,overrun
 import xyedge
 
