@@ -571,7 +571,7 @@ def copy_shapefiles(expmod, combo, dry_run=False):
     # Copy relevant Combo-related metadata
     for leaf in ('RELEASE', 'DOMAIN'):
         with ioutil.WriteIfDifferent(arcdir / f'{leaf}.zip') as owid:
-            _zip_dir(xdir / leaf, owid.tmpefile)
+            _zip_dir(xdir / leaf, owid.tmpfile)
 #        shutil.rmtree(arcdir / leaf, ignore_errors=True)
 #        shutil.copytree(xdir / leaf, arcdir / leaf)
 
