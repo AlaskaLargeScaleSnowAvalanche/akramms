@@ -241,6 +241,7 @@ class OverrunChecker:
             # If RAMMS did not detect an overrun, we are fine.
             if 'out.overrun' not in out_names:
                 return False
+            return True    # DEBUG
 
             in_names = names_by_ext(in_zip)
 
