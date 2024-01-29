@@ -665,7 +665,7 @@ def xmosaic(args):
         # Prepare snow input
         if args.snow:
             # Ensure all avalanches use the same snow input
-            snowfile_argss = list(akdf['combo'].map(expmod.combo_to_snowfile_args).toset())
+            snowfile_argss = sorted(set(akdf['combo'].map(expmod.combo_to_snowfile_args)))
             assert all(x[:-2] == snowfile_argss[0][:-2] for x in snowfile_argss)
 
             # Create virtual raster to query
