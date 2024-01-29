@@ -26,7 +26,7 @@ def snowfile(exp_dir, exp_name, snow_dataset, year0, year1, downscale_algo, idom
     return pathlib.Path(ofname)
 
 # --------------------------------------------------------------------------@
-def snowfile_vrt(snowfile_args_vrt, snowfiles):
+def snowfile_vrt(snowfile_argss):
     """Dynamically creates a virtual mosaic .vrt that encompasses AT LEAST the snowfiles given here.
     snowfile_args_vrt:
         Tuple containing args for snowfile() function above (not including idom,jdom)
@@ -35,9 +35,17 @@ def snowfile_vrt(snowfile_args_vrt, snowfiles):
         The VRT file will ONLY be regenerated if one of the snowfiles is newer
     """
 
+    snowfiles = [snowfile(*x) for x in snowfile_argss]
     snowdir = snowfiles[0].parents[0]
-    snowfile_glob = snowfile(*(snowfile_args_vrt[:-2] + ('*','*')))
+    snowfile_glob = snowfile(*(snowfile_argss[0][:-2] + ('*','*')))
     ofname = snowfile_glob.parents[0] / (snowfile_glob.parts[-1][:-8] + '.vrt')  # _*_*.tif -> .vrt
+
+    print(snowfiles)
+    print(snowdir)
+    print(snowfile_glob)
+    print(ofname)
+
+    sys.exit(0)
 
     # Decide whether we need to regenerate the .vrt file
     if not os.path.exists(ofname):
