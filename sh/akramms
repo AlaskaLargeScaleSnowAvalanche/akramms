@@ -654,6 +654,7 @@ def xmosaic(args):
         parseds = akramms.parse.parse_args(args.spec)
         akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
         print(akdf.columns)
+        print(akdf[['exp','combo']])
         return
 
         # Make sure they all use the same experiment
