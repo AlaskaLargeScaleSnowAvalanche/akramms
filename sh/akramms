@@ -671,7 +671,7 @@ def xmosaic(args):
             # Create virtual raster to query
             snowfile_vrt = downscale_snow.snowfile_vrt(
                 snowfile_args[0][:-2],
-                (downscale_snow.snowfile(x) for x in snowfile_args))
+                [downscale_snow.snowfile(x) for x in snowfile_args])
 
         if args.save is not None:
             with open(args.save, 'wb') as out:

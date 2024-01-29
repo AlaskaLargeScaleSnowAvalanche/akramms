@@ -35,7 +35,7 @@ def snowfile_vrt(snowfile_args_vrt, snowfiles):
         The VRT file will ONLY be regenerated if one of the snowfiles is newer
     """
 
-    snowdir = snowfiles.parents[0]
+    snowdir = snowfiles[0].parents[0]
     snowfile_glob = snowfile(*(snowfile_args_vrt[:-2] + ('*','*')))
     ofname = snowfile_glob.parents[0] / (snowfile_glob.parts[-1][:-8] + '.vrt')  # _*_*.tif -> .vrt
 
