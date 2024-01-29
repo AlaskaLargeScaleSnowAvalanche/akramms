@@ -132,7 +132,7 @@ def mosaic_avals(gridM, akdf, ofname_zip, tdir,
 
 #    for aval_i,fname in enumerate(avals):
     print(akdf.columns)
-    return
+    akdf = akdf.sort_data('id')
     for tup in akdf.itertuples(index=False):
         arcdir = tup.releasefile
         if not os.path.isfile(tup.avalfile):
