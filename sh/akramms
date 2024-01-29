@@ -653,13 +653,21 @@ def xmosaic(args):
         # Identify archived avalanches for use in the mosaic
         parseds = akramms.parse.parse_args(args.spec)
         akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
-        print(akdf.columns)
-        print(akdf[['exp','combo']])
-        return
 
         # Make sure they all use the same experiment
         # (Because extents are queried from the experiment definition file)
         assert all(x == akdf.exp[0] for x in akdf.exp)
+
+
+        # See if all the wcombos are the same.
+        # (Eg: same combo except different tiles)
+        # In that case, we can add snow / etc. info to the mosaic
+        akdf['wcombo'] = akdf['combo'].map(lambda combo: tuple(combo[:-2]))
+
+        print(akdf.columns)
+        print(akdf[['exp','combo', 'wcombo']])
+        return
+
         expmod = akramms.parse.load_expmod(akdf.exp[0])
 
         extent,akdf = avalquery.query(akdf, args.extent, statuses=args.status, scenetypes='arc', margin=args.margin)
