@@ -14,8 +14,90 @@ import scipy.ndimage
 
 """Rules to prepare the snow field for direct use in determining snow depth for PRAs."""
 
+def snowfile(exp_dir, exp_name, snow_dataset, year0, year1, downscale_algo, idom, jdom):
+    """Creates the name of a snow file.
+    idom,jdom:
+        may be '*' to allow for wildcards and globbing."""
+
+    sidom = idom if isinstance(idom,str) else f'{idom:03d}'
+    sjdom = jdom if isinstance(jdom,str) else f'{jdom:03d}'
+    ofname = os.path.join(exp_dir, 'snow',
+        f'{exp_name}_{snow_dataset}_{year0}_{year1}_{downscale_algo}_{sidom}_{sjdom}.tif')
+    return ofname
+
+# --------------------------------------------------------------------------@
+def snowfile_vrt(snowfile_args_vrt, snowfiles)
+    """Dynamically creates a virtual mosaic .vrt that encompasses AT LEAST the snowfiles given here.
+    snowfile_args_vrt:
+        Tuple containing args for snowfile() function above (not including idom,jdom)
+    snowfiles:
+        Specific snowfiles we want to make sure are in the VRT file.
+        The VRT file will ONLY be regenerated if one of the snowfiles is newer
+    """
+
+    snowdir = snowfiles.parents[0]
+    snowfile_glob = snowfile(*(snowfile_args_vrt[:-2] + ('*','*')))
+    ofname = snowfile_glob.parents[0] / (snowfile_glob.parts[-1][:-8] + '.vrt')  # _*_*.tif -> .vrt
+
+    # Decide whether we need to regenerate the .vrt file
+    if not os.path.exists(ofname):
+        regen = True
+    else:
+        ofname_mtime = os.path.getmtime(ofname)
+        snowfile_mtime = max(os.path.getmtime(x) for x in snowfiles)
+        regen = (snowfile_mtime >= ofname_mtime)
+
+    if regen:
+        cmd = ['gdalbuildvrt']
+
+        # No (known) need for -allow_projection_difference in this case.
+        # Tiles use the same projection, but named differently
+        # Error received: expected NAD83 / Alaska Albers, got NAD_1983_CORS96_Alaska_Albers
+        # Eg: ifsar/CELL_391/N5430W13200P/DTM_N5430W13200P.tif
+        # cmd.append('-allow_projection_difference')
+
+        # Include ALL appropriate snowfiles in the VRT, not just the
+        # snowfile(s) needed for now.
+        cmd.append(ofname)
+        cmd += [os.path.relname(x, snowdir) for x in glob.glob(snowfile_glob)]
+        subprocess.run(cmd, cwd=snowdir, check=True)
+
+    return ofname
+
+
 # --------------------------------------------------------------------------
-@functools.lru_cache()
+def extract_snow(snowfile_vrt, poly, ofname, resolution=None, sanity_check=True):
+    """Extracts a sub-raster from a snowfile_vrt virtual raster file
+    poly:
+        A rectangle
+    ofname:
+        Output raster filename
+    """
+    xx,yy = poly.exterior.coords.xy
+
+    x0,x1,y0,y1 = gdalutil.positive_rectangle(xx[0], xx[2], yy[0], yy[2])
+
+    cmd = ['gdal_translate']
+    # https://gis.stackexchange.com/questions/1104/should-gdal-be-set-to-produce-geotiff-files-with-compression-which-algorithm-sh
+    cmd += ['-co', 'COMPRESS=DEFLATE']
+    cmd += ['-co', 'TFW=YES']   # https://gis.stackexchange.com/questions/271995/how-to-get-gdal-translate-to-create-world-file-for-geotiff
+#    if sanity_check:
+#        cmd += ['-eco']    # Error when completely outside (SANITY CHECK)
+    if resolution is not None:
+        cmd += ['-tr', str(resolution), str(resolution)]
+
+    cmd.append('-projwin')
+    # -projwin <ulx> <uly> <lrx> <lry>
+    # Therefore, y1<y0 in typical projection, where y increases as you go northward.
+    cmd += [str(n) for n in (x0,y1,x1,y0)]
+
+    cmd += [snowfile_vrt, ofname]
+
+    os.makedirs(os.path.split(ofname)[0], exist_ok=True)
+    subprocess.run(cmd, check=True)
+
+# ------------------------------------------------------------------
+functools.lru_cache()
 def r_distance_from_coast(wrf_geo_nc, ofname):
     """Computes the distance of every WRF gridcell from the coast
     wrf_geo_nc:

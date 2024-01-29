@@ -2,6 +2,7 @@ import os,collections,sys
 import numpy as np
 import schema
 from uafgi.util import schemautil,shputil,gisutil
+from akramms import downscale_snow
 from akramms import config, r_experiment
 from akramms import r_prepare,r_domain_builder,file_info
 from akramms import d_ifsar, d_usgs_landcover
@@ -81,6 +82,11 @@ def combo_to_scenedir(combo, scenetype='x'):
     scene_name = f'{scenetype}-{combo.idom:03d}-{combo.jdom:03d}'    # Underscores would confuse things
 
     return dir / trial_name / scene_name
+
+def combo_to_snowfile_args(combo):
+    return (dir, name,
+        combo.snow_dataset, combo.downscale_algo,
+        combo.year0, combo.year1, combo.idom, combo.jdom)
 
 # -------------------------------------------------------------
 def add_dem(makefile, idom, jdom, sanity_check=True):

@@ -215,8 +215,9 @@ def r_snow(exp_mod, snow_dataset, downscale_algo, year0, year1, idom, jdom):
         inputs.append(dfcA_tif)
 
     # Determine output filename
-    ofname = os.path.join(exp_mod.dir, 'snow',
-        f'{exp_mod.name}_{snow_dataset}_{year0}_{year1}_{downscale_algo}_{idom:03d}_{jdom:03d}.tif')
+#    ofname = os.path.join(exp_mod.dir, 'snow',
+#        f'{exp_mod.name}_{snow_dataset}_{year0}_{year1}_{downscale_algo}_{idom:03d}_{jdom:03d}.tif')
+    return downscale_snow.snowfile(exp_mod.dir, exp_mod.name, snow_dataset, year0, year1, downscale_algo, idom, jdom)
 
     def action(tdir):
         if downscale_algo == 'lapse':
