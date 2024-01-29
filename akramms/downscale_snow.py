@@ -23,7 +23,7 @@ def snowfile(exp_dir, exp_name, snow_dataset, year0, year1, downscale_algo, idom
     sjdom = jdom if isinstance(jdom,str) else f'{jdom:03d}'
     ofname = os.path.join(exp_dir, 'snow',
         f'{exp_name}_{snow_dataset}_{year0}_{year1}_{downscale_algo}_{sidom}_{sjdom}.tif')
-    return ofname
+    return pathlib.Path(ofname)
 
 # --------------------------------------------------------------------------@
 def snowfile_vrt(snowfile_args_vrt, snowfiles):
