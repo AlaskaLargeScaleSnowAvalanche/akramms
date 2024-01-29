@@ -26,7 +26,7 @@ def snowfile(exp_dir, exp_name, snow_dataset, year0, year1, downscale_algo, idom
     return ofname
 
 # --------------------------------------------------------------------------@
-def snowfile_vrt(snowfile_args_vrt, snowfiles)
+def snowfile_vrt(snowfile_args_vrt, snowfiles):
     """Dynamically creates a virtual mosaic .vrt that encompasses AT LEAST the snowfiles given here.
     snowfile_args_vrt:
         Tuple containing args for snowfile() function above (not including idom,jdom)
