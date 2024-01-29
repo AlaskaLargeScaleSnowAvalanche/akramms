@@ -630,7 +630,7 @@ def _parse_statuses(sstat):
     argument('--limit', type=int,
         help='Limit number of avalanches processed (for DEBUGGING)'),
     argument('--status', type=_parse_statuses,
-        default = [joblib.JobStatus.OVERRUN, joblib.JobStatus.FINISHED],
+        default = [joblib.JobStatus.FINISHED],
         help="Comma-separated statuses to plot: OVERRUN,FINISHED"),
     argument('--extent', '-e', default='tile',
         help="Designation of extent of final mosiac: tile, aval, <listed in experiment>, or coordinates"),
