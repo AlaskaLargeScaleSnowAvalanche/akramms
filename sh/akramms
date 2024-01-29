@@ -653,6 +653,8 @@ def xmosaic(args):
         # Identify archived avalanches for use in the mosaic
         parseds = akramms.parse.parse_args(args.spec)
         akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
+        print(akdf.columns)
+        return
 
         # Make sure they all use the same experiment
         # (Because extents are queried from the experiment definition file)
