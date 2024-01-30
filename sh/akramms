@@ -219,7 +219,8 @@ def status(args):
         akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run, ignore_statuses=ignore_statuses))
 
     akdf = pd.concat(dfs).sort_values('sort_order')
-    joblib.print_status(akdf, args.level)
+    print(akdf[['sort_order', 'combo', 'combo_status']])
+#    joblib.print_status(akdf, args.level)
 # ---------------------------------------------------------------------
 def get_exp_dir(exp_mod):
     return config.roots.join('PRJ', exp_mod.name)
