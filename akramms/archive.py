@@ -606,7 +606,7 @@ def finish_combo(expmod, combo, dry_run=False):
         out.write('Combo archived\n')
 
     # (Very conservatively) delete the xdir by moving it to a todel directory.
-    todel = xdir.parents[0]
+    todel = xdir.parents[0] / 'todel'
     odir = todel / xdir.parts[-1]
     if os.path.exists(odir):
         shutil.rmtree(odir)
