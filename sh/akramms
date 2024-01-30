@@ -697,7 +697,7 @@ def xmosaic(args):
             raise ValueError('If more than one Combo is involved in a query, you must specify the mosaic output filename via --output')
         scombo = '-'.join(str(x) for x in combos[0])
         sstatus = ''.join(joblib.JobStatus._member_names_[x][0] for x in sorted(args.status))
-        ofname = f'{scombo}-{sstatus}.zip'
+        ofname = f'{expmod.name}-{scombo}-{sstatus}.zip'
     print(f'Writing mosaic output file {ofname}')
 
 
