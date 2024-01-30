@@ -585,7 +585,7 @@ def finish_combo(expmod, combo, dry_run=False):
     xdir = expmod.combo_to_scenedir(combo, scenetype='x')
     arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
 
-    
+
     ofname = arcdir / 'archived.txt'
     if dry_run:
         print(f'If not for dry_run, I would be writing the file {ofname}')
@@ -595,6 +595,12 @@ def finish_combo(expmod, combo, dry_run=False):
     with open(ofname, 'w') as out:
         out.write('Combo archived\n')
 
+    # (Very conservatively) delete the xdir by moving it to a todel directory.
+    todel = xdir.parents[0]
+    odir = todel / xdir.parts[-1]
+    if os.path.exists(odir):
+        shutil.rmtree(odir)
+    shutil.move(xdir, todel)
 
 
 # ----------------------------------------------------------

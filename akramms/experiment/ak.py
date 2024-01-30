@@ -201,15 +201,14 @@ def full():
     """Yields the combos for the FULL experiment.
     REQUIRES: domains.shp and domains_margin.shp
     """
-    domains_ij = all_domains()
 
     # Generate set of trials
     snow = 'ccsm'
     downscale_algo = 'lapse'
-    for year0,year1 in [(1981, 1990),]:
-        for forest in ('For', 'NoFor'):
-            for return_period in [10,30,100,300]:
-                for idom,jdom in domains_ij:
+    for forest in ('For', 'NoFor'):
+        for idom,jdom in spiral_domains(113, 45):    # Spiral around Juneau
+            for year0,year1 in [(1981, 1990), (2051,2060)]:
+                for return_period in [10,30,100,300]:
                     yield Combo(snow, year0, year1, downscale_algo, forest, return_period, idom, jdom)
 
 # -----------------------------------------------------------------
@@ -229,9 +228,5 @@ def elizabeth():
     yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 47)    # A Juneau-close box
 
 def edge():
-    for z in spiral_domains(113, 45):
-        print(z)
-#    dij = all_domains()
-#    print(dij)
-
-#   yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 111, 42)    # Tile borders with Canada
+    # A single edge cell
+    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 111, 42)    # Tile borders with Canada
