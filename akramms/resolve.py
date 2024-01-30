@@ -9,8 +9,8 @@ from akramms import level,parse,file_info
 
 def initial(parseds):
     orows = list()
-    for parsed in parseds:
-        orows.append({'parsed': parsed})
+    for n,parsed in enumerate(parseds):
+        orows.append({'sort_order': n, 'parsed': parsed})
     return pd.DataFrame(orows)
 
 
