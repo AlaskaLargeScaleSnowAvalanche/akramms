@@ -213,8 +213,9 @@ def names_by_ext(izip):
 class OverrunChecker:
 
     def __init__(self, dem_mask_tif):
-        self.gridI,dem_mask,_ = gdalutil.read_raster(dem_mask_tif)
-        self.dem_mask = dem_mask.astype(np.byte)
+        if os.path.exists(dem_mask_tif):
+            self.gridI,dem_mask,_ = gdalutil.read_raster(dem_mask_tif)
+            self.dem_mask = dem_mask.astype(np.byte)
 #        print('dddddddddddd ', self.dem_mask.dtype, self.dem_mask.shape)
 
     def is_overrun(self, in_zip, out_zip):
@@ -241,12 +242,17 @@ class OverrunChecker:
             # If RAMMS did not detect an overrun, we are fine.
             if 'out.overrun' not in out_names:
                 return False
-#            return True    # DEBUG
+
+            # If no mask file, we are done, just rely on C++ RAMMS
+            # assessment that an overrun HAS occurred.
+            if not hasattr(self, 'dem_mask'):
+                return True
 
             in_names = names_by_ext(in_zip)
 
             # RAMMS thinks it overran.  Inspect the domain mask further to
             # determine whether it in fact overran.
+
 
 
             # Identify oedge, the set of gridcells that, if the avalanche hits them,
