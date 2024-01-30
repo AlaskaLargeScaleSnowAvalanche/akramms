@@ -738,7 +738,8 @@ def xmosaic(args):
     if args.snow:
         kwargs['snow_fn'] = lambda box_poly,ofname: downscale_snow.extract_snow(snowfile_vrt, box_poly, ofname)
 
-    with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
+#    with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
+    with ioutil.TmpDir() as tdir:
         mosaic.mosaic_avals(gridM, akdf, ofname, tdir, **kwargs)
 
 
