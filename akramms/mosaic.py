@@ -91,7 +91,7 @@ def ozip_write(ozip, fname):
 
 def mosaic_avals(gridM, akdf, ofname_zip, tdir,
     rho=300, vars=_mosaic_keys,
-    dem_fn=None, landcover_fn=None, snowfile_fn=None):
+    dem_fn=None, landcover_fn=None, snow_fn=None):
 
     """General mosaic function for a bunch of avalanches and a domain
 
@@ -226,7 +226,7 @@ def mosaic_avals(gridM, akdf, ofname_zip, tdir,
             ozip_write(ozip, os.path.join(dir, 'dem.tfw'))
 
         # Snowfile
-        if snowfile_fn is not None:
+        if snow_fn is not None:
             snow_fn(box_poly, dir / 'snow0.tif')
             gdal.Warp(str(dir / 'snow.tif'), str(dir / 'snow0.tif'), xRes=30, yRes=30)
             ozip_write(ozip, dir / 'snow.tif')
