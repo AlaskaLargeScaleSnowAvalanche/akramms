@@ -442,7 +442,7 @@ def add_combo_quickstatus(akdf0):
 
     dfs = list()
     if len(akdf0) == 0:
-        akdf0['combo_quickstatus'] = False
+        akdf0['combo_quickstatus'] = JobStatus.UNKNOWN
         return akdf0
 
 
@@ -453,13 +453,14 @@ def add_combo_quickstatus(akdf0):
         for tup in akdf1.itertuples(index=False):
             arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
             if os.path.exists(arcdir / 'archived.txt'):
-                combo_quickstatus.append(JobStatus.MARKED_FINISHED)
+                status = JobStatus.MARKED_FINISHED
             else:
                 xdir = expmod.combo_to_scenedir(tup.combo, scenetype='x')
                 if not os.path.exists(xdir):
-                    combo_quickstatus.append(JobStatus.NOINPUT)
+                    status = JobStatus.NOINPUT
                 else:
-                    combo_quickstatus.append(JobStatus.UNKNOWN)
+                    status = JobStatus.UNKNOWN
+            combo_quickstatus.append(status)
 
         akdf1['combo_quickstatus'] = combo_quickstatus
 
