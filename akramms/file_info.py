@@ -9,8 +9,8 @@ class JobStatus(enum.IntEnum):
     OVERRUN = 5      # Avalanche overran the boundary; auto-resubmit
     FINISHED = 6     # The avalanche (or chunk or combo) has finished, and it's successful
     MARKED_FINISHED = 7       # Chunk or combo has finished, and has been marked as such (shortcut)
-    ARCHIVED = 8    # For combos: It's been fully archived to an arc directory
-
+    ARCHIVED = 8    # For combos: It's been fully archived to an arc directory (NOT USED)
+    UNKNOWN = 9    # The status is unkwnown; used for quick partial status checking
 
 # ---------------------------------------------------------------------
 def is_file_good(fname):

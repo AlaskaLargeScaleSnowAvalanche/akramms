@@ -424,34 +424,44 @@ def agg_status(statuses, ignore_statuses={}):
     ret = min(status for status in counts.keys())
     return ret
 
-def add_combo_marked_finished(akdf0):
+def add_combo_quickstatus(akdf0):
 
     """Adds a quick per-combo status field based on just whether the
     combo has been marked finished.  Allows for easy exclusion of
-    aready-finished combos in akramms run.
+    aready-finished combos in akramms run; and not-started combos when
+    looking at status.
 
     akdf:
         Resolved to combo level (theoretical, i.e. realized=False)
+
     """
 
     # Make it idempotent
-    if 'combo_marked_finished' in akdf0.columns:
+    if 'combo_quickstatus' in akdf0.columns:
         return akdf0
 
     dfs = list()
     if len(akdf0) == 0:
-        akdf0['combo_marked_finished'] = False
+        akdf0['combo_quickstatus'] = False
         return akdf0
 
 
     for exp,akdf1 in akdf0.reset_index(drop=True).groupby('exp'):
         expmod = parse.load_expmod(exp)
 
-        combo_marked_finished = list()
+        combo_quickstatus = list()
         for tup in akdf1.itertuples(index=False):
             arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
-            combo_marked_finished.append(os.path.exists(arcdir / 'archived.txt'))
-        akdf1['combo_marked_finished'] = combo_marked_finished
+            if os.path.exists(arcdir / 'archived.txt'):
+                combo_quickstatus.append(JobStatus.MARKED_FINISHED)
+            else:
+                xdir = expmod.combo_to_scenedir(tup.combo, scenetype='x')
+                if not os.path.exists(xdir):
+                    combo_quickstatus.append(JobStatus.NOINPUT)
+                else:
+                    combo_quickstatus.append(JobStatus.UNKNOWN)
+
+        akdf1['combo_quickstatus'] = combo_quickstatus
 
         dfs.append(akdf1)
 
