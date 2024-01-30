@@ -65,7 +65,7 @@ def snowfile_vrt(snowfile_argss):
         # Include ALL appropriate snowfiles in the VRT, not just the
         # snowfile(s) needed for now.
         cmd.append(ofname)
-        cmd += [os.path.relname(x, snowdir) for x in glob.glob(str(snowfile_glob))]
+        cmd += [os.path.relpath(x, snowdir) for x in glob.glob(str(snowfile_glob))]
         subprocess.run(cmd, cwd=snowdir, check=True)
 
     return ofname
