@@ -487,7 +487,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
 
     # Cull combos that have finished or not yet started
     akdf0 = add_combo_quickstatus(akdf0)
-    mask = (akdf0.combo_quickstatus == joblib.JobStatus.UNKNOWN)
+    mask = (akdf0.combo_quickstatus == JobStatus.UNKNOWN)
     dfs.append(akdf0[~mask].rename(columns={'combo_quickstatus':'combo_status'}))
     akdf0 = akdf0[mask].drop('combo_quickstatus', axis=1)
 
