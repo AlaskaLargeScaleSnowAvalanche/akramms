@@ -692,10 +692,10 @@ def xmosaic(args):
             raise ValueError('--output must specify a .zip file')
     else:
         # Make up filename based on combos
-        combos = set(akdf.combo)
+        combos = list(set(akdf.combo))
         if len(combos) > 1:
             raise ValueError('If more than one Combo is involved in a query, you must specify the mosaic output filename via --output')
-        scombo = '-'.join(str(x) for x in combos)
+        scombo = '-'.join(str(x) for x in combos[0])
         sstatus = ''.join(joblib.JobStatus._member_names_[x][0] for x in sorted(args.status))
         ofname = f'{scombo}-{sstatus}.zip'
         print(ofname)
