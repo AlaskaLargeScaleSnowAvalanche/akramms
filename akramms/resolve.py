@@ -9,8 +9,8 @@ from akramms import level,parse,file_info
 
 def initial(parseds):
     orows = list()
-    for n,parsed in enumerate(parseds):
-        orows.append({'sort_order': n, 'parsed': parsed})
+    for parsed in parseds:
+        orows.append({'parsed': parsed})
     return pd.DataFrame(orows)
 
 
@@ -64,20 +64,20 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
     # ----------------------------
 
 
-    for tup in akdf.itertuples(index=False):
+    for n,tup in enumerate(akdf.itertuples(index=False)):
         expmod = parse.load_expmod(tup.exp)
 #        print('tup ', type(tup), tup)
         parsed = tup.parsed
 
         if parsed['type'] == 'arcfile':
-            orows.append(itertools.chain(tup, [None]))
+            orows.append(itertools.chain(tup, [n, None]))
             continue
 
         if 'wcombo' in parsed:
             wcombo = parsed['wcombo']
             if 'ijdom' in parsed:
                 combo = parse.new_combo(expmod, itertools.chain(wcombo, parsed['ijdom']))
-                orows.append(itertools.chain(tup, [combo]))
+                orows.append(itertools.chain(tup, [n, combo]))
             elif realized:
                 # It's a wildcard combo, list the full combos there on disk
                 trialdir = level.theory_wcombo_to_trialdir(tup.exp, wcombo)
@@ -86,7 +86,7 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
         elif 'expset_fn' in parsed:
             # User asked for a list of combos...
             for tcombo in parsed['expset_fn']():
-                orows.append(itertools.chain(tup, [parse.new_combo(expmod, tcombo)]))
+                orows.append(itertools.chain(tup, [n, parse.new_combo(expmod, tcombo)]))
 
         elif realized:
             # No combo info given, our only clue is the experiment itself.
@@ -109,7 +109,7 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
         else:
             raise ValueError('Not able to determine combos for: {}'.format(tup))
 
-    return pd.DataFrame(orows, columns=list(akdf.columns) + ['combo'])
+    return pd.DataFrame(orows, columns=list(akdf.columns) + ['combo_order', 'combo'])
 #    return pd.DataFrame(orows, columns=tuple(
 #        itertools.chain(type(tup)._fields, ['combo'])))
 

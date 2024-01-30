@@ -218,7 +218,7 @@ def status(args):
     dfs.append(joblib.add_status(
         akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run, ignore_statuses=ignore_statuses))
 
-    akdf = pd.concat(dfs).sort_values('sort_order')
+    akdf = pd.concat(dfs).sort_values('combo_order')
     print(akdf[['sort_order', 'combo', 'combo_status']])
 #    joblib.print_status(akdf, args.level)
 # ---------------------------------------------------------------------
