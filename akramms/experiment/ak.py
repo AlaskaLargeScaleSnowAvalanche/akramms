@@ -186,7 +186,7 @@ def all_domains():
 
 def spiral_domains(x0, y0):
     """Use Ulam Spiral out from a central domain tile"""
-    dij = set(domains_ij)
+    dij = set(all_domains())
     for n in itertools.count(start=0, step=1):
         dxy = ulam.n_to_xy(n)
         xy = (x0 + dxy[0], y0 + dxy[1])
