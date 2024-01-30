@@ -73,7 +73,7 @@ def snowfile_vrt(snowfile_argss):
 
 
 # --------------------------------------------------------------------------
-def extract_snow(snowfile_vrt, poly, ofname, resolution=None, sanity_check=True):
+def extract_snow(snowfile_vrt, poly, ofname, sanity_check=True):
     """Extracts a sub-raster from a snowfile_vrt virtual raster file
     poly:
         A rectangle
@@ -90,8 +90,6 @@ def extract_snow(snowfile_vrt, poly, ofname, resolution=None, sanity_check=True)
     cmd += ['-co', 'TFW=YES']   # https://gis.stackexchange.com/questions/271995/how-to-get-gdal-translate-to-create-world-file-for-geotiff
 #    if sanity_check:
 #        cmd += ['-eco']    # Error when completely outside (SANITY CHECK)
-    if resolution is not None:
-        cmd += ['-tr', str(resolution), str(resolution)]
 
     cmd.append('-projwin')
     # -projwin <ulx> <uly> <lrx> <lry>
@@ -99,6 +97,7 @@ def extract_snow(snowfile_vrt, poly, ofname, resolution=None, sanity_check=True)
     cmd += [str(n) for n in (x0,y1,x1,y0)]
 
     cmd += [snowfile_vrt, ofname]
+    print('extract_snow: ', ' '.join(cmd))
 
     os.makedirs(os.path.split(ofname)[0], exist_ok=True)
     subprocess.run(cmd, check=True)
