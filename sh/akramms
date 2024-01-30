@@ -568,13 +568,21 @@ def ps(args):
 ])
 def xoverrun(args):
     """Resubmits overruns"""
-    # Find the overruns
+    # Find the combos to check
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=False, scenetypes={'x', 'arc'})
 
+    # Speed optimization:
+    # Exclude combos that are finished or don't yet exist
+    # (and the x-dir might have been deleted)
+    akdf0 = joblib.add_combo_quickstatus(akdf0)
+    akdf0 = akdf0[~akdf0.combo_quickstatus.isin([
+        joblib.JobStatus.NOINPUT,
+        joblib.JobStatus.MARKED_FINISHED])]
+
     if args.ignore is not None:
         ignore_statuses = {joblib.JobStatus._member_map_[x] for x in args.ignore.split(',')}
-        update = False    # Don't permanently updates tatus based on ignoring certain status codes
+        update = False    # Don't permanently updates status based on ignoring certain status codes
     else:
         ignore_statuses = {}
         update = True
