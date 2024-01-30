@@ -206,7 +206,7 @@ def status(args):
 
     # Special optimizations when working at combo level (large scale)
     dfs = list()
-    if level == 'combo':
+    if args.level == 'combo':
         # Cull combos that have finished or not started
         akdf = resolve.resolve_to(parseds, 'combo', realized=False)
         akdf = joblib.add_combo_quickstatus(akdf)
