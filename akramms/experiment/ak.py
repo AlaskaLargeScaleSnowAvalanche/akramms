@@ -85,8 +85,9 @@ def combo_to_scenedir(combo, scenetype='x'):
 
 def combo_to_snowfile_args(combo):
     return (dir, name,
-        combo.snow_dataset, combo.downscale_algo,
-        combo.year0, combo.year1, combo.idom, combo.jdom)
+        combo.snow_dataset,
+        combo.year0, combo.year1, combo.downscale_algo,
+        combo.idom, combo.jdom)
 
 # -------------------------------------------------------------
 def add_dem(makefile, idom, jdom, sanity_check=True):
