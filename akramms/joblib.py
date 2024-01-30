@@ -424,6 +424,40 @@ def agg_status(statuses, ignore_statuses={}):
     ret = min(status for status in counts.keys())
     return ret
 
+def add_combo_marked_finished(akdf0):
+
+    """Adds a quick per-combo status field based on just whether the
+    combo has been marked finished.  Allows for easy exclusion of
+    aready-finished combos in akramms run.
+
+    akdf:
+        Resolved to combo level (theoretical, i.e. realized=False)
+    """
+
+    # Make it idempotent
+    if 'marked_finished' in akdf0.columns:
+        return akdf0
+
+    dfs = list()
+    if len(akdf0) == 0:
+        akdf0['marked_finished'] = False
+        return akdf0
+
+
+    for exp,akdf1 in akdf0.reset_index(drop=True).groupby('exp'):
+        expmod = parse.load_expmod(exp)
+
+        marked_finished = list()
+        for tup in akdf1.itertuples(index=False):
+            arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
+            marked_finished.append(os.path.exists(arcdir / 'archived.txt'))
+        akdf1['marked_finished'] = marked_finished
+
+        dfs.append(akdf1)
+
+    return pd.concat(dfs)
+
+
 
 def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_statuses={}):
     """akdf:
@@ -435,7 +469,6 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         return akdf0
 
     dfs = list()
-
     if len(akdf0) == 0:
         akdf0['combo_status'] = JobStatus.TODO
         return akdf0

@@ -402,7 +402,11 @@ def run(args):
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
     akdf0 = akdf0.reset_index(drop=True)
 
-    print(akdf0['combo'])
+    # Exclude combos that have already been completely finished and archived
+    # (and the x-dir might have been deleted)
+    akdf0 = joblib.add_combo_marked_finished(akdf0)
+    akdf0 = akdf0[~akdf0.combo_marked_finished]
+    print(akdf0)
     return
 
     for exp,akdf1 in akdf0.groupby('exp'):
