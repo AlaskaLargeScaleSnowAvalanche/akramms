@@ -626,7 +626,7 @@ def _parse_statuses(sstat):
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser.'),
     argument('-s', '--save', help='Name of query file to write to'),
     argument('-q', '--query', help='Name of query file to read from.  If set, then spec is ignored'),
-    argument('-o', '--output', required=True, help='Name of Mosaic output file to write'),
+    argument('-o', '--output', help='Name of Mosaic output file to write'),
     argument('--limit', type=int,
         help='Limit number of avalanches processed (for DEBUGGING)'),
     argument('--status', type=_parse_statuses,
@@ -662,26 +662,41 @@ def xmosaic(args):
 
         expmod = akramms.parse.load_expmod(akdf.exp[0])
         extent,akdf = avalquery.query(akdf, args.extent, statuses=args.status, scenetypes='arc', margin=args.margin)
-        # Prepare snow input
-        if args.snow:
-            # Ensure all avalanches use the same snow input
-            snowfile_argss = sorted(set(akdf['combo'].map(expmod.combo_to_snowfile_args)))
-            assert all(x[:-2] == snowfile_argss[0][:-2] for x in snowfile_argss)
-
-            # Create virtual raster to query
-            snowfile_vrt = downscale_snow.snowfile_vrt(snowfile_argss)
-
-        if args.save is not None:
-            with open(args.save, 'wb') as out:
-                pickle.dump(expmod.name, out)
-                pickle.dump(extent, out)
-                pickle.dump(akdf, out)
     else:
         with open(args.query, 'rb') as fin:
             exp = pickle.load(out)
             expmod = parse.load_expmod(exp)
             extent = pickle.load(out)
             akdf = pickle.load(out)
+
+    # Save query for later
+    if args.save is not None:
+        with open(args.save, 'wb') as out:
+            pickle.dump(expmod.name, out)
+            pickle.dump(extent, out)
+            pickle.dump(akdf, out)
+
+    # Prepare snow virtual raster for query
+    if args.snow:
+        # Ensure all avalanches use the same snow input
+        snowfile_argss = sorted(set(akdf['combo'].map(expmod.combo_to_snowfile_args)))
+        assert all(x[:-2] == snowfile_argss[0][:-2] for x in snowfile_argss)
+
+        # Create virtual raster to query
+        snowfile_vrt = downscale_snow.snowfile_vrt(snowfile_argss)
+
+    # Determine the output file name if none given
+    if args.output is not None:
+        ofname = args.output
+        if not ofname.endswith('.zip'):
+            raise ValueError('--output must specify a .zip file')
+    else:
+        # Make up filename based on combos
+        combos = set(akdf.combo)
+        if len(combos) > 1:
+            raise ValueError('If more than one Combo is involved in a query, you must specify the mosaic output filename via --output')
+        scombo = '-'.join(str(x) for x in combo)
+        ofname = f'{scombo}.zip'
 
 
     # Do mosaic
@@ -694,13 +709,10 @@ def xmosaic(args):
     print(akdf[['exp', 'combo','id']])
     print(f'Extent: {extent}')
 
-    if args.dry_run or (args.output is None):
+    if args.dry_run:
         print('Dry Run, not going further')
         return
 
-    ofname = args.output
-    if not ofname.endswith('.zip'):
-        raise ValueError('--output must specify a .zip file')
 
     kwargs = dict()
     if args.dem:
