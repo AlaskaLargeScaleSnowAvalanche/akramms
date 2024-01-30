@@ -192,7 +192,7 @@ def spiral_domains(x0, y0):
         xy = (x0 + dxy[0], y0 + dxy[1])
         if xy in dij:
             yield xy
-            del dij[xy]
+            dij.remove(xy)
             if len(dij) == 0:
                 return
 
