@@ -96,7 +96,7 @@ def extract_snow(snowfile_vrt, poly, ofname, sanity_check=True):
     # Therefore, y1<y0 in typical projection, where y increases as you go northward.
     cmd += [str(n) for n in (x0,y1,x1,y0)]
 
-    cmd += [snowfile_vrt, ofname]
+    cmd += [str(snowfile_vrt), str(ofname)]
     print('extract_snow: ', ' '.join(cmd))
 
     os.makedirs(os.path.split(ofname)[0], exist_ok=True)
