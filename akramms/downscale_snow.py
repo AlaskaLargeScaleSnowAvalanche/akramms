@@ -45,8 +45,6 @@ def snowfile_vrt(snowfile_argss):
     print(snowfile_glob)
     print(ofname)
 
-    sys.exit(0)
-
     # Decide whether we need to regenerate the .vrt file
     if not os.path.exists(ofname):
         regen = True
