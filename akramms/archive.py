@@ -567,7 +567,11 @@ def copy_shapefiles(expmod, combo, dry_run=False):
     xdir = expmod.combo_to_scenedir(combo, scenetype='x')
     arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
 
-    
+    # Only copy shapefile is the source and destination diretories
+    # already exist. i.e. there has been real work done so far
+    if not os.path.exists(xdir) or not os.path.exists(arcdir):
+        return
+
     # Copy relevant Combo-related metadata
     for leaf in ('RELEASE', 'DOMAIN'):
         with ioutil.WriteIfDifferent(arcdir / f'{leaf}.zip') as owid:
