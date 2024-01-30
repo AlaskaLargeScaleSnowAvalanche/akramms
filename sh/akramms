@@ -215,8 +215,8 @@ def status(args):
         akdf = akdf[mask].drop('combo_quickstatus', axis=1)
     else:
         akdf = resolve.resolve_to(parseds, args.level, realized=False)
-        dfs.append(joblib.add_status(
-            akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run, ignore_statuses=ignore_statuses))
+    dfs.append(joblib.add_status(
+        akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run, ignore_statuses=ignore_statuses))
 
     akdf = pd.merge(dfs)
     joblib.print_status(akdf, args.level)
