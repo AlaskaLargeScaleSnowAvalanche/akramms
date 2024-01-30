@@ -695,8 +695,9 @@ def xmosaic(args):
         combos = set(akdf.combo)
         if len(combos) > 1:
             raise ValueError('If more than one Combo is involved in a query, you must specify the mosaic output filename via --output')
-        scombo = '-'.join(str(x) for x in combo)
-        ofname = f'{scombo}.zip'
+        scombo = '-'.join(str(x) for x in combos)
+        sstatus = ''.join(joblib.JobStatus._member_names_[x][0] for x in sorted(args.status))
+        ofname = f'{scombo}-{sstatus}.zip'
 
 
     # Do mosaic
