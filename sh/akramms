@@ -698,7 +698,8 @@ def xmosaic(args):
         scombo = '-'.join(str(x) for x in combos)
         sstatus = ''.join(joblib.JobStatus._member_names_[x][0] for x in sorted(args.status))
         ofname = f'{scombo}-{sstatus}.zip'
-
+        print(ofname)
+        return
 
     # Do mosaic
     res = expmod.resolution
