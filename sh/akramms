@@ -190,7 +190,7 @@ def parse(args):
     argument('--update', action='store_true',
         help='Update markers of completion?'),
     argument('--ignore',
-        help="Disregard these status codes when aggregating (comma-separated status codes)"),
+        help="Disregard these status codes when aggregating (comma-separated status codes).  At times used with --ignore NOINPUT in some special cases."),
     argument('--dry-run', action='store_true',
         help="Don't actually do the work inside combo archive"),
 ])
