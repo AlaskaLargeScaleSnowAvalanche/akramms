@@ -227,11 +227,11 @@ def mosaic_avals(gridM, akdf, ofname_zip, tdir,
 
         # Snowfile
         if snow_fn is not None:
-            snow_fn(box_poly, dir / 'snow0.tif')
+            snow_fn(box_poly, dir / 'snow.tif')
 
-            # Write TFW file
-            options = ['COMPRESS=LZW', 'TFW=YES']
-            gdal.Warp(str(dir / 'snow.tif'), str(dir / 'snow0.tif'), xRes=30, yRes=30, options=options)
+            # No need to reduce resolution for such a smooth file, only negligable space savings
+            #options = ['COMPRESS=LZW', 'TFW=YES']
+            #gdal.Warp(str(dir / 'snow.tif'), str(dir / 'snow0.tif'), xRes=30, yRes=30, options=options)
             ozip_write(ozip, dir / 'snow.tif')
             ozip_write(ozip, os.path.join(dir, 'snow.tfw'))
 
