@@ -205,7 +205,7 @@ def status(args):
     parseds = akramms.parse.parse_args(args.spec)
 
     # Special optimizations when working at combo level (large scale)
-    akdf = resolve.resolve_to(parseds, ags.level, realized=False)
+    akdf = resolve.resolve_to(parseds, args.level, realized=False)
 #    dfs = list()
 #    if args.level == 'combo':
 #        # Cull combos that have finished or not started
