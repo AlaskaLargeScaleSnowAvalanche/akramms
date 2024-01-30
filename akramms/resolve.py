@@ -60,24 +60,24 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
         # Add rows to the dataframe now
         for ijdom in sorted(ijdoms):
             combo = parse.new_combo(expmod, (itertools.chain(wcombo, ijdom)))
-            orows.append(itertools.chain(tup, [combo]))
+            orows.append(itertools.chain(tup, [len(orows), combo]))
     # ----------------------------
 
-
-    for n,tup in enumerate(akdf.itertuples(index=False)):
+    for tup in akdf.itertuples(index=False):
         expmod = parse.load_expmod(tup.exp)
 #        print('tup ', type(tup), tup)
         parsed = tup.parsed
 
         if parsed['type'] == 'arcfile':
-            orows.append(itertools.chain(tup, [n, None]))
+            orows.append(itertools.chain(tup, [len(orows), None]))
             continue
 
         if 'wcombo' in parsed:
             wcombo = parsed['wcombo']
             if 'ijdom' in parsed:
                 combo = parse.new_combo(expmod, itertools.chain(wcombo, parsed['ijdom']))
-                orows.append(itertools.chain(tup, [n, combo]))
+                orows.append(itertools.chain(tup, [len(orows), combo]))
+                n += 1
             elif realized:
                 # It's a wildcard combo, list the full combos there on disk
                 trialdir = level.theory_wcombo_to_trialdir(tup.exp, wcombo)
@@ -86,7 +86,7 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
         elif 'expset_fn' in parsed:
             # User asked for a list of combos...
             for tcombo in parsed['expset_fn']():
-                orows.append(itertools.chain(tup, [n, parse.new_combo(expmod, tcombo)]))
+                orows.append(itertools.chain(tup, [len(orows), parse.new_combo(expmod, tcombo)]))
 
         elif realized:
             # No combo info given, our only clue is the experiment itself.
