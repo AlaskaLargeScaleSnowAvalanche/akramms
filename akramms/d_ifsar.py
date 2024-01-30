@@ -93,7 +93,9 @@ def extract(type, poly, ofname, resolution=None, sanity_check=True):
 
 #    cmd += [str(n) for n in (min(x0,x1), min(y0,y1), max(x0,x1), max(y0,y1))]
 #    cmd += ['-projwin', str(x0), str(y1), str(x1), str(y0), ifsar_vrt, ofname]    # North-up
-    cmd += [r_vrt(type).outputs[0], ofname]
+    cmd += [r_vrt(type).outputs[0], str(ofname)]
+
+    print('d_ifsar.extract(): ', ' '.join(cmd))
 
     os.makedirs(os.path.split(ofname)[0], exist_ok=True)
     subprocess.run(cmd, check=True)
