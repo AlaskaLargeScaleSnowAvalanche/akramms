@@ -418,7 +418,7 @@ def run(args):
 
     # Keep combo_order
     for exp,akdf1 in akdf0.groupby('exp'):
-        akdf1 = akdf1.sort_values('combo_order')
+        # akdf1 = akdf1.sort_values('combo_order')    # Not needed
         expmod = akramms.parse.load_expmod(exp)
 
         # ---------------- Step 1:
