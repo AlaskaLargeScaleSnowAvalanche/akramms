@@ -435,23 +435,23 @@ def add_combo_marked_finished(akdf0):
     """
 
     # Make it idempotent
-    if 'marked_finished' in akdf0.columns:
+    if 'combo_marked_finished' in akdf0.columns:
         return akdf0
 
     dfs = list()
     if len(akdf0) == 0:
-        akdf0['marked_finished'] = False
+        akdf0['combo_marked_finished'] = False
         return akdf0
 
 
     for exp,akdf1 in akdf0.reset_index(drop=True).groupby('exp'):
         expmod = parse.load_expmod(exp)
 
-        marked_finished = list()
+        combo_marked_finished = list()
         for tup in akdf1.itertuples(index=False):
             arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
-            marked_finished.append(os.path.exists(arcdir / 'archived.txt'))
-        akdf1['marked_finished'] = marked_finished
+            combo_marked_finished.append(os.path.exists(arcdir / 'archived.txt'))
+        akdf1['combo_marked_finished'] = combo_marked_finished
 
         dfs.append(akdf1)
 
