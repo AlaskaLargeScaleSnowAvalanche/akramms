@@ -207,7 +207,7 @@ def juneau():
         # Just one combo for now
         yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 113, 45)    # A Juneau-close box
         yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 113, 44)    # North of Juneau
-        yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 111, 42)    # Tile borders with Canada
+#        yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 111, 42)    # Tile borders with Canada
 
 def simple():
     yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 45)    # A Juneau-close box
@@ -216,4 +216,7 @@ def elizabeth():
     yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 47)    # A Juneau-close box
 
 def edge():
-    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 111, 42)    # Tile borders with Canada
+    dij = all_domains()
+    print(dij)
+
+#   yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 111, 42)    # Tile borders with Canada
