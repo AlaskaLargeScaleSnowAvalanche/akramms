@@ -218,7 +218,7 @@ def status(args):
     dfs.append(joblib.add_status(
         akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run, ignore_statuses=ignore_statuses))
 
-    akdf = pd.merge(dfs)
+    akdf = pd.concat(dfs)
     joblib.print_status(akdf, args.level)
 # ---------------------------------------------------------------------
 def get_exp_dir(exp_mod):
