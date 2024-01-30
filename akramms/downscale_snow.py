@@ -40,10 +40,10 @@ def snowfile_vrt(snowfile_argss):
     snowfile_glob = snowfile(*(snowfile_argss[0][:-2] + ('*','*')))
     ofname = snowfile_glob.parents[0] / (snowfile_glob.parts[-1][:-8] + '.vrt')  # _*_*.tif -> .vrt
 
-    print(snowfiles)
-    print(snowdir)
-    print(snowfile_glob)
-    print(ofname)
+    #print(snowfiles)
+    #print(snowdir)
+    #print(snowfile_glob)
+    #print(ofname)
 
     # Decide whether we need to regenerate the .vrt file
     if not os.path.exists(ofname):
