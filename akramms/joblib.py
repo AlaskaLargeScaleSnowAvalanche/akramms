@@ -480,11 +480,18 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         return akdf0
 
     dfs = list()
+
     if len(akdf0) == 0:
         akdf0['combo_status'] = JobStatus.TODO
         return akdf0
 
+    # Cull combos that have finished or not yet started
+    akdf0 = add_combo_quickstatus(akdf0)
+    mask = (akdf0.combo_quickstatus == joblib.JobStatus.UNKNOWN)
+    dfs.append(akdf0[~mask].rename(columns={'combo_quickstatus':'combo_status'}))
+    akdf0 = akdf0[mask].drop('combo_quickstatus', axis=1)
 
+    # Go to more work to determine the status of the rest of htem.
     for exp,akdf1 in akdf0.reset_index(drop=True).groupby('exp'):
         expmod = parse.load_expmod(exp)
 
@@ -529,32 +536,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
 
         dfs.append(akdf1)
 
-        # ------------------------------------------
-#        # Get jobstatus at releasefile level
-#        rfdf1 = resolve.resolve_chunk(akdf1)
-#        rfdf1 = add_chunk_status(rfdf1, realized=realized, update=update)
-#
-#        # Aggregate id status back to combo level and add to akdf1
-#        combo_status = \
-#            rfdf1[['combo','chunk_status']].groupby('combo').min() \
-#            .rename(columns={'chunk_status': 'combo_status'})
-#        akdf1 = akdf1.merge(combo_status, how='left', left_on='combo', right_index=True)
-#        akdf1['combo_status'] = akdf1.combo_status.fillna(JobStatus.NOINPUT).astype(int)
-#        # -------------------------------------------------
-#
-#        # Archive combos if they have in fact finished
-#        if update:
-#            mask = (akdf1.combo_status == JobStatus.FINISHED)
-#            dfs.append(akdf1[~mask])
-#
-#            finished_combo_df = akdf1[mask]
-#            archive.archive_combos(finished_combo_df, dry_run=dry_run)
-#            finished_combo_df.combo_status = JobStatus.ARCHIVED
-#            dfs.append(finished_combo_df)
-#        else:
-#            dfs.append(akdf1)
-
-    return pd.concat(dfs)
+    return pd.concat(dfs).sort_values('combo_order')
 # ------------------------------------------------------------
 def add_status(akdf, level, realized=True, update=True, dry_run=False, ignore_statuses={}):
     if level == 'id':

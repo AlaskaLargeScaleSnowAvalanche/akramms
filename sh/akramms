@@ -205,20 +205,21 @@ def status(args):
     parseds = akramms.parse.parse_args(args.spec)
 
     # Special optimizations when working at combo level (large scale)
-    dfs = list()
-    if args.level == 'combo':
-        # Cull combos that have finished or not started
-        akdf = resolve.resolve_to(parseds, 'combo', realized=False)
-        akdf = joblib.add_combo_quickstatus(akdf)
-        mask = (akdf.combo_quickstatus == joblib.JobStatus.UNKNOWN)
-        dfs.append(akdf[~mask].rename(columns={'combo_quickstatus':'combo_status'}))
-        akdf = akdf[mask].drop('combo_quickstatus', axis=1)
-    else:
-        akdf = resolve.resolve_to(parseds, args.level, realized=False)
-    dfs.append(joblib.add_status(
+    akdf = resolve.resolve_to(parseds, ags.level, realized=False)
+#    dfs = list()
+#    if args.level == 'combo':
+#        # Cull combos that have finished or not started
+#        akdf = joblib.add_combo_quickstatus(akdf)
+#        mask = (akdf.combo_quickstatus == joblib.JobStatus.UNKNOWN)
+#        dfs.append(akdf[~mask].rename(columns={'combo_quickstatus':'combo_status'}))
+#        akdf = akdf[mask].drop('combo_quickstatus', axis=1)
+#
+#    dfs.append(
+
+    akdf = joblib.add_status(
         akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run, ignore_statuses=ignore_statuses))
 
-    akdf = pd.concat(dfs).sort_values('combo_order')
+#    akdf = pd.concat(dfs).sort_values('combo_order')
     print(akdf[['combo_order', 'combo', 'combo_status']])
     joblib.print_status(akdf, args.level)
 # ---------------------------------------------------------------------
