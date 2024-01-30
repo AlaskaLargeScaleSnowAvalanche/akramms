@@ -231,4 +231,3 @@ def r_snow(exp_mod, snow_dataset, downscale_algo, year0, year1, idom, jdom):
     return make.Rule(action, inputs, [ofname])
 
 # -----------------------------------------------------------------------
-

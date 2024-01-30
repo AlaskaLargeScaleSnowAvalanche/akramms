@@ -1,7 +1,7 @@
-import os,collections,sys
+import os,collections,sys,itertools
 import numpy as np
 import schema
-from uafgi.util import schemautil,shputil,gisutil
+from uafgi.util import schemautil,shputil,gisutil,ulam
 from akramms import downscale_snow
 from akramms import config, r_experiment
 from akramms import r_prepare,r_domain_builder,file_info
@@ -183,6 +183,19 @@ def all_domains():
 #    domains_ij = [(row.idom, row.jdom) for row in domains_df.itertuples(index=False)]
     return domains_ij
 
+
+def spiral_domains(x0, y0):
+    """Use Ulam Spiral out from a central domain tile"""
+    dij = set(domains_ij)
+    for n in itertools.count(start=0, step=1):
+        dxy = ulam.n_to_xy(n)
+        xy = (x0 + dxy[0], y0 + dxy[1])
+        if xy in dij:
+            yield xy
+            del dij[xy]
+            if len(dij) == 0:
+                return
+
 # Different subsets of combos to try when running the experiment
 def full():
     """Yields the combos for the FULL experiment.
@@ -216,7 +229,9 @@ def elizabeth():
     yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 47)    # A Juneau-close box
 
 def edge():
-    dij = all_domains()
-    print(dij)
+    for z in spiral_domains(113, 45):
+        print(z)
+#    dij = all_domains()
+#    print(dij)
 
 #   yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 111, 42)    # Tile borders with Canada
