@@ -608,10 +608,11 @@ def finish_combo(expmod, combo, dry_run=False):
     # (Very conservatively) delete the xdir by moving it to a todel directory.
     if os.path.exists(xdir):
         todel = xdir.parents[0] / 'todel'
+        os.makedirs(todel, exist_ok=True)
         odir = todel / xdir.parts[-1]
         if os.path.exists(odir):
             shutil.rmtree(odir)
-        shutil.move(xdir, todel)
+        shutil.move(xdir, odir)
 
 
 # ----------------------------------------------------------
