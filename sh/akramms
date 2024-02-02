@@ -738,19 +738,19 @@ def stdmosaic(args):
     # Process mosaics one combo at a time
     plan = list()
     for ix in range(len(akdf0)):
-        exp = akdf0.exp.iloc[0]
+        exp = akdf0.exp.item()
         expmod = akramms.parse.load_expmod(exp)
         akdf1 = akdf0.iloc[[ix],:]    # akdf1 is just one row of akdf0
 
         # Determine output filename
-        combo = akdf1.combo.iloc[0]
+        combo = akdf1.combo.item()
         scombo = '-'.join(str(x) for x in combo)
         sstatus = ''.join(joblib.JobStatus._member_names_[x][0] for x in sorted(args.status))
         ofname = expmod.dir / 'mosaic' / f'{expmod.name}-{scombo}-{sstatus}.zip'
         print(f'Writing mosaic output file {ofname}')
 
         # See if the output file needs regenerating
-        if (not os.path.exists(ofname)) or (os.path.getmtime(ofname) < akdf1.combo_quickstatus_mtime.iloc[0]):
+        if (not os.path.exists(ofname)) or (os.path.getmtime(ofname) < akdf1.combo_quickstatus_mtime.item()):
             mosaic.mosaic_avals_combo(
                 akdf1, 'tile', ofname, statuses=args.status,
                 margin=None, snow=True, dem=True, landcover=True,
