@@ -765,7 +765,7 @@ def upload_mosaic(args):
     for name in names:
         cmd = ['rclone', 'copy', str(mosaic_dir / name), 'alaska:AvalancheShare/mosaic']
         print(' '.join(cmd))
-        subproces.run(cmd, check=True)
+        subprocess.run(cmd, check=True)
 
 
 
