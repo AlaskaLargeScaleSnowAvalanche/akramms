@@ -155,6 +155,7 @@ def prepare_data(scene_dir):
         script_args['outCoordSystem'] = arcgisutil.Lambda('arcpy', 'SpatialReference', scene_args['coordinate_system'])
 
     # Run the core script (we've already passed the rq barrier by now)
+    os.makedirs(scene_dir / 'in_mem', exist_ok=True)    # Avoid problems in ArcGIS script.
     data_prep_PRA_py = os.path.join(harnutil.HARNESS, 'akramms', 'sh', 'arcgis', 'data_prep_PRA.py')
     arcgisutil.run_script(data_prep_PRA_py, script_args, cwd=scene_dir, dry_run=False)
 
