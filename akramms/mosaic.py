@@ -273,10 +273,11 @@ def mosaic_avals_combo(akdf, sextent, ofname,
 
     # Make sure they all use the same experiment
     # (Because extents are queried from the experiment definition file)
-    assert all(x == akdf.exp[0] for x in akdf.exp)
+    row0 = akdf.iloc[0]
+    assert all(x == row0.exp for x in akdf.exp)
 
     # Query down to the id level
-    expmod = akramms.parse.load_expmod(akdf.exp[0])
+    expmod = akramms.parse.load_expmod(row0.exp)
     extent,akdf = avalquery.query(akdf, sextent, statuses=statuses, scenetypes='arc', margin=margin)
 
     # Prepare snow virtual raster for query
