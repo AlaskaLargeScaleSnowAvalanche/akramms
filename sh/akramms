@@ -746,7 +746,7 @@ def stdmosaic(args):
         print(f'Writing mosaic output file {ofname}')
 
 
-        print('akdf1)
+        print(akdf1)
         return
 
         mosaic.mosaic_avals_combo(
