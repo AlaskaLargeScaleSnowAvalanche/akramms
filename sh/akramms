@@ -737,9 +737,9 @@ def stdmosaic(args):
 
     # Process mosaics one combo at a time
     plan = list()
+    exp = akdf0.iloc[0].exp
+    expmod = akramms.parse.load_expmod(exp)
     for ix in range(len(akdf0)):
-        exp = akdf0.exp[0]
-        expmod = akramms.parse.load_expmod(exp)
         akdf1 = akdf0.iloc[[ix],:]    # akdf1 is just one row of akdf0
 
         # Determine output filename
