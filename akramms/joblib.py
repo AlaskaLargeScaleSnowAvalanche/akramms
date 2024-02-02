@@ -457,7 +457,7 @@ def add_combo_quickstatus(akdf0, mtime=False):
             arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
             if os.path.exists(arcdir / 'archived.txt'):
                 status = JobStatus.MARKED_FINISHED
-                mtimes.append(os.getmtime(arcdir / 'archived.txt'))
+                mtimes.append(os.path.getmtime(arcdir / 'archived.txt'))
             else:
                 xdir = expmod.combo_to_scenedir(tup.combo, scenetype='x')
                 if not os.path.exists(xdir):
