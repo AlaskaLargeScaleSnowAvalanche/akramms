@@ -749,11 +749,8 @@ def stdmosaic(args):
         print(f'Writing mosaic output file {ofname}')
 
 
-        print('xxxxxx ', args.status)
-        return
-
         mosaic.mosaic_avals_combo(
-            akdf1, 'tile', ofname, args.status,
+            akdf1, 'tile', ofname, statuses=args.status,
             margin=None, snow=True, dem=True, landcover=True,
             dry_run=args.dry_run)
 

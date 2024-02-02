@@ -164,7 +164,7 @@ def extent_by_avalanches(expmod, akdf):
     return extent
 
 # ---------------------------------------------------------------------
-def query(akdf0, sextent, include_overruns=False, scenetypes={'x', 'arc'},
+def query(akdf0, sextent, scenetypes={'x', 'arc'},
     statuses=[file_info.JobStatus.OVERRUN, file_info.JobStatus.FINISHED], margin=None):
 
     """akdf:

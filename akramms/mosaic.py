@@ -267,7 +267,7 @@ def mosaic_avals_combo(akdf, sextent, ofname,
 
     # Query down to the id level
     expmod = akramms.parse.load_expmod(akdf.exp[0])
-    extent,akdf = avalquery.query(akdf, sextent, statuses, scenetypes='arc', margin=margin)
+    extent,akdf = avalquery.query(akdf, sextent, statuses=statuses, scenetypes='arc', margin=margin)
 
     # Prepare snow virtual raster for query
     if snow:
