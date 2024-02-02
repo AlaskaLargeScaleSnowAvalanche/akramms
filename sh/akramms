@@ -747,7 +747,7 @@ def stdmosaic(args):
 
 
         mosaic.mosaic_avals_combo(
-            akdf, 'tile', ofname, args.status,
+            akdf1, 'tile', ofname, args.status,
             margin=None, snow=True, dem=Treu, landcover=True,
             dry_run=args.dry_run)
 
