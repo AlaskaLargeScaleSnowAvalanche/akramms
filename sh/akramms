@@ -729,7 +729,7 @@ def stdmosaic(args):
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
 
     # Only run for combos that are completely finished
-    akdf0 = joblib.add_combo_quickstatus(akdf0)
+    akdf0 = joblib.add_combo_quickstatus(akdf0, mtime=True)
     akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED]
 
     if len(akdf0) == 0:
@@ -748,11 +748,12 @@ def stdmosaic(args):
         ofname = expmod.dir / 'mosaic' / f'{expmod.name}-{scombo}-{sstatus}.zip'
         print(f'Writing mosaic output file {ofname}')
 
-
-        mosaic.mosaic_avals_combo(
-            akdf1, 'tile', ofname, statuses=args.status,
-            margin=None, snow=True, dem=True, landcover=True,
-            dry_run=args.dry_run)
+        # See if the output file needs regenerating
+        if (not os.path.exists(ofname)) or (os.getmtime(ofname) < akdf1.combo_quickstatus_mtime):
+            mosaic.mosaic_avals_combo(
+                akdf1, 'tile', ofname, statuses=args.status,
+                margin=None, snow=True, dem=True, landcover=True,
+                dry_run=args.dry_run)
 
 
 
