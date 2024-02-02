@@ -238,7 +238,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
 def mosaic_avals_combo(akdf, sextent, ofname,
     statuses=[file_info.JobStatus.FINISHED],
     margin=None, snow=False, dem=False, landcover=False,
-    dry_run=False)
+    dry_run=False):
 
     """General mosaic function for a bunch of avalanches and a domain
 
