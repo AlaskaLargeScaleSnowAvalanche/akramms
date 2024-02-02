@@ -89,7 +89,7 @@ def ozip_write(ozip, fname):
     """Writes with truncated arcname"""
     ozip.write(fname, arcname=os.path.split(fname)[1])
 
-def mosaic_avals(gridM, akdf, ofname_zip, tdir,
+def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
     rho=300, vars=_mosaic_keys,
     dem_fn=None, landcover_fn=None, snow_fn=None):
 
@@ -97,8 +97,6 @@ def mosaic_avals(gridM, akdf, ofname_zip, tdir,
 
     gridM:
         Sub-grid (of global gridG) defining the extent of our mosaic domain
-    avals:
-        Generator of NetDCDF avalanche filenames to mosaic
     akdf:
         Avalanches (in scenetype='arc') to mosiac
         Resolved to the id level
@@ -168,6 +166,7 @@ def mosaic_avals(gridM, akdf, ofname_zip, tdir,
             _mosaic.mosaic(*args)
 
     # Write output GeoTIFF and Zip it up
+    os.makedirs(ofname_zip.parents[0], exist_ok=True)
     with zipfile.ZipFile(ofname_zip, mode='w', compression=zipfile.ZIP_STORED) as ozip:
 
         box_poly = gridM.bounding_box
@@ -236,64 +235,73 @@ def mosaic_avals(gridM, akdf, ofname_zip, tdir,
             ozip_write(ozip, os.path.join(dir, 'snow.tfw'))
 
 
-    # TODO: Create a RELEASE file, for avalanches with aspecs
+def mosaic_avals_combo(akdf, sextent, ofname,
+    statuses=[file_info.JobStatus.FINISHED],
+    margin=None, snow=False, dem=False, landcover=False,
+    dry_run=False)
+
+    """General mosaic function for a bunch of avalanches and a domain
+
+    akdf:
+        Avalanches (in scenetype='arc') to mosiac
+        Resolved to the id level
+        Must contain columns: releasefile (actually arcdir), avalfile, id
+
+    sextent: One of...
+        (x0,y0,x1,y1)
+            or
+        experiment-specific extent label
+            or
+        'tile': Use the extent of an (idom,jdom) subdomain tile
+            or
+        'avalanche': Use avalanches to determine overall extent
+
+    ofname:
+        Name of output filename
+    """
+
+    # Make sure they all use the same experiment
+    # (Because extents are queried from the experiment definition file)
+    assert all(x == akdf.exp[0] for x in akdf.exp)
+
+    # Query down to the id level
+    expmod = akramms.parse.load_expmod(akdf.exp[0])
+    extent,akdf = avalquery.query(akdf, sextent, statuses, scenetypes='arc', margin=margin)
+
+    # Prepare snow virtual raster for query
+    if snow:
+        # Ensure all avalanches use the same snow input
+        snowfile_argss = sorted(set(akdf['combo'].map(expmod.combo_to_snowfile_args)))
+        assert all(x[:-2] == snowfile_argss[0][:-2] for x in snowfile_argss)
+
+        # Create virtual raster to query
+        snowfile_vrt = downscale_snow.snowfile_vrt(snowfile_argss)
+
+    if not ofname.endswith('.zip'):
+        raise ValueError('--output must specify a .zip file')
+
+    # Do mosaic
+    res = expmod.resolution
+    gridG = expmod.gridD.global_grid(res, res)
+    gridM = expmod.gridD.subgrid(extent[0], extent[1], extent[2], extent[3], res, res)
+
+    print(akdf[['exp', 'combo','id']])
+    print(f'Extent: {extent}')
+
+    if dry_run:
+        print('Dry Run, not going further')
+        return
 
 
+    kwargs = dict()
+    if dem:
+        kwargs['dem_fn'] = expmod.extract_dem
+    if landcover:
+        kwargs['landcover_fn'] = expmod.extract_landcover
+    if snow:
+        kwargs['snow_fn'] = lambda box_poly,ofname: downscale_snow.extract_snow(snowfile_vrt, box_poly, ofname)
 
-
-
-#
-#def main():
-#    from uafgi.util import ioutil
-#    from akramms import experiment
-#
-#    import akramms.e_alaska as exp_mod
-#
-#    res = exp_mod.resolution
-#    gridG = exp_mod.gridD.global_grid(res, res)
-##    gridM = exp_mod.gridD.sub(113,45, res, res)    # Could be arbitrary rectangle
-#    gridM = exp_mod.gridD.subgrid(
-#        1109800, 1107000,
-#        1111300, 1108000,
-#        res, res)
-#
-#    avals = ['/home/efischer/prj/ak/ak_ccsm_1981_1990_lapse_For_30/arc-113-045/aval-1762.nc']
 #    with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
-#        mosaic_avals(exp_mod, gridM, avals, 'avals2.zip', tdir=tdir)
-#
-#main()
-
-# 
-# 
-# # Ways to select avalanches:
-# # 1. By bouding box
-# # 2. By scene (just use bounding box of scene)
-# 
-# 
-# ** Add scene info to NetCDF avalanches
-# 
-# ** In PRA_post: only include avalanches whose PRA is >50% in the main part of the domain.
-# 
-# 
-# 
-# def select_aval(exp_mod, x0,y0,x1,y1):
-# 
-# * Determine (i0,j0,i1,j1) of mosiac rectangle in master coordinate system
-# * Determine which domains we overlap with
-# * for each overlapping domain:
-#   * Determine (i,j) offset of domain from master coordinate system (relative to 0,0)
-#   * Determine (i,j) delta offset to apply to (i,j) coordinates in this domain
-#   * for each avalanche:
-#     * Read data from NetCDF
-#     * Convert to (i,j) coordinates of mosiac rectangle
-#     * Get rid of any coordinates outside of mosaic rectangle (eg: negative, or >= x1/y1)
-#     * Mosaic it in!
-# 
-# # 2. 
-#     def ijbox_indexgrid(self, ix, iy, margin=False):
-#         """Returns (i0,j0,i1,j1) of the given domain *index grid* J.
-#         The index grid is the (i,j) gridcell coordinate system defined
-#         by the (0,0) ("origin") domain."""
-# 
-# TODO: See 300 return period, test on two domains
+    with ioutil.TmpDir() as tdir:
+        mosaic_avals_id(gridM, akdf, ofname, tdir, **kwargs)
 

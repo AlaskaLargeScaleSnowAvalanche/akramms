@@ -172,14 +172,14 @@ def query(akdf0, sextent, include_overruns=False, scenetypes={'x', 'arc'},
         (If it contains specific IDs, that will be in the `parsed`
         column, and will come out later in this function as we resolve
         to ID level)
-    extent: One of...
+    sextent: One of...
         (x0,y0,x1,y1)
             or
         experiment-specific extent label
             or
         'tile': Use the extent of an (idom,jdom) subdomain tile
             or
-        'avlanche': Use avlanches to determine overall extent
+        'avalanche': Use avalanches to determine overall extent
     include_overruns:
         Should overrun avalanches be included when resolving avalanches
 

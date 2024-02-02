@@ -568,6 +568,7 @@ def ps(args):
 ])
 def xoverrun(args):
     """Resubmits overruns"""
+
     # Find the combos to check
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=False, scenetypes={'x', 'arc'})
@@ -646,9 +647,10 @@ def _parse_statuses(sstat):
 
 @subcommand(name='mosaic', args=[
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser.'),
-    argument('-s', '--save', help='Name of query file to write to'),
-    argument('-q', '--query', help='Name of query file to read from.  If set, then spec is ignored'),
-    argument('-o', '--output', help='Name of Mosaic output file to write'),
+#    argument('-s', '--save', help='Name of query file to write to'),
+#    argument('-q', '--query', help='Name of query file to read from.  If set, then spec is ignored'),
+    argument('-o', '--output', required=True,
+        help='Name of Mosaic output file to write'),
     argument('--limit', type=int,
         help='Limit number of avalanches processed (for DEBUGGING)'),
     argument('--status', type=_parse_statuses,
@@ -672,83 +674,83 @@ def xmosaic(args):
 
     run_setup_py()
 
-    # Get the avalanches and extent to mosaic
-    if args.query is None:
-        # Identify archived avalanches for use in the mosaic
-        parseds = akramms.parse.parse_args(args.spec)
-        akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
+    # Identify archived avalanches for use in the mosaic
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
 
-        # Make sure they all use the same experiment
-        # (Because extents are queried from the experiment definition file)
-        assert all(x == akdf.exp[0] for x in akdf.exp)
+    mosaic.mosaic_avals_combo(
+        akdf, args.extent, args.output,
+        args.status, args.margin,
+        args.snow, args.dem, args.landcover,
+        args.dry_run)
 
-        expmod = akramms.parse.load_expmod(akdf.exp[0])
-        extent,akdf = avalquery.query(akdf, args.extent, statuses=args.status, scenetypes='arc', margin=args.margin)
-    else:
-        with open(args.query, 'rb') as fin:
-            exp = pickle.load(out)
-            expmod = parse.load_expmod(exp)
-            extent = pickle.load(out)
-            akdf = pickle.load(out)
+#    else:
+#        with open(args.query, 'rb') as fin:
+#            exp = pickle.load(out)
+#       expmod = parse.load_expmod(exp)
+#            extent = pickle.load(out)
+#            akdf = pickle.load(out)
+#
+#    # Save query for later
+#    if args.save is not None:
+#        with open(args.save, 'wb') as out:
+#            pickle.dump(expmod.name, out)
+#            pickle.dump(extent, out)
+#            pickle.dump(akdf, out)
 
-    # Save query for later
-    if args.save is not None:
-        with open(args.save, 'wb') as out:
-            pickle.dump(expmod.name, out)
-            pickle.dump(extent, out)
-            pickle.dump(akdf, out)
 
-    # Prepare snow virtual raster for query
-    if args.snow:
-        # Ensure all avalanches use the same snow input
-        snowfile_argss = sorted(set(akdf['combo'].map(expmod.combo_to_snowfile_args)))
-        assert all(x[:-2] == snowfile_argss[0][:-2] for x in snowfile_argss)
 
-        # Create virtual raster to query
-        snowfile_vrt = downscale_snow.snowfile_vrt(snowfile_argss)
 
-    # Determine the output file name if none given
-    if args.output is not None:
-        ofname = args.output
-        if not ofname.endswith('.zip'):
-            raise ValueError('--output must specify a .zip file')
-    else:
-        # Make up filename based on combos
-        combos = list(set(akdf.combo))
-        if len(combos) > 1:
-            raise ValueError('If more than one Combo is involved in a query, you must specify the mosaic output filename via --output')
+
+@subcommand(args=[
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser.'),
+#    argument('-s', '--save', help='Name of query file to write to'),
+#    argument('-q', '--query', help='Name of query file to read from.  If set, then spec is ignored'),
+    argument('-o', '--output', help='Name of Mosaic output file to write'),
+    argument('--status', type=_parse_statuses,
+        default = [joblib.JobStatus.FINISHED],
+        help="Comma-separated statuses to plot: OVERRUN,FINISHED"),
+#    argument('--dem', action='store_true',
+#        help="Include original DEM in the output?"),
+#    argument('--landcover', action='store_true',
+#        help="Include original landcover in the output?"),
+#    argument('--snow', action='store_true',
+#        help="Include original snowcover in the output?"),
+    argument('--dry-run', action='store_true',
+        help="Don't actually do the work"),
+])
+def stdmosaic(args):
+    from akramms import mosaic,downscale_snow
+
+    run_setup_py()
+
+    # Identify combos
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf0 = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
+
+    # Exclude combos that have already been completely finished and archived
+    akdf0 = joblib.add_combo_quickstatus(akdf0)
+    akdf0 = akdf0[akdf0.combo_quickstatus != joblib.JobStatus.MARKED_FINISHED]
+
+    # Process mosaics one combo at a time
+    for ix in range(len(akdf0)):
+        exp = akdf0.exp[0]
+        expmod = akramms.parse.load_expmod(exp)
+        akdf1 = akdf0.iloc[[ix],:]    # akdf1 is just one row of akdf0
+
+        # Determine output filename
+        combo = akdf1.combo[0]
         scombo = '-'.join(str(x) for x in combos[0])
         sstatus = ''.join(joblib.JobStatus._member_names_[x][0] for x in sorted(args.status))
-        ofname = f'{expmod.name}-{scombo}-{sstatus}.zip'
-    print(f'Writing mosaic output file {ofname}')
+        ofname = exp.dir / 'mosaic' / f'{expmod.name}-{scombo}-{sstatus}.zip'
+        print(f'Writing mosaic output file {ofname}')
 
 
-    # Do mosaic
-    res = expmod.resolution
-    gridG = expmod.gridD.global_grid(res, res)
-#    gridM = expmod.gridD.sub(113,45, res, res)    # Could be arbitrary rectangle
-    gridM = expmod.gridD.subgrid(extent[0], extent[1], extent[2], extent[3], res, res)
+        mosaic.mosaic_avals_combo(
+            akdf, 'tile', ofname, args.status,
+            margin=None, snow=True, dem=Treu, landcover=True,
+            dry_run=args.dry_run)
 
-
-    print(akdf[['exp', 'combo','id']])
-    print(f'Extent: {extent}')
-
-    if args.dry_run:
-        print('Dry Run, not going further')
-        return
-
-
-    kwargs = dict()
-    if args.dem:
-        kwargs['dem_fn'] = expmod.extract_dem
-    if args.landcover:
-        kwargs['landcover_fn'] = expmod.extract_landcover
-    if args.snow:
-        kwargs['snow_fn'] = lambda box_poly,ofname: downscale_snow.extract_snow(snowfile_vrt, box_poly, ofname)
-
-#    with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
-    with ioutil.TmpDir() as tdir:
-        mosaic.mosaic_avals(gridM, akdf, ofname, tdir, **kwargs)
 
 
 #Ways to choose the extent:
