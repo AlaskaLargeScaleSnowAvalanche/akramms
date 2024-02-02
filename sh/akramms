@@ -749,7 +749,7 @@ def stdmosaic(args):
         print(f'Writing mosaic output file {ofname}')
 
         # See if the output file needs regenerating
-        if (not os.path.exists(ofname)) or (os.path.getmtime(ofname) < akdf1.combo_quickstatus_mtime):
+        if (not os.path.exists(ofname)) or (os.path.getmtime(ofname) < akdf1.combo_quickstatus_mtime[0]):
             mosaic.mosaic_avals_combo(
                 akdf1, 'tile', ofname, statuses=args.status,
                 margin=None, snow=True, dem=True, landcover=True,
