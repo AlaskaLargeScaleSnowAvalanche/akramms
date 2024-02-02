@@ -728,9 +728,12 @@ def stdmosaic(args):
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
 
-    # Exclude combos that have already been completely finished and archived
+    # Only run for combos that are completely finished
     akdf0 = joblib.add_combo_quickstatus(akdf0)
-    akdf0 = akdf0[akdf0.combo_quickstatus != joblib.JobStatus.MARKED_FINISHED]
+    akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED]
+
+    if len(akdf0) == 0:
+        raise ValueError('None of the select combos are MARKED_FINISHED.  Run akramms status --update')
 
     # Process mosaics one combo at a time
     for ix in range(len(akdf0)):
