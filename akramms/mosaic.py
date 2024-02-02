@@ -4,7 +4,7 @@ import pandas as pd
 from osgeo import gdal
 import zipfile,netCDF4
 from uafgi.util import gdalutil,cfutil,shputil
-from akramms import experiment,archive,file_info,avlaquery
+from akramms import experiment,archive,file_info,avalquery
 import akramms.parse
 import _mosaic
 
