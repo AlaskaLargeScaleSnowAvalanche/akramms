@@ -279,7 +279,7 @@ def mosaic_avals_combo(akdf, sextent, ofname,
         print('xxxxxxxxxxxx ', snowfile_argss)
         snowfile_vrt = downscale_snow.snowfile_vrt(snowfile_argss)
 
-    if not ofname.endswith('.zip'):
+    if not ofname.parts[-1].endswith('.zip'):
         raise ValueError('--output must specify a .zip file')
 
     # Do mosaic
