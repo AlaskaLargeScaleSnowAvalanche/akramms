@@ -222,6 +222,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
         if dem_fn is not None:
             dem_fn(box_poly, dir / 'dem0.tif')
 
+            # gdal.Warp() does not create TFW files, but gdalwarp command does.
 #            options = ['COMPRESS=LZW', 'TFW=YES']
 #            gdal.Warp(str(dir / 'dem.tif'), str(dir / 'dem0.tif'), xRes=30, yRes=30, options=options)
 #gdal_translate -co TFW=YES -co PROFILE=BASELINE dem.tif demx.tif
@@ -312,7 +313,7 @@ def mosaic_avals_combo(akdf, sextent, ofname,
     if snow:
         kwargs['snow_fn'] = lambda box_poly,ofname: downscale_snow.extract_snow(snowfile_vrt, box_poly, ofname)
 
-    with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
-#    with ioutil.TmpDir() as tdir:
+#    with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
+    with ioutil.TmpDir() as tdir:
         mosaic_avals_id(gridM, akdf, ofname, tdir, **kwargs)
 
