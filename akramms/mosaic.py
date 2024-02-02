@@ -5,6 +5,7 @@ from osgeo import gdal
 import zipfile,netCDF4
 from uafgi.util import gdalutil,cfutil,shputil
 from akramms import experiment,archive,file_info
+import akramms.parse
 import _mosaic
 
 # python -m cProfile -o prof -s cumtime `which akramms` mosaic juneau1-1981-1990.qy 
