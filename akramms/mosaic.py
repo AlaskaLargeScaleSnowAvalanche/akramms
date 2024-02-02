@@ -221,7 +221,8 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
         # DEM
         if dem_fn is not None:
             dem_fn(box_poly, dir / 'dem0.tif')
-            gdal.Warp(str(dir / 'dem.tif'), str(dir / 'dem0.tif'), xRes=30, yRes=30)
+            options = ['COMPRESS=LZW', 'TFW=YES']
+            gdal.Warp(str(dir / 'dem.tif'), str(dir / 'dem0.tif'), xRes=30, yRes=30, options=options)
             ozip_write(ozip, dir / 'dem.tif')
             ozip_write(ozip, os.path.join(dir, 'dem.tfw'))
 
