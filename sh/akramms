@@ -736,6 +736,7 @@ def stdmosaic(args):
         raise ValueError('None of the select combos are MARKED_FINISHED.  Run akramms status --update')
 
     # Process mosaics one combo at a time
+    plan = list()
     for ix in range(len(akdf0)):
         exp = akdf0.exp[0]
         expmod = akramms.parse.load_expmod(exp)
@@ -754,6 +755,18 @@ def stdmosaic(args):
                 akdf1, 'tile', ofname, statuses=args.status,
                 margin=None, snow=True, dem=True, landcover=True,
                 dry_run=args.dry_run)
+
+
+@subcommand(name='upload-mosaic')
+def upload_mosaic(args):
+    prj = pathlib.Path('/home/efischer/prj/ak')
+    mosaic_dir = prg / 'mosaic'
+    names = sorted(os.listdir(mosaic_dir))
+    for name in names:
+        cmd = ['rclone', 'copy', str(mosaic_dir / name), 'alaska:AvalancheShare/mosaic']
+        print(' '.join(cmd))
+        subproces.run(cmd, check=True)
+
 
 
 
