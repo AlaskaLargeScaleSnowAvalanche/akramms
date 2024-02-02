@@ -763,6 +763,8 @@ def upload_mosaic(args):
     mosaic_dir = prj / 'mosaic'
     names = sorted(os.listdir(mosaic_dir))
     for name in names:
+        if not name.endswith('.zip'):
+            continue
         cmd = ['rclone', 'copy', str(mosaic_dir / name), 'alaska:AvalancheShare/mosaic']
         print(' '.join(cmd))
         subprocess.run(cmd, check=True)
