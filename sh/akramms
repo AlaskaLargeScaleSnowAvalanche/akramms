@@ -760,7 +760,7 @@ def stdmosaic(args):
 @subcommand(name='upload-mosaic')
 def upload_mosaic(args):
     prj = pathlib.Path('/home/efischer/prj/ak')
-    mosaic_dir = prg / 'mosaic'
+    mosaic_dir = prj / 'mosaic'
     names = sorted(os.listdir(mosaic_dir))
     for name in names:
         cmd = ['rclone', 'copy', str(mosaic_dir / name), 'alaska:AvalancheShare/mosaic']
