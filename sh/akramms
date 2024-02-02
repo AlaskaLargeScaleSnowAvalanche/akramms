@@ -742,7 +742,7 @@ def stdmosaic(args):
         combo = akdf1.combo[0]
         scombo = '-'.join(str(x) for x in combo)
         sstatus = ''.join(joblib.JobStatus._member_names_[x][0] for x in sorted(args.status))
-        ofname = exp.dir / 'mosaic' / f'{expmod.name}-{scombo}-{sstatus}.zip'
+        ofname = expmod.dir / 'mosaic' / f'{expmod.name}-{scombo}-{sstatus}.zip'
         print(f'Writing mosaic output file {ofname}')
 
 
