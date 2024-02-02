@@ -276,6 +276,7 @@ def mosaic_avals_combo(akdf, sextent, ofname,
         assert all(x[:-2] == snowfile_argss[0][:-2] for x in snowfile_argss)
 
         # Create virtual raster to query
+        print('xxxxxxxxxxxx ', snowfile_argss)
         snowfile_vrt = downscale_snow.snowfile_vrt(snowfile_argss)
 
     if not ofname.endswith('.zip'):
