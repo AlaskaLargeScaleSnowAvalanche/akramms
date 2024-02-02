@@ -470,7 +470,7 @@ def add_combo_quickstatus(akdf0, mtime=False):
 
         akdf1['combo_quickstatus'] = combo_quickstatus
         if mtime:
-            akdf1['mtimes'] = mtimes
+            akdf1['combo_quickstatus_mtime'] = mtimes
 
         dfs.append(akdf1)
 
@@ -478,7 +478,7 @@ def add_combo_quickstatus(akdf0, mtime=False):
 
 
 
-def add_combo_status(akdf0, realized=True, update=True, dry_run=False, mtime=False, ignore_statuses={}):
+def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_statuses={}):#, mtime=False):
     """akdf:
         Resolved to combo level (theoretical, i.e. realized=False)
     """
@@ -494,18 +494,18 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, mtime=Fal
         return akdf0
 
     # Cull combos that have finished or not yet started
-    akdf0 = add_combo_quickstatus(akdf0, mtime=mtime)
+    akdf0 = add_combo_quickstatus(akdf0)#, mtime=mtime)
     mask = (akdf0.combo_quickstatus == JobStatus.UNKNOWN)
     renames = {'combo_quickstatus':'combo_status'}
-    if mtime:
-        renames['combo_quickstatus_mtime': 'combo_status_mtime']
+#    if mtime:
+#        renames['combo_quickstatus_mtime': 'combo_status_mtime']
     dfs.append(akdf0[~mask].rename(columns=renames))
     akdf0 = akdf0[mask].drop('combo_quickstatus', axis=1)
 
     # Go to more work to determine the status of the rest of them.
     for exp,akdf1 in akdf0.reset_index(drop=True).groupby('exp'):
         expmod = parse.load_expmod(exp)
-        akdf1['combo_status_mtime'] = -1    # We only get mtime for arcdir
+#        akdf1['combo_status_mtime'] = -1    # We only get mtime for arcdir
 
 #        akdf1['combo_status'] = JobStatus.NOINPUT    # The Combo doesn't exist yet
 
