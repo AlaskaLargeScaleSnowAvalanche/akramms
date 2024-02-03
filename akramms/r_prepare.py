@@ -92,7 +92,7 @@ def _prepare_data_outputs(scene_dir, scene_args):
     return outputs
 
 def prepare_data(scene_dir):
-    """Called from prepare_scene.py; RUNS ON WINDOWS HOST WITH ArcGIS"""
+    """Called from prepare_scene.py; RUNS ON WINDOWS using our Conda Python."""
     outputs = list()
     scene_args = params.load(scene_dir)
 

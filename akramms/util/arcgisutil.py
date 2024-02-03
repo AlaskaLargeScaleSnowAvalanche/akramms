@@ -101,8 +101,32 @@ def get_script_vars(namespace, script_vars):
     sys.stdout.flush()
 
 # ------------------------------------------------------    
+def kill_arcgis():
+    print('Killing ARCGIS Tasks... (do not be alarmed by two "not found" errors)')
+    sys.stdout.flush()
+    sys.stderr.flush()
+
+    sleep=False
+
+    for cmd in (
+        ['taskkill.exe', '/T', '/F', '/IM', 'ArcGISPro.exe']):
+
+        try:
+            subprocess.run(cmd, check=True)
+            sys.stdout.flush()
+            sys.stderr.flush()
+            sleep=True
+        except subprocess.CalledProcessError:
+            pass
+
+    # Wait around for NTFS to unlock files used by tasks
+    if sleep:
+        print('Sleeping because tasks were killed')
+        time.sleep(1)
+
+
 def run_script(script_file, args, cwd=None, dry_run=False):
-    """Runs and ArcGIS Python script
+    """Runs an ArcGIS Python script
     script_file: xxx.py
         Name of script to run.
         Either full pathname, or name in the akramms/sh folder.
@@ -130,8 +154,14 @@ def run_script(script_file, args, cwd=None, dry_run=False):
     with open(args_pik, 'wb') as out:
         pickle.dump(args, out)
 
+    # Make sure ArcGIS is running properly
+    kill_arcgis()
+    cmd = ["C:\Program Files\ArcGIS\Pro\bin\ArcGISPro.exe"]
+    print('Starging ArcGIS')
+    subprocess.run(cmd, check=True)
+
     # Run the script using ArcGIS Conda environment
-    cmd = [PYTHON_EXE, script_file, args_pik]
+    cmd = [PYTHON_EXE, script_file, args_pik]    # PYTHON_EXE = ArcGIS Python
     kwargs = {}
     if cwd is not None:
         kwargs['cwd'] = cwd
