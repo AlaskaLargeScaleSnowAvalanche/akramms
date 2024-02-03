@@ -187,6 +187,17 @@ def all_domains():
 def spiral_domains(x0, y0):
     """Use Ulam Spiral out from a central domain tile"""
     dij = set(all_domains())
+
+    # High prioirty domains
+    # (Code usese x/y and i/j interchangibly here)
+    high_priority = [
+        (110, 42), (109,42),    # Haines and West: Avalanche of 2024-2-2
+    ]
+    for xy in high_priority:
+        if xy in dij:
+            yield xy
+            dij.remove(xy)
+
     for n in itertools.count(start=0, step=1):
         dxy = ulam.n_to_xy(n)
         xy = (x0 + dxy[0], y0 + dxy[1])
