@@ -376,7 +376,7 @@ def ramms_to_nc0(out_zip, id_status, ncout):
         jvec_nz = jvec[nz_mask]
 
         print(type(max_height), max_height.shape)
-        print('ivec_nz ', ivec_nz)
+        print('ivec_nz ', ivec_nz, type(ivec_nz), len(ivec_nz))
 #        print('xxxxxxxxxxxx ', max_height, nz, ivec_nz, jvec_nz)
 
         i0 = np.min(ivec_nz)
