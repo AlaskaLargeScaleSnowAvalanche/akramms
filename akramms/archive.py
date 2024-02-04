@@ -371,6 +371,7 @@ def ramms_to_nc0(out_zip, id_status, ncout):
 
         # -----------------------------------
         # Determine bounding box: begin by determining active cells
+        # (It is not sufficient to just rely on one variable, for example max_height)
         nz_mask = np.logical_or(np.logical_or(
             vars['max_height'] > 0,
             vars['max_vel'] > 0),
@@ -378,8 +379,8 @@ def ramms_to_nc0(out_zip, id_status, ncout):
         ivec_nz = ivec[nz_mask]
         jvec_nz = jvec[nz_mask]
 
-        print(type(max_height), max_height.shape)
-        print('ivec_nz ', ivec_nz, type(ivec_nz), len(ivec_nz))
+#        print(type(max_height), max_height.shape)
+#        print('ivec_nz ', ivec_nz, type(ivec_nz), len(ivec_nz))
 #        print('xxxxxxxxxxxx ', max_height, nz, ivec_nz, jvec_nz)
 
         # Store the bounding box
