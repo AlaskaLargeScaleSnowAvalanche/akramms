@@ -130,7 +130,10 @@ def resolve_chunk(akdf, scenetypes={'x'}, realized=True):
 
     # -----------------------------
     orows = list()
-    def process_releasedir(tup, chunkid, releasedir):
+    def process_releasedir(tup, chunkid, releasedir, parsed_ids):
+        """parsed_ids: set
+            Specific IDs requested; only include chunks if they include these IDs.
+        """
 
         # If the arc directory doesn't yet exist...
         if not os.path.exists(releasedir):
@@ -139,10 +142,19 @@ def resolve_chunk(akdf, scenetypes={'x'}, realized=True):
 #        print(f'process_releasedir({releasedir}')
         for name in os.listdir(releasedir):
             match = file_info.chunk_release_fileRE.match(name)
+
 #            print('    match2 ', name, match)
             if match is not None:
+                releasefile = releasedir / name
+                if parse_ids is not None:
+                    # If query specified IDs, only include this chunk
+                    # if it has at least one of those IDs.
+                    rdf = shputil.read_df(releasefile, read_shapes=False)
+                    rdf = rdf[rdf.id.isin(parse_ids)]
+                    if len(rdf) == 0:
+                        continue
                 pra_size = match.group(1)
-                orows.append(itertools.chain(tup, ['x', pra_size, chunkid, releasedir / name]))
+                orows.append(itertools.chain(tup, ['x', pra_size, chunkid, releasefile]))
     # -----------------------------
 
     # Base releasefile on **what we see on disk**
@@ -174,13 +186,13 @@ def resolve_chunk(akdf, scenetypes={'x'}, realized=True):
                 scenedir = expmod.combo_to_scenedir(combo, scenetype='x')
                 chunkdir = scenedir / 'CHUNKS'
                 if os.path.isdir(chunkdir):
-                    for name in sorted(os.listdir(chunkdir)):    # List chunsk in an x-dir
+                    for name in sorted(os.listdir(chunkdir)):    # List chunks in an x-dir
                         match = _chunkRE.match(name)
 #                       print('    match = ', match)
                         if match is not None:
                             # We found a valid chunk dir!  Remember its associated RELEASE dir.
                             chunkid = int(match.group(2))
-                            process_releasedir(tup, chunkid, scenedir / 'CHUNKS' / name / 'RELEASE')
+                            process_releasedir(tup, chunkid, scenedir / 'CHUNKS' / name / 'RELEASE', parsed.get('ids',None))
 
         if 'arc' in scenetypes:
             scenedir = expmod.combo_to_scenedir(combo, scenetype='arc')
