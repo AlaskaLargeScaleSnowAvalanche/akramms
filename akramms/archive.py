@@ -490,7 +490,11 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
                     ncv.combo = '{exp}-{scombo}'
                     ncv.releasefile_timestamp = releasefile_timestamp
                     ncv.avalanche_timestamp = out_zip_dtime.isoformat()
-                    ramms_to_nc0(out_zip, tup.id_status, ncout)
+                    try:
+                        ramms_to_nc0(out_zip, tup.id_status, ncout)
+                    except Exception:
+                        print('**** ramms_to_nc0: error on tuple ', tup)
+                        raise
 
                     # Add info from scene that created this avalanche
                     with netCDF4.Dataset(os.path.join(x_dir, 'scene.nc')) as ncin:
