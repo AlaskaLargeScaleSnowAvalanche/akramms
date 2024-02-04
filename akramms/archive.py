@@ -379,24 +379,32 @@ def ramms_to_nc0(out_zip, id_status, ncout):
         print('ivec_nz ', ivec_nz, type(ivec_nz), len(ivec_nz))
 #        print('xxxxxxxxxxxx ', max_height, nz, ivec_nz, jvec_nz)
 
-        i0 = np.min(ivec_nz)
-        i1 = np.max(ivec_nz)
-        j0 = np.min(jvec_nz)
-        j1 = np.max(jvec_nz)
-
-        x0,y0 = gridI.to_xy(i0,j0)
-        x1,y1 = gridI.to_xy(i1,j1)
-
         # Store the bounding box
         ncout.createDimension('lowhigh', 2)
         ncv = ncout.createVariable('bounding_box', 'd', ('lowhigh', 'two'))
         ncv.description = 'Oriented bounding box of region occupied by avalanche.'
         ncv.grid_mapping = 'grid_mapping'
+
+        if len(ivec_nz) > 0:
+            i0 = np.min(ivec_nz)
+            i1 = np.max(ivec_nz)
+            j0 = np.min(jvec_nz)
+            j1 = np.max(jvec_nz)
+
+            x0,y0 = gridI.to_xy(i0,j0)
+            x1,y1 = gridI.to_xy(i1,j1)
+
+            ncv[:] = np.array([
+                [min(x0,x1), min(y0,y1)],
+                [max(x0,x1) + gridI.dx*np.sign(gridI.dx), max(y0,y1) + gridI.dy*np.sign(gridI.dy) ]])
+        else:
+            # Degenerate avalanche covered 0 gridcells.
+            # Make a dummy degenerate bounding box
+            ncv[:] = np.array([[0.,0.],[0.,0.]])
+
+
 #        for attr,val in coord_attrs.items():
 #            setattr(ncv, attr, val)
-        ncv[:] = np.array([
-            [min(x0,x1), min(y0,y1)],
-            [max(x0,x1) + gridI.dx*np.sign(gridI.dx), max(y0,y1) + gridI.dy*np.sign(gridI.dy) ]])
     return overrun
 
 
