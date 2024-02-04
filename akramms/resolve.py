@@ -146,7 +146,7 @@ def resolve_chunk(akdf, scenetypes={'x'}, realized=True):
 #            print('    match2 ', name, match)
             if match is not None:
                 releasefile = releasedir / name
-                if parse_ids is not None:
+                if parsed_ids is not None:
                     # If query specified IDs, only include this chunk
                     # if it has at least one of those IDs.
                     rdf = shputil.read_df(releasefile, read_shapes=False)
