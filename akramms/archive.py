@@ -370,8 +370,11 @@ def ramms_to_nc0(out_zip, id_status, ncout):
         max_height = vars['max_height']
 
         # -----------------------------------
-        # Determine bounding box
-        nz_mask = (max_height != 0)    # Mask for where max_height > 0
+        # Determine bounding box: begin by determining active cells
+        nz_mask = np.logical_or(np.logical_or(
+            vars['max_height'] > 0,
+            vars['max_vel'] > 0),
+            vars['depo'] > 0)
         ivec_nz = ivec[nz_mask]
         jvec_nz = jvec[nz_mask]
 
