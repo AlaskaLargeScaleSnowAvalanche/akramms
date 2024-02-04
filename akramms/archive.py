@@ -371,9 +371,13 @@ def ramms_to_nc0(out_zip, id_status, ncout):
 
         # -----------------------------------
         # Determine bounding box
-        nz = (max_height != 0)
-        ivec_nz = ivec[nz]
-        jvec_nz = jvec[nz]
+        nz_mask = (max_height != 0)    # Mask for where max_height > 0
+        ivec_nz = ivec[nz_mask]
+        jvec_nz = jvec[nz_mask]
+
+        print(type(max_height), max_height.shape)
+        print('ivec_nz ', ivec_nz)
+#        print('xxxxxxxxxxxx ', max_height, nz, ivec_nz, jvec_nz)
 
         i0 = np.min(ivec_nz)
         i1 = np.max(ivec_nz)
