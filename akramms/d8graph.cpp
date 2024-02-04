@@ -620,9 +620,75 @@ public:
     /** Merge neighbor lists in prep for an eqclass merger of j <- i */
     std::set<ix_t> &merge_neighbor_lists(ix_t j, ix_t i, bool debug=false)
     {
-        // Original neighbor lists
-        std::set<ix_t> &nghj(neighbors(j, true));
-        std::set<ix_t> &nghi(neighbors(i));
+
+        // Determine whether either node is already represented explicitly
+        auto ii(neighborss.find(i));
+        auto jj(neighborss.find(j));
+
+        // Merge the smaller set into the larger set
+        std::set<ix_t> ngh_merged;    // Final merged neighbor set
+        if (ii != neighbors.end()) {
+            if (jj != neighbors.end()) {
+                // i and j are both explicit
+                auto &nghi(ii->second);
+                auto &nghj(jj->second);
+
+                // --------------- Filter out i and j
+                nghj.erase(i);
+                nghi.erase(j);
+
+                // Ensure nghj is bigger (for efficiency)
+                if (nghj.size() < nghi.size())
+                    std::swap(nghi, nghj);
+                for (ix_t ix : nghi) nghj.insert(ix);
+            } else {
+                // i is explicit, j is implicit: Merge into i
+                std::set<ix_t> nghj;
+                nghj.reserve(8);
+                d8_neighbors_list(j, nghj);
+
+                auto &nghi(ii->second);
+
+                // --------------- Filter out i and j
+                nghj.erase(i);
+                nghi.erase(j);
+
+                for (ix_t ix : nghj) nghi.insert(ix);
+                neighborss.insert(std::make_pair(j, std::move(nghi)));
+            }
+        } else {
+            if (jj != neighbors.end()) {
+                // i is implicit, j is explicit
+                // j is explicit, i is implicit: Merge into j
+                std::set<ix_t> nghi;
+                nghi.reserve(8);
+                d8_neighbors_list(i, nghi);
+                auto &nghj(jj->second);
+
+                // --------------- Filter out i and j
+                nghj.erase(i);
+                nghi.erase(j);
+
+                for (ix_t ix : nghi) nghj.insert(ix);
+            } else {
+                // i and j are both implicit
+                // j is explicit, i is implicit: Merge into j
+                std::set<ix_t> nghi;
+                nghi.reserve(8);
+                d8_neighbors_list(i, nghi);
+
+                std::set<ix_t> nghj;
+                nghj.reserve(8);
+                d8_neighbors_list(j, nghj);
+
+                // --------------- Filter out i and j
+                nghj.erase(i);
+                nghi.erase(j);
+
+                for (ix_t ix : nghi) nghj.insert(ix);
+                neighborss.insert(std::make_pair(j, std::move(nghj)));
+            }
+        }
 
 if (debug) PySys_WriteStdout("********* Merging %d (%f) <- %d (%f)\n", j, dem[j], i, dem[i]);
 #if 0
@@ -630,21 +696,16 @@ PySys_WriteStdout(" pre neighbors[%d]: ", j); for (auto ii(nghj.begin()); ii != 
 PySys_WriteStdout(" pre neighbors[%d]: ", i); for (auto ii(nghi.begin()); ii != nghi.end(); ++ii) PySys_WriteStdout(" %d", *ii); PySys_WriteStdout("\n");
 #endif
 
-        // ------------------- Merge the lists
-        for (ix_t ix : nghi) nghj.insert(ix);
 
 #if 0
 PySys_WriteStdout("joined neighbors %d: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_joined.end(); ++ii) PySys_WriteStdout(" %d", *ii); PySys_WriteStdout("\n");
 #endif
 
-        // --------------- Filter out i and j
-        nghj.erase(i);
-        nghj.erase(j);
 
         // Delete neighbors list for i
         neighborss.erase(i);
 
-        // ============== Replace i->j in neighbor lists of neighbors
+        // ============== Replace i->j in neighboring sets of neighbors
         for (ix_t k : nghj) {
             std::set<ix_t> &nghk(neighbors(k, true));
             auto findi(nghk.find(i));
