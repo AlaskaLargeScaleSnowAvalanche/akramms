@@ -150,7 +150,7 @@ def resolve_chunk(akdf, scenetypes={'x'}, realized=True):
                     # If query specified IDs, only include this chunk
                     # if it has at least one of those IDs.
                     rdf = shputil.read_df(releasefile, read_shapes=False)
-                    rdf = rdf[rdf.Id.isin(parse_ids)]
+                    rdf = rdf[rdf.Id.isin(parsed_ids)]
                     if len(rdf) == 0:
                         continue
                 pra_size = match.group(1)
