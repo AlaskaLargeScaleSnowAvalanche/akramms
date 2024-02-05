@@ -38,8 +38,8 @@ static char module_docstring[] =
 
 typedef float dem_t;    // The Digital Elevation Model is single prceision
 typedef int ix_t;
-//typedef std::set<ix_t> neighbor_set;
-typedef std::unordered_set<ix_t> neighbor_set;
+typedef std::set<ix_t> neighbor_set;
+//typedef std::unordered_set<ix_t> neighbor_set;
 
 
 // ----------------------------------------------------------------------------------------
