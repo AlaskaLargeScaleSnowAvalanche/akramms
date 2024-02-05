@@ -331,7 +331,7 @@ def _submit_jobs(akdf, condor_priority=0):
         print('submit ', jb.avalanche_dir, job_name, inout)
         submit_job(jb.avalanche_dir, job_name, inout, condor_priority=condor_priority)
 
-def submit_jobs(akdf):
+def submit_jobs(akdf, **kwargs):
     akdf = add_id_status(akdf)
 
     # Only submit jobs that are ready to go and not in process or completed or something.
@@ -339,7 +339,7 @@ def submit_jobs(akdf):
 
     print('==================== Submitting:')
     print(akdf[['combo', 'chunkid', 'id']])
-    _submit_jobs(akdf)
+    _submit_jobs(akdf, **kwargs)
 
     return akdf
 # ------------------------------------------------------------
