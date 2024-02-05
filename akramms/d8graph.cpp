@@ -641,7 +641,7 @@ PySys_WriteStdout(" pre neighbors[%d]: ", i); for (auto ii(nghi.begin()); ii != 
         nghj.erase(i);
 
         // ------------------- Merge the lists (smaller into larger)
-//        if (nghj.size() < nghi.size()) std::swap(nghi, nghj);
+        if (nghj.size() < nghi.size()) std::swap(nghi, nghj);
         for (ix_t ix : nghi) nghj.insert(ix);
 
 #if 0
