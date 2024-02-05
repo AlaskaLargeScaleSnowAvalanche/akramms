@@ -622,7 +622,7 @@ public:
     {
         // Original neighbor lists
         std::set<ix_t> &nghj(neighbors(j, true));
-        std::set<ix_t> &nghi(neighbors(i));
+        std::set<ix_t> &nghi(neighbors(i, true));
 
 if (debug) PySys_WriteStdout("********* Merging %d (%f) <- %d (%f)\n", j, dem[j], i, dem[i]);
 #if 0
@@ -630,18 +630,21 @@ PySys_WriteStdout(" pre neighbors[%d]: ", j); for (auto ii(nghj.begin()); ii != 
 PySys_WriteStdout(" pre neighbors[%d]: ", i); for (auto ii(nghi.begin()); ii != nghi.end(); ++ii) PySys_WriteStdout(" %d", *ii); PySys_WriteStdout("\n");
 #endif
 
-        // ------------------- Merge the lists
+        // --------------- Filter out i and j
+        nghi.erase(j);
+        nghj.erase(i);
+
+        // ------------------- Merge the lists (smaller into larger)
+        if (nghj.size() < nghi.size()) std::swap(nghi, nghj);
         for (ix_t ix : nghi) nghj.insert(ix);
 
 #if 0
 PySys_WriteStdout("joined neighbors %d: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_joined.end(); ++ii) PySys_WriteStdout(" %d", *ii); PySys_WriteStdout("\n");
 #endif
 
-        // --------------- Filter out i and j
-        nghj.erase(i);
-        nghj.erase(j);
 
         // Delete neighbors list for i
+        nghi.clear();    // In case it's one of _neighbors_ret
         neighborss.erase(i);
 
         // ============== Replace i->j in neighbor lists of neighbors
