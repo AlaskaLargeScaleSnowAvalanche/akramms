@@ -38,10 +38,11 @@ error                   = {inout_name}.job.err
 log                     = {inout_name}.job.log
 request_cpus            = 1
 request_memory          = 1000M
+priority                = {condor_priority}
 queue 1
 """
 
-def submit_job(run_dir, job_name, inout_name):#, local=False):
+def submit_job(run_dir, job_name, inout_name, condor_priority=0):#, local=False):
     """Submits an individual avalanche simulation to HTCondor, after
     RAMMS top-level IDL has run.
 
@@ -64,7 +65,7 @@ def submit_job(run_dir, job_name, inout_name):#, local=False):
 
 
     print('Submitting job: {}'.format(job_name))
-    submit_txt = submit_tpl.format(job_name=job_name, inout_name=inout_name, run_dir=run_dir, DOCKER_TAG=DOCKER_TAG)
+    submit_txt = submit_tpl.format(job_name=job_name, inout_name=inout_name, run_dir=run_dir, DOCKER_TAG=DOCKER_TAG, condor_priority=condor_priority)
 
     cmd = ['condor_submit', '-batch-name', job_name]
     print(' '.join(cmd) + '<<EOF')
@@ -302,7 +303,7 @@ def print_job_statuses(akdf0):
 
 
 # --------------------------------------------------------------------
-def _submit_jobs(akdf):
+def _submit_jobs(akdf, condor_priority=0):
     """Does an initial (or subsequent) submit of jobs for a set of
     release files.  Submits jobs that can be submitted, and that have
     not yet been.
@@ -328,7 +329,7 @@ def _submit_jobs(akdf):
         inout = file_info.inout_name(jb, jb.chunkid, id)
 
         print('submit ', jb.avalanche_dir, job_name, inout)
-        submit_job(jb.avalanche_dir, job_name, inout)
+        submit_job(jb.avalanche_dir, job_name, inout, condor_priority=condor_priority)
 
 def submit_jobs(akdf):
     akdf = add_id_status(akdf)

@@ -136,7 +136,7 @@ def run_if_remote(control_file, *args, **kwargs):
     if not os.path.exists(control_file):
         harnutil.run_remote(*args, **kwargs)
 
-def run_chunk(release_file, crf, gridI, at_front=False, submit=False):
+def run_chunk(release_file, crf, gridI, at_front=False, submit=False, condor_priority=0):
     done_output = chunk_control_file(crf)
 
 #    crf = file_info.parse_chunk_release_file(release_file)
@@ -223,7 +223,7 @@ def run_chunk(release_file, crf, gridI, at_front=False, submit=False):
 
         parseds = [parse._parse_chunk_releasefile(release_file)]
         akdf = resolve.resolve_to(parseds, 'id', stage='in', realized=True)
-        joblib.submit_jobs(akdf)
+        joblib.submit_jobs(akdf, condor_priority=condor_priority)
 
     # Write output files
     done_output = chunk_control_file(crf)
@@ -265,7 +265,7 @@ def run_combo(scene_dir, dem_file, submit=True):
     with open(combo_control_file(scene_dir), 'w') as out:
         out.write('Done running initial RAMMS Stage 1 for all chunks in the combo (not including overruns).\n')
 # -----------------------------------------------------------------
-def releasefile_rule(release_file, dem_file, inputs, dry_run=False, at_front=False, submit=False):
+def releasefile_rule(release_file, dem_file, inputs, dry_run=False, at_front=False, submit=False, condor_priority=0):
     """Runs Stage 1 of RAMMS for one chunk
     (IDL code prepares individual avalanche runs)
 
@@ -278,6 +278,8 @@ def releasefile_rule(release_file, dem_file, inputs, dry_run=False, at_front=Fal
 
     inputs:
         All input files for the RAMMS run (superset of release_files)
+    condor_priority:
+        Priority to assign to HTCondor jobs
     """
 
 #    done_output = crf.scene_dir / 'ramms_stage1' / f'{crf.chunk_name}.txt'
@@ -290,7 +292,7 @@ def releasefile_rule(release_file, dem_file, inputs, dry_run=False, at_front=Fal
 
         # Avoid recomputing unnecessarily
         if not os.path.exists(chunk_control_file(crf)):
-            run_chunk(release_file, crf, gridI, at_front=at_front, submit=submit)
+            run_chunk(release_file, crf, gridI, at_front=at_front, submit=submit, condor_priority=condor_priority)
 
     return make.Rule(action, inputs, [done_output])
 
