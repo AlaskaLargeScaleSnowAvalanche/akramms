@@ -1,6 +1,6 @@
 import setuptools.sandbox
 import pathlib,os
-from akramms import r_domain_builder,
+from akramms import r_domain_builder
 from akramms.util import harnutil
 
 
