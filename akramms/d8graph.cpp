@@ -16,6 +16,7 @@
 #include <iterator>
 #include <cmath>
 #include <cwchar>
+#include <ctime>
 
 // https://stackoverflow.com/questions/77005/how-to-automatically-generate-a-stacktrace-when-my-program-crashes
 #include <cstdio>
@@ -495,6 +496,8 @@ public:
     EQClasses eqclasses;
 
 private:
+    std::time_t t0;
+
     // Maintain a DEM (imported from Python), giving us our neighbors
     dem_t *dem;
     int const nj;
@@ -536,7 +539,7 @@ private:
 
 public:
     D8Graph(dem_t *_dem, int _nj, int _ni, double _nodata)
-        : dem(_dem), nj(_nj), ni(_ni), nodata(_nodata)
+        : t0(std::time(nullptr)), dem(_dem), nj(_nj), ni(_ni), nodata(_nodata)
     {
 //PySys_WriteStdout("AA1 %f %f %f %f\n", dem[0], dem[1], dem[2], dem[3]);
 
@@ -626,7 +629,8 @@ public:
         neighbor_set &nghj(neighbors(j, true));
         neighbor_set &nghi(neighbors(i, true));
 
-if (debug) PySys_WriteStdout("********* Merging %d (%f) <- %d (%f)\n", j, dem[j], i, dem[i]);
+
+if (debug) PySys_WriteStdout("********* %ld Merging %d (%f) <- %d (%f)\n", std::time(nullptr) - t0, j, dem[j], i, dem[i]);
 #if 0
 PySys_WriteStdout(" pre neighbors[%d]: ", j); for (auto ii(nghj.begin()); ii != nghj.end(); ++ii) PySys_WriteStdout(" %d", *ii); PySys_WriteStdout("\n");
 PySys_WriteStdout(" pre neighbors[%d]: ", i); for (auto ii(nghi.begin()); ii != nghi.end(); ++ii) PySys_WriteStdout(" %d", *ii); PySys_WriteStdout("\n");
