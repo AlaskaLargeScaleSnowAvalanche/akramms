@@ -22,7 +22,7 @@ odir = HOME / 'tmp'
 def main():
 
 
-    rule = r_domain_builder.neighbor_1_rule(dem_file, odir)
+    rule = r_domain_builder.neighbor1_rule(dem_file, odir)
     rule()
 
 main()
