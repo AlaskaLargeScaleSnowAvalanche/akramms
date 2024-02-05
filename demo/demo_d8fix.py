@@ -1,5 +1,6 @@
 import pathlib,os
 import setuptools.sandbox
+from akramms.util import harnutil
 
 # ------------
 if True:
@@ -12,7 +13,6 @@ if True:
 # ------------
 
 from akramms import r_domain_builder
-from akramms.util import harnutil
 
 
 HOME = pathlib.Path(os.environ['HOME'])
