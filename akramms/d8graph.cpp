@@ -38,6 +38,8 @@ static char module_docstring[] =
 
 typedef float dem_t;    // The Digital Elevation Model is single prceision
 typedef int ix_t;
+//typedef std::set<ix_t> neighbor_set;
+typedef std::unordered_set<ix_t> neighbor_set;
 
 
 // ----------------------------------------------------------------------------------------
@@ -377,18 +379,18 @@ public:
 
     // EQClass with >1 element
     // Inner vector is SORTED
-    std::map<ix_t, std::set<ix_t>> eqclasses;
+    std::map<ix_t, neighbor_set> eqclasses;
 
 private:
     // Stand-in for single-element eqclasses
-    std::set<ix_t> _single_ret{0};
+    neighbor_set _single_ret{0};
 
 public:
 
     EQClasses() {}    // Start off with everything in its own class
 
     /** Fetches the elements of the ith equivalence class */
-    std::set<ix_t> const &members(int eqi)
+    neighbor_set const &members(int eqi)
     {
         auto ii(eqclasses.find(eqi));
         if (ii != eqclasses.end()) {
@@ -449,16 +451,16 @@ public:
     Returns:
         Sorted vector of members of newly merged j
     */
-    std::set<ix_t> &merge_eq(int j, int i)
+    neighbor_set &merge_eq(int j, int i)
     {
         // Access contents of the destination eq class,
         // converting to explicit form if needed.
         auto eqcj_it(eqclasses.find(j));
         if (eqcj_it == eqclasses.end()) {
 //            PySys_WriteStdout("Creating new eqclass for %d\n", j);
-            eqcj_it = eqclasses.insert(eqcj_it, std::make_pair(j, std::set<ix_t>{j}));
+            eqcj_it = eqclasses.insert(eqcj_it, std::make_pair(j, neighbor_set{j}));
         }
-        std::set<ix_t> &eqcj(eqcj_it->second);
+        neighbor_set &eqcj(eqcj_it->second);
 //std::cout << "Dst EQClass " << j << ": "; print_range(std::cout, eqcj.begin(), eqcj.end()); std::cout << std::endl;
 
         // Access contents of the source eq class.  We don't know or
@@ -502,9 +504,9 @@ private:
     std::vector<bool> edge;
 
     // Explicit neighbors for merged EQ classes
-    std::map<ix_t, std::set<ix_t>> neighborss;
+    std::map<ix_t, neighbor_set> neighborss;
     // Buffer used to return neighbors
-    std::array<std::set<ix_t>, 2> _neighbors_rets;
+    std::array<neighbor_set, 2> _neighbors_rets;
     int reti = 0;    // Double buffering
     // ---------------------------------------------------------
 
@@ -552,7 +554,7 @@ public:
     size_t size() const { return nj*ni; }
 
     /** Obtain list of neighbors based on raster. */
-    std::set<ix_t> &d8_neighbors_list(int ji0, std::set<ix_t> &ngh)
+    neighbor_set &d8_neighbors_list(int ji0, neighbor_set &ngh)
     {
         ngh.clear();
         //ngh.reserve(8);
@@ -590,7 +592,7 @@ public:
     expl:
         If set, then convert to expl format if not already.
     */
-    std::set<ix_t> &neighbors(int ji0, bool expl=false)
+    neighbor_set &neighbors(int ji0, bool expl=false)
     {
         // Are neighbors represented explicitly?
         // If so, just lookup and return that list.
@@ -604,7 +606,7 @@ public:
 
         // Prepare output buffer
         reti = 1 - reti;    // swap dem_t buffer
-        std::set<ix_t> &ngh(_neighbors_rets[reti]);
+        neighbor_set &ngh(_neighbors_rets[reti]);
 
         // Obtain explicit list of neighbors
         d8_neighbors_list(ji0, ngh);
@@ -618,11 +620,11 @@ public:
     }
 
     /** Merge neighbor lists in prep for an eqclass merger of j <- i */
-    std::set<ix_t> &merge_neighbor_lists(ix_t j, ix_t i, bool debug=false)
+    neighbor_set &merge_neighbor_lists(ix_t j, ix_t i, bool debug=false)
     {
         // Original neighbor lists
-        std::set<ix_t> &nghj(neighbors(j, true));
-        std::set<ix_t> &nghi(neighbors(i, true));
+        neighbor_set &nghj(neighbors(j, true));
+        neighbor_set &nghi(neighbors(i, true));
 
 if (debug) PySys_WriteStdout("********* Merging %d (%f) <- %d (%f)\n", j, dem[j], i, dem[i]);
 #if 0
@@ -649,7 +651,7 @@ PySys_WriteStdout("joined neighbors %d: ", j); for (auto ii(ngh_joined.begin());
 
         // ============== Replace i->j in neighbor lists of neighbors
         for (ix_t k : nghj) {
-            std::set<ix_t> &nghk(neighbors(k, true));
+            neighbor_set &nghk(neighbors(k, true));
             auto findi(nghk.find(i));
             if (findi != nghk.end()) {
                 nghk.erase(i);
@@ -669,17 +671,17 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
 
 
     /** Returns merged {eqclass vector, neighbor vector} */
-    std::array<std::set<ix_t> *, 2> const merge(int j, int i, bool debug=false)
+    std::array<neighbor_set *, 2> const merge(int j, int i, bool debug=false)
     {
         // ----------- Merge neighbor lists
-        std::set<ix_t> &nghj(merge_neighbor_lists(j, i, debug));
+        neighbor_set &nghj(merge_neighbor_lists(j, i, debug));
 
         // ----------- Maintain edge designation
         edge[j] = edge[j] || edge[i];
 
 
         // ----------- Merge underlying EQClasses
-        std::set<ix_t> &eqclassj(eqclasses.merge_eq(j,i));
+        neighbor_set &eqclassj(eqclasses.merge_eq(j,i));
         return {&eqclassj, &nghj};
     }
 
@@ -752,7 +754,7 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
         // Set DEM level for all cells in each eqclass
         for (auto eqii(eqclasses.eqclasses.begin()); eqii != eqclasses.eqclasses.end(); ++eqii) {
             dem_t const elev = dem[eqii->first];
-            std::set<ix_t> &members(eqii->second);
+            neighbor_set &members(eqii->second);
             for (auto ix2 : members) dem[ix2] = elev;
         }
     }
@@ -774,7 +776,7 @@ PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii !
         }
 
         // ix_i is the index of the "current" eq class
-        std::set<ix_t> ngh;
+        neighbor_set ngh;
         for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i) {
             // Skip cells that aren't part of the grid
             if (dem[ix_i] == nodata) continue;
