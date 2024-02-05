@@ -1,3 +1,4 @@
+import pathlib,os
 import setuptools.sandbox
 
 # ------------
@@ -10,7 +11,6 @@ if True:
     setuptools.sandbox.run_setup(setup_py, cmd)
 # ------------
 
-import pathlib,os
 from akramms import r_domain_builder
 from akramms.util import harnutil
 
