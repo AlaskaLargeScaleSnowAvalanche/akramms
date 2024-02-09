@@ -531,6 +531,8 @@ def run(args):
 # ------------------------------------------------------------------
 @subcommand([
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+    argument('priority', type=int, default=0, help='HTCondor Job Priority (larger number = higher priority jobs)'),
+
 ])
 def submit(args):
     """Standalone submission of avalanches.
@@ -539,7 +541,7 @@ def submit(args):
     parseds = akramms.parse.parse_args(args.spec)
 
     akdf = resolve.resolve_to(parseds, 'id', realized=True, stage='in')
-    akdf = joblib.submit_jobs(akdf)    # Only submits jobs that need submitting
+    akdf = joblib.submit_jobs(akdf, condor_priority=args.priority)    # Only submits jobs that need submitting
 
     print(f'{len(akdf)} jobs submitted')
 # ------------------------------------------------------------------

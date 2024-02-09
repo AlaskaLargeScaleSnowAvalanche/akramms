@@ -216,10 +216,13 @@ def full():
     # Generate set of trials
     snow = 'ccsm'
     downscale_algo = 'lapse'
-    for forest in ('For', 'NoFor'):
+#    for forest in ('For', 'NoFor'):
+    for forest in ('NoFor','For'):
         for idom,jdom in spiral_domains(113, 45):    # Spiral around Juneau
-            for year0,year1 in [(1981, 1990), (2051,2060)]:
+            for year0,year1 in [(1981, 2010),(2031,2060)]:
+#            for year0,year1 in [(1981, 1990), (2051,2060)]:
                 for return_period in [10,30,100,300]:
+#                for return_period in [10,100]:
                     yield Combo(snow, year0, year1, downscale_algo, forest, return_period, idom, jdom)
 
 # -----------------------------------------------------------------
