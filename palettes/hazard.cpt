@@ -1,0 +1,14 @@
+# nsa.cpt
+# 
+# Heatmap palette used in the "bounded informant"
+# graphic by the NSA.
+# 
+# COLOR_MODEL = RGB
+0 175 255   0   1 175 255   0
+1 225 253  12   2 225 253  12
+2 255 207   0   3 255 207   0
+3 255 112   0   4 255 112   0
+4 255   0   0   5 255   0   0
+B   0 129   0
+F 255   0   0
+
