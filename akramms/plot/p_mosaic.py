@@ -317,6 +317,7 @@ def plot_pdf(mosaic_zip, ofname):
 
         cmd = ['pdflatex', '--interaction=nonstopmode', page_tex.parts[-1]]
         print(' '.join(cmd))
+        print(f'cwd={page_tex.parents[0]}')
         subprocess.run(cmd, check=False, cwd=page_tex.parents[0])
 
         os.makedirs(ofname.parents[0], exist_ok=True)
