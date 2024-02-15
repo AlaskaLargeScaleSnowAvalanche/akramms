@@ -319,6 +319,7 @@ def plot_pdf(mosaic_zip, ofname):
         print(' '.join(cmd))
         subprocess.run(cmd, check=False, cwd=page_tex.parents[0])
 
+        os.makedirs(ofname.parents[0], exist_ok=True)
         os.rename(page_pdf, ofname)
 
 
