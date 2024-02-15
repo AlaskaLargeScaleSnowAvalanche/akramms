@@ -708,7 +708,7 @@ def xmosaic(args):
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser.'),
 #    argument('-s', '--save', help='Name of query file to write to'),
 #    argument('-q', '--query', help='Name of query file to read from.  If set, then spec is ignored'),
-    argument('-o', '--output', help='Name of Mosaic output file to write'),
+#    argument('-o', '--output', help='Name of Mosaic output file to write'),
     argument('--status', type=_parse_statuses,
         default = [joblib.JobStatus.FINISHED],
         help="Comma-separated statuses to plot: OVERRUN,FINISHED"),
@@ -733,6 +733,7 @@ def stdmosaic(args):
 
     # Only run for combos that are completely finished
     akdf0 = joblib.add_combo_quickstatus(akdf0, mtime=True)
+    print(akdf0)
     akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED]
 
     if len(akdf0) == 0:
