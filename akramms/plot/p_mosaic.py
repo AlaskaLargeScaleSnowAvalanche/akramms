@@ -291,7 +291,7 @@ page_tpl = string.Template(r"""
 
 
 def plot_pdf(mosaic_zip, ofname):
-    with ioutil.TmpDir(ofname.parents[0]) as tdir: #tdir='./tmp') as tdir:
+    with ioutil.TmpDir(tdir=ofname.parents[0]/'tmp') as tdir: #tdir='./tmp') as tdir:
 
 #        max_height_png = trim_png(
 #            plot_png(mosaic_zip, plot_max_height_layer, tdir.location / 'max_height0.png'),
