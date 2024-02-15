@@ -723,6 +723,7 @@ def xmosaic(args):
 ])
 def stdmosaic(args):
     from akramms import mosaic,downscale_snow
+    from akramms.plot import p_mosaic
 
     run_setup_py()
 
@@ -748,15 +749,22 @@ def stdmosaic(args):
         combo = akdf1.combo.item()
         scombo = '-'.join(str(x) for x in combo)
         sstatus = ''.join(joblib.JobStatus._member_names_[x][0] for x in sorted(args.status))
-        ofname = expmod.dir / 'mosaic' / f'{expmod.name}-{scombo}-{sstatus}.zip'
-        print(f'Writing mosaic output file {ofname}')
+        leafbase = f'{expmod.name}-{scombo}-{sstatus}'
+        ofname_zip = expmod.dir / 'mosaic' / f'{leafbase}.zip'
+        ofname_pdf = expmod.dir / 'plot' / f'{leafbase}.pdf'
+        print(f'Writing mosaic output file {ofname_zip}')
 
         # See if the output file needs regenerating
-        if (not os.path.exists(ofname)) or (os.path.getmtime(ofname) < akdf1.combo_quickstatus_mtime.item()):
+        if (not os.path.exists(ofname_zip)) or (os.path.getmtime(ofname_zip) < akdf1.combo_quickstatus_mtime.item()):
             mosaic.mosaic_avals_combo(
-                akdf1, 'tile', ofname, statuses=args.status,
+                akdf1, 'tile', ofname_zip, statuses=args.status,
                 margin=None, snow=True, dem=True, landcover=True,
                 dry_run=args.dry_run)
+
+        if (not os.path.exists(ofname_pdf)) or (os.path.getmtime(ofname_pdf) < akdf1.combo_quickstatus_mtime.item()):
+            p_mosaic.plot_pdf(ofname_zip, ofname_pdf)
+
+
 
 
 @subcommand(name='upload-mosaic')
