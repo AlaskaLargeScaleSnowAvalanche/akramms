@@ -89,6 +89,11 @@ def combo_to_snowfile_args(combo):
         combo.year0, combo.year1, combo.downscale_algo,
         combo.idom, combo.jdom)
 
+_pra_sizes = {'NoFor': ['L','M'], 'For': ['S','T']}
+def pra_sizes(combo):
+    """Determimes the PRA sizes we will compute in this experiment, for a given Combo."""
+    return _pra_sizes[combo.forest]
+
 # -------------------------------------------------------------
 def add_dem(makefile, idom, jdom, sanity_check=True):
     exp_mod = sys.modules[__name__]    # This module

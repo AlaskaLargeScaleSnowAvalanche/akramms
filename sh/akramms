@@ -507,6 +507,7 @@ def run(args):
                     continue
 
                 # and also split into chunks.
+                # Only create chunks for PRA sizes relevant to THIS scene (based on For / NoFor)
                 ramms1_inputs = list()
                 for pra_size in config.allowed_pra_sizes:
                     ramms1_inputs += makefile.add(r_pra_post.chunk_rule(

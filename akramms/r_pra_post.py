@@ -73,7 +73,8 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
     outputs = list()
     # See email from Marc Christen 2023-01-23
 #    rn = f'{For}_{resolution}m_{return_period}'
-    for pra_size in config.allowed_pra_sizes:
+#    for pra_size in config.allowed_pra_sizes:
+    for pra_size in ['L', 'M', 'S', 'T']:    # Compute release files for all PRA sizes, even if we will only run avalanches for some.
         # Copied from rammsutil.RammsName
 #        ramms_name = (scene_name, rn, pra_size)
 #        ramms_names.append(ramms_name)
