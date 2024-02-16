@@ -770,10 +770,15 @@ def stdmosaic(args):
 
 @subcommand(name='upload-mosaic')
 def upload_mosaic(args):
-    prj = pathlib.Path('/home/efischer/prj/ak')
-    mosaic_dir = prj / 'mosaic'
+    prj = pathlib.Path('/home/efischer/prj/ak')    # TODO: Fix hardcoding
 
+    mosaic_dir = prj / 'mosaic'
     cmd = ['rclone', 'copy', str(mosaic_dir), 'alaska:AvalancheShare/mosaic']
+    print(' '.join(cmd))
+    subprocess.run(cmd, check=True)
+
+    plot_dir = prj / 'plot'
+    cmd = ['rclone', 'copy', str(plot_dir), 'alaska:AvalancheShare/plot']
     print(' '.join(cmd))
     subprocess.run(cmd, check=True)
 
