@@ -1,8 +1,9 @@
 import gdal,ogr,os
+import pathlib
 
-
-raster_tif = '/Users/eafischer2/Downloads/maps/ak_DFC.tif'
-out_shp = '/Users/eafischer2/Downloads/maps/ak_DFC.shp'
+dir = pathlib.Path('/home/efischer/tmp')
+raster_tif = dir / 'ak_DFC.tif'
+out_shp = dir / 'ak_DFC.shp'
 
 def main():
     # open raster file
