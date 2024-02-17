@@ -223,7 +223,8 @@ def full():
     downscale_algo = 'lapse'
     for idom,jdom in spiral_domains(113, 45):    # Spiral around Juneau
         for year0,year1 in [(1981, 2010),(2031,2060)]:        # 30-year climatologies
-            for return_period in [10,30,100,300]:
+#            for return_period in [10,30,100,300]:
+            for return_period in [30,300]:
                 for forest in ('NoFor','For'):
                     yield Combo(snow, year0, year1, downscale_algo, forest, return_period, idom, jdom)
 

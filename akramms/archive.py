@@ -119,7 +119,7 @@ def parse_xy_coord(gridI, fin):
     return ivec, jvec
 
 
-def nc_xy_coord(ncout, gridI, coord_attrs, izip, arcname):
+def nc_xy_coord(ncout, gridI, coord_attrs, ivec, jvec)
     """
     izip, arcname:
         File .xy-coord file to read (from inside a zip)
@@ -128,9 +128,9 @@ def nc_xy_coord(ncout, gridI, coord_attrs, izip, arcname):
     """
 
     # Read the original file
-#    with open(fname,'rb') as fin:
-    with izip.open(arcname, 'r') as fin:
-        ivec, jvec = parse_xy_coord(gridI, fin)
+##    with open(fname,'rb') as fin:
+#    with izip.open(arcname, 'r') as fin:
+#        ivec, jvec = parse_xy_coord(gridI, fin)
 
     # Difference-encode i/j to increase compression
     divec = difference_encode(ivec)
@@ -176,16 +176,16 @@ def parse_out(fin):
         ('max_height', max_height, {'units': 'm'}),
         ('depo', depo,  {'units': 'm'}))
 
-def nc_out(ncout, izip, arcname, attrs={}):
+def nc_out(ncout, namevals, attrs={}):
     """
     Returns: {name: val}
         Value of variables read
         (max_vel, max_height, depo)
     """
-    # Read the values from the .out file
-#    with open(fname, 'rb') as fin:
-    with izip.open(arcname, 'r') as fin:
-        namevals = parse_out(fin)
+#    # Read the values from the .out file
+##    with open(fname, 'rb') as fin:
+#    with izip.open(arcname, 'r') as fin:
+#        namevals = parse_out(fin)
 
     # Create and populate the variables
     ncvs = list()
@@ -360,28 +360,36 @@ def ramms_to_nc0(out_zip, id_status, ncout):
 
         # The .xyz file (SKIP)
 
+        # -----------------------------------------------------------------
+        # Read the xy-coordinates, and also values on that grid
+        with in_zip.open(f'{leaf}.xy-coord', 'r') as fin:
+            ivec, jvec = parse_xy_coord(gridI, fin)
+        with out_zip.open(f'{leaf}.out', 'r') as fin:
+            namevals = parse_out(fin)
+
+        # Determine gridcells that are ACTUALLY used
+        nzmask = namevals[0][1]>0
+        for _,val,_ in namevals[1:]:
+            nzmask = np.logical_or(nzmask, val>0)
+#        nzmask = np.logical_or(*(val>0 for _,val,_ in namevals))
+
+        # Cut out the fat!
+        ivec = ivec[nzmask]
+        jvec = jvec[nzmask]
+        namevals = [(name,val[nzmask],attrs) for name,val,attrs in namevals]
+
+
+        # --------------------------------- Write the stuff we just read
         # The .xy-coord file
-        ivec,jvec = nc_xy_coord(ncout, gridI, coord_attrs, in_zip, f'{leaf}.xy-coord')
+        ivec,jvec = nc_xy_coord(ncout, gridI, coord_attrs, ivec, jvec)
 
         # The .out file
-        vars = nc_out(ncout, out_zip, f'{leaf}.out',
+        vars = nc_out(ncout, namevals,
             attrs={'grid_mapping': 'grid_mapping'})
             
         max_height = vars['max_height']
 
         # -----------------------------------
-        # Determine bounding box: begin by determining active cells
-        # (It is not sufficient to just rely on one variable, for example max_height)
-        nz_mask = np.logical_or(np.logical_or(
-            vars['max_height'] > 0,
-            vars['max_vel'] > 0),
-            vars['depo'] > 0)
-        ivec_nz = ivec[nz_mask]
-        jvec_nz = jvec[nz_mask]
-
-#        print(type(max_height), max_height.shape)
-#        print('ivec_nz ', ivec_nz, type(ivec_nz), len(ivec_nz))
-#        print('xxxxxxxxxxxx ', max_height, nz, ivec_nz, jvec_nz)
 
         # Store the bounding box
         ncout.createDimension('lowhigh', 2)
@@ -389,11 +397,11 @@ def ramms_to_nc0(out_zip, id_status, ncout):
         ncv.description = 'Oriented bounding box of region occupied by avalanche.'
         ncv.grid_mapping = 'grid_mapping'
 
-        if len(ivec_nz) > 0:
-            i0 = np.min(ivec_nz)
-            i1 = np.max(ivec_nz)
-            j0 = np.min(jvec_nz)
-            j1 = np.max(jvec_nz)
+        if len(ivec) > 0:
+            i0 = np.min(ivec)
+            i1 = np.max(ivec)
+            j0 = np.min(jvec)
+            j1 = np.max(jvec)
 
             x0,y0 = gridI.to_xy(i0,j0)
             x1,y1 = gridI.to_xy(i1,j1)

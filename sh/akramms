@@ -509,7 +509,7 @@ def run(args):
                 # and also split into chunks.
                 # Only create chunks for PRA sizes relevant to THIS scene (based on For / NoFor)
                 ramms1_inputs = list()
-                for pra_size in config.allowed_pra_sizes:
+                for pra_size in expmod.pra_sizes(combo):
                     ramms1_inputs += makefile.add(r_pra_post.chunk_rule(
                         scene_dir, scene_args, combo.forest, expmod.resolution,
                         combo.return_period, pra_size)).outputs
