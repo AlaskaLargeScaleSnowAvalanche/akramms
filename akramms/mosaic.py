@@ -1,12 +1,14 @@
 import os,pathlib,subprocess
 import numpy as np
 import pandas as pd
-from osgeo import gdal
 import zipfile,netCDF4
-from uafgi.util import gdalutil,cfutil,shputil,ioutil
+from osgeo import gdal,ogr
+from uafgi.util import gdalutil,ogrutil
+from uafgi.util import cfutil,shputil,ioutil
 from akramms import experiment,archive,file_info,avalquery,downscale_snow
 import akramms.parse
 import _mosaic
+
 
 # python -m cProfile -o prof -s cumtime `which akramms` mosaic juneau1-1981-1990.qy 
 
@@ -129,6 +131,14 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
         domain_count=np.zeros(shapeM, dtype='i2'),
         avalanche_count=np.zeros(shapeM, dtype='i2'))
 
+
+    # Use OGR to create shapefile for avalanche outlines
+    extent_shp = str(dir / 'extent.shp')
+    if os.path.exists(extent_shp):
+        os.remove(extent_shp)
+    extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
+    extent_layer = outDataSource.CreateLayer(extent_shp, ogrutil.to_srs(gridM.grid.wkt), geom_type=ogr.wkbMultiPolygon )
+
 #    for aval_i,fname in enumerate(avals):
     print(akdf.columns)
     akdf = akdf.sort_values('id')
@@ -147,14 +157,31 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
             # TODO: Store Geotransform as machine-precision doubles in the file
             gridA_gt = np.array([float(x) for x in nc.variables['grid_mapping'].GeoTransform.split(' ')])
 
+
+            # ------------ Polygonize the extent
+            iA = np.cumsum(nc.variables['i_diff'][:])
+            jA = np.cumsum(nc.variables['j_diff'][:])
+            max_vel = nc.variables['max_vel'][:].astype('f4')
+            max_height = nc.variables['max_height'][:].astype('f4')
+            depo = nc.variables['depo'][:].astype('f4')
+
+            nzmask = np.logical_or(np.logical_or(
+                max_vel>0, max_height>0), depo>0).astype('i8')
+
+            nzmask_ds = gdalutil.raster_ds((raster.grid, nzmask, 0))
+            nzmask_band = nzmask_ds.GetRasterBand(1)
+            gdal.Polygonize(nzmask_band, nzmask_band, extent_layer, -1)
+
+            # ---------- Copy raster into the overall mosaic
             # C++ extension does the real work
             args = (
                 nc.variables['i_diff'][:],
                 nc.variables['j_diff'][:],
                 gridA_gt[0], gridA_gt[3],
-                nc.variables['max_vel'][:].astype('f4'),
-                nc.variables['max_height'][:].astype('f4'),
-                nc.variables['depo'][:].astype('f4'),
+                max_vel, max_height, depo,
+#                nc.variables['max_vel'][:].astype('f4'),
+#                nc.variables['max_height'][:].astype('f4'),
+#                nc.variables['depo'][:].astype('f4'),
                 rho,
                 gridM.nx, gridM.x0, gridM.dx,
                 gridM.ny, gridM.y0, gridM.dy,

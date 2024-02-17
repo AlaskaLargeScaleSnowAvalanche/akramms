@@ -18,6 +18,7 @@ __all__ = ('archive',)
 # NOTE: Similar to rammsutil.read_polygon_from_zip()
 _all_spaceRE = re.compile(r'$\s*^')
 def _read_polygon(izip, poly_file):
+    """Reads RAMMS text format polygon files and returns them as a shapely.geometry.Polygon"""
 
 #    with open(poly_file) as fin:
     with io.TextIOWrapper(izip.open(poly_file, 'r'), encoding='utf-8') as fin:
