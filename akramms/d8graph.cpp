@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <vector>
 #include <array>
+#include <queue>
 #include <iostream>
 #include <iomanip>
 #include <iterator>
@@ -483,7 +484,8 @@ public:
 };
 
 // ----------------------------------------------------------
-const std::vector<std::array<int,2>> dneigh = {
+typedef std::vector<std::array<int,2>> dneigh_t;
+const dneigh_t dneigh8 = {
     {-1,-1}, {-1,0}, {-1,1},
     {0, -1},         {0, 1},
     {1,-1},  {1,0},  {1,1}};
@@ -515,7 +517,7 @@ private:
 
     // Increments to get to neighbors
     // These need to be in sorted order...
-//    static const std::vector<std::array<int,2>> dneigh;
+//    static const std::vector<std::array<int,2>> dneigh8;
 
     /** Determines whether a gridcell is an edge cell, i.e. borders on
     an unused cell or grid edge.  This function is called a the
@@ -524,7 +526,7 @@ private:
     bool is_edge(int j0, int i0)
     {
         // Look at neighboring nodes in 2D space
-        for (auto &dn : dneigh) {
+        for (auto &dn : dneigh8) {
             // It's an edge if at edge of domain
             int const j1 = j0 + dn[0];
             int const i1 = i0 + dn[1];
@@ -567,7 +569,7 @@ public:
         int const i0 = ji0 % ni;    // Probably compiles down to divmod
 
         // Look at neighboring nodes in 2D space
-        for (auto &dn : dneigh) {
+        for (auto &dn : dneigh8) {
 
             // Avoid outrunning our domain
             int const j1 = j0 + dn[0];
@@ -833,10 +835,139 @@ continue_outer: ;
 
 };
 
-
-
-
 // ====================================================================
+
+class DEM {
+
+    // Maintain a DEM (imported from Python), giving us our neighbors
+    dem_t const *elev;
+    int const nj;
+    int const ni;
+    double const nodata;             // dem==nodata ==> unused gridcell
+    dneigh_t const &dneigh;
+    std::vector<int> dneigh_ji;
+
+    int const nji;
+public:
+
+    /**
+    dneigh: Use dneigh4 or dneigh8 for 4-neighbor or 8-neighbor variants
+        typedef std::vector<std::array<int,2>> dneigh_t;
+        const dneigh_t dneigh8 = {
+            {-1,-1}, {-1,0}, {-1,1},
+            {0, -1},         {0, 1},
+            {1,-1},  {1,0},  {1,1}};
+    */
+    DEM(dem_t *_elev, int _nj, int _ni, double _nodata, dneigh_t const &_dneigh)
+        : elev(_elev), nj(_nj), ni(_ni), nodata(_nodata), dneigh(_dneigh),
+    {
+        // Compute neighbor deltas in 1D indexing
+        dneigh_ji.reserve(dneigh.size());
+        for (auto &dn : dneigh8) dneigh_ji.push_back(dn[0]*ni + dn[1])
+    }
+
+    inline int ji(int const j, int const i)
+        { return j*ni + i; }
+
+    /** Determines whether a gridcell is an edge cell, i.e. borders on
+    an unused cell or grid edge.  This function is called a the
+    beginning to build a lookup table, which is then modified as eq
+    classes are merged. */
+    bool is_edge(int j0, int i0)
+    {
+        // Look at neighboring nodes in 2D space
+        for (auto &dn : dneigh8) {
+            // It's an edge if at edge of domain
+            int const j1 = j0 + dn[0];
+            int const i1 = i0 + dn[1];
+            if ((j1<0) || (j1>=nj) || (i1<0) || (i1>ni)) return true;
+
+            // It's an edge if neighbor is unused
+            int const ji1 = ji(j1,i1)  // j1*ni + i1;
+            if (elev[ji1] == nodata) return true;
+        }
+        return false;
+    }
+
+}
+
+
+/** Computes the "Spill" value as per
+
+An effective depression filling algorithm for DEM-based 2-D surface flow modelling
+D. Zhu1, Q. Ren2, Y. Xuan1, Y. Chen3, and I. D. Cluckie1
+doi:10.5194/hess-17-495-2013
+
+    For b ← [cells on data boundary or channel cells]
+        Spill [b] ← Elevation [b]
+        PQueue.push(b)
+        Mark [b] = true
+    End For
+
+    While PQueue is not empty
+        c ← PQueue.top()      # Cell with lowest spill elevation
+        PQueue.pop(c)
+        Mark [c] ← true
+        For n ← [4 neighbors of c]
+            If not Mark [n]
+                Spill [n] ← Max(Elevation [n], Spill[c])
+                PQueue.push(n)
+            End If
+        End For
+    End While
+
+
+spill: Output array
+    Leveled values stored here
+
+
+*/
+void compute_spill(DEM const &dem, dem_t *spill)
+{
+    std::vector<bool> mark(dem.nj * dem.ni);    // Initialized to false
+
+    // https://en.cppreference.com/w/cpp/container/priority_queue
+    // Line 8 obtains the node with the least cost (the lowest spill
+    // elevation) through the member function PQueue.Top()
+
+
+    // Max priority queue by default stores tuples: (spill, j, i)
+    // We will make it a min queue without any extra code by storing -spill
+    std::priority_queue<std::tuple<double,int,int>> pqueue;    
+
+    // For b ← [cells on data boundary or channel cells]
+    for (int bj=0; bj<dem.nj; ++bj) {
+    for (int bi=0; bi<dem.ni; ++bi) {
+    if dem.is_edge(bj, bi) {
+        int const bji = dem.ji(bj, bi);
+        spill[bji] = dem.elev[bji];
+        pqueue.push(std::tuple<double,int,int>{-spill[bji], bj, bi});
+        mark[bji] = true;
+    }}}
+
+    while (!pqueue.empty()) {
+        std::tuple<double,int,int> const cq = pqueue.top();
+            double const cspill = -cq.get<0>();
+            int const cj = cq.get<1>();
+            int const ci = cq.get<2>();
+        int const cji = dem.ji(cj, ci);
+        pqueue.pop();
+        mark[cji] = true;
+
+        // Look at neighboring nodes in 2D space (j1,i1)
+        for (auto &dn : dem.dneigh) {
+            int const j1 = cj + dn[0];
+            int const i1 = ci + dn[1];
+            if ((j1<0) || (j1>=dem.nj) || (i1<0) || (i1>dem.ni)) return continue;
+
+            int const ji1 = dem.ji(j1,i1);
+            if (!mark[ji1]) {
+                spill[ji1] = std::max(dem.elev[ji1], spill[cji];
+                pqueue.push(std::tuple<double,int,int>{-spill[ji1], j1, i1});
+            }
+        }
+    }
+}
 
 // ------------------------------------------------------------
 
@@ -951,7 +1082,7 @@ std::unordered_set<ix_t> avalanche_runout(
                 // before) based on the 2D DEM
                 double min_ele = _elev(ji0);
                 min_ix.clear();
-                for (auto &dn : dneigh) {
+                for (auto &dn : dneigh8) {
                     // Avoid outrunning our domain
                     int const j1 = j0 + dn[0];
                     int const i1 = i0 + dn[1];
