@@ -193,19 +193,21 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
                 vals['avalanche_count'])
             _mosaic.mosaic(*args)
 
+        # Close extent.shp and store in the mosaic zip file
+        extent_layer = None
+        extent_ds None
+        for ext in ('shp','dbf','shx','prj'):
+            ozip_write(ozip, dir / f'extent.{ext}')
+
+
     # Write output GeoTIFF and Zip it up
     os.makedirs(ofname_zip.parents[0], exist_ok=True)
     with zipfile.ZipFile(ofname_zip, mode='w', compression=zipfile.ZIP_STORED) as ozip:
 
         box_poly = gridM.bounding_box
 
-
-
         # Shapefiles
         reldf, domdf = read_reldom(akdf, tdir)
-        #reldf = read_reldom(arcdir, 'rel')
-        print('xxxxxxxxxx reldf ', reldf.columns)
-        print(reldf[['pra_size']])
         for cname in reldf.columns:
             print(f"{cname}: {reldf[cname].dtype}")
         shputil.write_df(reldf, 'pra', 'Polygon', dir / 'rel.shp', wkt=gridM.wkt)
