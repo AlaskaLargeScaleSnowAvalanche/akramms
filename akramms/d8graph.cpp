@@ -365,123 +365,6 @@ std::array<TypeT, 2> sorted(TypeT a, TypeT b)
 #endif
 
 // ==================================================================================
-// ------------------------------------------------------------
-/** Determines which eqclass the ith gridcell is a part of */
-ix_t _parent(std::unordered_map<ix_t, ix_t> const &forwards, ix_t gci)
-{
-    auto ii(forwards.find(gci));
-    if (ii != forwards.end()) return ii->second;
-    return gci;
-}
-
-class EQClasses {
-public:
-    // Cell this has been merged into (if it's been merged)
-    std::unordered_map<ix_t, ix_t> forwards;
-
-    // EQClass with >1 element
-    // Inner vector is SORTED
-    std::map<ix_t, neighbor_set> eqclasses;
-
-private:
-    // Stand-in for single-element eqclasses
-    neighbor_set _single_ret{0};
-
-public:
-
-    EQClasses() {}    // Start off with everything in its own class
-
-    /** Fetches the elements of the ith equivalence class */
-    neighbor_set const &members(int eqi)
-    {
-        auto ii(eqclasses.find(eqi));
-        if (ii != eqclasses.end()) {
-            // This EQClass is stored explicitly, return it.
-            return ii->second;
-        } else {
-            // This EQClass is not explicitly represented, just equal to self
-            _single_ret.clear();
-            _single_ret.insert(eqi);
-            return _single_ret;
-        }
-    }
-
-    /** Fetches the elements of the ith equivalence class */
-    size_t size(int eqi)
-    {
-        auto ii(eqclasses.find(eqi));
-        if (ii != eqclasses.end()) {
-            // This EQClass is stored explicitly, return it.
-            return ii->second.size();
-        } else {
-            // This EQClass is not explicitly represented, just equal to self
-            return 1;
-        }
-    }
-
-
-
-
-    /** SPECIAL CASE: Determines the lowest-number index in an eq class
-    (Assumes members are always sorted)
-    ix:
-        An active eq class index (use parent() if needed).*/
-    ix_t min_member(ix_t ix) const
-    {
-        auto ii(eqclasses.find(ix));
-        if (ii != eqclasses.end()) {
-            return *(ii->second.begin());
-        } else {
-            return ix;
-        }
-    }
-
-    /** Determines which eqclass the ith gridcell is a part of */
-    ix_t parent(ix_t gci) const
-    {
-        auto ii(forwards.find(gci));
-        if (ii != forwards.end()) return ii->second;
-        return gci;
-    }
-
-
-    /** Merge eq class i into j
-    i:
-        Index of source equivalence class
-    j:
-        Index of destination equivalence class
-    Returns:
-        Sorted vector of members of newly merged j
-    */
-    neighbor_set &merge_eq(int j, int i)
-    {
-        // Access contents of the destination eq class,
-        // converting to explicit form if needed.
-        auto eqcj_it(eqclasses.find(j));
-        if (eqcj_it == eqclasses.end()) {
-//            PySys_WriteStdout("Creating new eqclass for %d\n", j);
-            eqcj_it = eqclasses.insert(eqcj_it, std::make_pair(j, neighbor_set{j}));
-        }
-        neighbor_set &eqcj(eqcj_it->second);
-//std::cout << "Dst EQClass " << j << ": "; print_range(std::cout, eqcj.begin(), eqcj.end()); std::cout << std::endl;
-
-        // Access contents of the source eq class.  We don't know or
-        // care whether it's in implicit or explicit form.
-        auto &eqci(members(i));
-
-//std::cout << "Src EQClass " << i << ": "; print_range(std::cout, eqci_bounds[0], eqci_bounds[1]); std::cout << std::endl;
-        // Merge eq class i into eq class j
-        for (ix_t ix : eqci) eqcj.insert(ix);
-
-        // Delete eqclass i and forward to j
-        eqclasses.erase(i);
-        forwards[i] = j;
-
-        // Return the new Equiv Class j
-        return eqcj;
-    }
-
-};
 
 // ----------------------------------------------------------
 typedef std::vector<std::array<int,2>> dneigh_t;
@@ -493,31 +376,19 @@ const dneigh_t dneigh8 = {
 /** A graph with implicit 8-way neighbors based on DEM and used /
 unused gridcells */
 class D8Graph {
-public:
-    // Maintain nodes of our graph as equivalence classes
-    EQClasses eqclasses;
-
 private:
-    std::time_t t0;
-
     // Maintain a DEM (imported from Python), giving us our neighbors
     dem_t *dem;
     int const nj;
     int const ni;
     double nodata;             // dem==nodata ==> unused gridcell
-    // Tells whether an EQ class is on the edge of the grid or adjacent to an unused cell
-    std::vector<bool> edge;
+    dneigh_t const &dneigh;
 
-    // Explicit neighbors for merged EQ classes
-    std::map<ix_t, neighbor_set> neighborss;
-    // Buffer used to return neighbors
-    std::array<neighbor_set, 2> _neighbors_rets;
-    int reti = 0;    // Double buffering
-    // ---------------------------------------------------------
+//    std::vector<dem_t> spill;    // Temporary variable
+//    std::vector<int> eqclass;
 
-    // Increments to get to neighbors
-    // These need to be in sorted order...
-//    static const std::vector<std::array<int,2>> dneigh8;
+    inline int ji(int const j, int const i)
+        { return j*ni + i; }
 
     /** Determines whether a gridcell is an edge cell, i.e. borders on
     an unused cell or grid edge.  This function is called a the
@@ -540,230 +411,233 @@ private:
     }
 
 public:
-    D8Graph(dem_t *_dem, int _nj, int _ni, double _nodata)
-        : t0(std::time(nullptr)), dem(_dem), nj(_nj), ni(_ni), nodata(_nodata)
-    {
-//PySys_WriteStdout("AA1 %f %f %f %f\n", dem[0], dem[1], dem[2], dem[3]);
-
-        // Initialize edge indicator
-        edge.reserve(nj*ni);
-        for (int j=0; j<nj; ++j) {
-        for (int i=0; i<ni; ++i) {
-            bool const ie = is_edge(j,i);
-            edge.push_back(ie);
-//            PySys_WriteStdout("is_edge[%d, %d] = %d\n", j, i, (int)ie);
-        }}
-
-    }
+    D8Graph(dem_t *_dem, int _nj, int _ni, double _nodata, dneigh_t const &_dneigh)
+        : t0(std::time(nullptr)), dem(_dem), nj(_nj), ni(_ni), nodata(_nodata), dneigh(_dneigh),
+//        spill(nj*ni), eqclass(nj*ni)
+    {}
 
     size_t size() const { return nj*ni; }
 
-    /** Obtain list of neighbors based on raster. */
-    neighbor_set &d8_neighbors_list(int ji0, neighbor_set &ngh)
-    {
-        ngh.clear();
-        //ngh.reserve(8);
+    /** Computes the "Spill" value as per
 
-        // Identify neighbors based on the 2D raster.
-        int const j0 = ji0 / ni;
-        int const i0 = ji0 % ni;    // Probably compiles down to divmod
+    An effective depression filling algorithm for DEM-based 2-D surface flow modelling
+    D. Zhu1, Q. Ren2, Y. Xuan1, Y. Chen3, and I. D. Cluckie1
+    doi:10.5194/hess-17-495-2013
 
-        // Look at neighboring nodes in 2D space
-        for (auto &dn : dneigh8) {
+        For b ← [cells on data boundary or channel cells]
+            Spill [b] ← Elevation [b]
+            PQueue.push(b)
+            Mark [b] = true
+        End For
 
-            // Avoid outrunning our domain
-            int const j1 = j0 + dn[0];
-            int const i1 = i0 + dn[1];
-            if ((j1<0) || (j1>=nj) || (i1<0) || (i1>=ni)) continue;
+        While PQueue is not empty
+            c ← PQueue.top()      # Cell with lowest spill elevation
+            PQueue.pop(c)
+            Mark [c] ← true
+            For n ← [4 neighbors of c]
+                If not Mark [n]
+                    Spill [n] ← Max(Elevation [n], Spill[c])
+                    PQueue.push(n)
+                End If
+            End For
+        End While
 
-            // Avoid "neighbor" gridcells that are unused
-            int ji1 = j1*ni + i1;
-            if (dem[ji1] == nodata) continue;
-            if (dem[ji1] == 0.0) continue;    // Avoid the ocean
 
-            // Follow forwrding for neighbors that have been merged
-            // NOTE: This could result in non-unique neighbor lists being returned!
-            ji1 = eqclasses.parent(ji1);
+    spill: Output array
+        Leveled values stored here
 
-            // Add to our list of output
-            ngh.insert(ji1);
-        }
 
-        return ngh;
-    }
-
-public:
-    /**
-    expl:
-        If set, then convert to expl format if not already.
     */
-    neighbor_set &neighbors(int ji0, bool expl=false)
+    void compute_spill(std::vector<dem_t> &spill)
     {
-        // Are neighbors represented explicitly?
-        // If so, just lookup and return that list.
-        auto ii(neighborss.find(ji0));
-        if (ii != neighborss.end()) {
-            return ii->second;
-        }
+        std::vector<bool> mark(this->nj * this->ni);    // Initialized to false
 
-        // Neighbor is not represented explicitly.
-        // Construct the neighbor list.
-
-        // Prepare output buffer
-        reti = 1 - reti;    // swap dem_t buffer
-        neighbor_set &ngh(_neighbors_rets[reti]);
-
-        // Obtain explicit list of neighbors
-        d8_neighbors_list(ji0, ngh);
-
-        // We're done if we don't need to store it for later use.
-        if (!expl) return ngh;
-
-        // We DO need to store the explicit representation.
-        ii = neighborss.insert(std::make_pair(ji0, std::move(ngh))).first;
-        return ii->second;
-    }
-
-    /** Merge neighbor lists in prep for an eqclass merger of j <- i */
-    neighbor_set &merge_neighbor_lists(ix_t j, ix_t i, bool debug=false)
-    {
-        // Original neighbor lists
-        neighbor_set &nghj(neighbors(j, true));
-        neighbor_set &nghi(neighbors(i, true));
+        // https://en.cppreference.com/w/cpp/container/priority_queue
+        // Line 8 obtains the node with the least cost (the lowest spill
+        // elevation) through the member function PQueue.Top()
 
 
-if (debug) PySys_WriteStdout("********* %ld Merging %d (%f) <- %d (%f)\n", std::time(nullptr) - t0, j, dem[j], i, dem[i]);
-#if 0
-PySys_WriteStdout(" pre neighbors[%d]: ", j); for (auto ii(nghj.begin()); ii != nghj.end(); ++ii) PySys_WriteStdout(" %d", *ii); PySys_WriteStdout("\n");
-PySys_WriteStdout(" pre neighbors[%d]: ", i); for (auto ii(nghi.begin()); ii != nghi.end(); ++ii) PySys_WriteStdout(" %d", *ii); PySys_WriteStdout("\n");
-#endif
+        // Max priority queue by default stores tuples: (spill, j, i)
+        // We will make it a min queue without any extra code by storing -spill
+        std::priority_queue<std::tuple<double,int,int>> pqueue;    
 
-        // --------------- Filter out i and j
-        nghi.erase(j);
-        nghj.erase(i);
+        // For b ← [cells on data boundary or channel cells]
+        for (int bj=0; bj<this->nj; ++bj) {
+        for (int bi=0; bi<this->ni; ++bi) {
+            int const bji = this->ji(bj, bi);
+            if (this->dem[ji1] == nodata) continue;
 
-        // ------------------- Merge the lists (smaller into larger)
-        if (nghj.size() < nghi.size()) std::swap(nghi, nghj);
-        for (ix_t ix : nghi) nghj.insert(ix);
-
-#if 0
-PySys_WriteStdout("joined neighbors %d: ", j); for (auto ii(ngh_joined.begin()); ii != ngh_joined.end(); ++ii) PySys_WriteStdout(" %d", *ii); PySys_WriteStdout("\n");
-#endif
-
-
-        // Delete neighbors list for i
-        nghi.clear();    // In case it's one of _neighbors_ret
-        neighborss.erase(i);
-
-        // ============== Replace i->j in neighbor lists of neighbors
-        for (ix_t k : nghj) {
-            neighbor_set &nghk(neighbors(k, true));
-            auto findi(nghk.find(i));
-            if (findi != nghk.end()) {
-                nghk.erase(i);
-                nghk.insert(j);
+            if this->is_edge(bj, bi) {
+                int const bji = this->ji(bj, bi);
+                spill[bji] = this->elev[bji];
+                pqueue.push(std::tuple<double,int,int>{-spill[bji], bj, bi});
+                mark[bji] = true;
             }
-        }
+        }}
 
-#if 0
-auto &xnghj(neighbors(j));
-PySys_WriteStdout(" post neighbors[%d]: ", j); for (auto ii(xnghj.begin()); ii != xnghj.end(); ++ii) PySys_WriteStdout(" %d", *ii); PySys_WriteStdout("\n");
-#endif
+        while (!pqueue.empty()) {
+            std::tuple<double,int,int> const cq = pqueue.top();
+                double const cspill = -cq.get<0>();
+                int const cj = cq.get<1>();
+                int const ci = cq.get<2>();
+            int const cji = this->ji(cj, ci);
+            pqueue.pop();
+            mark[cji] = true;
 
-        return nghj;
-    }
+            // Look at neighboring nodes in 2D space (j1,i1)
+            for (auto &dn : this->dneigh) {
+                int const j1 = cj + dn[0];
+                int const i1 = ci + dn[1];
+                if ((j1<0) || (j1>=this->nj) || (i1<0) || (i1>this->ni)) continue;
+                int const ji1 = this->ji(j1,i1);
+                if (this->dem[ji1] == nodata) continue;
 
-
-
-
-    /** Returns merged {eqclass vector, neighbor vector} */
-    std::array<neighbor_set *, 2> const merge(int j, int i, bool debug=false)
-    {
-        // ----------- Merge neighbor lists
-        neighbor_set &nghj(merge_neighbor_lists(j, i, debug));
-
-        // ----------- Maintain edge designation
-        edge[j] = edge[j] || edge[i];
-
-
-        // ----------- Merge underlying EQClasses
-        neighbor_set &eqclassj(eqclasses.merge_eq(j,i));
-        return {&eqclassj, &nghj};
-    }
-
-
-    /**
-    max_sink_size: (DEPRECATED; IGNORED)
-        Don't merge sinks larger than this.
-    */
-    void fill_sinks(size_t max_sink_size)
-    {
-
-        int merge_count = 0;
-        for (int ix=0; ix<(int)size(); ++ix) {
-            // Only look at primary node for each EQ class
-            if (eqclasses.parent(ix) != ix) continue;
-
-            // Progressively merge with neighbors
-            for (;;) {
-
-#if 1
-                // Edge nodes don't get merged, the unused gridcell
-                // nextdoor is by definition a place we can flow to from this
-                // gridcell.
-                if (edge[ix]) break;
-#endif
-
-                // Find index of the neighbor with the lowest elevation in the dem
-                // (that is small enough to merge)
-                ix_t min_ix = -1;
-                dem_t min_elev = 1.e20;
-                auto &ngh(neighbors(ix));
-                for (auto kk(ngh.begin()); ; ++kk) {
-                    if (kk == ngh.end()) break;
-#if 0     // max_sink_size is too buggy
-                    if (eqclasses.size(ix) + eqclasses.size(*kk) > max_sink_size) continue;
-#endif
-                    if (dem[*kk] < min_elev) {
-                        min_ix = *kk;
-                        min_elev = dem[min_ix];
-                    }
+                if (!mark[ji1]) {
+                    spill[ji1] = std::max(this->elev[ji1], spill[cji];
+                    pqueue.push(std::tuple<double,int,int>{-spill[ji1], j1, i1});
                 }
-                if (min_ix == -1) break;    // No merge candidates with small number of cells
+            }
+        }
+    }
 
-                //ix_t const min_ix = *std::min_element(ngh.begin(), ngh.end(),
-                //    [this](int const ix0, int const ix1) { return dem[ix0] < dem[ix1]; });
+    // Find all cells with spill equal to cell (bj, bi)
+    inline void equal_spill(
+        std::vector<dem_t> const &spill,
+        std::vector<bool> &mark,
+        std::vector<int> &forward,
+        std::vector<int> &neighbor_eqclass,
+        // std::vector<int> &neighbor_within,
+        npy_int *neighbor_within,
+        int bj, int bi)
+    {
 
-                // This Equiv class is not a sink because it has an outflow to a neighbor
-                if (dem[ix] > dem[min_ix]) break;
+        std::vector<int> eqlass;    // ji 1D index of items in the eq class
 
-                // Set elevation for the EQ class to the (higher) elevation of the neighbor
-                // (Elevation of other gridcells in the EQ class will be adjusted later)
-                dem[ix] = dem[min_ix];
+        // We are looking for adjacent cells with this value of spill
+        int const bji = this->ji(bj, bi);
+        spillval = spill[bji];
 
-                // Merge min_ix into ix, return neighbors of merged ix
-//if (ix == 18729844 || min_ix == 18729844) printf("TRACE Merge %d <- %d\n", ix, min_ix);
-                merge(ix, min_ix, merge_count % 10000 == 0);    // Merge into lower-elevation     index always
-                ++merge_count;
+        // Index of lowest neighbor node
+//        std::array<int,2> lowest_neighbor;
+        int lowest_neighbor;
+        dem_t lowest_neighbor_spill = spillval;
 
-//if (merge_count >= 30000) goto end_loop;
+        // Initialize our queue of cells we haven't yet looked at.
+        std::queue<std::array<int,2>> todo;
+        todo.push(std::array<int,2>{bj, bi});
 
-#if 0     // max_sink_size is too buggy
-                // Stop if we've gotten too large
-                if (merged_eqclass.size() > max_sink_size) break;
-#endif
+
+        while (!todo.empty()) {
+            std::array<int,2> const &cq(todo.front);
+                int const cj = cq[0];
+                int const ci = cq[1];
+                int const cji = this->ji(cj, ci);
+
+            // Add it to our eq class and mark as seen
+            eqclass.push_back(cji);
+            mark[cji] = true;
+
+            // Identify neighboring nodes to look at
+            for (auto &dn : this->dneigh) {
+                int const j1 = cj + dn[0];
+                int const i1 = ci + dn[1];
+                if ((j1<0) || (j1>=this->nj) || (i1<0) || (i1>this->ni)) continue;
+                int const ji1 = this->ji(j1,i1);
+                if (this->dem[ji1] == nodata) continue;
+                if (mark[ji1]) continue;
+
+                double const &neighbor_spill = spill[ji1];
+                if (neighbor_spill == spillval) {
+                    // It's one of us: look at it later
+                    todo.push(std::array<int,2>{j1,i1});
+                } else if (neighbor_spill < lowest_neighbor_spill) {
+                    // It's a real neighbor: determine if it's the LOWEST neighbor
+                    lowest_neighbor_spill = neighbor_spill;
+//                    lowest_neighbor = std::array<int,2>{j1,i1};
+                    lowest_neighbor = ji1;
+                }
 
             }
         }
-//end_loop:
 
-        // Set DEM level for all cells in each eqclass
-        for (auto eqii(eqclasses.eqclasses.begin()); eqii != eqclasses.eqclasses.end(); ++eqii) {
-            dem_t const elev = dem[eqii->first];
-            neighbor_set &members(eqii->second);
-            for (auto ix2 : members) dem[ix2] = elev;
+
+        // forward:
+        //    Points to the lowest gridcell in THIS eqclass
+        //    We know we are the lowest if forward[ji]==ji
+        // neighbor_eqclass:
+        //    Only valid for the LOWEST gridcell in each eqclass
+        //    Points tothe UNFORWARDED next-lowest neighbor.
+        // neighbor_within:
+        //    Valid for all but the LAST gridcell in each eqclass
+        //    Points to the next neighbor in this class.
+        //    neighbor2[LAST] = -2
+        //    We know we are the LAST gridcell in an eqclass if neighbor2[ji] == -2
+        //       In that case, our eqclass index is forward[ji]
+        //       And (once all forwards have been set), we should set:
+        //          neighbor1[ji] = forward[neighbor_eqclass[forward[ji]]]
+
+
+
+        // Use the computed equivalence class to set forward, neighbor_eqclass and neighbor_within
+        std::sort(eqclass, eqclass.begin(), eqclass.end());    // Sort by index
+
+        // Set forward and neighbor_within
+        int const ji_eq = eqclass[0];    // Label of our equivalence class
+        int ji0 = ji_eq;
+        neighbor_eqclass[ji0] = lowest_neighbor;
+        forward[ji0] = ji_eq;
+        for (size_t k=1; k<eqclass.size(); ++k) {
+            int ji1 = eqclass[k];
+            forward[ji1] = ji_eq;
+            neighbor_within[ji0] = j1;    // Setting neighbor_within for previous element
+            ji0 = ji1;
         }
+        neighbor_within[ji0] = -2;    // Last element in eqclass
+
     }
+
+
+    /** Top-level function */
+    void to_neighbor1(npy_int * const neighbor1)
+    {
+
+        int const nji = this->nj * this->ni;
+
+        // Compute spill
+        std::vector<dem_t> spill(nji, this->nodata)
+        compute_spill(spill);
+
+        // Initialize additional arrays
+        std::vector<bool> mark(nji, false);    // Initialized to false
+        std::vector<int> forward;    // Initialize to forward-to-self
+            forward.reserve(nji);
+            for (int ji=0; ji<nji; ++ji) forward[ji] = ji;
+        std::vector<int> neighbor_eqclass(nji, -2);
+
+        // neighbor_within can use same memory as neighbor1
+        npy_int * const neighbor_within = neighbor1;
+        for (int ji=0; ji<nji; ++ji) neighbor_within[ji] = -2;
+
+        // Iterate through the gridcells collecting equivalence classes
+        for (int bj=0; bj<this->nj; ++bj) {
+        for (int bi=0; bi<this->ni; ++bi) {
+            int const bji = this->ji(bj, bi);
+            if (this->dem[bji] == this->nodata) continue;
+            if (mark[bji]) continue;    // Already saw it in another eq class
+
+            equal_spill(spill, mark, forward, neighbor_eqclass, neighbor_within, bj, bi);
+
+        }}
+
+        // Iterate through one last time and set the neighbor1 element
+        // for the LAST of each eqclass
+        for (int ji=0; ji<nji; ++ji) {
+            if (neighbor1[ji] == -2) {
+                neighbor1[ji] = forward[neighbor_eqclass[forward[ji]]];
+            }
+        }
+
+
 
 
     /** Construct the degree-1 neighbor relationship.  Represented as
@@ -817,22 +691,6 @@ continue_outer: ;
         }
     }
 
-
-    /** Constructs a map of the sinks that have been filled in. */
-    void to_sinks(npy_int *sinks) const
-    {
-        // Initialize all to -1
-        for (ix_t ix_i=0; ix_i<(ix_t)size(); ++ix_i) {
-            sinks[ix_i] = -1;
-        }
-
-        for (auto eqii(eqclasses.eqclasses.begin()); eqii != eqclasses.eqclasses.end(); ++eqii) {
-            ix_t key = eqii->first;
-            for (ix_t ix : eqii->second) sinks[ix] = key;
-        }
-    }
-
-
 };
 
 // ====================================================================
@@ -845,7 +703,6 @@ class DEM {
     int const ni;
     double const nodata;             // dem==nodata ==> unused gridcell
     dneigh_t const &dneigh;
-    std::vector<int> dneigh_ji;
 
     int const nji;
 public:
@@ -859,12 +716,8 @@ public:
             {1,-1},  {1,0},  {1,1}};
     */
     DEM(dem_t *_elev, int _nj, int _ni, double _nodata, dneigh_t const &_dneigh)
-        : elev(_elev), nj(_nj), ni(_ni), nodata(_nodata), dneigh(_dneigh),
-    {
-        // Compute neighbor deltas in 1D indexing
-        dneigh_ji.reserve(dneigh.size());
-        for (auto &dn : dneigh8) dneigh_ji.push_back(dn[0]*ni + dn[1])
-    }
+        : elev(_elev), nj(_nj), ni(_ni), nodata(_nodata), dneigh(_dneigh)
+    {}
 
     inline int ji(int const j, int const i)
         { return j*ni + i; }
@@ -892,82 +745,6 @@ public:
 }
 
 
-/** Computes the "Spill" value as per
-
-An effective depression filling algorithm for DEM-based 2-D surface flow modelling
-D. Zhu1, Q. Ren2, Y. Xuan1, Y. Chen3, and I. D. Cluckie1
-doi:10.5194/hess-17-495-2013
-
-    For b ← [cells on data boundary or channel cells]
-        Spill [b] ← Elevation [b]
-        PQueue.push(b)
-        Mark [b] = true
-    End For
-
-    While PQueue is not empty
-        c ← PQueue.top()      # Cell with lowest spill elevation
-        PQueue.pop(c)
-        Mark [c] ← true
-        For n ← [4 neighbors of c]
-            If not Mark [n]
-                Spill [n] ← Max(Elevation [n], Spill[c])
-                PQueue.push(n)
-            End If
-        End For
-    End While
-
-
-spill: Output array
-    Leveled values stored here
-
-
-*/
-void compute_spill(DEM const &dem, dem_t *spill)
-{
-    std::vector<bool> mark(dem.nj * dem.ni);    // Initialized to false
-
-    // https://en.cppreference.com/w/cpp/container/priority_queue
-    // Line 8 obtains the node with the least cost (the lowest spill
-    // elevation) through the member function PQueue.Top()
-
-
-    // Max priority queue by default stores tuples: (spill, j, i)
-    // We will make it a min queue without any extra code by storing -spill
-    std::priority_queue<std::tuple<double,int,int>> pqueue;    
-
-    // For b ← [cells on data boundary or channel cells]
-    for (int bj=0; bj<dem.nj; ++bj) {
-    for (int bi=0; bi<dem.ni; ++bi) {
-    if dem.is_edge(bj, bi) {
-        int const bji = dem.ji(bj, bi);
-        spill[bji] = dem.elev[bji];
-        pqueue.push(std::tuple<double,int,int>{-spill[bji], bj, bi});
-        mark[bji] = true;
-    }}}
-
-    while (!pqueue.empty()) {
-        std::tuple<double,int,int> const cq = pqueue.top();
-            double const cspill = -cq.get<0>();
-            int const cj = cq.get<1>();
-            int const ci = cq.get<2>();
-        int const cji = dem.ji(cj, ci);
-        pqueue.pop();
-        mark[cji] = true;
-
-        // Look at neighboring nodes in 2D space (j1,i1)
-        for (auto &dn : dem.dneigh) {
-            int const j1 = cj + dn[0];
-            int const i1 = ci + dn[1];
-            if ((j1<0) || (j1>=dem.nj) || (i1<0) || (i1>dem.ni)) return continue;
-
-            int const ji1 = dem.ji(j1,i1);
-            if (!mark[ji1]) {
-                spill[ji1] = std::max(dem.elev[ji1], spill[cji];
-                pqueue.push(std::tuple<double,int,int>{-spill[ji1], j1, i1});
-            }
-        }
-    }
-}
 
 // ------------------------------------------------------------
 
