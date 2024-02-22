@@ -495,7 +495,10 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
             int const cj = std::get<1>(cq);
             int const ci = std::get<2>(cq);
         int const cji = dem.ji(cj, ci);
+long s0 = pqueue.size();
         pqueue.pop();
+long s2 = pqueue.size();
+PySys_WriteStdout("pqueue size %ld -> %ld\n");
         set_mark(cji);
 
         // Look at neighboring nodes in 2D space (j1,i1)
@@ -512,7 +515,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
             }
         }
 
-if (nprocessed > 20000000L) break;
+if (nprocessed > 20L) break;
     }
     PySys_WriteStdout("END compute_spill()\n");
 }
