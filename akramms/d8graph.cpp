@@ -453,6 +453,8 @@ spill: Output array
 */
 static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
 {
+    PySys_WriteStdout("BEGIN compute_spill()\n");
+
     std::vector<bool> mark(dem.nj * dem.ni);    // Initialized to false
 
     // https://en.cppreference.com/w/cpp/container/priority_queue
@@ -501,6 +503,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
             }
         }
     }
+    PySys_WriteStdout("END compute_spill()\n");
 }
 
 // Find all cells with spill equal to cell (bj, bi)
@@ -607,6 +610,7 @@ static inline void equal_spill(
 
 static inline void to_neighbor1(DEMNeigh const &dem, npy_int * const sinks, npy_int * const neighbor1)
 {
+    PySys_WriteStdout("BEGIN to_neighbor1()\n");
 
     int const nji = dem.nj * dem.ni;
 
@@ -626,6 +630,7 @@ static inline void to_neighbor1(DEMNeigh const &dem, npy_int * const sinks, npy_
     for (int ji=0; ji<nji; ++ji) neighbor_within[ji] = -2;
 
     // Iterate through the gridcells collecting equivalence classes
+    PySys_WriteStdout("BEGIN equal_spills\n");
     for (int bj=0; bj<dem.nj; ++bj) {
     for (int bi=0; bi<dem.ni; ++bi) {
         int const bji = dem.ji(bj, bi);
@@ -635,9 +640,11 @@ static inline void to_neighbor1(DEMNeigh const &dem, npy_int * const sinks, npy_
         equal_spill(dem, spill, mark, forward, neighbor_eqclass, neighbor_within, bj, bi);
 
     }}
+    PySys_WriteStdout("END equal_spills\n");
 
     // Iterate through one last time and set the neighbor1 element
     // for the LAST of each eqclass
+    PySys_WriteStdout("BEGIN neighbor1\n");
     for (int ji=0; ji<nji; ++ji) {
         if (neighbor1[ji] == -2) {
             int const fji = forward[ji];   // ==-1 if singleton
@@ -652,6 +659,8 @@ static inline void to_neighbor1(DEMNeigh const &dem, npy_int * const sinks, npy_
             }
         }
     }
+    PySys_WriteStdout("END neighbor1\n");
+    PySys_WriteStdout("END to_neighbor1()\n");
 }
 
 // -------------------------------------------------------------
