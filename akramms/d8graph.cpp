@@ -387,14 +387,14 @@ public:
 //    std::vector<dem_t> spill;    // Temporary variable
 //    std::vector<int> eqclass;
 
-    inline int ji(int const j, int const i)
+    inline int ji(int const j, int const i) const
         { return j*ni + i; }
 
     /** Determines whether a gridcell is an edge cell, i.e. borders on
     an unused cell or grid edge.  This function is called a the
     beginning to build a lookup table, which is then modified as eq
     classes are merged. */
-    bool is_edge(int j0, int i0)
+    bool is_edge(int j0, int i0) const
     {
         // Look at neighboring nodes in 2D space
         for (auto &dn : dneigh8) {
@@ -412,7 +412,7 @@ public:
 
 public:
     DEMNeigh(dem_t *_dem, int _nj, int _ni, double _nodata, dneigh_t const &_dneigh)
-        : t0(std::time(nullptr)), dem(_dem), nj(_nj), ni(_ni), nodata(_nodata), dneigh(_dneigh),
+        : dem(_dem), nj(_nj), ni(_ni), nodata(_nodata), dneigh(_dneigh)
 //        spill(nj*ni), eqclass(nj*ni)
     {}
 
@@ -451,7 +451,7 @@ spill: Output array
 
 
 */
-statidc inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
+static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
 {
     std::vector<bool> mark(dem.nj * dem.ni);    // Initialized to false
 
@@ -468,9 +468,9 @@ statidc inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill
     for (int bj=0; bj<dem.nj; ++bj) {
     for (int bi=0; bi<dem.ni; ++bi) {
         int const bji = dem.ji(bj, bi);
-        if (dem.dem[ji1] == nodata) continue;
+        if (dem.dem[bji] == dem.nodata) continue;
 
-        if dem.is_edge(bj, bi) {
+        if (dem.is_edge(bj, bi)) {
             int const bji = dem.ji(bj, bi);
             spill[bji] = dem.dem[bji];
             pqueue.push(std::tuple<double,int,int>{-spill[bji], bj, bi});
@@ -480,9 +480,9 @@ statidc inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill
 
     while (!pqueue.empty()) {
         std::tuple<double,int,int> const cq = pqueue.top();
-            double const cspill = -cq.get<0>();
-            int const cj = cq.get<1>();
-            int const ci = cq.get<2>();
+            // double const cspill = -std::get<0>(cq);   // (not used)
+            int const cj = std::get<1>(cq);
+            int const ci = std::get<2>(cq);
         int const cji = dem.ji(cj, ci);
         pqueue.pop();
         mark[cji] = true;
@@ -493,10 +493,10 @@ statidc inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill
             int const i1 = ci + dng[1];
             if ((j1<0) || (j1>=dem.nj) || (i1<0) || (i1>dem.ni)) continue;
             int const ji1 = dem.ji(j1,i1);
-            if (dem.dem[ji1] == nodata) continue;
+            if (dem.dem[ji1] == dem.nodata) continue;
 
             if (!mark[ji1]) {
-                spill[ji1] = std::max(dem.dem[ji1], spill[cji];
+                spill[ji1] = std::max(dem.dem[ji1], spill[cji]);
                 pqueue.push(std::tuple<double,int,int>{-spill[ji1], j1, i1});
             }
         }
@@ -515,14 +515,13 @@ static inline void equal_spill(
     int bj, int bi)
 {
 
-    std::vector<int> eqlass;    // ji 1D index of items in the eq class
+    std::vector<int> eqclass;    // ji 1D index of items in the eq class
 
     // We are looking for adjacent cells with this value of spill
     int const bji = dem.ji(bj, bi);
-    spillval = spill[bji];
+    dem_t spillval = spill[bji];
 
-    // Index of lowest neighbor node
-      std::array<int,2> lowest_neighbor;
+    // (1D) Index of lowest neighbor node
     int lowest_neighbor;
     dem_t lowest_neighbor_spill = spillval;
 
@@ -532,7 +531,7 @@ static inline void equal_spill(
 
 
     while (!todo.empty()) {
-        std::array<int,2> const &cq(todo.front);
+        std::array<int,2> const &cq(todo.front());
             int const cj = cq[0];
             int const ci = cq[1];
             int const cji = dem.ji(cj, ci);
@@ -547,7 +546,7 @@ static inline void equal_spill(
             int const i1 = ci + dn[1];
             if ((j1<0) || (j1>=dem.nj) || (i1<0) || (i1>dem.ni)) continue;
             int const ji1 = dem.ji(j1,i1);
-            if (dem.dem[ji1] == nodata) continue;
+            if (dem.dem[ji1] == dem.nodata) continue;
             if (mark[ji1]) continue;
 
             double const &neighbor_spill = spill[ji1];
@@ -557,7 +556,6 @@ static inline void equal_spill(
             } else if (neighbor_spill < lowest_neighbor_spill) {
                 // It's a real neighbor: determine if it's the LOWEST neighbor
                 lowest_neighbor_spill = neighbor_spill;
-                  lowest_neighbor = std::array<int,2>{j1,i1};
                 lowest_neighbor = ji1;
             }
 
@@ -585,11 +583,11 @@ static inline void equal_spill(
     int const ji_eq = eqclass[0];    // Label of our equivalence class
     if (eqclass.size() == 1) {
         forward[ji_eq] = -1;
-        neighbor_eqclass[ji] = lowest_neighbor;
-        neighbor_within[ji] = -2;
+        neighbor_eqclass[ji_eq] = lowest_neighbor;
+        neighbor_within[ji_eq] = -2;
     } else {
         // Use the computed equivalence class to set forward, neighbor_eqclass and neighbor_within
-        std::sort(eqclass, eqclass.begin(), eqclass.end());    // Sort by index
+        std::sort(eqclass.begin(), eqclass.end());    // Sort by index
 
         // Set forward and neighbor_within
         int ji0 = ji_eq;
@@ -598,7 +596,7 @@ static inline void equal_spill(
         for (size_t k=1; k<eqclass.size(); ++k) {
             int ji1 = eqclass[k];
             forward[ji1] = ji_eq;
-            neighbor_within[ji0] = j1;    // Setting neighbor_within for previous element
+            neighbor_within[ji0] = ji1;    // Setting neighbor_within for previous element
             ji0 = ji1;
         }
         neighbor_within[ji0] = -2;    // Last element in eqclass
@@ -613,8 +611,8 @@ static inline void to_neighbor1(DEMNeigh const &dem, npy_int * const sinks, npy_
     int const nji = dem.nj * dem.ni;
 
     // Compute spill
-    std::vector<dem_t> spill(nji, dem.nodata)
-    compute_spill(spill);
+    std::vector<dem_t> spill(nji, dem.nodata);
+    compute_spill(dem, spill);
 
     // Initialize additional arrays
     std::vector<bool> mark(nji, false);    // Initialized to false
@@ -634,7 +632,7 @@ static inline void to_neighbor1(DEMNeigh const &dem, npy_int * const sinks, npy_
         if (dem.dem[bji] == dem.nodata) continue;
         if (mark[bji]) continue;    // Already saw it in another eq class
 
-        equal_spill(spill, mark, forward, neighbor_eqclass, neighbor_within, bj, bi);
+        equal_spill(dem, spill, mark, forward, neighbor_eqclass, neighbor_within, bj, bi);
 
     }}
 
