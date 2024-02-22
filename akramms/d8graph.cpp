@@ -467,7 +467,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
     std::priority_queue<std::tuple<double,int,int>> pqueue;    
 
     int nprocessed = 0;
-    void incr_nprocessed() {
+    auto incr_processed = []() {
         ++nprocessed;
         if ((nprocessed % 10000) == 0) {
             PySys_WriteStdout("    nprocessed = %d\n", nprocessed);
