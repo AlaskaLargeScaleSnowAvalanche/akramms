@@ -466,6 +466,14 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
     // We will make it a min queue without any extra code by storing -spill
     std::priority_queue<std::tuple<double,int,int>> pqueue;    
 
+    int nprocessed = 0;
+    void incr_nprocessed() {
+        ++nprocessed;
+        if ((nprocessed % 10000) == 0) {
+            PySys_WriteStdout("    nprocessed = %d\n", nprocessed);
+        }
+    }
+
     // For b ← [cells on data boundary or channel cells]
     for (int bj=0; bj<dem.nj; ++bj) {
     for (int bi=0; bi<dem.ni; ++bi) {
@@ -477,6 +485,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
             spill[bji] = dem.dem[bji];
             pqueue.push(std::tuple<double,int,int>{-spill[bji], bj, bi});
             mark[bji] = true;
+            incr_nprocessed();
         }
     }}
 
@@ -488,6 +497,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
         int const cji = dem.ji(cj, ci);
         pqueue.pop();
         mark[cji] = true;
+        incr_nprocessed();
 
         // Look at neighboring nodes in 2D space (j1,i1)
         for (auto &dng : dem.dneigh) {
