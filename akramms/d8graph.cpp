@@ -472,7 +472,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
         if ((nprocessed % 10000) == 0) {
             PySys_WriteStdout("    nprocessed = %d\n", nprocessed);
         }
-    }
+    };
 
     // For b ← [cells on data boundary or channel cells]
     for (int bj=0; bj<dem.nj; ++bj) {
