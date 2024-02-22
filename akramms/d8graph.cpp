@@ -466,12 +466,12 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
     // We will make it a min queue without any extra code by storing -spill
     std::priority_queue<std::tuple<double,int,int>> pqueue;    
 
-    int nprocessed = 0;
-    auto set_mark = [&mark, &nprocessed](int ji) {
+    long nprocessed = 0;
+    auto set_mark = [&mark, &nprocessed,&pqueue](int ji) {
         mark[ji] = true;
         ++nprocessed;
-        if ((nprocessed % 10000) == 0) {
-            PySys_WriteStdout("    nprocessed = %d\n", nprocessed);
+        if ((nprocessed % 100000) == 0) {
+            PySys_WriteStdout("    nprocessed = %ld (q=%ld)\n", nprocessed, pqueue.size());
         }
     };
 
@@ -511,6 +511,8 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
                 pqueue.push(std::tuple<double,int,int>{-spill[ji1], j1, i1});
             }
         }
+
+if (nprocessed > 20000000L) break;
     }
     PySys_WriteStdout("END compute_spill()\n");
 }
