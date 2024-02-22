@@ -120,7 +120,7 @@ def parse_xy_coord(gridI, fin):
     return ivec, jvec
 
 
-def nc_xy_coord(ncout, gridI, coord_attrs, ivec, jvec)
+def nc_xy_coord(ncout, gridI, coord_attrs, ivec, jvec):
     """
     izip, arcname:
         File .xy-coord file to read (from inside a zip)
