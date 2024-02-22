@@ -529,6 +529,7 @@ static inline void equal_spill(
     npy_int *neighbor_within,
     int bj, int bi)
 {
+PySys_WriteStdout("BEGIN equal_spill(%d, %d)\n");
 
     std::vector<int> eqclass;    // ji 1D index of items in the eq class
 
@@ -544,12 +545,14 @@ static inline void equal_spill(
     std::queue<std::array<int,2>> todo;
     todo.push(std::array<int,2>{bj, bi});
 
+PySys_WriteStdout("AA1\n");
 
     while (!todo.empty()) {
         std::array<int,2> const &cq(todo.front());
             int const cj = cq[0];
             int const ci = cq[1];
             int const cji = dem.ji(cj, ci);
+        todo.pop();
 
         // Add it to our eq class and mark as seen
         eqclass.push_back(cji);
@@ -577,6 +580,7 @@ static inline void equal_spill(
         }
     }
 
+PySys_WriteStdout("AA2\n");
 
     // forward:
     //    Points to the lowest gridcell in THIS eqclass
@@ -616,6 +620,7 @@ static inline void equal_spill(
         }
         neighbor_within[ji0] = -2;    // Last element in eqclass
     }
+PySys_WriteStdout("END equal_spill(%d, %d)\n");
 
 }
 
