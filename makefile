@@ -1,6 +1,5 @@
-demo_d8graph:
-	python setup.py build
-	python demo_d8graph.py 
+setup:
+	python setup.py install --prefix inst
 
 
 # This assumes you have done `rclone config` and created a setup
