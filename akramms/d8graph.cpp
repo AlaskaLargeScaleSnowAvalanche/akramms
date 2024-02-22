@@ -471,7 +471,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
     auto set_mark = [&mark, &nprocessed,&pqueue](int ji) {
         mark[ji] = true;
         ++nprocessed;
-        if ((nprocessed % 1000000) == 0) {
+        if ((nprocessed % 100000) == 0) {
             PySys_WriteStdout("    nprocessed = %ld (q=%ld)\n", nprocessed, pqueue.size());
         }
     };
@@ -543,8 +543,14 @@ static inline void equal_spill(
     // Initialize our queue of cells we haven't yet looked at.
     std::queue<std::array<int,2>> todo;
     todo.push(std::array<int,2>{bj, bi});
+    mark[bji] = true;
 
     while (!todo.empty()) {
+if (todo.size() > 100000L) {
+    PySys_WriteStdout("Exiting, too big\n");
+    return;
+}
+
         std::array<int,2> const &cq(todo.front());
             int const cj = cq[0];
             int const ci = cq[1];
@@ -553,7 +559,6 @@ static inline void equal_spill(
 
         // Add it to our eq class and mark as seen
         eqclass.push_back(cji);
-        mark[cji] = true;
 
         // Identify neighboring nodes to look at
         for (auto &dn : dem.dneigh) {
@@ -568,6 +573,7 @@ static inline void equal_spill(
             if (neighbor_spill == spillval) {
                 // It's one of us: look at it later
                 todo.push(std::array<int,2>{j1,i1});
+                mark[ji1] = true;
             } else if (neighbor_spill < lowest_neighbor_spill) {
                 // It's a real neighbor: determine if it's the LOWEST neighbor
                 lowest_neighbor_spill = neighbor_spill;
@@ -652,6 +658,7 @@ PySys_WriteStdout("  bj = %d\n", bj);
 
     }}
     PySys_WriteStdout("END equal_spills\n");
+return;
 
     // Iterate through one last time and set the neighbor1 element
     // for the LAST of each eqclass
