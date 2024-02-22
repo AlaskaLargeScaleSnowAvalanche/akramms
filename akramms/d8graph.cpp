@@ -471,7 +471,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
     auto set_mark = [&mark, &nprocessed,&pqueue](int ji) {
         mark[ji] = true;
         ++nprocessed;
-        if ((nprocessed % 100000) == 0) {
+        if ((nprocessed % 1000000) == 0) {
             PySys_WriteStdout("    nprocessed = %ld (q=%ld)\n", nprocessed, pqueue.size());
         }
     };
@@ -644,6 +644,7 @@ static inline void to_neighbor1(DEMNeigh const &dem, npy_int * const sinks, npy_
     // Iterate through the gridcells collecting equivalence classes
     PySys_WriteStdout("BEGIN equal_spills\n");
     for (int bj=0; bj<dem.nj; ++bj) {
+PySys_WriteStdout("  bj = %ld\n", bj);
     for (int bi=0; bi<dem.ni; ++bi) {
         int const bji = dem.ji(bj, bi);
         if (dem.dem[bji] == dem.nodata) continue;
