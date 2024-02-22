@@ -513,7 +513,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
             }
         }
 
-if (nprocessed > 20L) break;
+//if (nprocessed > 20L) break;
     }
     PySys_WriteStdout("END compute_spill()\n");
 }
