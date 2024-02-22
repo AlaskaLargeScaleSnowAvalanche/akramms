@@ -522,7 +522,7 @@ static inline void equal_spill(
     dem_t spillval = spill[bji];
 
     // (1D) Index of lowest neighbor node
-    int lowest_neighbor;
+    int lowest_neighbor = -1;   // Will be set below.
     dem_t lowest_neighbor_spill = spillval;
 
     // Initialize our queue of cells we haven't yet looked at.
