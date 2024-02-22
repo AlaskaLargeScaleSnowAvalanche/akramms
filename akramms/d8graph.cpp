@@ -455,6 +455,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
 {
     PySys_WriteStdout("BEGIN compute_spill()\n");
 
+    // True if this cell has been added to the priority queue.
     std::vector<bool> mark(dem.nj * dem.ni);    // Initialized to false
 
     // https://en.cppreference.com/w/cpp/container/priority_queue
@@ -495,11 +496,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
             int const cj = std::get<1>(cq);
             int const ci = std::get<2>(cq);
         int const cji = dem.ji(cj, ci);
-long s0 = pqueue.size();
         pqueue.pop();
-long s2 = pqueue.size();
-PySys_WriteStdout("pqueue size %ld -> %ld\n", s0, s2);
-        set_mark(cji);
 
         // Look at neighboring nodes in 2D space (j1,i1)
         for (auto &dng : dem.dneigh) {
@@ -512,6 +509,7 @@ PySys_WriteStdout("pqueue size %ld -> %ld\n", s0, s2);
             if (!mark[ji1]) {
                 spill[ji1] = std::max(dem.dem[ji1], spill[cji]);
                 pqueue.push(std::tuple<double,int,int>{-spill[ji1], j1, i1});
+                set_mark(ji1);
             }
         }
 
