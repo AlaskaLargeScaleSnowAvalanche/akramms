@@ -664,7 +664,7 @@ static inline void to_neighbor1(DEMNeigh const &dem, npy_int * const sinks, npy_
     // for the LAST of each eqclass
     PySys_WriteStdout("BEGIN neighbor1\n");
     for (int ji=0; ji<nji; ++ji) {
-        if (ji % 1000000 == 0) PySys_WriteStdout("ji=%ld\n", ji);
+        if (ji % 1000000 == 0) PySys_WriteStdout("ji=%d\n", ji);
         if (neighbor1[ji] == -2) {
             int const fji = forward[ji];   // ==-1 if singleton
             if (fji == -1) {
