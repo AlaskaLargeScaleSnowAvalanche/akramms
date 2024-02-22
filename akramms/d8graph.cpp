@@ -644,7 +644,7 @@ static inline void to_neighbor1(DEMNeigh const &dem, npy_int * const sinks, npy_
     // Iterate through the gridcells collecting equivalence classes
     PySys_WriteStdout("BEGIN equal_spills\n");
     for (int bj=0; bj<dem.nj; ++bj) {
-PySys_WriteStdout("  bj = %ld\n", bj);
+PySys_WriteStdout("  bj = %d\n", bj);
     for (int bi=0; bi<dem.ni; ++bi) {
         int const bji = dem.ji(bj, bi);
         if (dem.dem[bji] == dem.nodata) continue;
@@ -671,6 +671,7 @@ PySys_WriteStdout("  bj = %ld\n", bj);
                 neighbor1[ji] = forward[neighbor_eqclass[fji]];
             }
         }
+if (ji >= 100) break;
     }
     PySys_WriteStdout("END neighbor1\n");
     PySys_WriteStdout("END to_neighbor1()\n");
