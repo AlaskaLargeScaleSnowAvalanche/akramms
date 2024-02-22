@@ -498,7 +498,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
 long s0 = pqueue.size();
         pqueue.pop();
 long s2 = pqueue.size();
-PySys_WriteStdout("pqueue size %ld -> %ld\n");
+PySys_WriteStdout("pqueue size %ld -> %ld\n", s0, s2);
         set_mark(cji);
 
         // Look at neighboring nodes in 2D space (j1,i1)
