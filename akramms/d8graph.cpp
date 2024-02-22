@@ -467,7 +467,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
     std::priority_queue<std::tuple<double,int,int>> pqueue;    
 
     int nprocessed = 0;
-    auto set_mark = [&mark, &nprocessed](ji) {
+    auto set_mark = [&mark, &nprocessed](int ji) {
         mark[ji] = true;
         ++nprocessed;
         if ((nprocessed % 10000) == 0) {
