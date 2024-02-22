@@ -648,17 +648,17 @@ static inline void to_neighbor1(DEMNeigh const &dem, npy_int * const sinks, npy_
     // Iterate through the gridcells collecting equivalence classes
     PySys_WriteStdout("BEGIN equal_spills\n");
     for (int bj=0; bj<dem.nj; ++bj) {
-PySys_WriteStdout("  bj = %d\n", bj);
-    for (int bi=0; bi<dem.ni; ++bi) {
-        int const bji = dem.ji(bj, bi);
-        if (dem.dem[bji] == dem.nodata) continue;
-        if (mark[bji]) continue;    // Already saw it in another eq class
+        if (bj % 1000 == 0) PySys_WriteStdout("  bj = %d\n", bj);
+        for (int bi=0; bi<dem.ni; ++bi) {
+            int const bji = dem.ji(bj, bi);
+            if (dem.dem[bji] == dem.nodata) continue;
+            if (mark[bji]) continue;    // Already saw it in another eq class
 
-        equal_spill(dem, spill, mark, forward, neighbor_eqclass, neighbor_within, bj, bi);
+            equal_spill(dem, spill, mark, forward, neighbor_eqclass, neighbor_within, bj, bi);
 
-    }}
+        }
+    }
     PySys_WriteStdout("END equal_spills\n");
-return;
 
     // Iterate through one last time and set the neighbor1 element
     // for the LAST of each eqclass
