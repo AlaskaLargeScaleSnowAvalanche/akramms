@@ -467,7 +467,8 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
     std::priority_queue<std::tuple<double,int,int>> pqueue;    
 
     int nprocessed = 0;
-    auto incr_processed = [&nprocessed]() {
+    auto set_mark = [&mark, &nprocessed](ji) {
+        mark[ji] = true;
         ++nprocessed;
         if ((nprocessed % 10000) == 0) {
             PySys_WriteStdout("    nprocessed = %d\n", nprocessed);
@@ -484,8 +485,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
             int const bji = dem.ji(bj, bi);
             spill[bji] = dem.dem[bji];
             pqueue.push(std::tuple<double,int,int>{-spill[bji], bj, bi});
-            mark[bji] = true;
-            incr_nprocessed();
+            set_mark(bji);
         }
     }}
 
@@ -496,8 +496,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
             int const ci = std::get<2>(cq);
         int const cji = dem.ji(cj, ci);
         pqueue.pop();
-        mark[cji] = true;
-        incr_nprocessed();
+        set_mark(cji);
 
         // Look at neighboring nodes in 2D space (j1,i1)
         for (auto &dng : dem.dneigh) {
