@@ -529,7 +529,7 @@ static inline void equal_spill(
     npy_int *neighbor_within,
     int bj, int bi)
 {
-PySys_WriteStdout("BEGIN equal_spill(%d, %d)\n");
+PySys_WriteStdout("BEGIN equal_spill(%d, %d)\n", bj, bi);
 
     std::vector<int> eqclass;    // ji 1D index of items in the eq class
 
@@ -620,7 +620,7 @@ PySys_WriteStdout("AA2\n");
         }
         neighbor_within[ji0] = -2;    // Last element in eqclass
     }
-PySys_WriteStdout("END equal_spill(%d, %d)\n");
+PySys_WriteStdout("END equal_spill(%d, %d)\n", bj, bi);
 
 }
 
