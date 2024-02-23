@@ -542,6 +542,9 @@ static inline void equal_spill(
     // from gridcells that were changed going from dem -> spill
     if (dem.dem[bji] == spill[bji]) return;
 
+    // Don't reprocess cells we've already makred as being part of an eq class.
+    if (mark[bji]) return;
+
     std::vector<int> eqclass;    // ji 1D index of items in the eq class
 
     // We are looking for adjacent cells with this value of spill
@@ -554,7 +557,7 @@ static inline void equal_spill(
     // Initialize our queue of cells we haven't yet looked at.
     std::queue<std::array<int,2>> todo;
     todo.push(std::array<int,2>{bj, bi});
-    mark[bji] = true;  marked.push_back(bji);
+    mark[bji] = true;//  marked.push_back(bji);
 
     while (!todo.empty()) {
 
@@ -580,7 +583,7 @@ static inline void equal_spill(
             if (neighbor_spill == spillval) {
                 // It's one of us: look at it later
                 todo.push(std::array<int,2>{j1,i1});
-                mark[ji1] = true;  marked.push_back(ji1);
+                mark[ji1] = true;  //marked.push_back(ji1);
             } else if (neighbor_spill < lowest_neighbor_spill) {
                 // It's a real neighbor: determine if it's the LOWEST neighbor
                 lowest_neighbor_spill = neighbor_spill;
@@ -590,9 +593,9 @@ static inline void equal_spill(
         }
     }
 
-    // Undo the marks we just made
-    for (auto ji: marked) mark[ji] = false;
-    marked.clear();
+//    // Undo the marks we just made
+//    for (auto ji: marked) mark[ji] = false;
+//    marked.clear();
 
     // forward:
     //    Points to the lowest gridcell in THIS eqclass
