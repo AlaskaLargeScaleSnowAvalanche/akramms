@@ -528,13 +528,14 @@ static inline void equal_spill(
 //    std::vector<dem_t> const &spill,
     dem_t * const spill,
     std::vector<bool> &mark,
+    std::vector<int> &marked,
     std::vector<int> &forward,
     std::vector<int> &neighbor_eqclass,
     // std::vector<int> &neighbor_within,
     npy_int *neighbor_within,    // Initialized to -2
     int bj, int bi)
 {
-    std::vector<int> marked;    // Remember nodes we marked
+//    std::vector<int> marked;    // Remember nodes we marked
     int const bji = dem.ji(bj, bi);
 
     // Only initiate flood search for equivalence classes starting
@@ -591,6 +592,7 @@ static inline void equal_spill(
 
     // Undo the marks we just made
     for (auto ji: marked) mark[ji] = false;
+    marked.clear();
 
     // forward:
     //    Points to the lowest gridcell in THIS eqclass
@@ -656,6 +658,7 @@ static inline void to_neighbor1(DEMNeigh const &dem, dem_t * const spill, npy_in
     for (int ji=0; ji<nji; ++ji) neighbor_within[ji] = -2;
 
     // Iterate through the gridcells collecting equivalence classes
+    std::vector<int> marked;
     PySys_WriteStdout("BEGIN equal_spills\n");
     for (int bj=0; bj<dem.nj; ++bj) {
         if (bj % 1000 == 0) PySys_WriteStdout("  bj = %d\n", bj);
@@ -664,7 +667,7 @@ static inline void to_neighbor1(DEMNeigh const &dem, dem_t * const spill, npy_in
             if (dem.dem[bji] == dem.nodata) continue;
             if (mark[bji]) continue;    // Already saw it in another eq class
 
-            equal_spill(dem, spill, mark, forward, neighbor_eqclass, neighbor_within, bj, bi);
+            equal_spill(dem, spill, mark, marked, forward, neighbor_eqclass, neighbor_within, bj, bi);
 
         }
     }
