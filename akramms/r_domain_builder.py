@@ -66,7 +66,7 @@ def neighbor1_rule(dem_file, odir, fill_sinks=True):
         # dem has now been filled in.  Re-read the original DEM to mask-in ocean areas.
         _, dem, _ = gdalutil.read_raster(dem_file)
         dem_filled[dem==0.0] = 0.0
-        gdalutil.write_raster(dem_filled_file, grid_info, dem, nodata, type=gdal.GDT_Float64)
+        gdalutil.write_raster(dem_filled_file, grid_info, dem_filled, nodata, type=gdal.GDT_Float64)
 
     return make.Rule(action, [dem_file], [dem_filled_file, sinks_file, neighbor1_file])
 # --------------------------------------------------------------------
