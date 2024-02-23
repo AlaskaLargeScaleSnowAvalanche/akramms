@@ -677,8 +677,7 @@ static inline void to_neighbor1(DEMNeigh const &dem, dem_t * const spill, npy_in
             // Unused (non-land) gridcell
             sinks[ji] = -1;
             neighbor1[ji] = -1;
-        }
-        if (neighbor1[ji] == -2) {
+        } else if (neighbor1[ji] == -2) {
             int const fji = forward[ji];   // ==-1 if singleton
             if (fji == -1) {
                 // It's a singleton
