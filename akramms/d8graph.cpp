@@ -675,7 +675,7 @@ static inline void to_neighbor1(DEMNeigh const &dem, dem_t * const spill, npy_in
             sinks[ji] = -1;
             neighbor1[ji] = -1;
         } else if (neighbor_within[ji] == -2) {
-            if ((forward[ji] == ji) && (neighbor_within[ji] == -2)) { 
+            if ((forward[ji] == ji) { 
                 // It's a singleton; equal_spill() overlooked it
                 sinks[ji] = -1;
                 neighbor1[ji] = forward[neighbor_eqclass[ji]];
