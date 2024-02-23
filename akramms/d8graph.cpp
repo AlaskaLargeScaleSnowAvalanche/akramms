@@ -534,11 +534,15 @@ static inline void equal_spill(
     npy_int *neighbor_within,
     int bj, int bi)
 {
+    int const bji = dem.ji(bj, bi);
+
+    // Only initiate flood search for equivalence classes starting
+    // from gridcells that were changed going from dem -> spill
+    if (dem.dem[bji] == spill[bji]) return;
 
     std::vector<int> eqclass;    // ji 1D index of items in the eq class
 
     // We are looking for adjacent cells with this value of spill
-    int const bji = dem.ji(bj, bi);
     dem_t spillval = spill[bji];
 
     // (1D) Index of lowest neighbor node
