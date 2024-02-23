@@ -390,6 +390,10 @@ public:
     inline int ji(int const j, int const i) const
         { return j*ni + i; }
 
+    /** Avoid nodata and ocean */
+    inline bool in_grid(int const ji)
+    { return (dem[ji] != nodata) && (dem[ji] != 0.0); }
+
     /** Determines whether a gridcell is an edge cell, i.e. borders on
     an unused cell or grid edge.  This function is called a the
     beginning to build a lookup table, which is then modified as eq
@@ -405,7 +409,7 @@ public:
 
             // It's an edge if neighbor is unused
             int const ji1 = j1*ni + i1;
-            if (dem[ji1] == nodata) return true;
+            if (!in_grid(ji1)) return true;
         }
         return false;
     }
@@ -471,7 +475,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
     auto set_mark = [&mark, &nprocessed,&pqueue](int ji) {
         mark[ji] = true;
         ++nprocessed;
-        if ((nprocessed % 100000) == 0) {
+        if ((nprocessed % 1000000) == 0) {
             PySys_WriteStdout("    nprocessed = %ld (q=%ld)\n", nprocessed, pqueue.size());
         }
     };
@@ -480,7 +484,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
     for (int bj=0; bj<dem.nj; ++bj) {
     for (int bi=0; bi<dem.ni; ++bi) {
         int const bji = dem.ji(bj, bi);
-        if (dem.dem[bji] == dem.nodata) continue;
+        if (!in_grid(bji)) continue;
 
         if (dem.is_edge(bj, bi)) {
             int const bji = dem.ji(bj, bi);
@@ -504,7 +508,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
             int const i1 = ci + dng[1];
             if ((j1<0) || (j1>=dem.nj) || (i1<0) || (i1>dem.ni)) continue;
             int const ji1 = dem.ji(j1,i1);
-            if (dem.dem[ji1] == dem.nodata) continue;
+            if (!in_grid(ji1)) continue;
 
             if (!mark[ji1]) {
                 spill[ji1] = std::max(dem.dem[ji1], spill[cji]);
@@ -566,7 +570,7 @@ if (todo.size() > 100000L) {
             int const i1 = ci + dn[1];
             if ((j1<0) || (j1>=dem.nj) || (i1<0) || (i1>dem.ni)) continue;
             int const ji1 = dem.ji(j1,i1);
-            if (dem.dem[ji1] == dem.nodata) continue;
+            if (!in_grid(ji1)) continue;
             if (mark[ji1]) continue;
 
             double const &neighbor_spill = spill[ji1];
@@ -664,7 +668,7 @@ static inline void to_neighbor1(DEMNeigh const &dem, npy_int * const sinks, npy_
     // for the LAST of each eqclass
     PySys_WriteStdout("BEGIN neighbor1\n");
     for (int ji=0; ji<nji; ++ji) {
-        if (ji % 1000000 == 0) PySys_WriteStdout("ji=%d\n", ji);
+//        if (ji % 1000000 == 0) PySys_WriteStdout("ji=%d\n", ji);
         if (neighbor1[ji] == -2) {
             int const fji = forward[ji];   // ==-1 if singleton
             if (fji == -1) {
