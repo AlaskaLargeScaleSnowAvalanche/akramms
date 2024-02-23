@@ -555,7 +555,7 @@ static inline void equal_spill(
     dem_t lowest_neighbor_spill = spillval;
 
     // Initialize our queue of cells we haven't yet looked at.
-    std::queue<std::array<int,2>> todo;
+    std::queue<std::array<int,2>> todo;    // Cells only in here if they are part of the eq class.
     todo.push(std::array<int,2>{bj, bi});
     mark[bji] = true;//  marked.push_back(bji);
 
@@ -579,7 +579,7 @@ static inline void equal_spill(
             if (!dem.in_grid(ji1)) continue;
             if (mark[ji1]) continue;
 
-            double const &neighbor_spill = spill[ji1];
+            double const neighbor_spill = spill[ji1];
             if (neighbor_spill == spillval) {
                 // It's one of us: look at it later
                 todo.push(std::array<int,2>{j1,i1});
@@ -614,15 +614,16 @@ static inline void equal_spill(
     //          neighbor1[ji] = forward[neighbor_eqclass[forward[ji]]]
 
 
-    int const ji_eq = eqclass[0];    // Label of our equivalence class
     if (eqclass.size() == 1) {
         // This never happens: eq classes are always at least size 2.  Singletons return immediately.
+        int const ji_eq = eqclass[0];    // Label of our equivalence class
         forward[ji_eq] = -1;
         neighbor_eqclass[ji_eq] = lowest_neighbor;
         neighbor_within[ji_eq] = -2;
     } else {
         // Use the computed equivalence class to set forward, neighbor_eqclass and neighbor_within
         std::sort(eqclass.begin(), eqclass.end());    // Sort by index
+        int const ji_eq = eqclass[0];    // Label of our equivalence class
 
         // Set forward and neighbor_within
         int ji0 = ji_eq;
