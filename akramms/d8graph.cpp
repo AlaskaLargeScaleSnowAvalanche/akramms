@@ -455,7 +455,7 @@ spill: Output array
 
 
 */
-static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
+static inline void compute_spill(DEMNeigh const &dem, dem_t * const spill)//std::vector<dem_t> &spill)
 {
     PySys_WriteStdout("BEGIN compute_spill()\n");
 
