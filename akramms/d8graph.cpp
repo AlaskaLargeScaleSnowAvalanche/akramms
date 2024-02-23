@@ -522,20 +522,24 @@ static inline void compute_spill(DEMNeigh const &dem, dem_t * const spill)//std:
     PySys_WriteStdout("END compute_spill()\n");
 }
 
-// Find all cells with spill equal to cell (bj, bi)
-static inline void equal_spill(
-    DEMNeigh const &dem,
-//    std::vector<dem_t> const &spill,
-    dem_t * const spill,
-    std::vector<bool> &mark,
-    std::vector<int> &marked,
-    std::vector<int> &forward,
-    std::vector<int> &neighbor_eqclass,
-    // std::vector<int> &neighbor_within,
-    npy_int *neighbor_within,    // Initialized to -2
-    int bj, int bi)
-{
 
+
+static inline void to_neighbor1(DEMNeigh const &dem, dem_t * const spill, npy_int * const sinks, npy_int * const neighbor1)
+{
+    PySys_WriteStdout("BEGIN to_neighbor1()\n");
+    int const nji = dem.nj * dem.ni;
+
+    // Fill the sinks using the standard algorithm
+    compute_spill(dem, spill);
+
+    // Initialize additional arrays
+    std::vector<bool> mark(nji, false);    // Has this been included in an equiv class?
+    std::vector<bool> singleton(nji, false);    // Is this gridcell part of a singleton equiv class?
+    std::vector<int> forward;    // Initialize to forward-to-self
+        forward.reserve(nji);
+        for (int ji=0; ji<nji; ++ji) forward[ji] = ji;
+
+    // Find equivalence class starting from each gridcell.
     for (int bj=0; bj<dem.nj; ++bj) {
     if (bj % 100 == 0) PySys_WriteStdout("  bj = %d\n", bj);
     for (int bi=0; bi<dem.ni; ++bi) {
@@ -543,202 +547,97 @@ static inline void equal_spill(
         if (!dem.in_grid(bji)) continue;
         if (mark[bji]) continue;    // Already saw it in another eq class
 
+    //    std::vector<int> marked;    // Remember nodes we marked
+        int const bji = dem.ji(bj, bi);
 
-//    std::vector<int> marked;    // Remember nodes we marked
-    int const bji = dem.ji(bj, bi);
+        // Only initiate flood search for equivalence classes starting
+        // from gridcells that were changed going from dem -> spill
+    //    if (dem.dem[bji] == spill[bji]) return;
 
-    // Only initiate flood search for equivalence classes starting
-    // from gridcells that were changed going from dem -> spill
-//    if (dem.dem[bji] == spill[bji]) return;
+        // Don't reprocess cells we've already makred as being part of an eq class.
+        if (mark[bji]) return;
 
-    // Don't reprocess cells we've already makred as being part of an eq class.
-    if (mark[bji]) return;
+        std::vector<int> eqclass;    // ji 1D index of items in the eq class
 
-    std::vector<int> eqclass;    // ji 1D index of items in the eq class
+        // We are looking for adjacent cells with this value of spill
+        dem_t spillval = spill[bji];
 
-    // We are looking for adjacent cells with this value of spill
-    dem_t spillval = spill[bji];
+        // (1D) Index of lowest neighbor node
+        int lowest_neighbor = -1;   // Will be set below.
+        dem_t lowest_neighbor_spill = spillval;
 
-    // (1D) Index of lowest neighbor node
-    int lowest_neighbor = -1;   // Will be set below.
-    dem_t lowest_neighbor_spill = spillval;
+        // Initialize our queue of cells we haven't yet looked at.
+        std::queue<std::array<int,2>> todo;    // Cells only in here if they are part of the eq class.
+        todo.push(std::array<int,2>{bj, bi});
+        mark[bji] = true;//  marked.push_back(bji);
 
-    // Initialize our queue of cells we haven't yet looked at.
-    std::queue<std::array<int,2>> todo;    // Cells only in here if they are part of the eq class.
-    todo.push(std::array<int,2>{bj, bi});
-    mark[bji] = true;//  marked.push_back(bji);
+        while (!todo.empty()) {
 
-    while (!todo.empty()) {
+            std::array<int,2> const &cq(todo.front());
+                int const cj = cq[0];
+                int const ci = cq[1];
+                int const cji = dem.ji(cj, ci);
+            todo.pop();
 
-        std::array<int,2> const &cq(todo.front());
-            int const cj = cq[0];
-            int const ci = cq[1];
-            int const cji = dem.ji(cj, ci);
-        todo.pop();
+            // Add it to our eq class
+            eqclass.push_back(cji);
 
-        // Add it to our eq class
-        eqclass.push_back(cji);
+            // Identify neighboring nodes to look at
+            for (auto &dn : dem.dneigh) {
+                int const j1 = cj + dn[0];
+                int const i1 = ci + dn[1];
+                if ((j1<0) || (j1>=dem.nj) || (i1<0) || (i1>dem.ni)) continue;
+                int const ji1 = dem.ji(j1,i1);
+                if (!dem.in_grid(ji1)) continue;
+                if (mark[ji1]) continue;
 
-        // Identify neighboring nodes to look at
-        for (auto &dn : dem.dneigh) {
-            int const j1 = cj + dn[0];
-            int const i1 = ci + dn[1];
-            if ((j1<0) || (j1>=dem.nj) || (i1<0) || (i1>dem.ni)) continue;
-            int const ji1 = dem.ji(j1,i1);
-            if (!dem.in_grid(ji1)) continue;
-            if (mark[ji1]) continue;
-
-            double const neighbor_spill = spill[ji1];
-            if (neighbor_spill == spillval) {
-                // It's one of us: look at it later
-                todo.push(std::array<int,2>{j1,i1});
-                mark[ji1] = true;  //marked.push_back(ji1);
-            } else if (neighbor_spill < lowest_neighbor_spill) {
-                // It's a real neighbor: determine if it's the LOWEST neighbor
-                lowest_neighbor_spill = neighbor_spill;
-                lowest_neighbor = ji1;
+                double const neighbor_spill = spill[ji1];
+                if (neighbor_spill == spillval) {
+                    // It's one of us: look at it later
+                    todo.push(std::array<int,2>{j1,i1});
+                    mark[ji1] = true;  //marked.push_back(ji1);
+                } else if (neighbor_spill < lowest_neighbor_spill) {
+                    // It's a real neighbor: determine if it's the LOWEST neighbor
+                    lowest_neighbor_spill = neighbor_spill;
+                    lowest_neighbor = ji1;
+                }
             }
         }
-    }
 
 
-    // We have our eqclass, now use it to set forward and neighbor1
-    std::sort(eqclass.begin(), eqclass.end());    // Sort by index
-    int const ji_eq = eqclass[0];    // Label of our equivalence class
-
-    // Set forward and neighbor_within
-    if (eqclass.size() == 1) {
-        singleton[eqclass[0]] = true;
-        neighbor1[ji_eq] = lowest_neighbor;    // Not yet forwarded
-        sinks[ji_eq] = -1;    // Special if cluase needed to set this to nodata (-1)
-    } else {
-        int ji0 = eqclass[0];
-        for (size_t k=1; k<eqclass.size(); ++k) {
-            int const ji1 = eqclass[k];
-
-            neighbor1[ji0] = ji1;
-            forward[ji0] = ji_eq;
-            singleton[ji0] = false;
-
-            ji0 = ji1;    // Increment pointer pair
-        }
-        // Last item in eq class
-        neighbor1[ji0] = lowest_neighbor;
-        forward[ji0] = ji_eq;
-        singleton[ji0] = false;
-    }
-
-
-
-
-
-
-
-
-//    // Undo the marks we just made
-//    for (auto ji: marked) mark[ji] = false;
-//    marked.clear();
-
-    // forward:
-    //    Points to the lowest gridcell in THIS eqclass
-    //    We know we are the lowest if forward[ji]==ji
-    //    If it's a non-consolidated eq class, then forward[ji]==-1
-    // neighbor_eqclass:
-    //    Only valid for the LOWEST gridcell in each eqclass
-    //    Points to the UNFORWARDED next-lowest neighbor.
-    // neighbor_within:
-    //    Valid for all but the LAST gridcell in each eqclass
-    //    Points to the next neighbor in this class.
-    //    neighbor2[LAST] = -2
-    //    We know we are the LAST gridcell in an eqclass if neighbor2[ji] == -2
-    //       In that case, our eqclass index is forward[ji]
-    //       And (once all forwards have been set), we should set:
-    //          neighbor1[ji] = forward[neighbor_eqclass[forward[ji]]]
-
-
-    if (eqclass.size() == 1) {
-        // This never happens: eq classes are always at least size 2.  Singletons return immediately.
-        int const ji_eq = eqclass[0];    // Label of our equivalence class
-        forward[ji_eq] = -1;
-        neighbor_eqclass[ji_eq] = lowest_neighbor;
-        neighbor_within[ji_eq] = -2;
-    } else {
-        // Use the computed equivalence class to set forward, neighbor_eqclass and neighbor_within
+        // We have our eqclass, now use it to set forward and neighbor1
         std::sort(eqclass.begin(), eqclass.end());    // Sort by index
         int const ji_eq = eqclass[0];    // Label of our equivalence class
 
-        // Set forward and neighbor_within
-        int ji0 = ji_eq;
-        neighbor_eqclass[ji0] = lowest_neighbor;
-        forward[ji0] = ji_eq;
-        for (size_t k=1; k<eqclass.size(); ++k) {
-            int ji1 = eqclass[k];
-            forward[ji1] = ji_eq;
-            neighbor_within[ji0] = ji1;    // Setting neighbor_within for previous element
-            ji0 = ji1;
-        }
-        neighbor_within[ji0] = -2;    // Last element in eqclass
-    }
-}
+        // Set singleton, neighbor1 and sinks for our eqclass
+        if (eqclass.size() == 1) {
+            singleton[eqclass[0]] = true;
+            neighbor1[ji_eq] = lowest_neighbor;    // Not yet forwarded
+            sinks[ji_eq] = -1;    // Special if cluase needed to set this to nodata (-1)
+        } else {
+            int ji0 = eqclass[0];
+            for (size_t k=1; k<eqclass.size(); ++k) {
+                int const ji1 = eqclass[k];
 
+                neighbor1[ji0] = ji1;
+                forward[ji0] = ji_eq;
+                singleton[ji0] = false;
 
-static inline void to_neighbor1(DEMNeigh const &dem, dem_t * const spill, npy_int * const sinks, npy_int * const neighbor1)
-{
-    PySys_WriteStdout("BEGIN to_neighbor1()\n");
-
-    int const nji = dem.nj * dem.ni;
-
-    // Fill the sinks using the standard algorithm
-//    std::vector<dem_t> spill(nji, dem.nodata);
-    compute_spill(dem, spill);
-
-    // Initialize additional arrays
-    std::vector<bool> mark(nji, false);    // Initialized to false
-    std::vector<int> forward;    // Initialize to forward-to-self
-        forward.reserve(nji);
-        for (int ji=0; ji<nji; ++ji) forward[ji] = ji;
-    std::vector<int> neighbor_eqclass(nji, -2);
-
-    // neighbor_within can use same memory as neighbor1
-    npy_int * const neighbor_within = neighbor1;
-    for (int ji=0; ji<nji; ++ji) neighbor_within[ji] = -2;
-
-    // Iterate through the gridcells collecting equivalence classes
-    std::vector<int> marked;
-    PySys_WriteStdout("BEGIN equal_spills\n");
-    for (int bj=0; bj<dem.nj; ++bj) {
-        if (bj % 100 == 0) PySys_WriteStdout("  bj = %d\n", bj);
-        for (int bi=0; bi<dem.ni; ++bi) {
-            int const bji = dem.ji(bj, bi);
-            if (dem.dem[bji] == dem.nodata) continue;
-            if (mark[bji]) continue;    // Already saw it in another eq class
-
-            equal_spill(dem, spill, mark, marked, forward, neighbor_eqclass, neighbor_within, bj, bi);
-
-        }
-    }
-    PySys_WriteStdout("END equal_spills\n");
-
-    // Iterate through one last time and set the neighbor1 element
-    // for the LAST of each eqclass
-    PySys_WriteStdout("BEGIN neighbor1\n");
-    for (int ji=0; ji<nji; ++ji) {
-        if (!dem.in_grid(ji)) {
-            // Unused (non-land) gridcell
-            sinks[ji] = -1;
-            neighbor1[ji] = -1;
-        } else if (neighbor_within[ji] == -2) {
-            if (forward[ji] == ji) { 
-                // It's a singleton; equal_spill() overlooked it
-                sinks[ji] = -1;
-                neighbor1[ji] = forward[neighbor_eqclass[ji]];
-            } else {
-                // Part of a larger eq class
-                sinks[ji] = forward[ji];
-                neighbor1[ji] = forward[neighbor_eqclass[forward[ji]]];
+                ji0 = ji1;    // Increment pointer pair
             }
+            // Last item in eq class
+            neighbor1[ji0] = lowest_neighbor;
+            forward[ji0] = ji_eq;
+            singleton[ji0] = false;
         }
+
     }
+
+    // Now that forward is fully set, use it to forward all neighbor1 values
+    for (int ji=0; ji<nji; ++ji) {
+        if (neighbor1[ji] > 0) neighbor1[ji] = forward[neighbor1[ji]];
+    }
+
     PySys_WriteStdout("END neighbor1\n");
     PySys_WriteStdout("END to_neighbor1()\n");
 }
