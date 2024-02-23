@@ -682,7 +682,7 @@ static inline void to_neighbor1(DEMNeigh const &dem, dem_t * const spill, npy_in
             } else {
                 // Part of a larger eq class
                 sinks[ji] = forward[ji];
-                neighbor1[ji] = forward[neighbor_eqclass[fji]];
+                neighbor1[ji] = forward[neighbor_eqclass[forward[ji]];
             }
         }
     }
