@@ -391,7 +391,7 @@ public:
         { return j*ni + i; }
 
     /** Avoid nodata and ocean */
-    inline bool in_grid(int const ji)
+    inline bool in_grid(int const ji) const
     { return (dem[ji] != nodata) && (dem[ji] != 0.0); }
 
     /** Determines whether a gridcell is an edge cell, i.e. borders on
@@ -484,7 +484,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
     for (int bj=0; bj<dem.nj; ++bj) {
     for (int bi=0; bi<dem.ni; ++bi) {
         int const bji = dem.ji(bj, bi);
-        if (!in_grid(bji)) continue;
+        if (!dem.in_grid(bji)) continue;
 
         if (dem.is_edge(bj, bi)) {
             int const bji = dem.ji(bj, bi);
@@ -508,7 +508,7 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
             int const i1 = ci + dng[1];
             if ((j1<0) || (j1>=dem.nj) || (i1<0) || (i1>dem.ni)) continue;
             int const ji1 = dem.ji(j1,i1);
-            if (!in_grid(ji1)) continue;
+            if (!dem.in_grid(ji1)) continue;
 
             if (!mark[ji1]) {
                 spill[ji1] = std::max(dem.dem[ji1], spill[cji]);
@@ -570,7 +570,7 @@ if (todo.size() > 100000L) {
             int const i1 = ci + dn[1];
             if ((j1<0) || (j1>=dem.nj) || (i1<0) || (i1>dem.ni)) continue;
             int const ji1 = dem.ji(j1,i1);
-            if (!in_grid(ji1)) continue;
+            if (!dem.in_grid(ji1)) continue;
             if (mark[ji1]) continue;
 
             double const &neighbor_spill = spill[ji1];
