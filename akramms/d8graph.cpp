@@ -535,12 +535,21 @@ static inline void equal_spill(
     npy_int *neighbor_within,    // Initialized to -2
     int bj, int bi)
 {
+
+    for (int bj=0; bj<dem.nj; ++bj) {
+    if (bj % 100 == 0) PySys_WriteStdout("  bj = %d\n", bj);
+    for (int bi=0; bi<dem.ni; ++bi) {
+        int const bji = dem.ji(bj, bi);
+        if (!dem.in_grid(bji)) continue;
+        if (mark[bji]) continue;    // Already saw it in another eq class
+
+
 //    std::vector<int> marked;    // Remember nodes we marked
     int const bji = dem.ji(bj, bi);
 
     // Only initiate flood search for equivalence classes starting
     // from gridcells that were changed going from dem -> spill
-    if (dem.dem[bji] == spill[bji]) return;
+//    if (dem.dem[bji] == spill[bji]) return;
 
     // Don't reprocess cells we've already makred as being part of an eq class.
     if (mark[bji]) return;
@@ -567,7 +576,7 @@ static inline void equal_spill(
             int const cji = dem.ji(cj, ci);
         todo.pop();
 
-        // Add it to our eq class and mark as seen
+        // Add it to our eq class
         eqclass.push_back(cji);
 
         // Identify neighboring nodes to look at
@@ -589,9 +598,42 @@ static inline void equal_spill(
                 lowest_neighbor_spill = neighbor_spill;
                 lowest_neighbor = ji1;
             }
-
         }
     }
+
+
+    // We have our eqclass, now use it to set forward and neighbor1
+    std::sort(eqclass.begin(), eqclass.end());    // Sort by index
+    int const ji_eq = eqclass[0];    // Label of our equivalence class
+
+    // Set forward and neighbor_within
+    if (eqclass.size() == 1) {
+        singleton[eqclass[0]] = true;
+        neighbor1[ji_eq] = lowest_neighbor;    // Not yet forwarded
+        sinks[ji_eq] = -1;    // Special if cluase needed to set this to nodata (-1)
+    } else {
+        int ji0 = eqclass[0];
+        for (size_t k=1; k<eqclass.size(); ++k) {
+            int const ji1 = eqclass[k];
+
+            neighbor1[ji0] = ji1;
+            forward[ji0] = ji_eq;
+            singleton[ji0] = false;
+
+            ji0 = ji1;    // Increment pointer pair
+        }
+        // Last item in eq class
+        neighbor1[ji0] = lowest_neighbor;
+        forward[ji0] = ji_eq;
+        singleton[ji0] = false;
+    }
+
+
+
+
+
+
+
 
 //    // Undo the marks we just made
 //    for (auto ji: marked) mark[ji] = false;
@@ -603,7 +645,7 @@ static inline void equal_spill(
     //    If it's a non-consolidated eq class, then forward[ji]==-1
     // neighbor_eqclass:
     //    Only valid for the LOWEST gridcell in each eqclass
-    //    Points tothe UNFORWARDED next-lowest neighbor.
+    //    Points to the UNFORWARDED next-lowest neighbor.
     // neighbor_within:
     //    Valid for all but the LAST gridcell in each eqclass
     //    Points to the next neighbor in this class.
