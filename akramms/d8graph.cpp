@@ -579,7 +579,7 @@ static inline void equal_spill(
             if (neighbor_spill == spillval) {
                 // It's one of us: look at it later
                 todo.push(std::array<int,2>{j1,i1});
-                mark[ji1] = true;  makred.push_back(ji1);
+                mark[ji1] = true;  marked.push_back(ji1);
             } else if (neighbor_spill < lowest_neighbor_spill) {
                 // It's a real neighbor: determine if it's the LOWEST neighbor
                 lowest_neighbor_spill = neighbor_spill;
