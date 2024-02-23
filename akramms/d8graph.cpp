@@ -671,7 +671,7 @@ static inline void to_neighbor1(DEMNeigh const &dem, dem_t * const spill, npy_in
         if (!dem.in_grid(ji)) {
             // Unused (non-land) gridcell
             sinks[ji] = -1;
-            neighbor1[ji] = -1
+            neighbor1[ji] = -1;
         }
         if (neighbor1[ji] == -2) {
             int const fji = forward[ji];   // ==-1 if singleton
