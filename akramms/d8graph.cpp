@@ -661,7 +661,7 @@ static inline void to_neighbor1(DEMNeigh const &dem, dem_t * const spill, npy_in
     std::vector<int> marked;
     PySys_WriteStdout("BEGIN equal_spills\n");
     for (int bj=0; bj<dem.nj; ++bj) {
-        if (bj % 1000 == 0) PySys_WriteStdout("  bj = %d\n", bj);
+        if (bj % 100 == 0) PySys_WriteStdout("  bj = %d\n", bj);
         for (int bi=0; bi<dem.ni; ++bi) {
             int const bji = dem.ji(bj, bi);
             if (dem.dem[bji] == dem.nodata) continue;
