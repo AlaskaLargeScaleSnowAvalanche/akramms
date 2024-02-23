@@ -531,7 +531,7 @@ static inline void equal_spill(
     std::vector<int> &forward,
     std::vector<int> &neighbor_eqclass,
     // std::vector<int> &neighbor_within,
-    npy_int *neighbor_within,
+    npy_int *neighbor_within,    // Initialized to -2
     int bj, int bi)
 {
     int const bji = dem.ji(bj, bi);
@@ -555,10 +555,6 @@ static inline void equal_spill(
     mark[bji] = true;
 
     while (!todo.empty()) {
-if (todo.size() > 100000L) {
-    PySys_WriteStdout("Exiting, too big\n");
-    return;
-}
 
         std::array<int,2> const &cq(todo.front());
             int const cj = cq[0];
@@ -611,6 +607,7 @@ if (todo.size() > 100000L) {
 
     int const ji_eq = eqclass[0];    // Label of our equivalence class
     if (eqclass.size() == 1) {
+        // This never happens: eq classes are always at least size 2.  Singletons return immediately.
         forward[ji_eq] = -1;
         neighbor_eqclass[ji_eq] = lowest_neighbor;
         neighbor_within[ji_eq] = -2;
@@ -677,15 +674,14 @@ static inline void to_neighbor1(DEMNeigh const &dem, dem_t * const spill, npy_in
             // Unused (non-land) gridcell
             sinks[ji] = -1;
             neighbor1[ji] = -1;
-        } else if (neighbor1[ji] == -2) {
-            int const fji = forward[ji];   // ==-1 if singleton
-            if (fji == -1) {
-                // It's a singleton
+        } else if (neighbor_within[ji] == -2) {
+            if ((forward[ji] == ji) && (neighbor_within[ji] == -2)) { 
+                // It's a singleton; equal_spill() overlooked it
                 sinks[ji] = -1;
                 neighbor1[ji] = forward[neighbor_eqclass[ji]];
             } else {
                 // Part of a larger eq class
-                sinks[ji] = fji;
+                sinks[ji] = forward[ji];
                 neighbor1[ji] = forward[neighbor_eqclass[fji]];
             }
         }
