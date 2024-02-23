@@ -53,8 +53,8 @@ def neighbor1_rule(dem_file, odir, fill_sinks=True):
 
         # Compute the degree-1 neighbor graph on the DEM
         # (This also fills sinks in dem)
-        sinks, neighbor1 = d8graph.neighbor_graph(dem, nodata, int(fill_sinks))
-        dem_filled = dem    # dem has now been filled in, change name appropriately
+        dem_filled, sinks, neighbor1 = d8graph.neighbor_graph(dem, nodata, int(fill_sinks))
+#        dem_filled = dem    # dem has now been filled in, change name appropriately
 
         # Write sinks and neighbor1 so we can forget about them
         gdalutil.write_raster(sinks_file, grid_info, sinks, -1)

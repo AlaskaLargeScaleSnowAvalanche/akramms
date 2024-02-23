@@ -628,14 +628,14 @@ if (todo.size() > 100000L) {
 }
 
 
-static inline void to_neighbor1(DEMNeigh const &dem, npy_int * const sinks, npy_int * const neighbor1)
+static inline void to_neighbor1(DEMNeigh const &dem, dem_t * const spill, npy_int * const sinks, npy_int * const neighbor1)
 {
     PySys_WriteStdout("BEGIN to_neighbor1()\n");
 
     int const nji = dem.nj * dem.ni;
 
-    // Compute spill
-    std::vector<dem_t> spill(nji, dem.nodata);
+    // Fill the sinks using the standard algorithm
+//    std::vector<dem_t> spill(nji, dem.nodata);
     compute_spill(dem, spill);
 
     // Initialize additional arrays
@@ -668,7 +668,11 @@ static inline void to_neighbor1(DEMNeigh const &dem, npy_int * const sinks, npy_
     // for the LAST of each eqclass
     PySys_WriteStdout("BEGIN neighbor1\n");
     for (int ji=0; ji<nji; ++ji) {
-//        if (ji % 1000000 == 0) PySys_WriteStdout("ji=%d\n", ji);
+        if (!dem.in_grid(ji)) {
+            // Unused (non-land) gridcell
+            sinks[ji] = -1;
+            neighbor1[ji] = -1
+        }
         if (neighbor1[ji] == -2) {
             int const fji = forward[ji];   // ==-1 if singleton
             if (fji == -1) {
@@ -915,6 +919,15 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
     // auto const nj = PyArray_DIM(dem,0);
     auto const ni = PyArray_DIM(dem,1);
     npy_intp const strides[] = {(npy_intp)(sizeof(int) * ni), (npy_intp)sizeof(int)};
+    // Or try: PyArrayObject *spill = (PyArrayObject*) PyArray_NewLikeArray(dem, NPY_ANYORDER, NULL, 0)
+    PyArrayObject *spill = (PyArrayObject*) PyArray_NewFromDescr(
+        &PyArray_Type, 
+        PyArray_DTYPE(dem),             // dtype=<same as dem>; PyArray_DTYPE() is same as PyARray_DESCR()
+        2,                                          // rank 2
+        PyArray_DIMS(dem), strides,    // Same shape as DEM
+        NULL,        // Allocate new memory
+        // PyArray_FLAGS(dem), ...
+        NPY_ARRAY_C_CONTIGUOUS | NPY_ARRAY_ALIGNED, NULL);
     PyArrayObject *neighbor1 = (PyArrayObject*) PyArray_NewFromDescr(
         &PyArray_Type, 
         PyArray_DescrFromType(NPY_INT32),             // dtype='i'
@@ -940,11 +953,12 @@ static PyObject* d8graph_neighbor_graph(PyObject *module, PyObject *args, PyObje
         DEMNeigh(
             (dem_t *)PyArray_GETPTR2(dem,0,0), PyArray_DIM(dem,0), PyArray_DIM(dem,1), nodata,
             dneigh8),
+        (dem_t *)PyArray_GETPTR2(spill,0,0),
         (npy_int *)PyArray_GETPTR2(sinks,0,0),
         (npy_int *)PyArray_GETPTR2(neighbor1,0,0));
 
     // ========================================================
-    return Py_BuildValue("OO", (PyObject *)sinks, (PyObject *)neighbor1);
+    return Py_BuildValue("OOO", (PyObject *)spill, (PyObject *)sinks, (PyObject *)neighbor1);
 }
 // ----------------------------------------------------------------------------------------
 static PyObject *polygon_to_python(std::vector<std::array<double,2>> const &mbr)
