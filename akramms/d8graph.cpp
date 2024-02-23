@@ -525,7 +525,8 @@ static inline void compute_spill(DEMNeigh const &dem, std::vector<dem_t> &spill)
 // Find all cells with spill equal to cell (bj, bi)
 static inline void equal_spill(
     DEMNeigh const &dem,
-    std::vector<dem_t> const &spill,
+//    std::vector<dem_t> const &spill,
+    dem_t * const spill,
     std::vector<bool> &mark,
     std::vector<int> &forward,
     std::vector<int> &neighbor_eqclass,
