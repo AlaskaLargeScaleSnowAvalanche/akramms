@@ -183,8 +183,9 @@ def chunk_rule(scene_dir, scene_args, For, resolution, return_period, pra_size):
     inputs = [
         scene_dir / 'RELEASE' / f'{base}_rel.shp',
         scene_dir / 'DOMAIN' / f'{base}_dom.shp',
-        scene_args['dem_file'],
-        scene_args['forest_file']]
+        scene_args['dem_file']]
+    if 'forest_file' in scene_args:
+        inputs.append(scene_args['forest_file'])
     outputs = [
         scene_dir / 'RELEASE' / f'{base}_chunks.csv']
 
