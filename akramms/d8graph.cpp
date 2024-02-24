@@ -607,7 +607,7 @@ static void to_neighbor1(
 
             // Should never happen: this gridcell is a known NON-sink.
             if (lowest_neighbor < 0) {
-                print("ERROR: lowest_neighbor was never set (d8graph.cpp)\n");
+                printf("ERROR: lowest_neighbor was never set (d8graph.cpp)\n");
                 assert(false);
             }
 
