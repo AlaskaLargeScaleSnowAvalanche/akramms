@@ -640,7 +640,7 @@ static void to_neighbor1(
                 double const neighbor_spill = spill[ji1];
                 if (neighbor_spill == spill[bji]) {
                     // It's one of us!
-                    add_to_eqclass(ji1, c1[0]+dn[0], cq[1]+dn[1]);
+                    add_to_eqclass(ji1, cq[0]+dn[0], cq[1]+dn[1]);
                 } else if (neighbor_spill < lowest_neighbor_spill) {
                     // It's the lowest neighbor yet of this equivalence class
                     lowest_neighbor_spill = neighbor_spill;
