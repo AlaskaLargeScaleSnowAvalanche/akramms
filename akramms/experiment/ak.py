@@ -246,4 +246,6 @@ def elizabeth():
 
 def edge():
     # A single edge cell
-    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 111, 42)    # Tile borders with Canada
+    for return_period in [30,300]:
+        for forest in ('NoFor','For'):
+            yield Combo('ccsm', 1981, 2010, 'lapse', forest, return_period, 111, 42)   # Tile borders  Canada
