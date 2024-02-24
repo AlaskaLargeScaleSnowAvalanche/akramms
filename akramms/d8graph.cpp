@@ -457,8 +457,9 @@ doi:10.5194/hess-17-495-2013
 
 spill: Output array
     Leveled values stored here
-
-
+in_eqclass: Output array
+    True if this gridcell was raised in spill; or if another gridcell
+    was raised TO this in spill.
 */
 static inline void compute_spill(DEMNeigh const &dem, dem_t * const spill, std::vector<bool> &in_eqclass)
 {
@@ -576,7 +577,7 @@ static void to_neighbor1(
         int const i1 = bi + dn[1];
         if (!dem.in_range(j1, i1)) return -1;
         int const ji1 = dem.ji(j1,i1);
-if (dem.ji(bj,bi) == 4603) printf("   neighbor (%d, %d) -> (%d, %d): in_grid = %d\n", bj, bi, j1, i1, dem.in_grid(ji1));
+//if (dem.ji(bj,bi) == 4603) printf("   neighbor (%d, %d) -> (%d, %d): in_grid = %d\n", bj, bi, j1, i1, dem.in_grid(ji1));
         if (!dem.in_grid(ji1)) return -1;
         return ji1;
     };
@@ -613,7 +614,7 @@ if (dem.ji(bj,bi) == 4603) printf("   neighbor (%d, %d) -> (%d, %d): in_grid = %
             for (auto &dn : dem.dneigh) {
                 int const ji1 = neighbor_cell(bj, bi, dn);
                 if (ji1 < 0) continue;
-if (bji == 4603) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f diff=%g)\n", bj, bi, bji, ji1, spill[ji1], spill[bji], spill[ji1]-spill[bji]);
+//if (bji == 4603) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f diff=%g)\n", bj, bi, bji, ji1, spill[ji1], spill[bji], spill[ji1]-spill[bji]);
 
                 double const neighbor_spill = spill[ji1];
                 if (neighbor_spill < lowest_neighbor_spill) {
@@ -626,11 +627,12 @@ if (bji == 4603) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f diff=%g)
             // DO NOT mark this cell.  Only cells involved in equiv
             // classes get marked.
 
+            // ********** SANITY CHECK
             // Should never happen: this gridcell is a known NON-sink.
             if ((lowest_neighbor_spill > spill[bji]) && !dem.is_edge(bj,bi)) {
                 printf("ERROR: Sink Remaining (d8graph.cpp) bji=%d\n", bji);
-//                assert(false);
-//                exit(-1);
+//                assert(false);    // For some reason, this does not cause it to exit
+                exit(-1);
             }
 
             // Set our results for this singleton cell
