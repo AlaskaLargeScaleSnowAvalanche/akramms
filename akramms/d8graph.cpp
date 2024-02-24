@@ -394,6 +394,10 @@ public:
     inline bool in_grid(int const ji) const
     { return (dem[ji] != nodata) && (dem[ji] != 0.0); }
 
+    inline bool in_range(int const j1, int const i1)
+    { return (j1>=0) && (j1<dem.nj) && (i1>=0) && (i1<dem.ni); }
+
+
     /** Determines whether a gridcell is an edge cell, i.e. borders on
     an unused cell or grid edge.  This function is called a the
     beginning to build a lookup table, which is then modified as eq
@@ -524,7 +528,13 @@ static inline void compute_spill(DEMNeigh const &dem, dem_t * const spill)//std:
 
 
 
-static inline void to_neighbor1(DEMNeigh const &dem, dem_t * const spill, npy_int * const sinks, npy_int * const neighbor1)
+static void to_neighbor1(
+    // ---- INPUT DEM
+    DEMNeigh const &dem,
+    // ---- OUTPUTS
+    dem_t * const spill,
+    npy_int * const sinks,
+    npy_int * const neighbor1)
 {
     PySys_WriteStdout("BEGIN to_neighbor1()\n");
     int const nji = dem.nj * dem.ni;
@@ -539,65 +549,99 @@ static inline void to_neighbor1(DEMNeigh const &dem, dem_t * const spill, npy_in
         forward.reserve(nji);
         for (int ji=0; ji<nji; ++ji) forward[ji] = ji;
 
+    // This is reused on every iteration
+    std::queue<std::array<int,2>> todo;    // Cells only in here if they are part of the eq class.
+    std::vector<int> eqclass;    // ji 1D index of items in the eq class
+    auto add_to_eqclass = [&mark, &eqclass](int ji, int j, int i) {
+        mark[ji] = true;
+        eqclass.push_back(ji);
+        todo.push(std::array<int,2>{j, i});
+    };
+
+    // Deteremins whether a neighbor to gridcell (j,i) is valid.
+    // If it is, returns that cell's 1D index.  Otherwise returns -1
+    auto neighbor_cell = [&dem,&mark](int bj, int bi, std::array<int,2> const &dn) -> int {
+        int const j1 = bi + dn[0];
+        int const i1 = bj + dn[1];
+        if (!dem.in_range(j1, i1)) return -1;
+        int const ji1 = dem.ji(j1,i1);
+        if (mark[ji1] || !dem.in_grid(ji1)) return -1;
+        return ji1;
+    };
+
     // Find equivalence class starting from each gridcell.
     for (int bj=0; bj<dem.nj; ++bj) {
     if (bj % 100 == 0) PySys_WriteStdout("  bj = %d\n", bj);
     for (int bi=0; bi<dem.ni; ++bi) {
         int const bji = dem.ji(bj, bi);
-        if (!dem.in_grid(bji)) continue;
+        if (!dem.in_grid(bji)) continue;    // Check for unused cells
         if (mark[bji]) continue;    // Already saw it in another eq class
 
-    //    std::vector<int> marked;    // Remember nodes we marked
-        int const bji = dem.ji(bj, bi);
+        // (1D) Index of lowest neighbor node to (bj,bi)
+        int lowest_neighbor = -1;
+        double lowest_neighbor_spill = spill[bji];  // std::numeric_limits<double>::max();
+
+        // ----------------------------------------
+        // 1. Handle gridcells that were not adjusted by compute_spill()
 
         // Only initiate flood search for equivalence classes starting
         // from gridcells that were changed going from dem -> spill
-    //    if (dem.dem[bji] == spill[bji]) return;
+        // This prevents us from merging adjacent cells that just
+        // happen to be of the same elevation, but were not part of
+        // internally drained basins.
+        if (dem.dem[bji] == spill[bji]) {
 
-        // Don't reprocess cells we've already makred as being part of an eq class.
-        if (mark[bji]) return;
-
-        std::vector<int> eqclass;    // ji 1D index of items in the eq class
-
-        // We are looking for adjacent cells with this value of spill
-        dem_t spillval = spill[bji];
-
-        // (1D) Index of lowest neighbor node
-        int lowest_neighbor = -1;   // Will be set below.
-        dem_t lowest_neighbor_spill = spillval;
-
-        // Initialize our queue of cells we haven't yet looked at.
-        std::queue<std::array<int,2>> todo;    // Cells only in here if they are part of the eq class.
-        todo.push(std::array<int,2>{bj, bi});
-        mark[bji] = true;//  marked.push_back(bji);
-
-        while (!todo.empty()) {
-
-            std::array<int,2> const &cq(todo.front());
-                int const cj = cq[0];
-                int const ci = cq[1];
-                int const cji = dem.ji(cj, ci);
-            todo.pop();
-
-            // Add it to our eq class
-            eqclass.push_back(cji);
-
-            // Identify neighboring nodes to look at
+            // Identify neighbor1 by looking at neighbors
             for (auto &dn : dem.dneigh) {
-                int const j1 = cj + dn[0];
-                int const i1 = ci + dn[1];
-                if ((j1<0) || (j1>=dem.nj) || (i1<0) || (i1>dem.ni)) continue;
-                int const ji1 = dem.ji(j1,i1);
-                if (!dem.in_grid(ji1)) continue;
-                if (mark[ji1]) continue;
+                int const ji1 = neighbor_cell(bj, bi, dn);
+                if (ji1 < 0) continue;
 
                 double const neighbor_spill = spill[ji1];
-                if (neighbor_spill == spillval) {
-                    // It's one of us: look at it later
-                    todo.push(std::array<int,2>{j1,i1});
-                    mark[ji1] = true;  //marked.push_back(ji1);
-                } else if (neighbor_spill < lowest_neighbor_spill) {
+                if (neighbor_spill < lowest_neighbor_spill) {
                     // It's a real neighbor: determine if it's the LOWEST neighbor
+                    lowest_neighbor_spill = neighbor_spill;
+                    lowest_neighbor = ji1;
+                }
+            }
+
+            // Should never happen: this gridcell is a known NON-sink.
+            if (lowest_neighbor < 0) {
+                print("ERROR: lowest_neighbor was never set (d8graph.cpp)\n");
+                assert false;
+            }
+
+            // Set our results for this singleton cell
+            neighbor1[bji] = lowest_neighbor;
+            forward[bji] = bji;
+            singleton[bji] = true;
+
+            continue;
+        }
+
+        // ---------------------------------------------
+        // 2. Find extent of the equivalence class
+
+        // The gridcell DOES have a changed spill value; find other
+        // gridcells in its equivalence class.
+        eqclass.clear();
+        todo.clear();
+        add_to_eqclass(bji, bj, bi);
+
+        while (!todo.empty()) {
+            std::array<int,2> const &cq(todo.front());
+            todo.pop();
+
+            // Look at neighbor nodes
+            for (auto &dn : dem.dneigh) {
+                int const ji1 = neighbor_cell(cq[0], cq[1], dn);
+                if (ji1 < 0) continue;
+
+                double const neighbor_spill = spill[ji1];
+                if (neighbor_spill == spill[bji]) {
+                    // It's one of us!
+                    add_to_eqclass(ji1, c1[0]+dn[0], cq[1]+dn[1]);
+                } else if (neighbor_spill < lowest_neighbor_spill) {
+                    // It's the lowest neighbor yet of this equivalence class
                     lowest_neighbor_spill = neighbor_spill;
                     lowest_neighbor = ji1;
                 }
@@ -605,33 +649,35 @@ static inline void to_neighbor1(DEMNeigh const &dem, dem_t * const spill, npy_in
         }
 
 
+        // ---------------------------------------------
+        // 3. Use equivalence class to set output variables
+
         // We have our eqclass, now use it to set forward and neighbor1
         std::sort(eqclass.begin(), eqclass.end());    // Sort by index
         int const ji_eq = eqclass[0];    // Label of our equivalence class
 
-        // Set singleton, neighbor1 and sinks for our eqclass
-        if (eqclass.size() == 1) {
-            singleton[eqclass[0]] = true;
-            neighbor1[ji_eq] = lowest_neighbor;    // Not yet forwarded
-            sinks[ji_eq] = -1;    // Special if cluase needed to set this to nodata (-1)
-        } else {
-            int ji0 = eqclass[0];
-            for (size_t k=1; k<eqclass.size(); ++k) {
-                int const ji1 = eqclass[k];
+        // Neighbor1 should point each gridcell to the next within the
+        // equivalence class
+        int ji0 = eqclass[0];
+        for (size_t k=1; k<eqclass.size(); ++k) {
+            int const ji1 = eqclass[k];
 
-                neighbor1[ji0] = ji1;
-                forward[ji0] = ji_eq;
-                singleton[ji0] = false;
-
-                ji0 = ji1;    // Increment pointer pair
-            }
-            // Last item in eq class
-            neighbor1[ji0] = lowest_neighbor;
+            neighbor1[ji0] = ji1;
             forward[ji0] = ji_eq;
             singleton[ji0] = false;
+
+            ji0 = ji1;    // Increment pointer pair
         }
 
-    }
+        // Last item in eq class
+        neighbor1[ji0] = lowest_neighbor;
+        forward[ji0] = ji_eq;
+        singleton[ji0] = false;
+
+    }}
+
+    // ---------------------------------------------
+    // 4. Finalize neighbor1 values based on final forwarding info
 
     // Now that forward is fully set, use it to forward all neighbor1 values
     for (int ji=0; ji<nji; ++ji) {
