@@ -575,7 +575,7 @@ static void to_neighbor1(
         int const i1 = bi + dn[1];
         if (!dem.in_range(j1, i1)) return -1;
         int const ji1 = dem.ji(j1,i1);
-if (dem.ji(bj,bi) == 7102) printf("   neighbor (%d, %d) -> (%d, %d): in_grid = %d\n", bj, bi, j1, i1, dem.in_grid(ji1));
+if (dem.ji(bj,bi) == 4603) printf("   neighbor (%d, %d) -> (%d, %d): in_grid = %d\n", bj, bi, j1, i1, dem.in_grid(ji1));
         if (!dem.in_grid(ji1)) return -1;
         return ji1;
     };
@@ -607,7 +607,7 @@ if (dem.ji(bj,bi) == 7102) printf("   neighbor (%d, %d) -> (%d, %d): in_grid = %
             for (auto &dn : dem.dneigh) {
                 int const ji1 = neighbor_cell(bj, bi, dn);
                 if (ji1 < 0) continue;
-if (bji == 7102) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f)\n", bj, bi, bji, ji1, spill[ji1], spill[bji]);
+if (bji == 4603) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f)\n", bj, bi, bji, ji1, spill[ji1], spill[bji]);
 
                 double const neighbor_spill = spill[ji1];
                 if (neighbor_spill < lowest_neighbor_spill) {
