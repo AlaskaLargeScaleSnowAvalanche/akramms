@@ -566,7 +566,7 @@ static void to_neighbor1(
         int const i1 = bj + dn[1];
         if (!dem.in_range(j1, i1)) return -1;
         int const ji1 = dem.ji(j1,i1);
-        if (mark[ji1] || !dem.in_grid(ji1)) return -1;
+        if (!dem.in_grid(ji1)) return -1;
         return ji1;
     };
 
@@ -637,7 +637,7 @@ if (bji == 1542) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f)\n", bj,
             // Look at neighbor nodes
             for (auto &dn : dem.dneigh) {
                 int const ji1 = neighbor_cell(cq[0], cq[1], dn);
-                if (ji1 < 0) continue;
+                if ((ji1 < 0) || mark[ji1]) continue;
 
                 double const neighbor_spill = spill[ji1];
                 if (neighbor_spill == spill[bji]) {
