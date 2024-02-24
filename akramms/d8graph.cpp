@@ -562,8 +562,8 @@ static void to_neighbor1(
     // Deteremins whether a neighbor to gridcell (j,i) is valid.
     // If it is, returns that cell's 1D index.  Otherwise returns -1
     auto neighbor_cell = [&dem,&mark](int bj, int bi, std::array<int,2> const &dn) -> int {
-        int const j1 = bi + dn[0];
-        int const i1 = bj + dn[1];
+        int const j1 = bj + dn[0];
+        int const i1 = bi + dn[1];
         if (!dem.in_range(j1, i1)) return -1;
         int const ji1 = dem.ji(j1,i1);
 if (dem.ji(bj,bi) == 1542) printf("   neighbor (%d, %d) -> (%d, %d): in_grid = %d\n", bj, bi, j1, i1, dem.in_grid(ji1));
