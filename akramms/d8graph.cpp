@@ -410,7 +410,7 @@ public:
             // It's an edge if at edge of domain
             int const j1 = j0 + dn[0];
             int const i1 = i0 + dn[1];
-            if ((j1<0) || (j1>=nj) || (i1<0) || (i1>ni)) return true;
+            if ((j1<0) || (j1>=nj) || (i1<0) || (i1>=ni)) return true;
 
             // It's an edge if neighbor is unused
             int const ji1 = j1*ni + i1;
@@ -612,7 +612,7 @@ if (bji == 301) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f)\n", bj, 
             // classes get marked.
 
             // Should never happen: this gridcell is a known NON-sink.
-            if (lowest_neighbor < 0) {
+            if ((lowest_neighbor < 0) && !dem.is_edge(bj,bi) {
                 printf("ERROR: lowest_neighbor was never set (d8graph.cpp) bji=%d\n", bji);
 //                assert(false);
 //                exit(-1);
