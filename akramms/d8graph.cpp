@@ -613,7 +613,7 @@ if (dem.ji(bj,bi) == 4603) printf("   neighbor (%d, %d) -> (%d, %d): in_grid = %
             for (auto &dn : dem.dneigh) {
                 int const ji1 = neighbor_cell(bj, bi, dn);
                 if (ji1 < 0) continue;
-if (bji == 4603) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f)\n", bj, bi, bji, ji1, spill[ji1], spill[bji]);
+if (bji == 4603) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f diff=%g)\n", bj, bi, bji, ji1, spill[ji1], spill[bji], spill[ji1]-spill[bji]);
 
                 double const neighbor_spill = spill[ji1];
                 if (neighbor_spill < lowest_neighbor_spill) {
@@ -628,7 +628,7 @@ if (bji == 4603) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f)\n", bj,
 
             // Should never happen: this gridcell is a known NON-sink.
             if ((lowest_neighbor > spill[bji]) && !dem.is_edge(bj,bi)) {
-                printf("ERROR: lowest_neighbor was never set (d8graph.cpp) bji=%d\n", bji);
+                printf("ERROR: Sink Remaining (d8graph.cpp) bji=%d\n", bji);
 //                assert(false);
 //                exit(-1);
             }
