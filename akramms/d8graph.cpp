@@ -395,7 +395,7 @@ public:
     { return (dem[ji] != nodata) && (dem[ji] != 0.0); }
 
     inline bool in_range(int const j1, int const i1)
-    { return (j1>=0) && (j1<dem.nj) && (i1>=0) && (i1<dem.ni); }
+    { return (j1>=0) && (j1<nj) && (i1>=0) && (i1<ni); }
 
 
     /** Determines whether a gridcell is an edge cell, i.e. borders on
