@@ -607,6 +607,9 @@ if (bji == 1542) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f)\n", bj,
                 }
             }
 
+            // DO NOT mark this cell.  Only cells involved in equiv
+            // classes get marked.
+
             // Should never happen: this gridcell is a known NON-sink.
 //            if (lowest_neighbor < 0) {
 //                printf("ERROR: lowest_neighbor was never set (d8graph.cpp) bji=%d\n", bji);
