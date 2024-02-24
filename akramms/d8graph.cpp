@@ -489,6 +489,7 @@ static inline void compute_spill(DEMNeigh const &dem, dem_t * const spill, std::
     for (int bj=0; bj<dem.nj; ++bj) {
     for (int bi=0; bi<dem.ni; ++bi) {
         int const bji = dem.ji(bj, bi);
+        spill[bji] = dem.dem[bji];    // Initialize spill
         if (!dem.in_grid(bji)) continue;
 
         if (dem.is_edge(bj, bi)) {
