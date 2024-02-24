@@ -612,7 +612,7 @@ if (bji == 301) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f)\n", bj, 
             // classes get marked.
 
             // Should never happen: this gridcell is a known NON-sink.
-            if ((lowest_neighbor < 0) && !dem.is_edge(bj,bi) {
+            if ((lowest_neighbor < 0) && !dem.is_edge(bj,bi)) {
                 printf("ERROR: lowest_neighbor was never set (d8graph.cpp) bji=%d\n", bji);
 //                assert(false);
 //                exit(-1);
