@@ -120,6 +120,9 @@ def add_combo(makefile, combo):
             exp_mod, combo.idom, combo.jdom)).outputs[0]
         forest_tif = makefile.add(r_experiment.r_forest(
             exp_mod, combo.idom, combo.jdom)).outputs[0]
+    else:
+        landcover_tif = None
+        forest_tif = None
 
     # Snow downscaling
     if combo.downscale_algo == 'lapse':
