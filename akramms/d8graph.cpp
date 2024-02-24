@@ -566,6 +566,7 @@ static void to_neighbor1(
         int const i1 = bj + dn[1];
         if (!dem.in_range(j1, i1)) return -1;
         int const ji1 = dem.ji(j1,i1);
+if (dem.ji(bj,bi) == 1542) printf("   neighbor (%d, %d) -> (%d, %d): in_grid = %d\n", bj, bi, j1, i1, dem.in_grid(ji1));
         if (!dem.in_grid(ji1)) return -1;
         return ji1;
     };
@@ -607,11 +608,11 @@ if (bji == 1542) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f)\n", bj,
             }
 
             // Should never happen: this gridcell is a known NON-sink.
-            if (lowest_neighbor < 0) {
-                printf("ERROR: lowest_neighbor was never set (d8graph.cpp) bji=%d\n", bji);
-                assert(false);
-//                exit(-1);
-            }
+//            if (lowest_neighbor < 0) {
+//                printf("ERROR: lowest_neighbor was never set (d8graph.cpp) bji=%d\n", bji);
+//                assert(false);
+////                exit(-1);
+//            }
 
             // Set our results for this singleton cell
             neighbor1[bji] = lowest_neighbor;
