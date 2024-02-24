@@ -551,12 +551,12 @@ static void to_neighbor1(
         for (int ji=0; ji<nji; ++ji) forward[ji] = ji;
 
     // This is reused on every iteration
-    std::queue<std::array<int,2>> todo;    // Cells only in here if they are part of the eq class.
+    std::vector<std::array<int,2>> todo;    // (Vector implementing a stack) Cells only in here if they are part of the eq class.
     std::vector<int> eqclass;    // ji 1D index of items in the eq class
     auto add_to_eqclass = [&mark, &eqclass,&todo](int ji, int j, int i) {
         mark[ji] = true;
         eqclass.push_back(ji);
-        todo.push(std::array<int,2>{j, i});
+        todo.push_back(std::array<int,2>{j, i});
     };
 
     // Deteremins whether a neighbor to gridcell (j,i) is valid.
@@ -629,8 +629,8 @@ static void to_neighbor1(
         add_to_eqclass(bji, bj, bi);
 
         while (!todo.empty()) {
-            std::array<int,2> const &cq(todo.front());
-            todo.pop();
+            std::array<int,2> const cq(todo.back());
+            todo.pop_back();
 
             // Look at neighbor nodes
             for (auto &dn : dem.dneigh) {
