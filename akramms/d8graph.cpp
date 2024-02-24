@@ -556,7 +556,7 @@ static void to_neighbor1(
 
     // Initialize additional arrays
     std::vector<bool> mark(nji, false);    // Has this been included in an equiv class?
-    std::vector<bool> singleton(nji, false);    // Is this gridcell part of a singleton equiv class?
+//    std::vector<bool> singleton(nji, false);    // Is this gridcell part of a singleton equiv class?
     std::vector<int> forward;    // Initialize to forward-to-self
         forward.reserve(nji);
         for (int ji=0; ji<nji; ++ji) forward[ji] = ji;
@@ -638,7 +638,7 @@ static void to_neighbor1(
             // Set our results for this singleton cell
             neighbor1[bji] = lowest_neighbor;
             forward[bji] = bji;
-            singleton[bji] = true;
+//            singleton[bji] = true;
 
             continue;
         }
@@ -689,7 +689,7 @@ static void to_neighbor1(
 
             neighbor1[ji0] = ji1;
             forward[ji0] = ji_eq;
-            singleton[ji0] = false;
+//            singleton[ji0] = false;
 
             ji0 = ji1;    // Increment pointer pair
         }
@@ -697,7 +697,7 @@ static void to_neighbor1(
         // Last item in eq class
         neighbor1[ji0] = lowest_neighbor;
         forward[ji0] = ji_eq;
-        singleton[ji0] = false;
+//        singleton[ji0] = false;
 
     }}
 
@@ -707,6 +707,7 @@ static void to_neighbor1(
     // Now that forward is fully set, use it to forward all neighbor1 values
     for (int ji=0; ji<nji; ++ji) {
         if (neighbor1[ji] > 0) neighbor1[ji] = forward[neighbor1[ji]];
+        sinks[ji] = (in_eqclass[ji] ? -1 : forward[ji]);
     }
 
     PySys_WriteStdout("END neighbor1\n");
