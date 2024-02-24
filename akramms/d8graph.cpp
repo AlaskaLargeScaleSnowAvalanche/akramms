@@ -596,7 +596,7 @@ static void to_neighbor1(
             for (auto &dn : dem.dneigh) {
                 int const ji1 = neighbor_cell(bj, bi, dn);
                 if (ji1 < 0) continue;
-printf("Neighbor: (%d, %d; %d) - %d: spill = %f\n", bj, bi, bji, ji1, spill[ji1]);
+if (bji == 1542) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f)\n", bj, bi, bji, ji1, spill[ji1], spill[bji]);
 
                 double const neighbor_spill = spill[ji1];
                 if (neighbor_spill < lowest_neighbor_spill) {
