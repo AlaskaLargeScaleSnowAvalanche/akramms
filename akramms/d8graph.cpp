@@ -707,7 +707,7 @@ static void to_neighbor1(
     // Now that forward is fully set, use it to forward all neighbor1 values
     for (int ji=0; ji<nji; ++ji) {
         if (neighbor1[ji] > 0) neighbor1[ji] = forward[neighbor1[ji]];
-        sinks[ji] = (in_eqclass[ji] ? -1 : forward[ji]);
+        sinks[ji] = (in_eqclass[ji] ? forward[ji] : -1);
     }
 
     PySys_WriteStdout("END neighbor1\n");
