@@ -394,7 +394,7 @@ public:
     inline bool in_grid(int const ji) const
     { return (dem[ji] != nodata) && (dem[ji] != 0.0); }
 
-    inline bool in_range(int const j1, int const i1)
+    inline bool in_range(int const j1, int const i1) const
     { return (j1>=0) && (j1<nj) && (i1>=0) && (i1<ni); }
 
 
