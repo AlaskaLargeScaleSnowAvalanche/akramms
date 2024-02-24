@@ -460,7 +460,7 @@ spill: Output array
 
 
 */
-static inline void compute_spill(DEMNeigh const &dem, dem_t * const spill)//std::vector<dem_t> &spill)
+static inline void compute_spill(DEMNeigh const &dem, dem_t * const spill, std::vector<bool> &in_eqclass)
 {
     PySys_WriteStdout("BEGIN compute_spill()\n");
 
@@ -516,7 +516,14 @@ static inline void compute_spill(DEMNeigh const &dem, dem_t * const spill)//std:
             if (!dem.in_grid(ji1)) continue;
 
             if (!mark[ji1]) {
-                spill[ji1] = std::max(dem.dem[ji1], spill[cji]);
+                // spill[ji1] = std::max(dem.dem[ji1], spill[cji]);
+                if (dem.dem[ji1] > spill[cji]) {
+                    spill[ji1] = dem.dem[ji1];
+                } else {
+                    spill[ji1] = spill[cji];
+                    in_eqclass[ji1] = true;
+                    in_eqclass[cji] = true;
+                }
                 pqueue.push(std::tuple<double,int,int>{-spill[ji1], j1, i1});
                 set_mark(ji1);
             }
@@ -542,7 +549,8 @@ static void to_neighbor1(
     int const nji = dem.nj * dem.ni;
 
     // Fill the sinks using the standard algorithm
-    compute_spill(dem, spill);
+    std::vector<bool> in_eqclass(nji, false);
+    compute_spill(dem, spill, in_eqclass);
 
     // Initialize additional arrays
     std::vector<bool> mark(nji, false);    // Has this been included in an equiv class?
@@ -592,7 +600,8 @@ if (dem.ji(bj,bi) == 7102) printf("   neighbor (%d, %d) -> (%d, %d): in_grid = %
         // This prevents us from merging adjacent cells that just
         // happen to be of the same elevation, but were not part of
         // internally drained basins.
-        if (dem.dem[bji] == spill[bji]) {
+//        if (dem.dem[bji] == spill[bji]) {
+        if (in_eqclass[bji]) {
 
             // Identify neighbor1 by looking at neighbors
             for (auto &dn : dem.dneigh) {
