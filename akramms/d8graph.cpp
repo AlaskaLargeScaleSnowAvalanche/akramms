@@ -591,7 +591,7 @@ if (dem.ji(bj,bi) == 4603) printf("   neighbor (%d, %d) -> (%d, %d): in_grid = %
 
         // (1D) Index of lowest neighbor node to (bj,bi)
         int lowest_neighbor = -1;
-        double lowest_neighbor_spill = spill[bji];  // std::numeric_limits<double>::max();
+        double lowest_neighbor_spill = std::numeric_limits<double>::max(); // spill[bji];  // 
 
         // ----------------------------------------
         // 1. Handle gridcells that were not adjusted by compute_spill()
@@ -605,6 +605,11 @@ if (dem.ji(bj,bi) == 4603) printf("   neighbor (%d, %d) -> (%d, %d): in_grid = %
         if (in_eqclass[bji]) {
 
             // Identify neighbor1 by looking at neighbors
+            // If two adjacent non-sinks just happen to ahve the same
+            // elevation in the DEM, Then lowest_neighbor_spill will
+            // equal spill[bji].  That's why lowest_neighbor_spill is
+            // initiated with MAX_DOUBLE above, ensuring that we will
+            // identify the lowest neighbor.
             for (auto &dn : dem.dneigh) {
                 int const ji1 = neighbor_cell(bj, bi, dn);
                 if (ji1 < 0) continue;
@@ -622,7 +627,7 @@ if (bji == 4603) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f)\n", bj,
             // classes get marked.
 
             // Should never happen: this gridcell is a known NON-sink.
-            if ((lowest_neighbor < 0) && !dem.is_edge(bj,bi)) {
+            if ((lowest_neighbor > spill[bji]) && !dem.is_edge(bj,bi)) {
                 printf("ERROR: lowest_neighbor was never set (d8graph.cpp) bji=%d\n", bji);
 //                assert(false);
 //                exit(-1);
