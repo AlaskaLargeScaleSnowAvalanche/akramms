@@ -627,7 +627,7 @@ if (bji == 4603) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f diff=%g)
             // classes get marked.
 
             // Should never happen: this gridcell is a known NON-sink.
-            if ((lowest_neighbor > spill[bji]) && !dem.is_edge(bj,bi)) {
+            if ((lowest_neighbor_spill > spill[bji]) && !dem.is_edge(bj,bi)) {
                 printf("ERROR: Sink Remaining (d8graph.cpp) bji=%d\n", bji);
 //                assert(false);
 //                exit(-1);
