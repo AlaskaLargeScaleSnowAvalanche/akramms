@@ -504,7 +504,7 @@ def data_prep_PRA2_rule(scene_dir, scene_args, inputs):
 
     # xml import files
     for freq in ('frequent', 'extreme'):
-        for forest in ((True,False) if scene_args['forest_file'] else (False,)):
+        for forest in ((True,False) if scene_args.get('forest_file', None) else (False,)):
             _Forest = '_Forest' if forest else '_NoForest'
             import_xml = os.path.join(scene_dir, 'eCog', f'PRA_import_{freq}{_Forest}.xml')
             outputs.append(import_xml)
