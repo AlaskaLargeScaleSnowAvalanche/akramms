@@ -611,11 +611,11 @@ if (bji == 1542) printf("Neighbor: (%d, %d; %d) - %d: spill = %f (vs %f)\n", bj,
             // classes get marked.
 
             // Should never happen: this gridcell is a known NON-sink.
-//            if (lowest_neighbor < 0) {
-//                printf("ERROR: lowest_neighbor was never set (d8graph.cpp) bji=%d\n", bji);
-//                assert(false);
-////                exit(-1);
-//            }
+            if (lowest_neighbor < 0) {
+                printf("ERROR: lowest_neighbor was never set (d8graph.cpp) bji=%d\n", bji);
+                assert(false);
+                exit(-1);
+            }
 
             // Set our results for this singleton cell
             neighbor1[bji] = lowest_neighbor;
