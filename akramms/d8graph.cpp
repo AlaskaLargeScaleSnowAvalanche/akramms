@@ -552,7 +552,7 @@ static void to_neighbor1(
     // This is reused on every iteration
     std::queue<std::array<int,2>> todo;    // Cells only in here if they are part of the eq class.
     std::vector<int> eqclass;    // ji 1D index of items in the eq class
-    auto add_to_eqclass = [&mark, &eqclass](int ji, int j, int i) {
+    auto add_to_eqclass = [&mark, &eqclass,&todo](int ji, int j, int i) {
         mark[ji] = true;
         eqclass.push_back(ji);
         todo.push(std::array<int,2>{j, i});
