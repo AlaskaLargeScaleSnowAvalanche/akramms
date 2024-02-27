@@ -195,7 +195,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
 
         # Close extent.shp and store in the mosaic zip file
         extent_layer = None
-        extent_ds None
+        extent_ds = None
         for ext in ('shp','dbf','shx','prj'):
             ozip_write(ozip, dir / f'extent.{ext}')
 
