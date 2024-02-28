@@ -1,4 +1,4 @@
-import os,pathlib,subprocess,sys
+import os,pathlib,subprocess,sys,typing
 import numpy as np
 import pandas as pd
 import zipfile,netCDF4
@@ -99,6 +99,14 @@ def ozip_write(ozip, fname):
     """Writes with truncated arcname"""
     ozip.write(fname, arcname=os.path.split(fname)[1])
 
+
+class _ExtentShp(typing.NamedTuple):
+    scombo: str
+    shp: str
+    ds: object
+    layer: object
+    Id: object
+
 def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
     rho=300, vars=_mosaic_keys,
     dem_fn=None, landcover_fn=None, snow_fn=None):
@@ -140,15 +148,21 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
 
 
     # Use OGR to create shapefile for avalanche outlines
-    extent_shp = str(dir / 'extent.shp')
-    print('Writing extent_shp ', extent_shp)
-    if os.path.exists(extent_shp):
-        os.remove(extent_shp)
-    extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
-    extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.wkt), geom_type=ogr.wkbMultiPolygon )
-    # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
-    extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
-    print('extent_Id = ', extent_Id)
+    # Create one OGR layer per combo so we can merge them later to get the metadata right.
+    extent_shps = dict()
+    for combo in akdf.combo.unique():
+        scombo = '-'.join(str(x) for x in combo)
+        extent_shp = str(dir / f'extent-{scombo}.shp')
+        print('Writing extent_shp ', extent_shp)
+        if os.path.exists(extent_shp):
+            os.remove(extent_shp)
+        extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
+        extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.wkt), geom_type=ogr.wkbMultiPolygon )
+        # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
+        extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
+        print('extent_Id = ', extent_Id)
+
+        extent_shps[combo] = _ExtentShp(scombo, extent_shp, extent_ds, extent_layer, extent_Id)
 
 #    for aval_i,fname in enumerate(avals):
     print(akdf.columns)
@@ -156,10 +170,10 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
     count = 0
     for tup in akdf.itertuples(index=False):
 
-#        # DEBUGGING
-#        count += 1
-#        if count > 100:
-#            break
+        # DEBUGGING
+        count += 1
+        if count > 100:
+            break
 
         arcdir = tup.releasefile
         if not os.path.isfile(tup.avalfile):
@@ -221,7 +235,8 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
             # Since we've only set things to tup.id, we will only get Polygon(s) for that.
             # The pixel value is placed in the Id attribute
             # Polygonize docs: https://gdal.org/api/gdal_alg.html (search for GDALPolygonize)
-            gdal.Polygonize(nzmask_band, nzmask_band, extent_layer, extent_Id)
+            extent_shp = extent_shps[tup.combo]
+            gdal.Polygonize(nzmask_band, nzmask_band, extent_shp.layer, extent_shp.Id)#extent_layer, extent_Id)
 
             # ---------- Copy raster into the overall mosaic
             # C++ extension does the real work
@@ -249,9 +264,19 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
     os.makedirs(ofname_zip.parents[0], exist_ok=True)
     with zipfile.ZipFile(ofname_zip, mode='w', compression=zipfile.ZIP_STORED) as ozip:
 
-        # Close extent.shp and store in the mosaic zip file
-        extent_layer = None
-        extent_ds = None
+        # Close extent.shp files, merge, and store in the mosaic zip file
+        final_extent_shp = str(dir / f'extent.shp')
+        scombo_fnames = [(x.scombo, x.shp) for x in extent_shps.values()]
+        extent_shps = None    # Close the files with OGR
+        xdfs = list()
+        for (scombo, extent_shp) in scombo_fnames:
+            xdf = shputil.read_df(extent_shp)
+            xdf['combo'] = scombo
+            xdfs.append(xdf)
+        shputil.write_df(pd.concat(xdfs))
+
+        scombos = [x.scombo for x in extent_shps]
+        fnames = [x.shp for x in extent_shps]
 
         # Copy the extent.shp files we created above (extent_layer / extent_ds)
         for ext in ('shp','dbf','shx','prj'):
