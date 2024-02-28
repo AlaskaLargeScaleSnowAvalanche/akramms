@@ -42,11 +42,14 @@ def read_reldom(akdf0, tdir):
         reldf = reldf.drop('id', axis=1)
         reldf['pra_size'] = reldf['pra_size'].astype('string')
         reldf['combo'] = scombo
+        reldf['combo'] = reldf['combo'].astype('string')
+        
         reldfs.append(reldf)
 
         domdf = df.merge(domdf, how='left', left_on='id', right_on='Id')
         domdf = domdf.drop('id', axis=1)
         domdf['combo'] = scombo
+        domdf['combo'] = domdf['combo'].astype('string')
         domdfs.append(domdf)
 
     reldf = pd.concat(reldfs)
