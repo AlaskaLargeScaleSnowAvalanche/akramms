@@ -28,7 +28,7 @@ def read_reldom(akdf0, tdir):
     """
     reldfs = list()
     domdfs = list()
-    for combo,arcdir,akdf1 in akdf0.groupby(['combo', 'releasefile']):
+    for (combo,arcdir),akdf1 in akdf0.groupby(['combo', 'releasefile']):
         scombo = '-'.join(str(x) for x in tup.combo)
 
         # Read all _rel / _dom data in the archive dir
