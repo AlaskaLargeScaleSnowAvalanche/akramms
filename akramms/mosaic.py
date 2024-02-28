@@ -269,7 +269,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
         final_extent_shp = str(dir / f'extent.shp')
         scombo_fnames = [(x.scombo, x.shp) for x in extent_shps.values()]
         # Close the files in OGR by making things garbage collect
-        for key in extent_shps.keys():
+        for key in list(extent_shps.keys()):
             del extent_shps[key]
 #        extent_shps = None    # Close the files with OGR
         xdfs = list()
