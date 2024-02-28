@@ -501,9 +501,10 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
                     # Add info from the RELEASE file
                     ncv = ncout.createVariable('releasefile_attrs', 'i')
                     ncv.description = 'Attributes from the RELEASE shapefile used to set up this avalanche'
+                    ncf.Id = tup.id    # The ID we use to identify avalanches
                     # Copy info from the RELEASE file into the NetCDF output.
                     row = rdf.loc[tup.id]
-                    for aname,val in row.items():
+                    for aname,val in row.items():   # Does not include Id because tup.id is the index now
                         setattr(ncv, aname, val)
 
                     # Add provenance info

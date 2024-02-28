@@ -139,6 +139,9 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
         os.remove(extent_shp)
     extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
     extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.wkt), geom_type=ogr.wkbMultiPolygon )
+    # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
+    extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
+    print('extent_Id = ', extent_Id)
 
 #    for aval_i,fname in enumerate(avals):
     print(akdf.columns)
@@ -191,8 +194,8 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
 
             # Burn the gridcells that are part of our grid
             # (already pared down)
-            nzmaskL = np.zeros((gridL.ny, gridL.nx))
-            nzmaskL[jL,iL] = 1
+            nzmaskL = np.zeros((gridL.ny, gridL.nx), dtype=np.int32)
+            nzmaskL[jL,iL] = tup.id    # This will get written into the attribute table
 
             max_vel = nc.variables['max_vel'][:].astype('f4')
             max_height = nc.variables['max_height'][:].astype('f4')
@@ -206,7 +209,12 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
 
             nzmask_ds = gdalutil.raster_ds((gridL, nzmaskL, 0))
             nzmask_band = nzmask_ds.GetRasterBand(1)
-            gdal.Polygonize(nzmask_band, nzmask_band, extent_layer, -1)
+
+            # Produces a separate polygon for each different (non-zero) value in nzmaskL
+            # Since we've only set things to tup.id, we will only get Polygon(s) for that.
+            # The pixel value is placed in the Id attribute
+            # Polygonize docs: https://gdal.org/api/gdal_alg.html (search for GDALPolygonize)
+            gdal.Polygonize(nzmask_band, nzmask_band, extent_layer, extent_Id)
 
             # ---------- Copy raster into the overall mosaic
             # C++ extension does the real work
