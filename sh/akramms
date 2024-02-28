@@ -745,11 +745,13 @@ def stdmosaic(args):
     exp = akdf0.iloc[0].exp
     expmod = akramms.parse.load_expmod(exp)
     for akdf1 in mosaic.consolidate_by_forest(expmod, akdf0):
+# No need to sort
+#        # akdf1 has two rows.  Sort to get predictable order (the 'For' row forst)
+#        akdf1 = akdf1.sort_values('combo')    # Could sort by 'forest' instead
 
         # Determine output filename
         forest_ix = expmod.combo_keys.index('forest')
         combo = akdf1.combo.tolist()[0]
-#        print('ffffffff ', combo)
         combo = list(combo[:forest_ix]) + ['AllFor'] + list(combo[forest_ix+1:])
         scombo = '-'.join(str(x) for x in combo)
         sstatus = ''.join(joblib.JobStatus._member_names_[x][0] for x in sorted(args.status))
@@ -759,13 +761,14 @@ def stdmosaic(args):
         print(f'Writing mosaic output file {ofname_zip}')
 
         # See if the output file needs regenerating
-        if (not os.path.exists(ofname_zip)) or (os.path.getmtime(ofname_zip) < akdf1.combo_quickstatus_mtime.item()):
+        combo_quickstatus_mtime = akdf1.combo_quickstatus_mtime.max()
+        if (not os.path.exists(ofname_zip)) or (os.path.getmtime(ofname_zip) < combo_quickstatus_mtime):
             mosaic.mosaic_avals_combo(
                 akdf1, 'tile', ofname_zip, statuses=args.status,
                 margin=None, snow=True, dem=True, landcover=True,
                 dry_run=args.dry_run)
 
-        if (not os.path.exists(ofname_pdf)) or (os.path.getmtime(ofname_pdf) < akdf1.combo_quickstatus_mtime.item()):
+        if (not os.path.exists(ofname_pdf)) or (os.path.getmtime(ofname_pdf) < combo_quickstatus_mtime):
             p_mosaic.plot_pdf(ofname_zip, ofname_pdf)
 
 
