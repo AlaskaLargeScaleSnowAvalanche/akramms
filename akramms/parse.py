@@ -97,7 +97,7 @@ def parse_parts(parts, load=False, assume_wcombo=False):
 
     return ret
 # ----------------------------------------------------------------------
-_expsetRE = re.compile(r'([^.]+)\.([^.]+)$')
+_expsetRE = re.compile(r'([^.]*[^-])\.([^-][^.]*)$')
 def parse_expset(expset, load=True):
     """A run is a generator inside an experiment that yields a bunch of combos.
     expset: Eg:
