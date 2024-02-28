@@ -748,7 +748,7 @@ def stdmosaic(args):
 
         # Determine output filename
         forest_ix = expmod.combo_keys.index('forest')
-        combo = akdf1.iloc.tolist()[0]
+        combo = akdf1.combo.tolist()[0]
         print('ffffffff ', combo)
         combo = combo[:forest_ix] + ['AllFor'] + combo[forest_ix+1:]
         scombo = '-'.join(str(x) for x in combo)
