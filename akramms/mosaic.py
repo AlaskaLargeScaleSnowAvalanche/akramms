@@ -152,7 +152,8 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
     extent_shps = dict()
     for combo in akdf.combo.unique():
         scombo = '-'.join(str(x) for x in combo)
-        extent_shp = str(dir / f'extent-{scombo}.shp')
+#        extent_shp = str(dir / f'extent-{scombo}.shp')
+        extent_shp = f'extent-{scombo}.shp'
         print('Writing extent_shp ', extent_shp)
         if os.path.exists(extent_shp):
             os.remove(extent_shp)
@@ -235,8 +236,8 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
             # Since we've only set things to tup.id, we will only get Polygon(s) for that.
             # The pixel value is placed in the Id attribute
             # Polygonize docs: https://gdal.org/api/gdal_alg.html (search for GDALPolygonize)
-            extent_shp = extent_shps[tup.combo]
-            gdal.Polygonize(nzmask_band, nzmask_band, extent_shp.layer, extent_shp.Id)#extent_layer, extent_Id)
+            gdal.Polygonize(nzmask_band, nzmask_band,
+                extent_shps[tup.combo].layer, extent_shps[tup.combo].Id)
 
             # ---------- Copy raster into the overall mosaic
             # C++ extension does the real work
