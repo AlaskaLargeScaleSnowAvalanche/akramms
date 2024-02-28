@@ -61,7 +61,7 @@ combo_schema = schema.Schema({
         {'select', 'lapse'},
         "Algorithm to use downscaling snow from WRF to RAMMS grid"),
     'forest': schemautil.EnumField(
-        {'', 'For', 'NoFor'},
+        {'', 'For', 'NoFor'},    # Blank string in EnumField allows for wildcard forest in mosaic plotting
         "Use the forest file or not"),
     'return_period': schemautil.ParsedEnumField(
         int, repr,

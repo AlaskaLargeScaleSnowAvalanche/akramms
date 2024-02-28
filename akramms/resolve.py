@@ -446,3 +446,17 @@ def part_range(nrows, part, nparts):
 def filter_by_part(akdf0, part, nparts):
     rr = part_range(len(akdf0), part, nparts)
     return akdf0.iloc[rr]
+# -------------------------------------------------------------
+def expand_combo_wildcard_forest(akdf):
+    """Expands Combo-level lines with a blank forest into two lines: one with 'For' and one with 'NoFor'.
+    This allows for easy plotting in mosaics.
+
+    akdf:
+        Resolved to the COMBO level
+    """
+
+    print(akdf)
+    return akdf
+
+
+# -------------------------------------------------------------
