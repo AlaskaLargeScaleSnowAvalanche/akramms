@@ -348,3 +348,18 @@ def mosaic_avals_combo(akdf, sextent, ofname,
     with ioutil.TmpDir() as tdir:
         mosaic_avals_id(gridM, akdf, ofname, tdir, **kwargs)
 
+# ---------------------------------------------------------------------------------
+def consolidate_by_forest(expmod, akdf0):
+    """
+    akdf0:
+        Resolved by combo.  (Single exp only)
+    Returns / Yields: [akdf1, akdf1, ...]
+        Each akdf1 contains two rows of akdf0 with matching For/NoFor pairs.
+    """
+
+    # This should ALWAYS work.  'forest' is a REQUIRED key in Combos
+    # If it fails it will throw a ValueError.
+    forest_ix = expmod.combo_keys.index('forest')
+
+    for ix in range(len(akdf0)):
+        akdf1 = akdf0.iloc[[ix],:]    # akdf1 is just one row of akdf0
