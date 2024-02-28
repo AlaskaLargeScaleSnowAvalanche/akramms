@@ -295,7 +295,9 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
             xdf['combo'] = scombo
             print('RRRRRRRRR 1833', xdf.loc[xdf.Id==1833][['Id','combo']])
             xdfs.append(xdf)
-        shputil.write_df(pd.concat(xdfs), 'shape', 'MultiPolygon', final_extent_shp, wkt=gridM.wkt)
+        xdf = pd.concat(xdfs)
+        print([(col,xdf[col].dtype) for col in xdf.columns])
+        shputil.write_df(xdf, 'shape', 'MultiPolygon', final_extent_shp, wkt=gridM.wkt)
 
         # Copy the extent.shp files we created above (extent_layer / extent_ds)
         for ext in ('shp','dbf','shx','prj'):
