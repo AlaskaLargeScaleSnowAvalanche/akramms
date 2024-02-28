@@ -137,7 +137,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
     if os.path.exists(extent_shp):
         os.remove(extent_shp)
     extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
-    extent_layer = outDataSource.CreateLayer(extent_shp, ogrutil.to_srs(gridM.grid.wkt), geom_type=ogr.wkbMultiPolygon )
+    extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.grid.wkt), geom_type=ogr.wkbMultiPolygon )
 
 #    for aval_i,fname in enumerate(avals):
     print(akdf.columns)
