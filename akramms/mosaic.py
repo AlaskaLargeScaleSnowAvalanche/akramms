@@ -143,7 +143,14 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
 #    for aval_i,fname in enumerate(avals):
     print(akdf.columns)
     akdf = akdf.sort_values('id')
+    count = 0
     for tup in akdf.itertuples(index=False):
+
+        # DEBUGGING
+        count += 1
+        if count > 100:
+            break
+
         arcdir = tup.releasefile
         if not os.path.isfile(tup.avalfile):
             print(f'Missing avalanche file: {tup.avalfile}')
@@ -195,7 +202,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
 #                max_vel>0, max_height>0), depo>0).astype('i8')
 
 
-            print('xxxxxxxx ', gridL.geotransform, gridL.nx, gridL.ny)
+#            print('xxxxxxxx ', gridL.geotransform, gridL.nx, gridL.ny)
 
             nzmask_ds = gdalutil.raster_ds((gridL, nzmaskL, 0))
             nzmask_band = nzmask_ds.GetRasterBand(1)
