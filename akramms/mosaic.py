@@ -272,8 +272,8 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
         for (scombo, extent_shp) in scombo_fnames:
             print('RRRRRRRRReading ', extent_shp)
             xdf = shputil.read_df(extent_shp)
-            print('RRRRRRRRR 1833', xdf.loc[xdf.Id==1833][['Id','combo']])
             xdf['combo'] = scombo
+            print('RRRRRRRRR 1833', xdf.loc[xdf.Id==1833][['Id','combo']])
             xdfs.append(xdf)
         shputil.write_df(pd.concat(xdfs), 'shape', 'MultiPolygon', final_extent_shp, wkt=gridM.wkt)
 
