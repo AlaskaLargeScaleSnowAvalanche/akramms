@@ -187,10 +187,10 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
     count = 0
     for tup in akdf.itertuples(index=False):
 
-        # DEBUGGING
-        count += 1
-        if count > 100:
-            break
+#        # DEBUGGING
+#        count += 1
+#        if count > 100:
+#            break
 
         arcdir = tup.releasefile
         if not os.path.isfile(tup.avalfile):
