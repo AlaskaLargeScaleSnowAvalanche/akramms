@@ -152,31 +152,57 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
         with netCDF4.Dataset(tup.avalfile) as nc:
             nc.set_always_mask(False)
 
-            # "gridA" = Avalanche's local grid (it will be one of the subdomains), WITH MARGIN
+            # --------------- gridA is overall scene grid, WITH MARGIN
             # Geotransform of this avalanche's local grid
             # TODO: Store Geotransform as machine-precision doubles in the file
             gridA_gt = np.array([float(x) for x in nc.variables['grid_mapping'].GeoTransform.split(' ')])
+            gridA_wkt = nc.variables['grid_mapping'].crs_wkt
 
+            # --------------- Determine gridL, an x/y oriented grid (subgrid of the tile) containing the avalanche.
+            i_diff = nc.variables['i_diff'][:]
+            j_diff = nc.variables['j_diff'][:]
+            iA = np.cumsum(i_diff)
+            jA = np.cumsum(j_diff)
 
             # ------------ Polygonize the extent
-            iA = np.cumsum(nc.variables['i_diff'][:])
-            jA = np.cumsum(nc.variables['j_diff'][:])
-            max_vel = nc.variables['max_vel'][:].astype('f4')
-            max_height = nc.variables['max_height'][:].astype('f4')
-            depo = nc.variables['depo'][:].astype('f4')
+            # Create a sub-grid gridL around just the avalanche (fast polygonize)
+            iL_min = np.min(iA) - 2
+            iL_max = np.max(iA) + 3
+            jL_min = np.min(jA) - 2
+            jL_max = np.max(jA) + 3
+            iL = iA - iL_min
+            jL = jA - jL_min
+            gridL_gt = np.array(gridA_gt, dtype='i8')
+            gridL_gt[0] += gridL_gt[1] * iL_min
+            gridL_gt[3] += gridL_gt[4] * jL_min
+            gridL = gisutil.RasterInfo(
+                ncv.crs_wkt,
+                iL_max - iL_min,
+                jL_max - jL_min,
+                gridL_gt)
 
-            nzmask = np.logical_or(np.logical_or(
-                max_vel>0, max_height>0), depo>0).astype('i8')
+            # Burn the gridcells that are part of our grid
+            # (already pared down)
+            nzmaskL = np.zeros((gridL.ny, gridL.nx))
+            nzmaskL[jL,iL] = 1
 
-            nzmask_ds = gdalutil.raster_ds((gridM, nzmask, 0))
+#            max_vel = nc.variables['max_vel'][:].astype('f4')
+#            max_height = nc.variables['max_height'][:].astype('f4')
+#            depo = nc.variables['depo'][:].astype('f4')
+#
+#            nzmask = np.logical_or(np.logical_or(
+#                max_vel>0, max_height>0), depo>0).astype('i8')
+
+            nzmask_ds = gdalutil.raster_ds((gridL, nzmaskL, 0))
             nzmask_band = nzmask_ds.GetRasterBand(1)
             gdal.Polygonize(nzmask_band, nzmask_band, extent_layer, -1)
 
             # ---------- Copy raster into the overall mosaic
             # C++ extension does the real work
             args = (
-                nc.variables['i_diff'][:],
-                nc.variables['j_diff'][:],
+                i_diff, j_diff,
+#                nc.variables['i_diff'][:],
+#                nc.variables['j_diff'][:],
                 gridA_gt[0], gridA_gt[3],
                 max_vel, max_height, depo,
 #                nc.variables['max_vel'][:].astype('f4'),

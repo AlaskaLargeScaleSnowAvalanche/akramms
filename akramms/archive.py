@@ -354,8 +354,8 @@ def ramms_to_nc0(out_zip, id_status, ncout):
         # we thought we could process overruns without re-running RAMMS.
         ret = nc_poly(ncout, in_zip, f'{leaf}.v1.dom', f'dom', coord_attrs,
             {'description': f'OFFICIAL release area polygon written by RAMMS IDL code.',
-            'grid_mapping': 'grid_mapping',
-            'nx': gridI.nx, 'ny': gridI.ny},    # Make sure we capture the original grid dimensions so we can re-create raster later.
+            'grid_mapping': 'grid_mapping'},
+#            'nx': gridI.nx, 'ny': gridI.ny},    # Make sure we capture the original grid dimensions so we can re-create raster later.  (NO: This turned out to be the original tile, we need the local grid, which is not stored anywhere other than the domain outline itself).
             required=False)
 
         # The .xyz file (SKIP)
