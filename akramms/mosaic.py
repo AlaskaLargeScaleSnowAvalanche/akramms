@@ -222,13 +222,16 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
         # Close extent.shp and store in the mosaic zip file
         extent_layer = None
         extent_ds = None
-        for ext in ('shp','dbf','shx','prj'):
-            ozip_write(ozip, dir / f'extent.{ext}')
 
 
     # Write output GeoTIFF and Zip it up
     os.makedirs(ofname_zip.parents[0], exist_ok=True)
     with zipfile.ZipFile(ofname_zip, mode='w', compression=zipfile.ZIP_STORED) as ozip:
+
+        # Copy the extent.shp files we created above (extent_layer / extent_ds)
+        for ext in ('shp','dbf','shx','prj'):
+            ozip_write(ozip, dir / f'extent.{ext}')
+
 
         box_poly = gridM.bounding_box
 
