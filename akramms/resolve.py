@@ -75,8 +75,8 @@ def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
         if 'wcombo' in parsed:
             wcombo = parsed['wcombo']
             if 'ijdom' in parsed:
-                combo = parse.new_combo(expmod, itertools.chain(wcombo, parsed['ijdom']))
-                orows.append(itertools.chain(tup, [len(orows), combo]))
+                for combo in parse.new_combos_expand_forest(expmod, itertools.chain(wcombo, parsed['ijdom'])):
+                    orows.append(itertools.chain(tup, [len(orows), combo]))
             elif realized:
                 # It's a wildcard combo, list the full combos there on disk
                 trialdir = level.theory_wcombo_to_trialdir(tup.exp, wcombo)

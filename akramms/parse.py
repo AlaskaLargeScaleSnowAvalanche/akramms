@@ -3,7 +3,7 @@ import importlib
 import netCDF4
 from akramms import file_info
 
-__all__ = ('parse_args', 'new_combo')
+__all__ = ('parse_args', 'new_combo', 'new_combo_expand_forest')
 
 # =====================================================================
 _module_type = type(re)    # Any module will do here
@@ -22,7 +22,7 @@ def load_expmod(exp_name):
     return exp_mod
 
 _all_dotsRE = re.compile(r'^([\.]+)$')
-def parse_parts(parts, load=False, assume_wcombo=False):
+def _parse_parts(parts, load=False, assume_wcombo=False):
     """
     parts: Eg:
         ['ak', 'ccsm', '1981', '1990', 'lapse', 'For', '30', '.', '.']
@@ -96,6 +96,7 @@ def parse_parts(parts, load=False, assume_wcombo=False):
             ret['wcombo'] = tuple(parts)
 
     return ret
+
 # ----------------------------------------------------------------------
 _expsetRE = re.compile(r'([^.]*[^-])\.([^-][^.]*)$')
 def parse_expset(expset, load=True):
@@ -400,10 +401,23 @@ def new_combo(expmod, scombo):
     """Given individual parts of Combo as strings, creates a fully
     typed Combo object."""
     dcombo = {key:val for key,val in zip(expmod.combo_keys, scombo)}
-    # Allow for forest wildcard (useful for mosaic)
-    if dcombo.get('forest', '') is None:
-        dcombo['forest'] = ''
     return expmod.Combo(**expmod.combo_schema.validate(dcombo))
+# -----------------------------------------------------------
+def new_combos_expand_forest(expmod, scombo):
+    """Similar to new_combo(), but returns multiple combos, expanding with forest=None as a wildcard.
+    Returns: [Combo, ...]
+    """
+
+    dcombo = {key:val for key,val in zip(expmod.combo_keys, scombo)}
+    if dcombo.get('forest', '') is None:
+        combos = list()
+        for forest in ('For', 'NoFor'):
+            dcombo['forest'] = forest
+            combos.append(expmod.Combo(**expmod.combo_schema.validate(dcombo)))
+        return combos
+    else:
+        # No wildcard
+        return [expmod.Combo(**expmod.combo_schema.validate(dcombo))]
 
 # -----------------------------------------------------------
 #def main():

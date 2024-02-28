@@ -732,8 +732,6 @@ def stdmosaic(args):
     # Identify combos
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
-    print(akdf0)
-    print(akdf0.columns)
 
     # Only run for combos that are completely finished
     akdf0 = joblib.add_combo_quickstatus(akdf0, mtime=True)

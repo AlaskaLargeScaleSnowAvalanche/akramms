@@ -140,7 +140,7 @@ def query_condor(expmod):
         parts= job_name.split('-')
         #expmod = parse.load_expmod(parts[0])
 #        print('parts ', parts)
-        combo = parse.new_combo(expmod, parts[1:-3])
+        combo = parse.new_combo(expmod, parts[1:-3])    # Take off idom,jdom,chunkid
         id = int(parts[-3])
         chunkid = int(parts[-1])
 
