@@ -28,7 +28,9 @@ def read_reldom(akdf0, tdir):
     """
     reldfs = list()
     domdfs = list()
-    for arcdir,akdf1 in akdf0.groupby('releasefile'):
+    for combo,arcdir,akdf1 in akdf0.groupby(['combo', 'releasefile']):
+        scombo = '-'.join(str(x) for x in tup.combo)
+
         # Read all _rel / _dom data in the archive dir
         reldf = archive.read_reldom(arcdir/'RELEASE.zip', 'rel', tdir, shape='pra')
         domdf = archive.read_reldom(arcdir/'DOMAIN.zip', 'dom', tdir, shape='dom')
@@ -39,10 +41,12 @@ def read_reldom(akdf0, tdir):
         reldf = df.merge(reldf, how='left', left_on='id', right_on='Id')
         reldf = reldf.drop('id', axis=1)
         reldf['pra_size'] = reldf['pra_size'].astype('string')
+        reldf['combo'] = scombo
         reldfs.append(reldf)
 
         domdf = df.merge(domdf, how='left', left_on='id', right_on='Id')
         domdf = domdf.drop('id', axis=1)
+        domdf['combo'] = scombo
         domdfs.append(domdf)
 
     reldf = pd.concat(reldfs)
