@@ -750,7 +750,7 @@ def stdmosaic(args):
         forest_ix = expmod.combo_keys.index('forest')
         combo = akdf1.combo.tolist()[0]
         print('ffffffff ', combo)
-        combo = combo[:forest_ix] + ['AllFor'] + combo[forest_ix+1:]
+        combo = list(combo[:forest_ix]) + ['AllFor'] + list(combo[forest_ix+1:])
         scombo = '-'.join(str(x) for x in combo)
         sstatus = ''.join(joblib.JobStatus._member_names_[x][0] for x in sorted(args.status))
         leafbase = f'{expmod.name}-{scombo}-{sstatus}'
