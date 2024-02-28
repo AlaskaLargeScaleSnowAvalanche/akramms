@@ -1,4 +1,4 @@
-import os,pathlib,subprocess
+import os,pathlib,subprocess,sys
 import numpy as np
 import pandas as pd
 import zipfile,netCDF4
@@ -350,10 +350,12 @@ def mosaic_avals_combo(akdf, sextent, ofname,
 
 # ---------------------------------------------------------------------------------
 def consolidate_by_forest(expmod, akdf0):
-    """
+    """Combines For / NoFor pairs for stdmosaic operations.
+    Raises an error if any unmatched rows are found in the input.
+
     akdf0:
         Resolved by combo.  (Single exp only)
-    Returns / Yields: [akdf1, akdf1, ...]
+    Returns: [akdf1, akdf1, ...]
         Each akdf1 contains two rows of akdf0 with matching For/NoFor pairs.
     """
 
@@ -361,5 +363,13 @@ def consolidate_by_forest(expmod, akdf0):
     # If it fails it will throw a ValueError.
     forest_ix = expmod.combo_keys.index('forest')
 
-    for ix in range(len(akdf0)):
-        akdf1 = akdf0.iloc[[ix],:]    # akdf1 is just one row of akdf0
+    akdf0['combo_noforest'] = akdf0.combo.map( lambda combo: tuple((combo[:forest_ix],)+combo[forest_ix+1:]) )
+#    akdf0['forest'] = akdf0.combo.map(lambda combo: combo[forest_ix])
+
+    akdf1s = list()
+    for combo_noforest,akdf1 in akdf0.groupby('combo_noforest'):
+        if len(akdf1) != 2:
+            raise ValueError(f'ERROR: Need both For and NoFor pair to proceed further, we have only: {akdf1.combo.tolist()}')
+
+        akdf1s.append(akdf1
+    return akdf1s

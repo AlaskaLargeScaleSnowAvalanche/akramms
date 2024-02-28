@@ -736,9 +736,6 @@ def stdmosaic(args):
     # Only run for combos that are completely finished
     akdf0 = joblib.add_combo_quickstatus(akdf0, mtime=True)
     akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED]
-    print('aaaaaaaaaaaaaaaa')
-    print(akdf0.combo)
-    return
 
     if len(akdf0) == 0:
         raise ValueError('None of the select combos are MARKED_FINISHED.  Run akramms status --update')
@@ -748,6 +745,11 @@ def stdmosaic(args):
     exp = akdf0.iloc[0].exp
     expmod = akramms.parse.load_expmod(exp)
     for akdf1 in mosaic.consolidate_by_forest(expmod, akdf0):
+
+        print('aaaaaaaaaaaaaaaa')
+        print(akdf1.combo)
+        continue
+
 
         # Determine output filename
         combo = akdf1.combo.item()
