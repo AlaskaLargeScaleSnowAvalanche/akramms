@@ -134,6 +134,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
 
     # Use OGR to create shapefile for avalanche outlines
     extent_shp = str(dir / 'extent.shp')
+    print('Writing extent_shp ', extent_shp)
     if os.path.exists(extent_shp):
         os.remove(extent_shp)
     extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
@@ -222,14 +223,13 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
                 vals['avalanche_count'])
             _mosaic.mosaic(*args)
 
-        # Close extent.shp and store in the mosaic zip file
-        extent_layer = None
-        extent_ds = None
-
-
     # Write output GeoTIFF and Zip it up
     os.makedirs(ofname_zip.parents[0], exist_ok=True)
     with zipfile.ZipFile(ofname_zip, mode='w', compression=zipfile.ZIP_STORED) as ozip:
+
+        # Close extent.shp and store in the mosaic zip file
+        extent_layer = None
+        extent_ds = None
 
         # Copy the extent.shp files we created above (extent_layer / extent_ds)
         for ext in ('shp','dbf','shx','prj'):
