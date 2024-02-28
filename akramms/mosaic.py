@@ -107,6 +107,20 @@ class _ExtentShp(typing.NamedTuple):
     layer: object
     Id: object
 
+def new_extent_shp(dir, gridM, combo):
+    scombo = '-'.join(str(x) for x in combo)
+    extent_shp = str(dir / f'extent-{scombo}.shp')
+    print('Writing extent_shp ', extent_shp)
+    if os.path.exists(extent_shp):
+        os.remove(extent_shp)
+    extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
+    extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.wkt), geom_type=ogr.wkbMultiPolygon )
+    # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
+    extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
+    return _ExtentShp(scombo, extent_shp, extent_ds, extent_layer, extent_Id)
+
+
+
 def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
     rho=300, vars=_mosaic_keys,
     dem_fn=None, landcover_fn=None, snow_fn=None):
@@ -151,19 +165,21 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
     # Create one OGR layer per combo so we can merge them later to get the metadata right.
     extent_shps = dict()
     for combo in akdf.combo.unique():
-        scombo = '-'.join(str(x) for x in combo)
-#        extent_shp = str(dir / f'extent-{scombo}.shp')
-        extent_shp = f'extent-{scombo}.shp'
-        print('Writing extent_shp ', extent_shp)
-        if os.path.exists(extent_shp):
-            os.remove(extent_shp)
-        extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
-        extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.wkt), geom_type=ogr.wkbMultiPolygon )
-        # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
-        extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
-        print('extent_Id = ', extent_Id)
+        extent_shps[combo] = new_extent_shp(dir, gridM, combo)
 
-        extent_shps[combo] = _ExtentShp(scombo, extent_shp, extent_ds, extent_layer, extent_Id)
+#        scombo = '-'.join(str(x) for x in combo)
+##        extent_shp = str(dir / f'extent-{scombo}.shp')
+#        extent_shp = f'extent-{scombo}.shp'
+#        print('Writing extent_shp ', extent_shp)
+#        if os.path.exists(extent_shp):
+#            os.remove(extent_shp)
+#        extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
+#        extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.wkt), geom_type=ogr.wkbMultiPolygon )
+#        # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
+#        extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
+#        print('extent_Id = ', extent_Id)
+#
+#        extent_shps[combo] = _ExtentShp(scombo, extent_shp, extent_ds, extent_layer, extent_Id)
 
 #    for aval_i,fname in enumerate(avals):
     print(akdf.columns)
