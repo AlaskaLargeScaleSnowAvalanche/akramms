@@ -350,14 +350,13 @@ def ramms_to_nc0(out_zip, id_status, ncout):
             required=False)
 
         # The .v?.dom files
-        vdoms = list()
-        for i in itertools.count(1):
-            ifname = f'{base}.v{i}.dom'
-            ret = nc_poly(ncout, in_zip, f'{leaf}.v{i}.dom', f'dom_v{i}', coord_attrs,
-                {'description': f'OFFICIAL release area polygon written by RAMMS IDL code (enlargement try #{i}).'},
-                required=False)
-            if ret is None:
-                break
+        # There will only be one: having more than one in the zip file is vestigal from when
+        # we thought we could process overruns without re-running RAMMS.
+        ret = nc_poly(ncout, in_zip, f'{leaf}.v1.dom', f'dom', coord_attrs,
+            {'description': f'OFFICIAL release area polygon written by RAMMS IDL code.',
+            'grid_mapping': 'grid_mapping',
+            'nx': gridI.nx, 'ny': gridI.ny},    # Make sure we capture the original grid dimensions so we can re-create raster later.
+            required=False)
 
         # The .xyz file (SKIP)
 

@@ -168,7 +168,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
             nzmask = np.logical_or(np.logical_or(
                 max_vel>0, max_height>0), depo>0).astype('i8')
 
-            nzmask_ds = gdalutil.raster_ds((raster.grid, nzmask, 0))
+            nzmask_ds = gdalutil.raster_ds((gridM, nzmask, 0))
             nzmask_band = nzmask_ds.GetRasterBand(1)
             gdal.Polygonize(nzmask_band, nzmask_band, extent_layer, -1)
 
