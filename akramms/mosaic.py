@@ -176,7 +176,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
             gridL_gt[0] += gridL_gt[1] * iL_min
             gridL_gt[3] += gridL_gt[4] * jL_min
             gridL = gisutil.RasterInfo(
-                ncv.crs_wkt,
+                nc.variables['grid_mapping'].crs_wkt,
                 iL_max - iL_min,
                 jL_max - jL_min,
                 gridL_gt)
