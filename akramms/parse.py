@@ -3,6 +3,8 @@ import importlib
 import netCDF4
 from akramms import file_info
 
+__all__ = ('parse_args', 'new_combo')
+
 # =====================================================================
 _module_type = type(re)    # Any module will do here
 @functools.lru_cache()
@@ -325,7 +327,7 @@ def parse_file(file):
 # ----------------------------------------------------------------------
 _exclude_dirs = {'.', '..'}
 def parse_args(args, load=True):
-    """Parses anything on the command line"""
+    """Parses anything on the command line.  Top-level function"""
 
     rets = list()    # The things we parsed
     parts = list()    # Accumulate args
@@ -337,8 +339,8 @@ def parse_args(args, load=True):
 
         # ----------- Handle main portion (before the single colon)
         if len(parts) == 1:
-            # First try parsing as an expset
             try:
+                # First try parsing as an expset
                 rets.append(parse_expset(parts[0], load=load))
             except ValueError:
                 # I guess it's not an expset
@@ -398,6 +400,9 @@ def new_combo(expmod, scombo):
     """Given individual parts of Combo as strings, creates a fully
     typed Combo object."""
     dcombo = {key:val for key,val in zip(expmod.combo_keys, scombo)}
+    # Allow for forest wildcard (useful for mosaic)
+    if dcombo.get('forest', '') is None:
+        dcombo['forest'] = ''
     return expmod.Combo(**expmod.combo_schema.validate(dcombo))
 
 # -----------------------------------------------------------

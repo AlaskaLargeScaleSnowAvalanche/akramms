@@ -48,7 +48,7 @@ gridD = gisutil.DomainGrid(
 experiment_region_zip = config.roots.syspath('{DATA}/wolken/SE_AK_Domain_Land.zip')
 experiment_region_shp = f'/vsizip/{experiment_region_zip}/SE_AK_Domain_Land.shp'
 
-# Scehma of top-level tuple describing a single trial.
+# Schema of top-level tuple describing a single trial.
 combo_schema = schema.Schema({
     'snow_dataset': schemautil.EnumField(
         {'ccsm', 'cfsr', 'gfdl'},
@@ -61,7 +61,7 @@ combo_schema = schema.Schema({
         {'select', 'lapse'},
         "Algorithm to use downscaling snow from WRF to RAMMS grid"),
     'forest': schemautil.EnumField(
-        {'For', 'NoFor'},
+        {'', 'For', 'NoFor'},
         "Use the forest file or not"),
     'return_period': schemautil.ParsedEnumField(
         int, repr,
