@@ -296,6 +296,8 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
             print('RRRRRRRRR 1833', xdf.loc[xdf.Id==1833][['Id','combo']])
             xdfs.append(xdf)
         xdf = pd.concat(xdfs)
+        xdf['combo'] = xdf['combo'].astype('string')
+
         print([(col,xdf[col].dtype) for col in xdf.columns])
         shputil.write_df(xdf, 'shape', 'MultiPolygon', final_extent_shp, wkt=gridM.wkt)
 
