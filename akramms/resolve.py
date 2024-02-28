@@ -455,8 +455,9 @@ def expand_combo_wildcard_forest(akdf):
         Resolved to the COMBO level
     """
 
-    print(akdf)
+    print('zzzzzzzzzzzzzzzzzzzzzzzzzzzz ', akdf)
     return akdf
+#    mask = (akdf.forest == '')
 
 
 # -------------------------------------------------------------
