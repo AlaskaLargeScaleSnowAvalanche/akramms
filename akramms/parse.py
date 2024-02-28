@@ -22,7 +22,7 @@ def load_expmod(exp_name):
     return exp_mod
 
 _all_dotsRE = re.compile(r'^([\.]+)$')
-def _parse_parts(parts, load=False, assume_wcombo=False):
+def parse_parts(parts, load=False, assume_wcombo=False):
     """
     parts: Eg:
         ['ak', 'ccsm', '1981', '1990', 'lapse', 'For', '30', '.', '.']
