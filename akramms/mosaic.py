@@ -371,5 +371,5 @@ def consolidate_by_forest(expmod, akdf0):
         if len(akdf1) != 2:
             raise ValueError(f'ERROR: Need both For and NoFor pair to proceed further, we have only: {akdf1.combo.tolist()}')
 
-        akdf1s.append(akdf1
+        akdf1s.append(akdf1)
     return akdf1s
