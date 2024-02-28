@@ -186,9 +186,9 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
             nzmaskL = np.zeros((gridL.ny, gridL.nx))
             nzmaskL[jL,iL] = 1
 
-#            max_vel = nc.variables['max_vel'][:].astype('f4')
-#            max_height = nc.variables['max_height'][:].astype('f4')
-#            depo = nc.variables['depo'][:].astype('f4')
+            max_vel = nc.variables['max_vel'][:].astype('f4')
+            max_height = nc.variables['max_height'][:].astype('f4')
+            depo = nc.variables['depo'][:].astype('f4')
 #
 #            nzmask = np.logical_or(np.logical_or(
 #                max_vel>0, max_height>0), depo>0).astype('i8')
