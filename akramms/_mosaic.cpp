@@ -67,16 +67,17 @@ void mosaic_mosaic(
         domain_countM[jiM] += 1;
 
         // Update variables for only used gridcells in avalanche domain
-        if (max_velA[kA] > 0) {
-            avalanche_countM[jiM] += 1;
-            depositionM[jiM] = std::max(depositionM[jiM], depoA[kA]);
-            max_heightM[jiM] = std::max(max_heightM[jiM], max_heightA[kA]);
-            max_velocityM[jiM] = std::max(max_velocityM[jiM], max_velA[kA]);
+//        used = false;
+//        if (max_velA[kA] > 0) {
 
-            double const _max_vel = max_velA[kA];
-            max_pressureM[jiM] = std::max(
-                max_pressureM[jiM], (float)(rho * _max_vel * _max_vel));
-        }
+        avalanche_countM[jiM] += 1;
+        depositionM[jiM] = std::max(depositionM[jiM], depoA[kA]);
+        max_heightM[jiM] = std::max(max_heightM[jiM], max_heightA[kA]);
+        max_velocityM[jiM] = std::max(max_velocityM[jiM], max_velA[kA]);
+
+        double const _max_vel = max_velA[kA];
+        max_pressureM[jiM] = std::max(
+            max_pressureM[jiM], (float)(rho * _max_vel * _max_vel));
     }
 }
 

@@ -233,13 +233,23 @@ def full():
 
 # -----------------------------------------------------------------
 def juneau():
-    for year0,year1 in [(1981,1990), (2051,2060)]:
+    for year0,year1 in [(1981,2010)]:
+        for return_period in [30,300]:
+            for idom,jdom in [(113,45), (113,44)]:
+                for forest in ('NoFor','For'):
+                    yield Combo('ccsm', year0, year1, 'lapse', forest, return_period, idom, jdom)
+
+
+
+
+
+#    for year0,year1 in [(1981,1990), (2051,2060)]:
 #    for year0,year1 in [(2051,2060)]:
 
-        # Just one combo for now
-        yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 113, 45)    # A Juneau-close box
-        yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 113, 44)    # North of Juneau
-        yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 111, 42)    # Tile borders with Canada
+#        # Just one combo for now
+#        yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 113, 45)    # A Juneau-close box
+#        yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 113, 44)    # North of Juneau
+#        yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 111, 42)    # Tile borders with Canada
 
 def simple():
     yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 45)    # A Juneau-close box
