@@ -290,15 +290,15 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
 #        extent_shps = None    # Close the files with OGR
         xdfs = list()
         for (scombo, extent_shp) in scombo_fnames:
-            print('RRRRRRRRReading ', extent_shp)
+#            print('RRRRRRRRReading ', extent_shp)
             xdf = shputil.read_df(extent_shp)
             xdf['combo'] = scombo
-            print('RRRRRRRRR 1833', xdf.loc[xdf.Id==1833][['Id','combo']])
+#            print('RRRRRRRRR 1833', xdf.loc[xdf.Id==1833][['Id','combo']])
             xdfs.append(xdf)
         xdf = pd.concat(xdfs)
         xdf['combo'] = xdf['combo'].astype('string')
 
-        print([(col,xdf[col].dtype) for col in xdf.columns])
+#        print([(col,xdf[col].dtype) for col in xdf.columns])
         shputil.write_df(xdf, 'shape', 'MultiPolygon', final_extent_shp, wkt=gridM.wkt)
 
         # Copy the extent.shp files we created above (extent_layer / extent_ds)

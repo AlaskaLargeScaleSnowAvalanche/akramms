@@ -680,7 +680,7 @@ def xmosaic(args):
     # Identify archived avalanches for use in the mosaic
     parseds = akramms.parse.parse_args(args.spec)
     akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
-    akdf = resolve.expand_combo_wildcard_forest(akdf)
+#    akdf = resolve.expand_combo_wildcard_forest(akdf)
 
     mosaic.mosaic_avals_combo(
         akdf, args.extent, args.output,
