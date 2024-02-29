@@ -683,7 +683,7 @@ def xmosaic(args):
 #    akdf = resolve.expand_combo_wildcard_forest(akdf)
 
     mosaic.mosaic_avals_combo(
-        akdf, args.extent, args.output,
+        akdf, args.extent, pathlib.Path(args.output),
         args.status, args.margin,
         args.snow, args.dem, args.landcover,
         args.dry_run)
