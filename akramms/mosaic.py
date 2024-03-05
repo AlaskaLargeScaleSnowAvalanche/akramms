@@ -452,7 +452,7 @@ def mosaic_avals_combo(akdf, sextent, ofname,
         mosaic_avals_id(gridM, akdf, ofname, tdir, **kwargs)
 
 # ---------------------------------------------------------------------------------
-def consolidate_by_forest(expmod, akdf0):
+def consolidate_by_forest(expmod, akdf0, check_forest_pairs=True):
     """Combines For / NoFor pairs for stdmosaic operations.
     Raises an error if any unmatched rows are found in the input.
 
@@ -470,9 +470,10 @@ def consolidate_by_forest(expmod, akdf0):
 #    akdf0['forest'] = akdf0.combo.map(lambda combo: combo[forest_ix])
 
     akdf1s = list()
-    for combo_noforest,akdf1 in akdf0.groupby('combo_noforest'):
-        if len(akdf1) != 2:
-            raise ValueError(f'ERROR: Need both For and NoFor pair to proceed further, we have only: {akdf1.combo.tolist()}')
+    if check_forest_pairs:
+        for combo_noforest,akdf1 in akdf0.groupby('combo_noforest'):
+            if len(akdf1) != 2:
+                raise ValueError(f'ERROR: Need both For and NoFor pair to proceed further, we have only: {akdf1.combo.tolist()}')
 
         akdf1s.append(akdf1)
     return akdf1s
