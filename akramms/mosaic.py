@@ -219,6 +219,12 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
             iL_max = np.max(iA) + 3
             jL_min = np.min(jA) - 2
             jL_max = np.max(jA) + 3
+
+            # DEBUG
+            iL_min = 0
+            jL_min = 0
+
+
             iL = iA - iL_min    # Vector operation
             jL = jA - jL_min
             gridL_gt = np.array(gridA_gt, dtype='i8')
@@ -231,10 +237,10 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
                 gridL_gt)
 
 
-            # DEBUG
-            gridL = gridM
-            iL = iA
-            jL = jA
+#            # DEBUG
+#            gridL = gridM
+#            iL = iA
+#            jL = jA
 
             # Burn the gridcells that are part of our grid
             # (already pared down)
