@@ -232,7 +232,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
 
 
             # DEBUG
-            gridL = gridA
+            gridL = gridM
 
             # Burn the gridcells that are part of our grid
             # (already pared down)
