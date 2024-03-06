@@ -219,7 +219,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
             iL_max = np.max(iA) + 3
             jL_min = np.min(jA) - 2
             jL_max = np.max(jA) + 3
-            iL = iA - iL_min
+            iL = iA - iL_min    # Vector operation
             jL = jA - jL_min
             gridL_gt = np.array(gridA_gt, dtype='i8')
             gridL_gt[0] += gridL_gt[1] * iL_min
@@ -229,6 +229,10 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
                 iL_max - iL_min,
                 jL_max - jL_min,
                 gridL_gt)
+
+
+            # DEBUG
+            gridL = gridA
 
             # Burn the gridcells that are part of our grid
             # (already pared down)
@@ -419,7 +423,6 @@ def mosaic_avals_combo(akdf, sextent, ofname,
         assert all(x[:-2] == snowfile_argss[0][:-2] for x in snowfile_argss)
 
         # Create virtual raster to query
-        print('xxxxxxxxxxxx ', snowfile_argss)
         snowfile_vrt = downscale_snow.snowfile_vrt(snowfile_argss)
 
     if not ofname.parts[-1].endswith('.zip'):
