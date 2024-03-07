@@ -47,6 +47,7 @@ void mosaic_mosaic(
     int const deltaj = -(gridM_y0 - gridA_y0) / gridM_dy + 0.5;
 
     PySys_WriteStdout("(deltai, deltaj) = (%d, %d)\n", deltai, deltaj);
+    PySys_WriteStdout("deltai: %f %f\n", -(gridM_x0 - gridA_x0), gridM_dx);
 
     int iA = 0;    // Current index in gridA
     int jA = 0;
