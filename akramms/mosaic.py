@@ -129,6 +129,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
 
     gridM:
         Sub-grid (of global gridG) defining the extent of our mosaic domain
+        When doing stdmosaic, this will be the same as the subdomain tile (gridA)
     akdf:
         Avalanches (in scenetype='arc') to mosiac
         Resolved to the id level
@@ -201,11 +202,15 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
         with netCDF4.Dataset(tup.avalfile) as nc:
             nc.set_always_mask(False)
 
-            # --------------- gridA is overall scene grid, WITH MARGIN
+            # --------------- gridA is the subdomain tile, WITH MARGIN
             # Geotransform of this avalanche's local grid
             # TODO: Store Geotransform as machine-precision doubles in the file
             gridA_gt = np.array([float(x) for x in nc.variables['grid_mapping'].GeoTransform.split(' ')])
             gridA_wkt = nc.variables['grid_mapping'].crs_wkt
+
+            print('gridM GT: ', gridM.geotransform)
+            print('gridA GT: ', gridA_gt)
+
 
             # --------------- Determine gridL, an x/y oriented grid (subgrid of the tile) containing the avalanche.
             i_diff = nc.variables['i_diff'][:]

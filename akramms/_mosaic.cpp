@@ -31,7 +31,7 @@ void mosaic_mosaic(
     // Constants
     double const rho,
 
-    // Info on the overall mosaic grid
+    // Info on the overall mosaic grid (which for stdmosaic is the same as the subdomain tile)
     int gridM_nx, double gridM_x0, double gridM_dx,
     int gridM_ny, double gridM_y0, double gridM_dy,
 
