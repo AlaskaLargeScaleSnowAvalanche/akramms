@@ -258,7 +258,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
             # > of an avalanche, where
             # >   Flow-depth > 0.25m AND
             # >   velocity > 1m/s
-            nzmask_val = np.zeros(nzmask.shape, dtype=np.int32)
+            nzmask_val = np.zeros(max_vel.shape, dtype=np.int32)
             namask_val[np.logical_and(max_height > 0.25, max_vel > 1.0)] = tup.id
 
             # Burn the gridcells that are part of our grid
