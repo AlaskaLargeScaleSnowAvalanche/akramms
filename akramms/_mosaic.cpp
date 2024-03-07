@@ -73,10 +73,16 @@ void mosaic_mosaic(
 //        used = false;
 //        if (max_velA[kA] > 0) {
 
-        avalanche_countM[jiM] += 1;
         depositionM[jiM] = std::max(depositionM[jiM], depoA[kA]);
         max_heightM[jiM] = std::max(max_heightM[jiM], max_heightA[kA]);
         max_velocityM[jiM] = std::max(max_velocityM[jiM], max_velA[kA]);
+
+        // On March 5, 2024 Marc Christen wrote:
+        // > These outlines are defined as an envelope of grid cells
+        // > of an avalanche, where
+        // >   Flow-depth > 0.25m AND
+        // >   velocity > 1m/s
+        if ((max_heightA[kA] > 0.25) && (max_velA[kA] > 1.0)) avalanche_countM[jiM] += 1;
 
         double const _max_vel = max_velA[kA];
         max_pressureM[jiM] = std::max(
