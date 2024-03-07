@@ -468,6 +468,7 @@ def mosaic_avals_combo(akdf, sextent, ofname,
 
 #    with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
 #    with ioutil.TmpDir(ofname.parents[0]) as tdir:
+    os.makedirs(ofname.parents[0], exist_ok=True)
     with ioutil.TmpDir(ofname.parents[0]) as tdir:
         mosaic_avals_id(gridM, akdf, ofname, tdir, **kwargs)
 
