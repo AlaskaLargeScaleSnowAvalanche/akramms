@@ -129,7 +129,8 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
 
     gridM:
         Sub-grid (of global gridG) defining the extent of our mosaic domain
-        When doing stdmosaic, this will be the same as the subdomain tile (gridA)
+        When doing stdmosaic, this will be the subdomain tile WITHOUT MARGINS
+        (Note that gridA is WITH MARGINS)
     akdf:
         Avalanches (in scenetype='arc') to mosiac
         Resolved to the id level
@@ -183,7 +184,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
 #        extent_shps[combo] = _ExtentShp(scombo, extent_shp, extent_ds, extent_layer, extent_Id)
 
 #    for aval_i,fname in enumerate(avals):
-    print(akdf.columns)
+#    print(akdf.columns)
     akdf = akdf.sort_values('id')
     count = 0
     for tup in akdf.itertuples(index=False):
@@ -208,8 +209,8 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
             gridA_gt = np.array([float(x) for x in nc.variables['grid_mapping'].GeoTransform.split(' ')])
             gridA_wkt = nc.variables['grid_mapping'].crs_wkt
 
-            print('gridM GT: ', gridM.geotransform)
-            print('gridA GT: ', gridA_gt)
+#            print('gridM GT: ', gridM.geotransform)
+#            print('gridA GT: ', gridA_gt)
 
 
             # --------------- Determine gridL, an x/y oriented grid (subgrid of the tile) containing the avalanche.

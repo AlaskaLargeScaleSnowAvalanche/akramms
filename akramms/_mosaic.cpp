@@ -31,7 +31,7 @@ void mosaic_mosaic(
     // Constants
     double const rho,
 
-    // Info on the overall mosaic grid (which for stdmosaic is the same as the subdomain tile)
+    // Info on the overall mosaic grid
     int gridM_nx, double gridM_x0, double gridM_dx,
     int gridM_ny, double gridM_y0, double gridM_dy,
 
@@ -45,6 +45,8 @@ void mosaic_mosaic(
 {
     int const deltai = -(gridM_x0 - gridA_x0) / gridM_dx + 0.5;
     int const deltaj = -(gridM_y0 - gridA_y0) / gridM_dy + 0.5;
+
+    PySys_WriteStdout("(deltai, deltaj) = (%d, %d)\n", deltai, deltaj);
 
     int iA = 0;    // Current index in gridA
     int jA = 0;
