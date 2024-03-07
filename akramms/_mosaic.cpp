@@ -43,8 +43,8 @@ void mosaic_mosaic(
     int16_t *domain_countM,
     int16_t *avalanche_countM)
 {
-    int const deltai = -(gridM_x0 - gridA_x0) / gridM_dx + 0.5;
-    int const deltaj = -(gridM_y0 - gridA_y0) / gridM_dy + 0.5;
+    int const deltai = std::lround(-(gridM_x0 - gridA_x0) / gridM_dx);
+    int const deltaj = std::lround(-(gridM_y0 - gridA_y0) / gridM_dy);
 
     PySys_WriteStdout("(deltai, deltaj) = (%d, %d)\n", deltai, deltaj);
     PySys_WriteStdout("deltai: %f %f\n", -(gridM_x0 - gridA_x0), gridM_dx);
