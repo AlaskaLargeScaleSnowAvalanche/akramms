@@ -226,9 +226,9 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
             jL_min = np.min(jA) - 2
             jL_max = np.max(jA) + 3
 
-            # DEBUG
-            iL_min = 0
-            jL_min = 0
+#            # DEBUG
+#            iL_min = 0
+#            jL_min = 0
 
 
             iL = iA - iL_min    # Vector operation
@@ -248,20 +248,23 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
 #            iL = iA
 #            jL = jA
 
-            # Burn the gridcells that are part of our grid
-            # (already pared down)
-            nzmaskL = np.zeros((gridL.ny, gridL.nx), dtype=np.int32)
-            nzmaskL[jL,iL] = tup.id    # This will get written into the attribute table
-
+            # Read avalanche output as values on list-of-gridcells
             max_vel = nc.variables['max_vel'][:].astype('f4')
             max_height = nc.variables['max_height'][:].astype('f4')
             depo = nc.variables['depo'][:].astype('f4')
-#
-#            nzmask = np.logical_or(np.logical_or(
-#                max_vel>0, max_height>0), depo>0).astype('i8')
 
+            # On March 5, 2024 Marc Christen wrote:
+            # > These outlines are defined as an envelope of grid cells
+            # > of an avalanche, where
+            # >   Flow-depth > 0.25m AND
+            # >   velocity > 1m/s
+            nzmask_val = np.zeros(nzmask.shape, dtype=np.int32)
+            namask_val[np.logical_and(max_height > 0.25, max_vel > 1.0)] = tup.id
 
-#            print('xxxxxxxx ', gridL.geotransform, gridL.nx, gridL.ny)
+            # Burn the gridcells that are part of our grid
+            # (already pared down)
+            nzmaskL = np.zeros((gridL.ny, gridL.nx), dtype=np.int32)
+            nzmaskL[jL,iL] = nzmask_val    # This will get written into the attribute table
 
             nzmask_ds = gdalutil.raster_ds((gridL, nzmaskL, 0))
             nzmask_band = nzmask_ds.GetRasterBand(1)
