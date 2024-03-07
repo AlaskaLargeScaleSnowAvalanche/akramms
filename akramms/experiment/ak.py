@@ -34,8 +34,10 @@ extract_landcover = d_usgs_landcover.extract    # Function to extract from maste
 # ----------------------------------------------
 
 # Define the domains within all of Alaska, each with an (idom, jdom) coordinate.
+# NOTE: Domain size and margin MUST be an even multiple of the
+#       gridcell spacing of the DEM (10m) and Forest (30m) files.
 domain_size = (30000., 30000.)   # 30km^2
-domain_margin = (8000,8000)    # 8km margin
+domain_margin = (7980,7980)    # 7980m margin
 gridD = gisutil.DomainGrid(
     wkt,
     config.roots.syspath('{DATA}/fischer/AlaskaBounds.shp'),
