@@ -46,8 +46,8 @@ void mosaic_mosaic(
     int const deltai = std::lround(-(gridM_x0 - gridA_x0) / gridM_dx);
     int const deltaj = std::lround(-(gridM_y0 - gridA_y0) / gridM_dy);
 
-    PySys_WriteStdout("(deltai, deltaj) = (%d, %d)\n", deltai, deltaj);
-    PySys_WriteStdout("deltai: %f %f\n", -(gridM_x0 - gridA_x0), gridM_dx);
+//    PySys_WriteStdout("(deltai, deltaj) = (%d, %d)\n", deltai, deltaj);
+//    PySys_WriteStdout("deltai: %f %f\n", -(gridM_x0 - gridA_x0), gridM_dx);
 
     int iA = 0;    // Current index in gridA
     int jA = 0;
