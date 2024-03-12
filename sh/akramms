@@ -231,6 +231,7 @@ def report(args):
     # Exclude combos that have already been completely finished and archived
     # (and the x-dir might have been deleted)
     akdf0 = joblib.add_combo_quickstatus(akdf0, mtime=True)
+    print(akdf0)
 
     mask = akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED
     akdf0 = akdf0[mask]
