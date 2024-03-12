@@ -221,7 +221,7 @@ def report(args):
     """Quick status report at the Combo level"""
 
     parseds = akramms.parse.parse_args(args.spec)
-    akdf0 = resolve.resolve_to(parseds, 'combo', realized=True)
+    akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
     akdf0 = akdf0.reset_index(drop=True)
 
     # Exclude combos that have already been completely finished and archived
