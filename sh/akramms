@@ -231,12 +231,12 @@ def report(args):
     # Exclude combos that have already been completely finished and archived
     # (and the x-dir might have been deleted)
     akdf0 = joblib.add_combo_quickstatus(akdf0, mtime=True)
-    print(akdf0)
 
     mask = (akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED)
     todo = akdf0[~mask].head(5)
     done = akdf0[mask]
-    print('len todo ', len(todo))
+
+
     todo['finished'] = None
 
 
@@ -252,7 +252,7 @@ def report(args):
 
     # Format things
     df['combo'] = df['combo'].map(lambda combo: '-'.join(str(x) for x in combo))
-    df['finished'] = df['finished'].map(lambda dt: None if dt is None else dt.strftime('%Y-%m-%d %H::%m'))
+    df['finished'] = df['finished'].map(lambda dt: '' if dt is None else dt.strftime('%Y-%m-%d %H::%m'))
     print(df)
 
 
