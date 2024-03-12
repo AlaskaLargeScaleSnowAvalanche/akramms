@@ -258,6 +258,7 @@ def report(args):
 
 
     print(f'Finished {ndone} of {ntodo} combos')
+    print('Recently finished / soon-to-compute combos include:')
     for tup in df.itertuples(index=False):
         print(f'{tup.combo}: {tup.finished}')
 
