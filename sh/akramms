@@ -233,7 +233,7 @@ def report(args):
     akdf0 = joblib.add_combo_quickstatus(akdf0, mtime=True)
 
     akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED]
-    todo = akdf0[akdf0.combo_quickstatus != joblib.JobStatus.MARKED_FINISHED].head()
+    todo = akdf0[akdf0.combo_quickstatus ~= joblib.JobStatus.MARKED_FINISHED].head()
     todo['finished'] = None
 
     akdf0['finished'] = akdf0['combo_quickstatus_mtime'].map(datetime.datetime.fromtimestamp)
