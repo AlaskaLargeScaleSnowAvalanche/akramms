@@ -233,7 +233,7 @@ def report(args):
     akdf0['finished'] = akdf0['combo_quickstatus_mtime'].map(datetime.datetime.fromtimestamp)
     akdf0['combo'] = akdf0['combo'].map(lambda combo: '-'.join(x for x in combo))
     akdf0 = akdf0.sort_values('combo_quickstatus_mtime', ascending=False)
-    akdf0 = akdf0[['combo', 'combo_quickstatus', 'finished']]
+    akdf0 = akdf0[['combo', 'finished']]
     print(akdf0)
 
 
