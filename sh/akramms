@@ -252,7 +252,7 @@ def report(args):
 
     # Format things
     df['combo'] = df['combo'].map(lambda combo: '-'.join(str(x) for x in combo))
-    df['finished'] = df['finished'].map(lambda dt: '' if dt is None else dt.strftime('%Y-%m-%d %H::%m'))
+    df['finished'] = df['finished'].map(lambda dt: None if pd.isnull(dt) else dt.strftime('%Y-%m-%d %H::%m'))
     print(df)
 
 
