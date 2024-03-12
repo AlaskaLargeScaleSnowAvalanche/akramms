@@ -236,7 +236,9 @@ def report(args):
     mask = (akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED)
     akdf0 = akdf0[mask]
     todo = akdf0[~mask].head()
+    print('len todo ', len(todo))
     todo['finished'] = None
+
 
     akdf0['finished'] = akdf0['combo_quickstatus_mtime'].map(datetime.datetime.fromtimestamp)
     akdf0 = akdf0.sort_values('combo_quickstatus_mtime', ascending=False)
