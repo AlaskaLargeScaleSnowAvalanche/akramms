@@ -237,6 +237,9 @@ def report(args):
     done = akdf0[mask]
 
 
+    ndone = len(done)
+    ntodo = len(todo)
+
     todo['finished'] = None
 
 
@@ -253,6 +256,8 @@ def report(args):
     df['combo'] = df['combo'].map(lambda combo: '-'.join(str(x) for x in combo))
     df['finished'] = df['finished'].map(lambda dt: '' if pd.isnull(dt) else dt.strftime('%Y-%m-%d %H::%m'))
 
+
+    print(f'Finished {ndone} of {ntodo} combos')
     for tup in df.itertuples(index=False):
         print(f'{tup.combo}: {tup.finished}')
 
