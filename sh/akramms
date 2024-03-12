@@ -214,6 +214,26 @@ def status(args):
 #    print(akdf[['combo_order', 'combo', 'combo_status']])
     joblib.print_status(akdf, args.level)
 # ---------------------------------------------------------------------
+@subcommand([
+])
+def report(args):
+    """Quick status report at the Combo level"""
+
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf0 = resolve.resolve_to(parseds, 'combo', realized=True)
+    akdf0 = akdf0.reset_index(drop=True)
+
+    # Exclude combos that have already been completely finished and archived
+    # (and the x-dir might have been deleted)
+    akdf0 = joblib.add_combo_quickstatus(akdf0)
+#    akdf0 = akdf0[akdf0.combo_quickstatus != joblib.JobStatus.MARKED_FINISHED]
+
+    print(akdf0)
+
+
+
+
+# ---------------------------------------------------------------------
 def get_exp_dir(exp_mod):
     return config.roots.join('PRJ', exp_mod.name)
 
