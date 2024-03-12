@@ -220,6 +220,8 @@ def status(args):
 def report(args):
     """Quick status report at the Combo level"""
 
+    import datetime
+
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
     akdf0 = akdf0.reset_index(drop=True)
