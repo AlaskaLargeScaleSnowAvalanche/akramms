@@ -233,7 +233,7 @@ def report(args):
     akdf0 = joblib.add_combo_quickstatus(akdf0, mtime=True)
     print(akdf0)
 
-    mask = akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED
+    mask = (akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED)
     akdf0 = akdf0[mask]
     todo = akdf0[~mask].head()
     todo['finished'] = None
