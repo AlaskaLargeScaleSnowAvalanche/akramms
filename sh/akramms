@@ -234,18 +234,18 @@ def report(args):
     print(akdf0)
 
     mask = (akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED)
-    akdf0 = akdf0[mask]
     todo = akdf0[~mask].head(5)
+    done = akdf0[mask]
     print('len todo ', len(todo))
     todo['finished'] = None
 
 
-    akdf0['finished'] = akdf0['combo_quickstatus_mtime'].map(datetime.datetime.fromtimestamp)
-    akdf0 = akdf0.sort_values('combo_quickstatus_mtime', ascending=False)
-    akdf0 = akdf0[akdf0['combo_quickstatus_mtime'] >= now-86400]
+    done['finished'] = done['combo_quickstatus_mtime'].map(datetime.datetime.fromtimestamp)
+    done = done.sort_values('combo_quickstatus_mtime', ascending=False)
+    done = done[done['combo_quickstatus_mtime'] >= now-86400]
 
 
-    df = pd.concat((todo, akdf0))
+    df = pd.concat((todo, done))
 
     df = df[['combo', 'finished']]
 
