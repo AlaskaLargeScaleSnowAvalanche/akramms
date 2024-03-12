@@ -215,6 +215,7 @@ def status(args):
     joblib.print_status(akdf, args.level)
 # ---------------------------------------------------------------------
 @subcommand([
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
 def report(args):
     """Quick status report at the Combo level"""
