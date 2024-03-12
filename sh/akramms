@@ -248,6 +248,7 @@ def report(args):
     df = pd.concat((todo, done))
 
     df = df[['combo', 'finished']]
+    print(df)
 
     # Format things
     df['combo'] = df['combo'].map(lambda combo: '-'.join(str(x) for x in combo))
