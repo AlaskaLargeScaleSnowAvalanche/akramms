@@ -220,7 +220,9 @@ def status(args):
 def report(args):
     """Quick status report at the Combo level"""
 
-    import datetime
+    import datetime,time
+
+    now = time.time()
 
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
@@ -229,15 +231,24 @@ def report(args):
     # Exclude combos that have already been completely finished and archived
     # (and the x-dir might have been deleted)
     akdf0 = joblib.add_combo_quickstatus(akdf0, mtime=True)
+
     akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED]
+    todo = akdf0[akdf0.combo_quickstatus != joblib.JobStatus.MARKED_FINISHED].head()
+    todo['finished'] = None
+
     akdf0['finished'] = akdf0['combo_quickstatus_mtime'].map(datetime.datetime.fromtimestamp)
     akdf0 = akdf0.sort_values('combo_quickstatus_mtime', ascending=False)
-    akdf0 = akdf0[['combo', 'finished']]
+    akdf0 = akdf0[akdf0['combo_quickstatus_mtime'] >= now-86400]
+
+
+    df = pd.concat((todo, akdf0))
+
+    df = df[['combo', 'finished']]
 
     # Format things
-    akdf0['combo'] = akdf0['combo'].map(lambda combo: '-'.join(str(x) for x in combo))
-    akdf0['finished'] = akdf0['finished'].map(lambda dt: dt.strftime('%Y-%m-%d %H::%m'))
-    print(akdf0)
+    df['combo'] = df['combo'].map(lambda combo: '-'.join(str(x) for x in combo))
+    df['finished'] = df['finished'].map(lambda dt: None if dt is None else dt.strftime('%Y-%m-%d %H::%m'))
+    print(df)
 
 
 
