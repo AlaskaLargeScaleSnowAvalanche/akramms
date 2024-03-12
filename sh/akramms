@@ -227,10 +227,13 @@ def report(args):
     # Exclude combos that have already been completely finished and archived
     # (and the x-dir might have been deleted)
     akdf0 = joblib.add_combo_quickstatus(akdf0, mtime=True)
-#    akdf0 = akdf0[akdf0.combo_quickstatus != joblib.JobStatus.MARKED_FINISHED]
+    akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED]
 
-    print(akdf0[['combo', 'combo_quickstatus', 'combo_quickstatus_mtime']])
+    akdf0 = akdf0[['combo', 'combo_quickstatus', 'combo_quickstatus_mtime']].rename(
+        columns={'combo_quickstatus_mtime': 'finished_time'})
 
+
+    print(akdf0)
 
 
 
