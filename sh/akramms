@@ -248,12 +248,14 @@ def report(args):
     df = pd.concat((todo, done))
 
     df = df[['combo', 'finished']]
-    print(df)
 
     # Format things
     df['combo'] = df['combo'].map(lambda combo: '-'.join(str(x) for x in combo))
-    df['finished'] = df['finished'].map(lambda dt: None if pd.isnull(dt) else dt.strftime('%Y-%m-%d %H::%m'))
-    print(df)
+    df['finished'] = df['finished'].map(lambda dt: '' if pd.isnull(dt) else dt.strftime('%Y-%m-%d %H::%m'))
+
+    for tup in df.itertuples(index=False):
+        print(f'{tup.combo}: {tup.finished}')
+
 
 
 
