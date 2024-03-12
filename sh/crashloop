@@ -1,0 +1,54 @@
+#!/usr/bin/env python
+#
+
+import subprocess,sys,itertools,time,os
+import argparse
+
+def main():
+
+    # Split commnad line arguments into those parsed by this command
+    # vs command we're running.
+    sargs = sys.argv[1:]
+    try:
+        colon = sargs.index('::')    # Split on this delimeter
+        raw_argss = [sargs[:colon], sargs[colon+1:]]
+    except ValueError:
+        # No colon in the list, just used default values
+        raw_argss = [[], sargs]    # No '::', everything assumed to be arg to enclosed command
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--period', '-p', type=int, default=0,
+        help='Try to run at a set frequency [s].')
+    parser.add_argument('--wait', '-w', type=int, default=0,
+        help='Amount of time to wait between runs [s].')
+    args = parser.parse_args(raw_argss[0])
+    cmd = raw_argss[1]
+
+    t0 = time.time()
+    while True:
+
+        # Run the command, do NOT crash on errors
+        print('========== crashloop running: {}'.format(' '.join(cmd)))
+        subprocess.run(cmd, check=False)
+
+        # Wait after running
+        if args.wait > 0:
+            time.sleep(args.wait)
+
+        # Figure out when we need to run next
+        t1 = time.time()
+        if args.period > 0:
+            next_time = t0 + args.period
+        else:
+            next_time = t1
+
+
+        # Sleep until it's time to run
+        if next_time > t1:
+            time.sleep(next_time - t1)
+
+        # Increment loop
+        t0 = t1
+
+
+main()
