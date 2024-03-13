@@ -158,7 +158,7 @@ def run_script(script_file, args, cwd=None, dry_run=False):
 
     # Make sure ArcGIS is running properly
     kill_arcgis()
-    cmd = [r'"C:\Program Files\ArcGIS\Pro\bin\ArcGISPro.exe"']
+    cmd = r'"C:\Program Files\ArcGIS\Pro\bin\ArcGISPro.exe"'
     print('Starting ArcGIS')
     subprocess.run(cmd, check=True)
 
