@@ -162,7 +162,8 @@ def run_script(script_file, args, cwd=None, dry_run=False):
     sys.stdout.flush()
     sys.stderr.flush()
 #    subprocess.run(r'ArcGISPro.exe', cwd=r'C:\Program Files\ArcGIS\Pro\bin', check=True)
-    subprocess.run(r'"C:\Program Files\ArcGIS\Pro\bin\ArcGISPro.exe"', check=True, shell=True)
+#    subprocess.run(r'"C:\Program Files\ArcGIS\Pro\bin\ArcGISPro.exe"', check=True, shell=True)
+    arcgis_proc = subprocess.Popen(r'"C:\Program Files\ArcGIS\Pro\bin\ArcGISPro.exe"', shell=True)
     print('Done starting ArcGISPro.exe')
 
     sys.stdout.flush()
