@@ -108,8 +108,10 @@ def kill_arcgis():
 
     sleep=False
 
-    for cmd in (
-        ['taskkill.exe', '/T', '/F', '/IM', 'ArcGISPro.exe']):
+#    for cmd in (
+#        ['taskkill.exe', '/T', '/F', '/IM', 'ArcGISPro.exe']):
+        
+    for cmd in ("taskkill.exe /T /F /IM ArcGISPro.exe",):
 
         try:
             subprocess.run(cmd, check=True)
