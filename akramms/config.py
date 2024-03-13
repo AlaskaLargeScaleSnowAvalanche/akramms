@@ -27,9 +27,9 @@ roots_l = default_roots(
 roots_w = default_roots(pathlib.PureWindowsPath, r'C:\Users\efischer\av') # r'\\nona.dnr.state.ak.us\enggeo_projects\avalanche_sim\av'
 
 # Differences from defaults
-roots_l['PRJ'] = '/mnt/avalanche_sim/scratch/prj'
+roots_l['PRJ'] = '/mnt/avalanche_sim/prj'
 #roots_w['PRJ'] = r'\\nona.dnr.state.ak.us\enggeo_projects\avalanche_sim\prj'
-roots_w['PRJ'] = r'M:\scratch\prj'
+roots_w['PRJ'] = r'M:\prj'
 
 # Roots for the system we're running on
 roots = roots_w if os.name=='nt' else roots_l
