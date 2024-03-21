@@ -36,8 +36,8 @@ def create_tables_sql(expmod):
         -- Store avalanches by wcombo
         create table {exp}_avals (
             wcomboid int references {exp}_wcombos(wcomboid) on delete cascade,
-            avlaid int,
-            UNIQUE KEY(wcomboid, avalid));
+            avlaid int);
+        create unique index {exp}_avals_idx on {exp}_avals(wcomboid, avalid);
         SELECT AddGeometryColumn('{exp}_avals', 'extent', '{expmod.epsg}', 'MULTIPOLYGON', 2);
         CREATE INDEX {exp}_extent_idx ON {exp}_avals USING GIST (wcomboid, extent);
     """
