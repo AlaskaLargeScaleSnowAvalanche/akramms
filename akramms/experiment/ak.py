@@ -80,7 +80,7 @@ combo_schema = schema.Schema({
 combo_sql_types = {
     'snow_dataset': 'varchar(10)',
     'year0': 'int4',
-    'year1': 'int4,',
+    'year1': 'int4',
     'downscale_algo': 'varchar(10)',
     'forest': 'varchar(5)',
     'return_period': 'int4',

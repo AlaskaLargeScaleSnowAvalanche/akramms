@@ -28,14 +28,14 @@ def create_tables_sql(expmod):
 
         -- Keep track of which combos we've uploaded
         create table {exp}_combos (
-            wcomboid int,
+            wcomboid int references {exp}_wcombos(wcomboid) on delete cascade,
             idom int,
             jdom int,
             PRIMARY KEY(wcomboid, idom, jdom));
 
         -- Store avalanches by wcombo
         create table {exp}_avals (
-            wcomboid serial,
+            wcomboid int references {exp}_wcombos(wcomboid) on delete cascade,
             avlaid int,
             UNIQUE KEY(wcomboid, avalid));
         SELECT AddGeometryColumn('{exp}_avals', 'extent', '{expmod.epsg}', 'MULTIPOLYGON', 2);
