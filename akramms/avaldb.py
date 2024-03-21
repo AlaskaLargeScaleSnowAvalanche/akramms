@@ -24,7 +24,7 @@ def create_tables_sql(expmod):
         create table {exp}_wcombos (
             wcomboid serial,
             {cols_types_sql},
-            PRIMARY KEY({cols_sql});
+            PRIMARY KEY({cols_sql}));
 
         -- Keep track of which combos we've uploaded
         create table {exp}_combos (
