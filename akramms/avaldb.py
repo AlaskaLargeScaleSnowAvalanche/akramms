@@ -21,7 +21,7 @@ def create_tables_sql(expmod):
     sql = f"""
 
         -- List the combos in this experiment
-        drop table {exp}_wcombos;
+        drop table {exp}_wcombos cascade;
         create table {exp}_wcombos (
             wcomboid serial UNIQUE,
             {cols_types_sql},
@@ -30,16 +30,17 @@ def create_tables_sql(expmod):
         -- Keep track of which combos we've uploaded
         drop table {exp}_combos;
         create table {exp}_combos (
-            wcomboid int references {exp}_wcombos(wcomboid) on delete cascade,
-            idom int,
-            jdom int,
+            wcomboid int not null references {exp}_wcombos(wcomboid) on delete cascade,
+            idom int not null,
+            jdom int not null,
             PRIMARY KEY(wcomboid, idom, jdom));
 
         -- Store avalanches by wcombo
         drop table {exp}_avals;
         create table {exp}_avals (
-            wcomboid int references {exp}_wcombos(wcomboid) on delete cascade,
-            avalid int);
+            wcomboid int not null references {exp}_wcombos(wcomboid) on delete cascade,
+            pra_size char(1) not null,
+            avalid int not null);
         create unique index {exp}_avals_idx on {exp}_avals(wcomboid, avalid);
         SELECT AddGeometryColumn('{exp}_avals', 'extent', '{expmod.epsg}', 'MULTIPOLYGON', 2);
         CREATE INDEX {exp}_extent_idx ON {exp}_avals USING GIST (wcomboid, extent);
@@ -60,6 +61,7 @@ def main():
     expmod = akramms.experiment.ak
     sql = create_tables_sql(expmod)
 
-    print(sql)
+    with open('sql','w') as out:
+        out.write(sql)
 
 main()
