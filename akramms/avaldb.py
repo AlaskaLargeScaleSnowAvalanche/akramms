@@ -21,12 +21,14 @@ def create_tables_sql(expmod):
     sql = f"""
 
         -- List the combos in this experiment
+        drop table {exp}_wcombos;
         create table {exp}_wcombos (
-            wcomboid serial,
+            wcomboid serial UNIQUE,
             {cols_types_sql},
             PRIMARY KEY({cols_sql}));
 
         -- Keep track of which combos we've uploaded
+        drop table {exp}_combos;
         create table {exp}_combos (
             wcomboid int references {exp}_wcombos(wcomboid) on delete cascade,
             idom int,
@@ -34,6 +36,7 @@ def create_tables_sql(expmod):
             PRIMARY KEY(wcomboid, idom, jdom));
 
         -- Store avalanches by wcombo
+        drop table {exp}_avals;
         create table {exp}_avals (
             wcomboid int references {exp}_wcombos(wcomboid) on delete cascade,
             avlaid int);
