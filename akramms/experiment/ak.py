@@ -14,6 +14,7 @@ name = __name__.rsplit('.', 1)[-1]    # e_alaska
 dir = config.roots['PRJ'] / name
 
 # Map coordinate system we use
+epsg = 338    # Same as WKT; see https://espg.io
 wkt = 'PROJCS["NAD83 / Alaska Albers",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["Degree",0.017453292519943295]],PROJECTION["Albers"],PARAMETER["standard_parallel_1",55],PARAMETER["standard_parallel_2",65],PARAMETER["latitude_of_origin",50],PARAMETER["central_meridian",-154],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["Meter",1]]'
 resolution = 10    # 10m resolution for our DEM
 snow_density = 300    # [kg m-3], used for mosaic
@@ -74,6 +75,19 @@ combo_schema = schema.Schema({
     'jdom': schemautil.NullableInt(
         "y index of the Alaska sub-domain to run"),
 })
+
+# SQL types for the files in the combo
+combo_sql_types = {
+    'snow_dataset': 'varchar(10)',
+    'year0': 'int4',
+    'year1': 'int4,',
+    'downscale_algo': 'varchar(10)',
+    'forest': 'varchar(5)',
+    'return_period': 'int4',
+    'idom': 'int4',
+    'jdom': 'int4',
+}
+
 
 combo_keys = list(combo_schema.schema.keys())
 Combo = collections.namedtuple('Combo', combo_keys)
