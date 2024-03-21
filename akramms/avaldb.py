@@ -7,7 +7,7 @@ def init_db_sql():
         CREATE EXTENSION postgis;
         -- https://www.postgresql.org/docs/current/btree-gist.html
         create extension btree_gist;
-    """:
+    """
 
 
 def create_tables_sql(expmod):
