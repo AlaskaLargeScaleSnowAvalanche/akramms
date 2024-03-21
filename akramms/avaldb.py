@@ -15,7 +15,7 @@ def create_tables_sql(expmod):
     exp = expmod.name
     cols = [('exp', 'varchar(20)')] + [(key, expmod.combo_sql_types[key]) for key in expmod.combo_schema.schema.keys()]
     cols = cols[:-2]    # Exclude idom/jdom
-    cols_sql = ','.join('{col}' for col,_ in cols)
+    cols_sql = ','.join(f'{col}' for col,_ in cols)
     cols_types_sql = ','.join('{col} {dtype} not null' for col,dtype in cols)
 
     sql = f"""
