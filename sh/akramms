@@ -824,6 +824,27 @@ def stdmosaic(args):
         if (not os.path.exists(ofname_pdf)) or (os.path.getmtime(ofname_pdf) < combo_quickstatus_mtime):
             p_mosaic.plot_pdf(ofname_zip, ofname_pdf)
 
+@subcommand(name='loaddb')
+def loaddb(args):
+
+    # Identify combos
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf0 = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
+
+    # Only load DB for combos that are completely finished
+    akdf0 = joblib.add_combo_quickstatus(akdf0, mtime=True)
+    akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED]
+
+    # Remove combos already in the database
+    TODO: Remove combos already in the database
+
+    if len(akdf0) == 0:
+        raise ValueError('None of the select combos are MARKED_FINISHED.  Run akramms status --update')
+
+
+
+
+
 
 
 

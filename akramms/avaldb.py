@@ -19,7 +19,6 @@ def create_tables_sql(expmod):
     cols_types_sql = ',\n'.join(f'{col} {dtype} not null' for col,dtype in cols)
 
     sql = f"""
-
         -- List the combos in this experiment
         drop table {exp}_wcombos cascade;
         create table {exp}_wcombos (
@@ -33,12 +32,16 @@ def create_tables_sql(expmod):
             wcomboid int not null references {exp}_wcombos(wcomboid) on delete cascade,
             idom int not null,
             jdom int not null,
+            archive_ts timestamp,
+            upload_ts timestamp,
             PRIMARY KEY(wcomboid, idom, jdom));
 
         -- Store avalanches by wcombo
         drop table {exp}_avals;
         create table {exp}_avals (
             wcomboid int not null references {exp}_wcombos(wcomboid) on delete cascade,
+            idom int not null,
+            jdom int not null,
             pra_size char(1) not null,
             avalid int not null);
         create unique index {exp}_avals_idx on {exp}_avals(wcomboid, avalid);
@@ -46,8 +49,54 @@ def create_tables_sql(expmod):
         CREATE INDEX {exp}_extent_idx ON {exp}_avals USING GIST (wcomboid, extent);
     """
 
-
     return sql;
+
+def load_avals(expmod, akdf):
+    """
+    akdf:
+        Resolved to ID
+    """
+
+
+
+def loaddb(akdf0):
+    """
+    akdf0:
+        Resolved to combo
+    """
+    # Resolve to the avalanche (ID) level
+    akdf0 = resolve.resolve_chunk(akdf0, scenetypes={'arc'})
+    akdf0 = resolve.resolve_id(akdf0, realized=True, status_col=True)
+    akdf0 = akdf1[akdf0.id_status == file_info.JobStatus.FINISHED]
+
+    sqls = list()    # Lines of sql
+    for (exp,combo),akdf1 in akdf0.reset_index(drop=True).groupby(['exp', 'combo']):
+        expmod = parse.load_expmod(exp)
+
+        # TODO:
+        1. Set up a wcomboid in the database
+        2. Read each avalanche
+        # 2. Upload to ak_combos to show we've finished this off
+
+        for tup in akdf1.itertuples(index=False):
+
+            arcdir = tup.releasefile
+            if not os.path.isfile(tup.avalfile):
+                raise ValueError(f'Missing avalanche file: {tup.avalfile}')
+
+            print(f'loaddb: {tup.avalfile}')
+
+            with netCDF4.Dataset(tup.avalfile) as nc:
+                nc.set_always_mask(False)
+
+
+            
+
+
+
+
+
+
 
 
 

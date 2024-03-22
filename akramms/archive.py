@@ -134,10 +134,10 @@ def nc_xy_coord(ncout, gridI, coord_attrs, ivec, jvec):
 #        ivec, jvec = parse_xy_coord(gridI, fin)
 
     # Difference-encode i/j to increase compression
-    divec = difference_encode(ivec)
-    djvec = difference_encode(jvec)
+    i_diff = difference_encode(ivec)
+    j_diff = difference_encode(jvec)
 
-    ncout.createDimension('ncells', len(divec))
+    ncout.createDimension('ncells', len(i_diff))
     ncvi = ncout.createVariable('i_diff', 'i', ('ncells',), compression='zlib')
     ncvi.description = "Difference-compressed X index of gridcells, uncompress using np.cumsum().  Use geotransform to convert to X in projected space"
 
@@ -149,8 +149,8 @@ def nc_xy_coord(ncout, gridI, coord_attrs, ivec, jvec):
     for k,v in coord_attrs['Y'].items():
         setattr(ncvj, k, v)
 
-    ncvi[:] = divec
-    ncvj[:] = djvec
+    ncvi[:] = i_diff
+    ncvj[:] = j_diff
 
     return ivec,jvec
 
@@ -687,7 +687,133 @@ def read_reldom(arcdir_zip, ext, tdir, **kwargs):
 #            if match is not None:
 #                # Doesn't work because shputil.read() doesn't use GDAL
 #                # fname = f'/vsizip/{arcdir}/RELEASE.zip/{info.filename}'
+
 # ----------------------------------------------------------
+
+class ArchiveReader:
+
+    def __init__(self, avalfile, combo, id):
+        self.avalfile = avalfile
+        self.combo = combo
+        self.id = id
+
+    def __enter__(self):
+        self.nc = netCDF4.Dataset(self.avalfile)
+        self.nc.__enter__()
+
+    def __exit(self, exc_type, exc_val, exc_tb):
+        self.nc.__exit(exc_type, exc_val, exc_tb)
+
+
+
+class ArchiveFile(typing.NamedTuple):
+    i_diff: object
+    j_diff: object
+    gridA_gt: object,
+    gridM: object
+    max_vel: object
+    max_height: object
+    depo: object
+    
+
+def read_nc(tup_avalfile, tup_combo, tup_id):
+        with netCDF4.Dataset(tup_avalfile) as nc:
+            nc.set_always_mask(False)
+
+            # --------------- gridA is the subdomain tile, WITH MARGIN
+            # Geotransform of this avalanche's local grid
+            # TODO: Store Geotransform as machine-precision doubles in the file
+            gridA_gt = np.array([float(x) for x in nc.variables['grid_mapping'].GeoTransform.split(' ')])
+            gridA_wkt = nc.variables['grid_mapping'].crs_wkt
+
+#            print('gridM GT: ', gridM.geotransform)
+#            print('gridA GT: ', gridA_gt)
+
+
+            # --------------- Determine gridL, an x/y oriented grid (subgrid of the tile) containing the avalanche.
+            i_diff = nc.variables['i_diff'][:]
+            j_diff = nc.variables['j_diff'][:]
+
+            iA = np.cumsum(i_diff)
+            jA = np.cumsum(j_diff)
+
+def polygonize_extent(
+    iA, jA, gridA_gt, crs_wkt, max_vel, max_height, depo,
+    extent_layer, extent_Id):
+
+    """Creates a polygon for the extent of an avalanche, and writes it
+    into an open OGR datasource.
+
+    iA, jA:
+        i/j location of each gridcell, in gridA (the subdomain tile WITH MARGIN)
+    gridA_gt:
+        Geotransform of gridA (eg: gridA.geotransform)
+    crs_wkt:
+        CRS used in gridA
+    max_vel, max_height, depo:
+        Data values output by RAMMS C++
+    extent_layer:
+        OGR layer to write into
+    extent_Id:
+        Reference to the OGR shapefile field called "Id", where
+        Avalanche Id is to be stored.
+
+    Example creating extent inputs:
+      extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
+      extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.wkt), geom_type=ogr.wkbMultiPolygon )
+      # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
+      extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
+
+    """
+
+    # Create a sub-grid gridL around just the avalanche (fast polygonize)
+    iL_min = np.min(iA) - 2
+    iL_max = np.max(iA) + 3
+    jL_min = np.min(jA) - 2
+    jL_max = np.max(jA) + 3
+
+    iL = iA - iL_min    # Vector operation
+    jL = jA - jL_min
+    gridL_gt = np.array(gridA_gt, dtype='i8')
+    gridL_gt[0] += gridL_gt[1] * iL_min
+    gridL_gt[3] += gridL_gt[5] * jL_min
+    gridL = gisutil.RasterInfo(
+        crs_wkt, #nc.variables['grid_mapping'].crs_wkt,
+        iL_max - iL_min,
+        jL_max - jL_min,
+        gridL_gt)
+
+#    # Read avalanche output as values on list-of-gridcells
+#    max_vel = nc.variables['max_vel'][:].astype('f4')
+#    max_height = nc.variables['max_height'][:].astype('f4')
+#    depo = nc.variables['depo'][:].astype('f4')
+
+    # On March 5, 2024 Marc Christen wrote:
+    # > These outlines are defined as an envelope of grid cells
+    # > of an avalanche, where
+    # >   Flow-depth > 0.25m AND
+    # >   velocity > 1m/s
+    nzmask_val = np.zeros(max_vel.shape, dtype=np.int32)
+    nzmask_val[np.logical_and(max_height > 0.25, max_vel > 1.0)] = tup_id
+
+    # Burn the gridcells that are part of our grid
+    # (already pared down)
+    nzmaskL = np.zeros((gridL.ny, gridL.nx), dtype=np.int32)
+    nzmaskL[jL,iL] = nzmask_val    # This will get written into the attribute table
+
+    nzmask_ds = gdalutil.raster_ds((gridL, nzmaskL, 0))
+    nzmask_band = nzmask_ds.GetRasterBand(1)
+
+    # Produces a separate polygon for each different (non-zero) value in nzmaskL
+    # Since we've only set things to tup_id, we will only get Polygon(s) for that.
+    # The pixel value is placed in the Id attribute
+    # Polygonize docs: https://gdal.org/api/gdal_alg.html (search for GDALPolygonize)
+    gdal.Polygonize(nzmask_band, nzmask_band,
+        extent_shps[tup_combo].layer, extent_shps[tup_combo].Id)
+
+
+# ----------------------------------------------------------
+
 #def archive_combos(akdf_combo, debug=False, dry_run=False, archive_overruns=False):
 #    """
 #    akdf:
