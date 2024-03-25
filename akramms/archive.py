@@ -618,20 +618,86 @@ def copy_shapefiles(expmod, combo, dry_run=False):
         with ioutil.WriteIfDifferent(arcdir / leaf) as owid:
             shutil.copy2(xdir / leaf, owid.tmpfile)
 
+class ArchiveContents(typing.NamedTuple):
+    """
+    gridA_gt:
+        Geotransform of gridA (eg: gridA.geotransform)
+    gridA_wkt:
+        CRS used in gridA
+    iA, jA: np.array[n]
+        i/j location of each gridcell, in gridA (the subdomain tile WITH MARGIN)
+    max_vel, max_height, depo: np.array[n]
+        Data values output by RAMMS C++
+    """
+    gridA_gt: object
+    gridA_wkt: str
+    iA: object
+    jA: object
+    max_vel: object
+    max_height: object
+    depo: object
+
+def read_nc(avalfile):
+    with netCDF4.Dataset(tup.avalfile) as nc:
+        # --------------- gridA is the subdomain tile, WITH MARGIN
+        # Geotransform of this avalanche's local grid
+        # TODO: Store Geotransform as machine-precision doubles in the file
+        gridA_gt = np.array([float(x) for x in nc.variables['grid_mapping'].GeoTransform.split(' ')])
+        gridA_wkt = nc.variables['grid_mapping'].crs_wkt
+
+        # --------------- Determine gridL, an x/y oriented grid (subgrid of the tile) containing the avalanche.
+        i_diff = nc.variables['i_diff'][:]
+        j_diff = nc.variables['j_diff'][:]
+
+        return ArchiveContents(
+            gridA_gt=gridA_gt, gridA_wkt=gridA_wkt,
+            iA=np.cumsum(i_diff),
+            jA=np.cumsum(j_diff),
+            max_vel=nc.variables['max_vel'][:].astype('f4'),
+            max_height=nc.variables['max_height'][:].astype('f4'),
+            depo=nc.variables['depo'][:].astype('f4'))
+
+
 
 
 def finish_combo(expmod, combo, dry_run=False):
+
     xdir = expmod.combo_to_scenedir(combo, scenetype='x')
     arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
 
-
-    ofname = arcdir / 'archived.txt'
+    control_fname = arcdir / 'archived.txt'
     if dry_run:
-        print(f'If not for dry_run, I would be writing the file {ofname}')
+        print(f'If not for dry_run, I would be writing the file {control_fname}')
         return
 
+    # ----------------- Write /vsizip/EXTENT.zip/extent.shp
+    # Get a list of all the Avalanches in this (archived) combo
+    scombo = '-'.join(str(x) for x in combo)
+    parseds = parse.parse_args([scombo])
+    akdf = resolve.resolve_to(parseds, 'id', realized=True, scenetypes={'arc'})
+    # TODO: Look at this dataframe
+
+    # Open the extent file (Shapefile within a Zip archive)
+    extent_zip = '/vsizip/{}'.format(arcdir / 'EXTENT.zip')
+    extent_vsif = gdal.VSIFOpenL(extent_zip, 'wb')
+    extent_shp = f'{extent_zip}/extent.shp'
+
+    extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
+    extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.wkt), geom_type=ogr.wkbMultiPolygon )
+
+    # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
+    extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
+
+    # Read avalanches, compute extent, and write into extent file
+    for tup in akdf.itertuples(index=False):
+        if not os.path.isfile(tup.avalfile):
+            raise ValueError(f'Missing avalanche file: {tup.avalfile}')
+
+        aval = read_nc(tup.avalfile)
+        polygonize_extent(aval, extent_layer, extent_Id)
+
     # Write the control file
-    with open(ofname, 'w') as out:
+    with open(control_fname, 'w') as out:
         out.write('Combo archived\n')
 
     # (Very conservatively) delete the xdir by moving it to a todel directory.
@@ -645,8 +711,12 @@ def finish_combo(expmod, combo, dry_run=False):
 
 
 # ----------------------------------------------------------
-def read_reldom(arcdir_zip, ext, tdir, **kwargs):
+def read_reldom(arcdir_zip, ext, **kwargs):
     """Reads all _rel/_dom files in an archive directory
+    Uses ogrutil; reads into OGR-type geometries
+
+    NOTE: This is similar but different from chunk.read_reldom()
+
     ext: 'rel' or 'dom' or 'chull'
 
     read_shapes:
@@ -661,100 +731,34 @@ def read_reldom(arcdir_zip, ext, tdir, **kwargs):
     """
 
     # Unzip required file(s)
-    restr = rf'^(.*)_{ext}\.(...)$'
+    #restr = rf'^(.*)_{ext}\.(...)$'
+    restr = rf'^(.*)_{ext}\.shp$'
     fnames = list()     # *.shp files to read
     fileRE = re.compile(restr)
     with zipfile.ZipFile(arcdir_zip) as izip:
         for info in izip.infolist():
             match = fileRE.match(info.filename)
             if match is not None:
-                izip.extract(info, path=tdir.location)
-                fname = os.path.join(tdir.location, info.filename)
-                if fname.endswith('.shp'):
-                    fnames.append(fname)
+                fnames.append(f'/vsizip//{arcdir_zip}/{info.filename}')
 
-    # Read the shapefile
     dfs = list()
     for fname in fnames:
-        print('fname ', fname)
-        df = shputil.read_df(fname, **kwargs)
-        dfs.append(df)
+        dfs.append(ogrutil.read_df(fname, **kwargs)
 
     return pd.concat(dfs)
-
-
-#            print('xxxxxxxxx ', info.filename, match)
-#            if match is not None:
-#                # Doesn't work because shputil.read() doesn't use GDAL
-#                # fname = f'/vsizip/{arcdir}/RELEASE.zip/{info.filename}'
-
 # ----------------------------------------------------------
-
-class ArchiveReader:
-
-    def __init__(self, avalfile, combo, id):
-        self.avalfile = avalfile
-        self.combo = combo
-        self.id = id
-
-    def __enter__(self):
-        self.nc = netCDF4.Dataset(self.avalfile)
-        self.nc.__enter__()
-
-    def __exit(self, exc_type, exc_val, exc_tb):
-        self.nc.__exit(exc_type, exc_val, exc_tb)
-
-
-
-class ArchiveFile(typing.NamedTuple):
-    i_diff: object
-    j_diff: object
-    gridA_gt: object,
-    gridM: object
-    max_vel: object
-    max_height: object
-    depo: object
-    
-
-def read_nc(tup_avalfile, tup_combo, tup_id):
-        with netCDF4.Dataset(tup_avalfile) as nc:
-            nc.set_always_mask(False)
-
-            # --------------- gridA is the subdomain tile, WITH MARGIN
-            # Geotransform of this avalanche's local grid
-            # TODO: Store Geotransform as machine-precision doubles in the file
-            gridA_gt = np.array([float(x) for x in nc.variables['grid_mapping'].GeoTransform.split(' ')])
-            gridA_wkt = nc.variables['grid_mapping'].crs_wkt
-
-#            print('gridM GT: ', gridM.geotransform)
-#            print('gridA GT: ', gridA_gt)
-
-
-            # --------------- Determine gridL, an x/y oriented grid (subgrid of the tile) containing the avalanche.
-            i_diff = nc.variables['i_diff'][:]
-            j_diff = nc.variables['j_diff'][:]
-
-            iA = np.cumsum(i_diff)
-            jA = np.cumsum(j_diff)
-
-def polygonize_extent(
-    iA, jA, gridA_gt, crs_wkt, max_vel, max_height, depo,
+def polygonize_extent(aval,
     extent_layer, extent_Id):
+#    iA, jA, gridA_gt, crs_wkt, max_vel, max_height, depo,
 
     """Creates a polygon for the extent of an avalanche, and writes it
     into an open OGR datasource.
 
-    iA, jA:
-        i/j location of each gridcell, in gridA (the subdomain tile WITH MARGIN)
-    gridA_gt:
-        Geotransform of gridA (eg: gridA.geotransform)
-    crs_wkt:
-        CRS used in gridA
-    max_vel, max_height, depo:
-        Data values output by RAMMS C++
-    extent_layer:
+    aval: Result of read_nc()
+
+    extent_layer: OUTPUT
         OGR layer to write into
-    extent_Id:
+    extent_Id: OUTPUT
         Reference to the OGR shapefile field called "Id", where
         Avalanche Id is to be stored.
 

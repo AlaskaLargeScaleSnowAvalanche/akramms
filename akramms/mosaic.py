@@ -16,7 +16,7 @@ import _mosaic
 # ===================================================================
 
 # ----------------------------------------------------------
-def read_reldom(akdf0, tdir):
+def read_reldom(akdf0):
     """
     akdf0:
         Avalanches (in scenetype='arc') to mosiac
@@ -32,8 +32,8 @@ def read_reldom(akdf0, tdir):
         scombo = '-'.join(str(x) for x in combo)
 
         # Read all _rel / _dom data in the archive dir
-        reldf = archive.read_reldom(arcdir/'RELEASE.zip', 'rel', tdir, shape='pra')
-        domdf = archive.read_reldom(arcdir/'DOMAIN.zip', 'dom', tdir, shape='dom')
+        reldf = archive.read_reldom(arcdir/'RELEASE.zip', 'rel', shape='pra')
+        domdf = archive.read_reldom(arcdir/'DOMAIN.zip', 'dom', shape='dom')
 
         # Filter down to just what we need
         df = akdf1[['id']]
@@ -331,7 +331,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
         box_poly = gridM.bounding_box
 
         # Shapefiles
-        reldf, domdf = read_reldom(akdf, tdir)
+        reldf, domdf = read_reldom(akdf)
         for cname in reldf.columns:
             print(f"{cname}: {reldf[cname].dtype}")
         shputil.write_df(reldf, 'pra', 'Polygon', dir / 'rel.shp', wkt=gridM.wkt)

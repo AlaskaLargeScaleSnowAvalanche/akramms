@@ -51,23 +51,11 @@ def create_tables_sql(expmod):
 
     return sql;
 
-def load_avals(expmod, akdf):
+def load_avals(akdf):
     """
     akdf:
         Resolved to ID
     """
-
-
-
-def loaddb(akdf0):
-    """
-    akdf0:
-        Resolved to combo
-    """
-    # Resolve to the avalanche (ID) level
-    akdf0 = resolve.resolve_chunk(akdf0, scenetypes={'arc'})
-    akdf0 = resolve.resolve_id(akdf0, realized=True, status_col=True)
-    akdf0 = akdf1[akdf0.id_status == file_info.JobStatus.FINISHED]
 
     sqls = list()    # Lines of sql
     for (exp,combo),akdf1 in akdf0.reset_index(drop=True).groupby(['exp', 'combo']):
@@ -88,6 +76,19 @@ def loaddb(akdf0):
 
             with netCDF4.Dataset(tup.avalfile) as nc:
                 nc.set_always_mask(False)
+
+
+
+
+def loaddb(akdf0):
+    """
+    akdf0:
+        Resolved to combo
+    """
+    # Resolve to the avalanche (ID) level
+    akdf0 = resolve.resolve_chunk(akdf0, scenetypes={'arc'})
+    akdf0 = resolve.resolve_id(akdf0, realized=True, status_col=True)
+    akdf0 = akdf1[akdf0.id_status == file_info.JobStatus.FINISHED]
 
 
             
