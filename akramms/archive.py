@@ -1,11 +1,12 @@
 import os,re,itertools,struct,pickle,zipfile,io,shutil,typing
+from osgeo import gdal,ogr
 import contextlib,sys,datetime,subprocess
 import concurrent.futures
 import numpy as np
 import pandas as pd
 import netCDF4
 import pyproj
-from uafgi.util import gdalutil,shputil,ncutil,ioutil
+from uafgi.util import gdalutil,shputil,ncutil,ioutil,ogrutil,gdalutil
 from akramms import config,parse,file_info,resolve,overrun
 import xyedge
 
@@ -217,7 +218,6 @@ class OverrunChecker:
         if os.path.exists(dem_mask_tif):
             self.gridI,dem_mask,_ = gdalutil.read_raster(dem_mask_tif)
             self.dem_mask = dem_mask.astype(np.byte)
-#        print('dddddddddddd ', self.dem_mask.dtype, self.dem_mask.shape)
 
     def is_overrun(self, in_zip, out_zip):
         """Determines whether a RAMMS result is overrun
@@ -674,14 +674,14 @@ def finish_combo(expmod, combo, dry_run=False):
 
 
     # ---------------- Write the control file
-	if not os.path.isfile(control_fname):
+    if not os.path.isfile(control_fname):
         with open(control_fname, 'w') as out:
             out.write('Combo archived\n')
  
     # ----------------- Write /vsizip/EXTENT.zip/extent.shp
     # (which is also the control file)
     # Get a list of all the Avalanches in this (archived) combo
-    scombo = '-'.join(str(x) for x in combo)
+    scombo = expmod.name + '-' + '-'.join(str(x) for x in combo)
     parseds = parse.parse_args([scombo])
     akdf = resolve.resolve_to(parseds, 'id', realized=True, scenetypes={'arc'})
     # TODO: Look at this dataframe
@@ -692,7 +692,7 @@ def finish_combo(expmod, combo, dry_run=False):
 
     extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
     try:
-        extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.wkt), geom_type=ogr.wkbMultiPolygon )
+        extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
 
         # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
         extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))

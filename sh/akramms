@@ -185,6 +185,8 @@ def parse(args):
 @subcommand([
     argument('level', help='What to resolve to', default='chunk'),
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+    argument('--quick', '-q', action='store_true',
+        help='Only do quick status'),
     argument('--realized', action='store_true',
         help='Only check avalanches with .in.zip / .out.zip files'),
     argument('--update', action='store_true',
@@ -207,8 +209,14 @@ def status(args):
     # Special optimizations when working at combo level (large scale)
     akdf = resolve.resolve_to(parseds, args.level, realized=False)
 
-    akdf = joblib.add_status(
-        akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run, ignore_statuses=ignore_statuses)
+    if args.quick:
+        if args.level != 'combo':
+            raise ValueError('Only combo level is available with --quick')
+        akdf = joblib.add_combo_quickstatus(akdf, mtime=True)
+        akdf = akdf.rename(columns={'combo_quickstatus': 'combo_status'})
+    else:
+        akdf = joblib.add_status(
+            akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run, ignore_statuses=ignore_statuses)
 
 #    akdf = pd.concat(dfs).sort_values('combo_order')
 #    print(akdf[['combo_order', 'combo', 'combo_status']])

@@ -457,9 +457,9 @@ def add_combo_quickstatus(akdf0, mtime=False):
         for tup in akdf1.itertuples(index=False):
             arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
             if os.path.exists(arcdir / 'archived.txt'):
-            	if os.path.existss(arcdir / 'EXTENT.zip'):
-            	    status = JobStatus.EXTENT
-            	else:
+                if os.path.exists(arcdir / 'EXTENT.zip'):
+                    status = JobStatus.EXTENT
+                else:
                     status = JobStatus.MARKED_FINISHED
                 mtimes.append(os.path.getmtime(arcdir / 'archived.txt'))
             else:
@@ -481,8 +481,15 @@ def add_combo_quickstatus(akdf0, mtime=False):
     return pd.concat(dfs)
 
 
+def _finished_status(expmod, combo):
+    arcdir = expmod.combo_to_scenedir(combo, 'arc')
+    if not os.path.isfile(arcdir / 'archived.txt'):
+        return JobStatus.UNKNOWN
+    if not os.path.isfile(arcdir / 'EXTENT.zip'):
+        return JobStatus.MARKED_FINISHED
+    return JobStatus.EXTENT
 
-def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_statuses={}):#, mtime=False):
+def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_statuses={}):
     """akdf:
         Resolved to combo level (theoretical, i.e. realized=False)
     """
@@ -499,25 +506,29 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
 
     # Cull combos that have finished or not yet started
     akdf0 = add_combo_quickstatus(akdf0)#, mtime=mtime)
-    mask = (akdf0.combo_quickstatus == JobStatus.UNKNOWN)
+    mask = (akdf0.combo_quickstatus != JobStatus.EXTENT)
+
     renames = {'combo_quickstatus':'combo_status'}
-#    if mtime:
-#        renames['combo_quickstatus_mtime': 'combo_status_mtime']
     dfs.append(akdf0[~mask].rename(columns=renames))
     akdf0 = akdf0[mask].drop('combo_quickstatus', axis=1)
 
     # Go to more work to determine the status of the rest of them.
     for exp,akdf1 in akdf0.reset_index(drop=True).groupby('exp'):
         expmod = parse.load_expmod(exp)
-#        akdf1['combo_status_mtime'] = -1    # We only get mtime for arcdir
-
-#        akdf1['combo_status'] = JobStatus.NOINPUT    # The Combo doesn't exist yet
 
         # Take care of combos we know are archived
-        is_archived = akdf1.combo.apply(lambda combo:
-            os.path.isfile(expmod.combo_to_scenedir(combo, 'arc') / 'archived.txt') )
+        finished_status = akdf1.combo.apply(lambda combo: _finished_status(expmod, combo))
+        is_archived = (finished_status != JobStatus.UNKNOWN)
         df = akdf1[is_archived]
-        df['combo_status'] = JobStatus.MARKED_FINISHED
+        df['combo_status'] = finished_status
+#        print('AA2')
+        if update:
+            # Do EXTENT.zip on files that only have archived.txt
+            for tup in df[df.combo_status == JobStatus.MARKED_FINISHED].itertuples(index=False):
+
+                print('Finishing combo (b): {}'.format(tup.combo))
+                archive.finish_combo(expmod, tup.combo, dry_run=dry_run)
+
         dfs.append(df)
         akdf1 = akdf1[~is_archived]
 
@@ -540,15 +551,19 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         akdf1['combo_status'] = akdf1.combo_status.fillna(JobStatus.NOINPUT).astype(int)
 
         # --------------------------------------------
+        print('update = ', update)
         if update:
             # Copy shapefiles
             for tup in akdf1.itertuples(index=False):
+                print('tup2', tup)
                 archive.copy_shapefiles(expmod, tup.combo, dry_run=dry_run)
 
             # Mark combos that have fully finished
-            mask = (akdf1.combo_status == JobStatus.FINISHED)
+            mask = (
+                (akdf1.combo_status == JobStatus.FINISHED) |
+                (akdf1.combo_status == JobStatus.MARKED_FINISHED))
             for tup in akdf1[mask].itertuples(index=False):
-                print('Finishing combo: {}'.format(tup.combo))
+                print('Finishing combo (a): {}'.format(tup.combo))
                 archive.finish_combo(expmod, tup.combo, dry_run=dry_run)
 
         dfs.append(akdf1)

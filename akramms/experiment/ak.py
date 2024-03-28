@@ -90,8 +90,10 @@ combo_sql_types = {
 
 
 combo_keys = list(combo_schema.schema.keys())
-Combo = collections.namedtuple('Combo', combo_keys)
-
+_Combo = collections.namedtuple('Combo', combo_keys)
+class Combo(_Combo):
+    def __repr__(self):
+        return '-'.join(str(x) for x in self)
 # -------------------------------------------------------------
 def combo_to_scenedir(combo, scenetype='x'):
     trial_name = f'{name}-{combo.snow_dataset}-{combo.year0}-{combo.year1}-{combo.downscale_algo}-{combo.forest}-{combo.return_period}'
