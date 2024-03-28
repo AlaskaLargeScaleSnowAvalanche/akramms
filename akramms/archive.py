@@ -1,4 +1,4 @@
-import os,re,itertools,struct,pickle,zipfile,io,shutil
+import os,re,itertools,struct,pickle,zipfile,io,shutil,typing
 import contextlib,sys,datetime,subprocess
 import concurrent.futures
 import numpy as np
@@ -666,11 +666,20 @@ def finish_combo(expmod, combo, dry_run=False):
     arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
 
     control_fname = arcdir / 'archived.txt'
+    extent_zip = arcdir / 'EXTENT.zip'
     if dry_run:
-        print(f'If not for dry_run, I would be writing the file {control_fname}')
+        print(f'If not for dry_run, I would be writing the file {extent_zip}')
         return
 
+
+
+    # ---------------- Write the control file
+	if not os.path.isfile(control_fname):
+        with open(control_fname, 'w') as out:
+            out.write('Combo archived\n')
+ 
     # ----------------- Write /vsizip/EXTENT.zip/extent.shp
+    # (which is also the control file)
     # Get a list of all the Avalanches in this (archived) combo
     scombo = '-'.join(str(x) for x in combo)
     parseds = parse.parse_args([scombo])
@@ -678,29 +687,31 @@ def finish_combo(expmod, combo, dry_run=False):
     # TODO: Look at this dataframe
 
     # Open the extent file (Shapefile within a Zip archive)
-    extent_zip = '/vsizip/{}'.format(arcdir / 'EXTENT.zip')
-    extent_vsif = gdal.VSIFOpenL(extent_zip, 'wb')
-    extent_shp = f'{extent_zip}/extent.shp'
+    extent_vsif = gdal.VSIFOpenL('/vsizip/{}.tmp'.format(extent_zip), 'wb')
+    extent_shp = f'/vsizip/{extent_zip}.tmp/extent.shp'
 
     extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
-    extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.wkt), geom_type=ogr.wkbMultiPolygon )
+    try:
+        extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.wkt), geom_type=ogr.wkbMultiPolygon )
 
-    # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
-    extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
+        # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
+        extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
 
-    # Read avalanches, compute extent, and write into extent file
-    for tup in akdf.itertuples(index=False):
-        if not os.path.isfile(tup.avalfile):
-            raise ValueError(f'Missing avalanche file: {tup.avalfile}')
+        # Read avalanches, compute extent, and write into extent file
+        for tup in akdf.itertuples(index=False):
+            if not os.path.isfile(tup.avalfile):
+                raise ValueError(f'Missing avalanche file: {tup.avalfile}')
 
-        aval = read_nc(tup.avalfile)
-        polygonize_extent(aval, extent_layer, extent_Id)
+            aval = read_nc(tup.avalfile)
+            polygonize_extent(aval, extent_layer, extent_Id)
+    finally:
+        extent_ds = None
+        extent_vsif = None
 
-    # Write the control file
-    with open(control_fname, 'w') as out:
-        out.write('Combo archived\n')
+    os.rename(f'{extent_zip}.tmp', extent_zip)
 
-    # (Very conservatively) delete the xdir by moving it to a todel directory.
+    # --------------- (Very conservatively)
+    # Delete the xdir by moving it to a todel directory.
     if os.path.exists(xdir):
         todel = xdir.parents[0] / 'todel'
         os.makedirs(todel, exist_ok=True)
@@ -743,7 +754,7 @@ def read_reldom(arcdir_zip, ext, **kwargs):
 
     dfs = list()
     for fname in fnames:
-        dfs.append(ogrutil.read_df(fname, **kwargs)
+        dfs.append(ogrutil.read_df(fname, **kwargs))
 
     return pd.concat(dfs)
 # ----------------------------------------------------------
@@ -817,31 +828,6 @@ def polygonize_extent(aval,
 
 
 # ----------------------------------------------------------
-
-#def archive_combos(akdf_combo, debug=False, dry_run=False, archive_overruns=False):
-#    """
-#    akdf:
-#        Resolved to combo level
-#    """
-#    akdf = resolve.resolve_chunk(akdf_combo, scenetypes='x')
-#    akdf = resolve.resolve_id(akdf, realized=True, stage='out', include_overruns=False)
-#    akdf = overrun.drop_duplicates(akdf)    # Remove overruns that were re-done
-#
-#    archive_ids(akdf, debug=debug, dry_run=dry_run)
-#
-#    for tup in akdf_combo.reset_index(drop=True).itertuples(index=False):
-#        arcdir = expmod.combo_to_scenedir(scenetype='arc')
-#        with open(arcdir / 'archived.txt', 'w') as out:
-#            out.write('Combo archived\n')
-#
-## ----------------------------------------------------------
-#def main():
-#    out_zip = '/home/efischer/prj/ak/ak-ccsm-1981-1990-lapse-For-30/x-113-045/CHUNKS/x-113-0450000230MFor_10m/RESULTS/x-113-04500002For_10m/30M/x-113-04500002For_10m_30M_3200.out.zip'
-#    with netCDF4.Dataset('x.nc', 'w') as ncout:
-#        ncv = ncout.createVariable('status', 'i')
-#        ramms_to_nc0(out_zip, ncout)
-
-#main()
 
 
 #TODO: Add T/S/M/L categorization to netCDF file

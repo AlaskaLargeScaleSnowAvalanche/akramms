@@ -81,15 +81,11 @@ def add_combo_status(akdf0, realized=True, update=True):
     # Make it idempotent
     if 'combo_status' in akdf0.columns:
         return akdf0
-#    print('zzzzzzzzzz2')
-
     dfs = list()
 
     if len(akdf0) == 0:
         akdf0['combo_status'] = JobStatus.TODO
         return akdf0
-
-#    print('zzzzzzzzzz3')
 
     for exp,akdf1 in akdf0.reset_index(drop=True).groupby('exp'):
         expmod = parse.load_expmod(exp)
@@ -115,9 +111,6 @@ def add_combo_status(akdf0, realized=True, update=True):
         iddf1 = overrun.drop_duplciates(iddf1)
 
         df = iddf1[iddf1.id_status == joblib.JobStatus.OVERRUN]
-        print('xxxxxxxxxxxyyyyyyyyyyyyyyyyy')
-        print(df)
-
 
         # Aggregate id status back to combo level and add to akdf1
         combo_status = \

@@ -836,7 +836,7 @@ def loaddb(args):
     akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED]
 
     # Remove combos already in the database
-    TODO: Remove combos already in the database
+#    TODO: Remove combos already in the database
 
     if len(akdf0) == 0:
         raise ValueError('None of the select combos are MARKED_FINISHED.  Run akramms status --update')

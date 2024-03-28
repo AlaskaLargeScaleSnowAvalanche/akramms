@@ -457,7 +457,10 @@ def add_combo_quickstatus(akdf0, mtime=False):
         for tup in akdf1.itertuples(index=False):
             arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
             if os.path.exists(arcdir / 'archived.txt'):
-                status = JobStatus.MARKED_FINISHED
+            	if os.path.existss(arcdir / 'EXTENT.zip'):
+            	    status = JobStatus.EXTENT
+            	else:
+                    status = JobStatus.MARKED_FINISHED
                 mtimes.append(os.path.getmtime(arcdir / 'archived.txt'))
             else:
                 xdir = expmod.combo_to_scenedir(tup.combo, scenetype='x')
@@ -511,7 +514,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
 #        akdf1['combo_status'] = JobStatus.NOINPUT    # The Combo doesn't exist yet
 
         # Take care of combos we know are archived
-        is_archived = akdf1.combo.apply(lambda combo: 
+        is_archived = akdf1.combo.apply(lambda combo:
             os.path.isfile(expmod.combo_to_scenedir(combo, 'arc') / 'archived.txt') )
         df = akdf1[is_archived]
         df['combo_status'] = JobStatus.MARKED_FINISHED
