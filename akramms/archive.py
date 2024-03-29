@@ -702,7 +702,7 @@ def finish_combo(expmod, combo, dry_run=False):
         extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
 
         # Read avalanches, compute extent, and write into extent file
-        for tup in akdf.itertuples(index=False):
+        for tup in akdf.sort_values('id').itertuples(index=False):
             if not os.path.isfile(tup.avalfile):
                 raise ValueError(f'Missing avalanche file: {tup.avalfile}')
 
