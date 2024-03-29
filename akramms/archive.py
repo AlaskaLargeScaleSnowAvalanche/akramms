@@ -638,7 +638,7 @@ class ArchiveContents(typing.NamedTuple):
     depo: object
 
 def read_nc(avalfile):
-    with netCDF4.Dataset(tup.avalfile) as nc:
+    with netCDF4.Dataset(avalfile) as nc:
         # --------------- gridA is the subdomain tile, WITH MARGIN
         # Geotransform of this avalanche's local grid
         # TODO: Store Geotransform as machine-precision doubles in the file
