@@ -698,7 +698,7 @@ def finish_combo(expmod, combo, dry_run=False):
             # Read avalanches, compute extent, and write into extent file
             nrow = len(akdf)
             n = 0
-            print('Polygonizing {nrow} avalanche extents', end='')
+            print(f'Polygonizing {nrow} avalanche extents', end='')
             sys.stdout.flush()
             for tup in akdf.sort_values('id').itertuples(index=False):
                 if n%100 == 0:
