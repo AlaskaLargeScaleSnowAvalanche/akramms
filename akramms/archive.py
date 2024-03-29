@@ -687,8 +687,9 @@ def finish_combo(expmod, combo, dry_run=False):
     # TODO: Look at this dataframe
 
     # Open the extent file (Shapefile within a Zip archive)
-    extent_vsif = gdal.VSIFOpenL('/vsizip/{}.tmp'.format(extent_zip), 'wb')
-    extent_shp = f'/vsizip/{extent_zip}.tmp/extent.shp'
+#    extent_vsif = gdal.VSIFOpenL('/vsizip/{}.tmp'.format(extent_zip), 'wb')
+    # https://gis.stackexchange.com/questions/306299/how-can-i-write-a-zipped-shapefile-with-ogr2ogr-and-vsizip
+    extent_shp = f'/vsizip/{extent_zip}.tmp/extent.shz'
 
     extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
     try:
