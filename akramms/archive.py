@@ -828,7 +828,7 @@ def polygonize_extent(aval, tup_id,
     # The pixel value is placed in the Id attribute
     # Polygonize docs: https://gdal.org/api/gdal_alg.html (search for GDALPolygonize)
     gdal.Polygonize(nzmask_band, nzmask_band,
-        extent_shps[tup_combo].layer, extent_shps[tup_combo].Id)
+        extent_layer, extent_Id)
 
 
 # ----------------------------------------------------------
