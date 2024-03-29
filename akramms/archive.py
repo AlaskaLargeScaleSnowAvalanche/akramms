@@ -786,10 +786,10 @@ def polygonize_extent(aval,
     """
 
     # Create a sub-grid gridL around just the avalanche (fast polygonize)
-    iL_min = np.min(iA) - 2
-    iL_max = np.max(iA) + 3
-    jL_min = np.min(jA) - 2
-    jL_max = np.max(jA) + 3
+    iL_min = np.min(aval.iA) - 2
+    iL_max = np.max(aval.iA) + 3
+    jL_min = np.min(aval.jA) - 2
+    jL_max = np.max(aval.jA) + 3
 
     iL = aval.iA - iL_min    # Vector operation
     jL = aval.jA - jL_min
