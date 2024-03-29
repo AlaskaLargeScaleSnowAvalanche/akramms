@@ -680,6 +680,7 @@ def finish_combo(expmod, combo, dry_run=False):
     # ----------------- Write /vsizip/EXTENT.zip/extent.shp
     with ioutil.TmpDir(dir=arcdir) as tdir:
         extent_shp = tdir.location / 'extent.shp'
+        extent_full_shp = tdir.location / 'extent_full.shp'
 
         # Get a list of all the Avalanches in this (archived) combo
         scombo = expmod.name + '-' + '-'.join(str(x) for x in combo)
@@ -689,11 +690,14 @@ def finish_combo(expmod, combo, dry_run=False):
 
         # Open and write the extent file (Shapefile within a Zip archive)
         extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(str(extent_shp))
+        extent_full_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(str(extent_full_shp))
         try:
             extent_layer = extent_ds.CreateLayer(str(extent_shp), ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
+            extent_full_layer = extent_full_s.CreateLayer(str(extent_full_shp), ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
 
             # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
             extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
+            extent_full_Id = extent_full_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
 
             # Read avalanches, compute extent, and write into extent file
             nrow = len(akdf)
@@ -708,7 +712,8 @@ def finish_combo(expmod, combo, dry_run=False):
                     raise ValueError(f'Missing avalanche file: {tup.avalfile}')
 
                 aval = read_nc(tup.avalfile)
-                polygonize_extent(aval, tup.id, extent_layer, extent_Id)
+                polygonize_extent(aval, tup.id, extent_layer, extent_Id, full=False)
+                polygonize_extent(aval, tup.id, extent_full_layer, extent_full_Id, full=True)
                 n += 1
             print('Done!')
         finally:
@@ -768,7 +773,7 @@ def read_reldom(arcdir_zip, ext, **kwargs):
     return pd.concat(dfs)
 # ----------------------------------------------------------
 def polygonize_extent(aval, tup_id,
-    extent_layer, extent_Id):
+    extent_layer, extent_Id, full=False):
 #    iA, jA, gridA_gt, crs_wkt, max_vel, max_height, depo,
 
     """Creates a polygon for the extent of an avalanche, and writes it
@@ -781,6 +786,10 @@ def polygonize_extent(aval, tup_id,
     extent_Id: OUTPUT
         Reference to the OGR shapefile field called "Id", where
         Avalanche Id is to be stored.
+
+    full:
+        True: polygonize all non-zero gridcells (used for SpataLite index).
+        False: polygonize using "user-level" definition of avalanche outline
 
     Example creating extent inputs:
       extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
@@ -820,7 +829,14 @@ def polygonize_extent(aval, tup_id,
     # >   Flow-depth > 0.25m AND
     # >   velocity > 1m/s
     nzmask_val = np.zeros(aval.max_vel.shape, dtype=np.int32)
-    nzmask_val[np.logical_and(aval.max_height > 0.25, aval.max_vel > 1.0)] = tup_id
+    if full:
+        nzmask_val[np.logical_and(np.logical_and(
+            aval.max_height > 0,
+            aval.max_vel > 0),
+            aval.depo > 0)] = tup_id
+    else:
+        nzmask_val[np.logical_and(
+            aval.max_height > 0.25, aval.max_vel > 1.0)] = tup_id
 
     # Burn the gridcells that are part of our grid
     # (already pared down)
