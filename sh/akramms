@@ -643,7 +643,8 @@ def xoverrun(args):
     akdf0 = joblib.add_combo_quickstatus(akdf0)
     akdf0 = akdf0[~akdf0.combo_quickstatus.isin([
         joblib.JobStatus.NOINPUT,
-        joblib.JobStatus.MARKED_FINISHED])]
+        joblib.JobStatus.MARKED_FINISHED,
+        joblib.JobStatus.EXTENT])]
 
     if args.ignore is not None:
         ignore_statuses = {joblib.JobStatus._member_map_[x] for x in args.ignore.split(',')}

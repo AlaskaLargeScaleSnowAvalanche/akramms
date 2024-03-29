@@ -706,9 +706,9 @@ def finish_combo(expmod, combo, dry_run=False):
             extent_ds = None
 
         # Convert to zip file
-        _zip_dir(tdir.location, tdir.location / 'EXTENT.zip')
+        _zip_dir(tdir.location, arcdir/'EXTENT-tmp.zip')
 
-        os.rename(tdir.location / 'EXTENT.zip', arcdir / 'EXTENT.zip')
+    os.rename(arcdir/'EXTENT-tmp.zip', arcdir / 'EXTENT.zip')
 
     # --------------- (Very conservatively)
     # Delete the xdir by moving it to a todel directory.
