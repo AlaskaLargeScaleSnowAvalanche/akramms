@@ -797,7 +797,7 @@ def polygonize_extent(aval,
     gridL_gt[0] += gridL_gt[1] * iL_min
     gridL_gt[3] += gridL_gt[5] * jL_min
     gridL = gisutil.RasterInfo(
-        aval.crs_wkt, #nc.variables['grid_mapping'].crs_wkt,
+        aval.gridA_wkt, #nc.variables['grid_mapping'].crs_wkt,
         iL_max - iL_min,
         jL_max - jL_min,
         gridL_gt)
