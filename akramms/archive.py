@@ -694,9 +694,9 @@ def finish_combo(expmod, combo, dry_run=False):
 #    extent_shp = extent_zip
 
 
-    extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_zip_tmp)
+    extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(str(extent_zip_tmp))
     try:
-        extent_layer = extent_ds.CreateLayer(extent_zip_tmp, ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
+        extent_layer = extent_ds.CreateLayer(str(extent_zip_tmp), ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
 
         # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
         extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
