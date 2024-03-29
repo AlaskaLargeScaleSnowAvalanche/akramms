@@ -666,8 +666,9 @@ def finish_combo(expmod, combo, dry_run=False):
     arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
 
     control_fname = arcdir / 'archived.txt'
-    extent_zip = arcdir / 'EXTENT.shz'
-    extent_zip_tmp = arcdir / 'EXTENT-tmp.shz'
+    extent_zip = arcdir / 'EXTENT.zip'
+    extent_folder = arcdir / 'EXTENT-tmp'
+    extent_zip_tmp = arcdir / 'EXTENT-tmp.zip'
     if dry_run:
         print(f'If not for dry_run, I would be writing the file {extent_zip}')
         return
@@ -680,37 +681,35 @@ def finish_combo(expmod, combo, dry_run=False):
             out.write('Combo archived\n')
  
     # ----------------- Write /vsizip/EXTENT.zip/extent.shp
-    # (which is also the control file)
-    # Get a list of all the Avalanches in this (archived) combo
-    scombo = expmod.name + '-' + '-'.join(str(x) for x in combo)
-    parseds = parse.parse_args([scombo])
-    akdf = resolve.resolve_to(parseds, 'id', realized=True, scenetypes={'arc'})
-    # TODO: Look at this dataframe
+    with ioutil.TmpDir(dir=arcdir) as tdir:
+        extent_shp = tdir.location / 'extent.shp'
 
-    # Open the extent file (Shapefile within a Zip archive)
-#    extent_vsif = gdal.VSIFOpenL('/vsizip/{}.tmp'.format(extent_zip), 'wb')
-    # https://gis.stackexchange.com/questions/306299/how-can-i-write-a-zipped-shapefile-with-ogr2ogr-and-vsizip
-    #extent_shp = f'/vsizip/{extent_zip}.tmp/extent.shz'
-#    extent_shp = extent_zip
+        # Get a list of all the Avalanches in this (archived) combo
+        scombo = expmod.name + '-' + '-'.join(str(x) for x in combo)
+        parseds = parse.parse_args([scombo])
+        akdf = resolve.resolve_to(parseds, 'id', realized=True, scenetypes={'arc'})
+        # TODO: Look at this dataframe
 
+        # Open and write the extent file (Shapefile within a Zip archive)
+        extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(str(extent_shp))
+        try:
+            extent_layer = extent_ds.CreateLayer(str(extent_shp), ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
 
-    extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(str(extent_zip_tmp))
-    try:
-        extent_layer = extent_ds.CreateLayer(str(extent_zip_tmp), ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
+            # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
+            extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
 
-        # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
-        extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
+            # Read avalanches, compute extent, and write into extent file
+            for tup in akdf.sort_values('id').itertuples(index=False):
+                if not os.path.isfile(tup.avalfile):
+                    raise ValueError(f'Missing avalanche file: {tup.avalfile}')
 
-        # Read avalanches, compute extent, and write into extent file
-        for tup in akdf.sort_values('id').itertuples(index=False):
-            if not os.path.isfile(tup.avalfile):
-                raise ValueError(f'Missing avalanche file: {tup.avalfile}')
+                aval = read_nc(tup.avalfile)
+                polygonize_extent(aval, tup.id, extent_layer, extent_Id)
+        finally:
+            extent_ds = None
 
-            aval = read_nc(tup.avalfile)
-            polygonize_extent(aval, tup.id, extent_layer, extent_Id)
-    finally:
-        extent_ds = None
-#        extent_vsif = None
+        # Convert to zip file
+        _zip_dir(tdir.location, extent_tmp_zip)
 
     os.rename(extent_zip_tmp, extent_zip)
 
