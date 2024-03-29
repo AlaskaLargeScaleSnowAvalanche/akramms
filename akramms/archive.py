@@ -785,6 +785,8 @@ def polygonize_extent(aval, tup_id,
 
     """
 
+    print(f'polygonize_extent({tup_id})')
+
     # Create a sub-grid gridL around just the avalanche (fast polygonize)
     iL_min = np.min(aval.iA) - 2
     iL_max = np.max(aval.iA) + 3
