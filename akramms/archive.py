@@ -718,6 +718,7 @@ def finish_combo(expmod, combo, dry_run=False):
             print('Done!')
         finally:
             extent_ds = None
+            extent_full_ds = None
 
         # Convert to zip file
         _zip_dir(tdir.location, arcdir/'EXTENT-tmp.zip')
