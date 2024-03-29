@@ -667,7 +667,7 @@ def finish_combo(expmod, combo, dry_run=False):
 
     control_fname = arcdir / 'archived.txt'
     extent_zip = arcdir / 'EXTENT.shz'
-    extent_zip_tmp = arcdir / 'EXTENT.tmp.shz'
+    extent_zip_tmp = arcdir / 'EXTENT-tmp.shz'
     if dry_run:
         print(f'If not for dry_run, I would be writing the file {extent_zip}')
         return
