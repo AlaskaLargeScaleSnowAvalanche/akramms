@@ -791,13 +791,13 @@ def polygonize_extent(aval,
     jL_min = np.min(jA) - 2
     jL_max = np.max(jA) + 3
 
-    iL = iA - iL_min    # Vector operation
-    jL = jA - jL_min
-    gridL_gt = np.array(gridA_gt, dtype='i8')
+    iL = aval.iA - iL_min    # Vector operation
+    jL = aval.jA - jL_min
+    gridL_gt = np.array(aval.gridA_gt, dtype='i8')
     gridL_gt[0] += gridL_gt[1] * iL_min
     gridL_gt[3] += gridL_gt[5] * jL_min
     gridL = gisutil.RasterInfo(
-        crs_wkt, #nc.variables['grid_mapping'].crs_wkt,
+        aval.crs_wkt, #nc.variables['grid_mapping'].crs_wkt,
         iL_max - iL_min,
         jL_max - jL_min,
         gridL_gt)
@@ -812,8 +812,8 @@ def polygonize_extent(aval,
     # > of an avalanche, where
     # >   Flow-depth > 0.25m AND
     # >   velocity > 1m/s
-    nzmask_val = np.zeros(max_vel.shape, dtype=np.int32)
-    nzmask_val[np.logical_and(max_height > 0.25, max_vel > 1.0)] = tup_id
+    nzmask_val = np.zeros(aval.max_vel.shape, dtype=np.int32)
+    nzmask_val[np.logical_and(aval.max_height > 0.25, aval.max_vel > 1.0)] = tup_id
 
     # Burn the gridcells that are part of our grid
     # (already pared down)
