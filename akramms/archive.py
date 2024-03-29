@@ -595,7 +595,7 @@ def archive_ids(akdf0, debug=False, dry_run=False):
 # ----------------------------------------------------------
 def _zip_dir(idir, ofname):
     with zipfile.ZipFile(ofname, 'w', compression=zipfile.ZIP_DEFLATED) as ozip:
-        for leaf in os.listdir(idir):
+        for leaf in sorted(os.listdir(idir)):
             ozip.write(idir / leaf, arcname=leaf) #, compress_type=zipfile.ZIP_DEFLATD)
 
 def copy_shapefiles(expmod, combo, dry_run=False):
