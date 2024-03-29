@@ -666,7 +666,8 @@ def finish_combo(expmod, combo, dry_run=False):
     arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
 
     control_fname = arcdir / 'archived.txt'
-    extent_zip = arcdir / 'EXTENT.zip'
+    extent_zip = arcdir / 'EXTENT.shz'
+    extent_zip_tmp = arcdir / 'EXTENT.tmp.shz'
     if dry_run:
         print(f'If not for dry_run, I would be writing the file {extent_zip}')
         return
@@ -689,11 +690,13 @@ def finish_combo(expmod, combo, dry_run=False):
     # Open the extent file (Shapefile within a Zip archive)
 #    extent_vsif = gdal.VSIFOpenL('/vsizip/{}.tmp'.format(extent_zip), 'wb')
     # https://gis.stackexchange.com/questions/306299/how-can-i-write-a-zipped-shapefile-with-ogr2ogr-and-vsizip
-    extent_shp = f'/vsizip/{extent_zip}.tmp/extent.shz'
+    #extent_shp = f'/vsizip/{extent_zip}.tmp/extent.shz'
+#    extent_shp = extent_zip
 
-    extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
+
+    extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_zip_tmp)
     try:
-        extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
+        extent_layer = extent_ds.CreateLayer(extent_zip_tmp, ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
 
         # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
         extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
@@ -707,9 +710,9 @@ def finish_combo(expmod, combo, dry_run=False):
             polygonize_extent(aval, extent_layer, extent_Id)
     finally:
         extent_ds = None
-        extent_vsif = None
+#        extent_vsif = None
 
-    os.rename(f'{extent_zip}.tmp', extent_zip)
+    os.rename(extent_zip_tmp, extent_zip)
 
     # --------------- (Very conservatively)
     # Delete the xdir by moving it to a todel directory.
