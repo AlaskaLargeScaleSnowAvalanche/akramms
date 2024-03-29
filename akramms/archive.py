@@ -707,7 +707,7 @@ def finish_combo(expmod, combo, dry_run=False):
                 raise ValueError(f'Missing avalanche file: {tup.avalfile}')
 
             aval = read_nc(tup.avalfile)
-            polygonize_extent(aval, extent_layer, extent_Id)
+            polygonize_extent(aval, tup.id, extent_layer, extent_Id)
     finally:
         extent_ds = None
 #        extent_vsif = None
@@ -762,7 +762,7 @@ def read_reldom(arcdir_zip, ext, **kwargs):
 
     return pd.concat(dfs)
 # ----------------------------------------------------------
-def polygonize_extent(aval,
+def polygonize_extent(aval, tup_id,
     extent_layer, extent_Id):
 #    iA, jA, gridA_gt, crs_wkt, max_vel, max_height, depo,
 
