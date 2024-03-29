@@ -666,9 +666,6 @@ def finish_combo(expmod, combo, dry_run=False):
     arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
 
     control_fname = arcdir / 'archived.txt'
-    extent_zip = arcdir / 'EXTENT.zip'
-    extent_folder = arcdir / 'EXTENT-tmp'
-    extent_zip_tmp = arcdir / 'EXTENT-tmp.zip'
     if dry_run:
         print(f'If not for dry_run, I would be writing the file {extent_zip}')
         return
@@ -709,9 +706,9 @@ def finish_combo(expmod, combo, dry_run=False):
             extent_ds = None
 
         # Convert to zip file
-        _zip_dir(tdir.location, extent_tmp_zip)
+        _zip_dir(tdir.location, tdir.location / 'EXTENT.zip')
 
-    os.rename(extent_zip_tmp, extent_zip)
+        os.rename(tdir.location / 'EXTENT.zip', arcdir / 'EXTENT.zip')
 
     # --------------- (Very conservatively)
     # Delete the xdir by moving it to a todel directory.
