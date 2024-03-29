@@ -696,12 +696,21 @@ def finish_combo(expmod, combo, dry_run=False):
             extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
 
             # Read avalanches, compute extent, and write into extent file
+            nrow = len(akdf)
+            n = 0
+            print('Polygonizing {nrow} avalanche extents', end='')
+            sys.stdout.flush()
             for tup in akdf.sort_values('id').itertuples(index=False):
+                if n%100 == 0:
+                    print('.', end='')
+                    sys.stdout.flush()
                 if not os.path.isfile(tup.avalfile):
                     raise ValueError(f'Missing avalanche file: {tup.avalfile}')
 
                 aval = read_nc(tup.avalfile)
                 polygonize_extent(aval, tup.id, extent_layer, extent_Id)
+                n += 1
+            print('Done!')
         finally:
             extent_ds = None
 
@@ -781,7 +790,7 @@ def polygonize_extent(aval, tup_id,
 
     """
 
-    print(f'polygonize_extent({tup_id})')
+#    print(f'polygonize_extent({tup_id})')
 
     # Create a sub-grid gridL around just the avalanche (fast polygonize)
     iL_min = np.min(aval.iA) - 2
