@@ -520,17 +520,17 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         finished_status = akdf1.combo.apply(lambda combo: _finished_status(expmod, combo))
         is_archived = (finished_status != JobStatus.UNKNOWN)
         df = akdf1[is_archived]
-        df['combo_status'] = finished_status
-#        print('AA2')
-        if update:
-            # Do EXTENT.zip on files that only have archived.txt
-            for tup in df[df.combo_status == JobStatus.MARKED_FINISHED].itertuples(index=False):
+        if len(df) > 0:
+            df['combo_status'] = finished_status
+            if update:
+                # Do EXTENT.zip on files that only have archived.txt
+                for tup in df[df.combo_status == JobStatus.MARKED_FINISHED].itertuples(index=False):
 
-                print('Finishing combo (b): {}'.format(tup.combo))
-                archive.finish_combo(expmod, tup.combo, dry_run=dry_run)
+                    print('Finishing combo (b): {}'.format(tup.combo))
+                    archive.finish_combo(expmod, tup.combo, dry_run=dry_run)
 
-        dfs.append(df)
-        akdf1 = akdf1[~is_archived]
+            dfs.append(df)
+            akdf1 = akdf1[~is_archived]
 
         # ------------------------------------------
         # Get jobstatus at id level
@@ -551,11 +551,9 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         akdf1['combo_status'] = akdf1.combo_status.fillna(JobStatus.NOINPUT).astype(int)
 
         # --------------------------------------------
-        print('update = ', update)
         if update:
             # Copy shapefiles
             for tup in akdf1.itertuples(index=False):
-                print('tup2', tup)
                 archive.copy_shapefiles(expmod, tup.combo, dry_run=dry_run)
 
             # Mark combos that have fully finished
