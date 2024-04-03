@@ -180,7 +180,7 @@ def resolve_chunk(akdf, scenetypes={'x'}, realized=True):
             expmod = parse.load_expmod(tup.exp)
             # combo = expmod.Combo(*tup.combo)
             combo = parse.new_combo(expmod, tup.combo)
-            print('*********** Made combo ', combo)
+#            print('*********** Made combo ', combo)
 
             if 'x' in scenetypes:
                 scenedir = expmod.combo_to_scenedir(combo, scenetype='x')

@@ -8,6 +8,29 @@ from uafgi.util import shapelyutil
 """Handle avalanches that overrun"""
 
 
+def rerun_ramms_stage1(akdf0, dem_file, dry_run=False):
+    """Re-runs RAMMS Stage 1 on "NOINPUT" chunks.
+    akdf0:
+        Resolved to combo
+    dem_file:
+        scene_args['dem_file']
+    """
+    cdf0 = resolve.resolve_chunk(akdf0)
+    cdf0 = cdf0[cdf0.chunk_status == file_info.JobStatus.NOINPUT]
+
+    for releasefile,cdf1 in cdf0.groupby('releasefile'):
+        jb = file_info.parse_chunk_release_file(releasefile)
+
+        # Run RAMMS Stage 1 (and auto-submit)
+        # releasefile = chunk_dir / 'RELEASE' / f'{jb.slope_name}_{jb.avalanche_name}_rel.shp'
+
+        rule = r_ramms1.releasefile_rule(releasefile, dem_file, [releasefile], dry_run=dry_run, submit=True, at_front=True, condor_priority=1)
+        if dry_run:
+            print(f'Except for --dry-run, I would be running RAMMS on the releasefile {releasefile}')
+        else:
+            rule()
+
+
 def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run=False, block=True):
     """Creates new chunks for avalanches that have overrun.
     akdf:
@@ -47,6 +70,13 @@ def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run
             # We're not doing synchronous.
             # Resubmit whatever we can, knowing it might not be complete
             break
+
+
+    # Re-run RAMMS for combos in the NOINPUT state
+    mask = (akdf0.combo_status == joblib.JobStatus.NOINPUT)
+    rerun_ramms_stage1(akdf0[mask])
+    akdf0 = akdf0[~mask]
+    return    # DEBUG
 
 
     # Only look at combos in the OVERRUN state, ignore all others
