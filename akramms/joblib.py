@@ -541,6 +541,8 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         # Replace older avalanches runs with newer runs of the same ID
         # (which presumably have fixed overrun problems)
         iddf1 = overrun.drop_duplicates(iddf1)
+        print('zzzzzzzzzzz')
+        print(iddf1['combo','id', 'id_status'])
 
         # Aggregate id status back to combo level and add to akdf1
         # (Now we know whether the combo has fully finished)
@@ -548,7 +550,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
             iddf1[['combo','id_status']].groupby('combo').agg(lambda x: agg_status(x,ignore_statuses)) \
             .rename(columns={'id_status': 'combo_status'})
         akdf1 = akdf1.merge(combo_status, how='left', left_on='combo', right_index=True)
-        print('combo_status ', akdf1[['combo', 'combo_status']])
+#        print('combo_status ', akdf1[['combo', 'combo_status']])
         akdf1['combo_status'] = akdf1.combo_status.fillna(JobStatus.NOINPUT).astype(int)
 
         # --------------------------------------------
