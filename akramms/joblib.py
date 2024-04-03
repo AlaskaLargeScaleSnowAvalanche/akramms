@@ -544,7 +544,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         print('zzzzzzzzzzz')
         xdf = iddf1[['combo','id', 'id_status']]
         print(xdf)
-        print(xdf[xdf.id_status] == JobStatus.NOINPUT)
+        print(xdf[xdf.id_status == JobStatus.NOINPUT])
 
         # Aggregate id status back to combo level and add to akdf1
         # (Now we know whether the combo has fully finished)
