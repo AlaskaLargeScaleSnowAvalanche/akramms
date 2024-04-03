@@ -15,6 +15,11 @@ def rerun_ramms_stage1(akdf0, dry_run=False):
     dem_file:
         scene_args['dem_file']
     """
+
+    # Nothing to do
+    if len(akdf0) == 0:
+        return
+
     print('----------------- BEGIN rerun_ramms_stage1() on chunks:')
     print(akdf0[['combo', 'combo_status']])
     cdf0 = resolve.resolve_chunk(akdf0)
@@ -42,8 +47,8 @@ def rerun_ramms_stage1(akdf0, dry_run=False):
         else:
             rule()
 
-    print('DEBUG: Exiting')
-    sys.exit(0)
+#    print('DEBUG: Exiting')
+#    sys.exit(0)
 
 def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run=False, block=True):
     """Creates new chunks for avalanches that have overrun.
