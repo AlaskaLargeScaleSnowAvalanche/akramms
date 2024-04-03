@@ -212,6 +212,11 @@ def all_domains():
 
 def spiral_domains(x0, y0):
     """Use Ulam Spiral out from a central domain tile"""
+
+#    yield (110,43)
+#    return
+
+
     dij = set(all_domains())
 
     # High prioirty domains
@@ -238,6 +243,8 @@ def full():
     """Yields the combos for the FULL experiment.
     REQUIRES: domains.shp and domains_margin.shp
     """
+
+
 
     # Generate set of trials
     snow = 'ccsm'
