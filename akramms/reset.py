@@ -37,6 +37,11 @@ def _deletes_combo_ramms1(scenedir):
         scenedir / 'ramms_stage1',
         scenedir / 'CHUNKS']
 # ----------------------------------------------------------------------
+def _deletes_combo_ramms1_cache(scenedir):
+    return [
+        scenedir / 'ramms_stage1.txt',
+        scenedir / 'ramms_stage1']
+# ----------------------------------------------------------------------
 def _deletes_chunk_chunk(chunkdir):
 
     """Removes the entire chunk.  After this, akramms will ignore the
