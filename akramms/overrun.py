@@ -36,7 +36,7 @@ def rerun_ramms_stage1(akdf0, dry_run=False):
         # Run RAMMS Stage 1 (and auto-submit)
         # releasefile = chunk_dir / 'RELEASE' / f'{jb.slope_name}_{jb.avalanche_name}_rel.shp'
 
-        rule = r_ramms1.releasefile_rule(releasefile, dem_file, [releasefile], dry_run=dry_run, submit=True, at_front=True, condor_priority=1)
+        rule = r_ramms1.releasefile_rule(releasefile, scene_args['dem_file'], [releasefile], dry_run=dry_run, submit=True, at_front=True, condor_priority=1)
         if dry_run:
             print(f'Except for --dry-run, I would be running RAMMS on the releasefile {releasefile}')
         else:
