@@ -19,9 +19,12 @@ def rerun_ramms_stage1(akdf0, dry_run=False):
     cdf0 = joblib.add_chunk_status(cdf0)
     print('rerun_ramms_stage1() ', cdf0.columns)
     print(cdf0)
+    cdf0['chunk_status'] = cdf0.chunk_status.fillna(JobStatus.NOINPUT).astype(int)
     cdf0 = cdf0[cdf0.chunk_status == file_info.JobStatus.NOINPUT]
+
     print('NOINPUT rows:')
-    print(cfd0)
+    print(cdf0)
+    sys.exit(0)
 
     for (exp, releasefile, combo),cdf1 in cdf0.groupby(['exp', 'releasefile']):
         expmod = parse.load_expmod(exp)
