@@ -135,6 +135,7 @@ def reset(akdf0, level, step):
         elif level == 'combo':
             for combo in akdf1.combo:
                 scenedir = expmod.combo_to_scenedir(combo, 'x')
+                print('Deleting from scenedir ',scenedir)
                 deletes += deletes_fn(scenedir)
         else:
             raise ValueError(f'Illegal level {level}')
