@@ -1,4 +1,4 @@
-import os,time,datetime
+import os,time,datetime,sys
 import pandas as pd
 from akramms import file_info,chunk,level,joblib,config
 from akramms import r_ramms1,parse,params,resolve
@@ -17,9 +17,11 @@ def rerun_ramms_stage1(akdf0, dry_run=False):
     """
     cdf0 = resolve.resolve_chunk(akdf0)
     cdf0 = joblib.add_chunk_status(cdf0)
-    print('xxxxxxxxx ', cdf0.columns)
+    print('rerun_ramms_stage1() ', cdf0.columns)
     print(cdf0)
     cdf0 = cdf0[cdf0.chunk_status == file_info.JobStatus.NOINPUT]
+    print('NOINPUT rows:')
+    print(cfd0)
 
     for (exp, releasefile, combo),cdf1 in cdf0.groupby(['exp', 'releasefile']):
         expmod = parse.load_expmod(exp)
@@ -35,6 +37,8 @@ def rerun_ramms_stage1(akdf0, dry_run=False):
         else:
             rule()
 
+    print('DEBUG: Exiting')
+    sys.exit(0)
 
 def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run=False, block=True):
     """Creates new chunks for avalanches that have overrun.
