@@ -542,7 +542,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         # (which presumably have fixed overrun problems)
         iddf1 = overrun.drop_duplicates(iddf1)
         print('zzzzzzzzzzz')
-        xdf = iddf1[['combo','id', 'id_status']]
+        xdf = iddf1[['combo', 'pra_size', 'chunkid', 'id', 'id_status']]
         print(xdf)
         print(xdf[xdf.id_status == JobStatus.NOINPUT])
 
