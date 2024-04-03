@@ -16,7 +16,9 @@ def rerun_ramms_stage1(akdf0, dry_run=False):
         scene_args['dem_file']
     """
     cdf0 = resolve.resolve_chunk(akdf0)
+    cdf0 = joblib.add_chunk_status(cdf0)
     print('xxxxxxxxx ', cdf0.columns)
+    print(cdf0)
     cdf0 = cdf0[cdf0.chunk_status == file_info.JobStatus.NOINPUT]
 
     for (exp, releasefile, combo),cdf1 in cdf0.groupby(['exp', 'releasefile', 'chunk']):
