@@ -21,7 +21,7 @@ def rerun_ramms_stage1(akdf0, dry_run=False):
     print(cdf0)
     cdf0 = cdf0[cdf0.chunk_status == file_info.JobStatus.NOINPUT]
 
-    for (exp, releasefile, combo),cdf1 in cdf0.groupby(['exp', 'releasefile', 'chunk']):
+    for (exp, releasefile, combo),cdf1 in cdf0.groupby(['exp', 'releasefile']):
         expmod = parse.load_expmod(exp)
         jb = file_info.parse_chunk_release_file(releasefile)
         scene_args = params.load(expmod.combo_to_scenedir(combo))
