@@ -548,6 +548,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
             iddf1[['combo','id_status']].groupby('combo').agg(lambda x: agg_status(x,ignore_statuses)) \
             .rename(columns={'id_status': 'combo_status'})
         akdf1 = akdf1.merge(combo_status, how='left', left_on='combo', right_index=True)
+        print('combo_status ', akdf1[['combo', 'combo_status']]
         akdf1['combo_status'] = akdf1.combo_status.fillna(JobStatus.NOINPUT).astype(int)
 
         # --------------------------------------------
