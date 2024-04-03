@@ -8,7 +8,7 @@ from uafgi.util import shapelyutil
 """Handle avalanches that overrun"""
 
 
-def rerun_ramms_stage1(akdf0, dem_file, dry_run=False):
+def rerun_ramms_stage1(akdf0, dry_run=False):
     """Re-runs RAMMS Stage 1 on "NOINPUT" chunks.
     akdf0:
         Resolved to combo
@@ -18,8 +18,10 @@ def rerun_ramms_stage1(akdf0, dem_file, dry_run=False):
     cdf0 = resolve.resolve_chunk(akdf0)
     cdf0 = cdf0[cdf0.chunk_status == file_info.JobStatus.NOINPUT]
 
-    for releasefile,cdf1 in cdf0.groupby('releasefile'):
+    for (exp, releasefile, combo),cdf1 in cdf0.groupby(['exp', 'releasefile', 'chunk']):
+        expmod = parse.load_expmod(exp)
         jb = file_info.parse_chunk_release_file(releasefile)
+        scene_args = params.load(expmod.combo_to_scenedir(combo))
 
         # Run RAMMS Stage 1 (and auto-submit)
         # releasefile = chunk_dir / 'RELEASE' / f'{jb.slope_name}_{jb.avalanche_name}_rel.shp'
@@ -74,7 +76,7 @@ def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run
 
     # Re-run RAMMS for combos in the NOINPUT state
     mask = (akdf0.combo_status == joblib.JobStatus.NOINPUT)
-    rerun_ramms_stage1(akdf0[mask])
+    rerun_ramms_stage1(akdf0[mask], dry_run=dry_run)
     akdf0 = akdf0[~mask]
     return    # DEBUG
 
