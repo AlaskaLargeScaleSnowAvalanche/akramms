@@ -506,7 +506,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
 
     # Cull combos that have finished or not yet started
     akdf0 = add_combo_quickstatus(akdf0)#, mtime=mtime)
-    mask = (akdf0.combo_quickstatus != JobStatus.EXTENT)
+    mask = (~akdf0.combo_quickstatus.isin([JobStatus.MARKED_FINISHED, JobStatus.EXTENT]))
 
     renames = {'combo_quickstatus':'combo_status'}
     dfs.append(akdf0[~mask].rename(columns=renames))
