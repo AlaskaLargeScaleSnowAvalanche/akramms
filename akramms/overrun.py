@@ -15,7 +15,7 @@ def rerun_ramms_stage1(akdf0, dry_run=False):
     dem_file:
         scene_args['dem_file']
     """
-    print('BEGIN rerun_ramms_stage1() on chunks:')
+    print('----------------- BEGIN rerun_ramms_stage1() on chunks:')
     print(akdf0[['combo', 'combo_status']])
     cdf0 = resolve.resolve_chunk(akdf0)
     cdf0 = joblib.add_chunk_status(cdf0)
