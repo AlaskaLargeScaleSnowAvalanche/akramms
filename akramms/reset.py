@@ -40,7 +40,8 @@ def _deletes_combo_ramms1(scenedir):
 def _deletes_combo_ramms1_cache(scenedir):
     return [
         scenedir / 'ramms_stage1.txt',
-        scenedir / 'ramms_stage1']
+        scenedir / 'ramms_stage1',
+        scenedir / 'ramms_stage2']
 # ----------------------------------------------------------------------
 def _deletes_chunk_chunk(chunkdir):
 
