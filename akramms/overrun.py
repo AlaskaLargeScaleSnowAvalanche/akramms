@@ -24,7 +24,7 @@ def rerun_ramms_stage1(akdf0, dry_run=False):
 
     print('NOINPUT rows (which we will resubmit to RAMMS Stage 1):')
     print(cdf0)
-    return
+#    return
 
     for (exp, releasefile, combo),cdf1 in cdf0.groupby(['exp', 'releasefile']):
         expmod = parse.load_expmod(exp)
