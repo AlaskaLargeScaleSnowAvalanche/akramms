@@ -92,10 +92,11 @@ def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run
 
 
     # Re-run RAMMS for combos in the NOINPUT state
-    mask = (akdf0.combo_status == joblib.JobStatus.NOINPUT)
-    rerun_ramms_stage1(akdf0[mask], dry_run=dry_run)
-    akdf0 = akdf0[~mask]
-    return    # DEBUG
+    # (This does not distinguish whether it is READY for RAMMS Stage 1)
+#    mask = (akdf0.combo_status == joblib.JobStatus.NOINPUT)
+#    rerun_ramms_stage1(akdf0[mask], dry_run=dry_run)
+#    akdf0 = akdf0[~mask]
+#    return    # DEBUG
 
 
     # Only look at combos in the OVERRUN state, ignore all others
