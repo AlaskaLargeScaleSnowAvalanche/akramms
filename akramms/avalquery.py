@@ -103,27 +103,17 @@ def check_extent_sign(extent):
 def tile_rtree(expmod):
     """Put all the available tiles into an RTree"""
     domains_margin_shp = os.path.join(expmod.dir, f'{expmod.name}_domains_margin.shp')
-    domains_df = shputil.read_df(domains_margin_shp)
-    print(domains_df)
+    domains_df = ogrutil.read_df(domains_margin_shp).set_index(['idom', 'jdom'])
+    return rtreeutil.RTree(domains_df)
 
-    # Number each tile with a single index
-    # https://toblerity.org/rtree/tutorial.html#creating-an-index
-    ix2dom = dict()
-    dom2ix = dict()
-    for ix,tup in enumerate(domains_df.itertuples(index=False)):
-        ix2dom[ix] = (tup.idom, tup.jdom)
-        dom2ix[(tup.idom, tup.jdom)] = ix
-
-    # Make the rtree
-    idx = rtree.index.Index(interleaved=True)
-    for tup in domains_df.itertuples(index=False):
-        xx, yy = tup.shape.exterior.coords.xy
-        bbox = (xx[0], yy[2], xx[2], yy[0])    # y-axis is north-up
-#        print(f"({tup.idom}, {tup.jdom}): {bbox}")
-        idx.insert(dom2ix[(tup.idom,tup.jdom)], bbox, tup.shape)
-
-    return idx
-
+def query_tiles(expmod, geom):
+    """Finds all the tiles (with margin) that overlap a given OGR Geometry.
+    geom:
+        An OGR Geometry
+    Returns:
+        [(idom, jdom), (idom, jdom), ...]
+    """
+    return tile_rtree(expmod).intersection(geom)    # [(idom, jdom), (idom, jdom), ...]
 
 def tiles_by_extent(expmod, extent):
     """Returns the (idom,jdom) of all tiles contributing avalanches
@@ -132,6 +122,11 @@ def tiles_by_extent(expmod, extent):
     """
 
     rt = tile_rtree(expmod)
+
+
+
+
+
 
 
 
