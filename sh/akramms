@@ -471,11 +471,11 @@ def run(args):
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
     akdf0 = akdf0.reset_index(drop=True)
-    print('aaaaaaaa1 ', akdf0)
 
     # Exclude combos that have already been completely finished and archived
     # (and the x-dir might have been deleted)
     akdf0 = joblib.add_combo_quickstatus(akdf0)
+    print('aaaaaaaa1 ', akdf0[['combo', 'combo_quickstatus']])
     akdf0 = akdf0[akdf0.combo_quickstatus < joblib.JobStatus.MARKED_FINISHED]
 
     # Keep combo_order
