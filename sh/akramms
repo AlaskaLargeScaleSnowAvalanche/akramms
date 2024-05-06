@@ -476,7 +476,7 @@ def run(args):
     # (and the x-dir might have been deleted)
     akdf0 = joblib.add_combo_quickstatus(akdf0)
     akdf0 = akdf0[akdf0.combo_quickstatus != joblib.JobStatus.MARKED_FINISHED]
-    print('aaaaaaa2 ', akdf0)
+#    print('aaaaaaa2 ', akdf0)
 
     # Keep combo_order
     for exp,akdf1 in akdf0.groupby('exp'):

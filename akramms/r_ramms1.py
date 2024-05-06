@@ -154,10 +154,12 @@ def run_chunk(release_file, crf, gridI, at_front=False, submit=False, condor_pri
             shutil.copy(fname1, fname0)
 
     chunk_dir_rel = config.roots.relpath(crf.chunk_dir)
+    print('AA1 ', crf.chunk_dir, chunk_dir_rel)
+    chunk_dir_path = config.roots_w.syspath(chunk_dir_rel, bash=True)
     cmd = ['sh', 
         config.roots_w.join('HARNESS', 'akramms', 'sh', 'run_ramms.sh', bash=True),
         '--ramms-version', config.ramms_version,
-        config.roots_w.syspath(chunk_dir_rel, bash=True), '1']    # '1'=stage 1
+        chunk_dir_path, '1']    # '1'=stage 1
 
     # RAMMS Stage 1 accepts inputs on stdin
     # rammsdist.run_on_windows_stage() calls read_inputs()
