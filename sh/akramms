@@ -475,8 +475,7 @@ def run(args):
     # Exclude combos that have already been completely finished and archived
     # (and the x-dir might have been deleted)
     akdf0 = joblib.add_combo_quickstatus(akdf0)
-    print('aaaaaaaa1 ', akdf0[['combo', 'combo_quickstatus']])
-    akdf0 = akdf0[akdf0.combo_quickstatus < joblib.JobStatus.MARKED_FINISHED]
+    akdf0 = akdf0[akdf0.combo_quickstatus != joblib.JobStatus.MARKED_FINISHED]
 
     # Keep combo_order
     for exp,akdf1 in akdf0.groupby('exp'):
