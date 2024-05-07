@@ -635,8 +635,9 @@ def rerun(args):
 
         for tup in akdf1s.itertuples(index=False):
             expmod = akramms.parse.load_expmod(tup.exp)
-            scenedir = expmod.combo_to_scenedir(combo)
-            print(scenedir)
+            scenedir = expmod.combo_to_scenedir(tup.combo)
+            chunkdir = scenedir / 'CHUNKS' / tup.chunkname
+            print(chunkdir)
 
 
         if len(akdf1s) > 0:
