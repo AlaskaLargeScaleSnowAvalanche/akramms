@@ -662,7 +662,7 @@ def rerun(args):
             print(f'------------- Rerunning Combo: {combo}')
             makefile = make.Makefile()
             add_run_combo(expmod, makefile, combo)
-            makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=ncpu)
+            makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
 
             print('Exiting after this combo...')
             return
