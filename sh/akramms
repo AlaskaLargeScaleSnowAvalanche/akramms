@@ -624,7 +624,7 @@ def rerun(args):
 
     for ix in range(len(akdf0)):
         combo = akdf0.iloc[ix].combo
-        print('combo ', combo)
+        print('combo ', combo, type(combo))
 
         # Look at individual chunks
         akdf1 = resolve.resolve_chunk(akdf0.iloc[ix:ix+1])
