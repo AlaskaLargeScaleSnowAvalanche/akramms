@@ -651,31 +651,32 @@ def rerun(args):
                     print(f'rm {file}')
                     os.remove(file)
 
+
+        if len(akdf1s) == 0:
+            continue
+
         # Re-run the Combo (which will re-run all the chunks)
+        joblib.print_status(akdf1s, 'chunk')
+        print(akdf1s[['chunkname', 'chunk_complete_stage2_cached', 'chunk_status']])
 
-        if len(akdf1s) > 0:
-#            print(akdf1s.columns)
-            joblib.print_status(akdf1s, 'chunk')
-            print(akdf1s[['chunkname', 'chunk_complete_stage2_cached', 'chunk_status']])
+        # Make a single Makefile for this set of combos
+        print(f'------------- Rerunning Combo: {combo}')
+        makefile = make.Makefile()
+        add_run_combo(expmod, makefile, combo)
+#        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
 
-            # Make a single Makefile for this set of combos
-            print(f'------------- Rerunning Combo: {combo}')
-            makefile = make.Makefile()
-            add_run_combo(expmod, makefile, combo)
-            makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
+        # See if the chunk status has changed
+        akdf1sb = akdf1s.copy().drop(columns=['chunk_status'])
+        akdf1sb = joblib.add_status(akdf1, 'chunk', realized=False, update=False)
 
-            print('Exiting after this combo...')
-            return
+        df = akdf1s[['chunkname', 'chunk_status']].merge(
+            akdfs1b[['chunkname', 'chunk_status']],
+            type='left', on='chunkname')
+        print('----- Change in status')
+        print(df)
 
-
-
-
-
-#    for tup in akdf0.itertuples(index=False):
-#        scombo = '-'.join(str(x) for x in tup.combo)
-#        sstat = joblib.JobStatus._member_names_[tup.combo_quickstatus]
-#        print(f'---------------------------- {tup.exp}-{scombo}: {sstat}')
-
+        print('Exiting after this combo...')
+        return
 # ------------------------------------------------------------------
 @subcommand([
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
