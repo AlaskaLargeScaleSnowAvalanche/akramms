@@ -374,7 +374,7 @@ def add_chunk_status(akdf, realized=True, update=True, ignore_statuses={}, dry_r
         # Get releasefiles (chunks) that are not yet complete (as per cache)
         akdf1 = complete.add_chunk_complete_cached(akdf1, 2)    # chunk_complete_stage2_cached
         mask = akdf1['chunk_complete_stage2_cached']
-        rf_complete_cached = akdf1[mask]
+        rf_complete_cached = akdf1[mask].copy()
         rf_complete_cached['chunk_status'] = JobStatus.MARKED_FINISHED
         dfs.append(rf_complete_cached)
 
