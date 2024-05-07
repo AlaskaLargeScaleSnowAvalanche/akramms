@@ -616,7 +616,7 @@ def rerun(args):
 
 
     # Zero in on combos that are not done
-    akdf0 = resolve.resolve_to(parseds, args.level, realized=False)
+    akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
     akdf0 = joblib.add_combo_quickstatus(akdf0, mtime=True)
     akdf0 = akdf0[~akdf0.combo_quickstatus.isin(
         [joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.EXTENT])]
