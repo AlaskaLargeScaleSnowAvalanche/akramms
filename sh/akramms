@@ -628,12 +628,13 @@ def rerun(args):
         akdf1 = resolve.resolve_chunk(akdf0.iloc[ix:ix+1])
         akdf1 = joblib.add_status(akdf1, 'chunk')
         # OVERRUN will be taken  care of by `akramms overrun`
-        akdf1 = akdf1[~akdf1.chunk_status.isin([joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.OVERRUN])]
-        print(akdf1.columns)
-        print(akdf1[['chunkid', 'chunkname', 'chunk_complete_stage2_cached', 'chunk_status']])
-        print('xxxxxxx ', akdf1)
-        if len(akdf1) > 0:
-            joblib.print_status(akdf1, 'chunk')
+        akdf1_suspect = akdf1[~akdf1.chunk_status.isin([joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.OVERRUN])]
+#        print(akdf1.columns)
+#        print(akdf1[['chunkname', 'chunk_complete_stage2_cached', 'chunk_status']])
+#        print('xxxxxxx ', akdf1)
+        joblib.print_status(akdf1, 'chunk')
+        if len(akdf1_suspect) > 0:
+            print('Exiting after this chunk...')
             return
 
 
