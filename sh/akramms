@@ -633,7 +633,7 @@ def rerun(args):
         akdf1 = joblib.add_status(akdf1, 'chunk', realized=False, update=False)
 
         # OVERRUN will be taken  care of by `akramms overrun`
-        akdf1s = akdf1[~akdf1.chunk_status.isin([joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.FINISHED, joblib.JobStatus.OVERRUN])]
+        akdf1s = akdf1[~akdf1.chunk_status.isin([joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.FINISHED, joblib.JobStatus.OVERRUN, joblib.JobStatus.INPROCESS])]
 
         # Reset chunks that didn't finish properly
         for tup in akdf1s.itertuples(index=False):
