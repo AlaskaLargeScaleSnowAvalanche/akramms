@@ -622,6 +622,12 @@ def rerun(args):
 #        [joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.EXTENT])]
     akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.UNKNOWN]
 
+    for ix in range(len(akdf0)):
+        akdf1 = akdf0.iloc[ix:ix+1]
+        print(akdf1)
+    return
+
+
     for tup in akdf0.itertuples(index=False):
         scombo = '-'.join(str(x) for x in tup.combo)
         sstat = joblib.JobStatus._member_names_[tup.combo_quickstatus]
