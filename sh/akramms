@@ -623,7 +623,7 @@ def rerun(args):
 
     for tup in akdf0.itertuples(index=False):
         scombo = '-'.join(str(x) for x in tup.combo)
-        sstat = JobStatus._member_names_[tup.combo_status]
+        sstat = joblib.JobStatus._member_names_[tup.combo_status]
         print(f'---------------------------- {tup.exp}-{scombo}: {sstat}')
 
 # ------------------------------------------------------------------
