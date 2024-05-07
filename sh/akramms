@@ -444,7 +444,7 @@ def locks(args):
     from akramms.util import rqutil
     rqutil.query_locks()
 # ------------------------------------------------------------------
-def add_run_combo(makefile, combo, max_step=999):
+def add_run_combo(expmod, makefile, combo, max_step=999):
     """Adds running one full combo to the makefile"""
 
     from akramms import r_pra_post
@@ -594,7 +594,7 @@ def run(args):
             for _,row1 in akdf1b.iterrows():
                 combo = row1['combo']
 
-                add_run_combo(makefile, combo)
+                add_run_combo(expmod, makefile, combo)
             makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=ncpu)
 
 # ------------------------------------------------------------------
@@ -661,7 +661,7 @@ def rerun(args):
             # Make a single Makefile for this set of combos
             print(f'------------- Rerunning Combo: {combo}')
             makefile = make.Makefile()
-            add_run_combo(makefile, combo)
+            add_run_combo(expmod, makefile, combo)
 #            makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=ncpu)
 
             print('Exiting after this combo...')
