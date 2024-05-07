@@ -623,7 +623,7 @@ def rerun(args):
     akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.UNKNOWN]
 
     for ix in range(len(akdf0)):
-        print(f'ix = {ix} of {len(akdf0)}')
+#        print(f'ix = {ix} of {len(akdf0)}')
         # Look at individual chunks
         akdf1 = resolve.resolve_chunk(akdf0.iloc[ix:ix+1])
         akdf1 = joblib.add_status(akdf1, 'chunk')
@@ -638,10 +638,10 @@ def rerun(args):
             return
 
 
-    for tup in akdf0.itertuples(index=False):
-        scombo = '-'.join(str(x) for x in tup.combo)
-        sstat = joblib.JobStatus._member_names_[tup.combo_quickstatus]
-        print(f'---------------------------- {tup.exp}-{scombo}: {sstat}')
+#    for tup in akdf0.itertuples(index=False):
+#        scombo = '-'.join(str(x) for x in tup.combo)
+#        sstat = joblib.JobStatus._member_names_[tup.combo_quickstatus]
+#        print(f'---------------------------- {tup.exp}-{scombo}: {sstat}')
 
 # ------------------------------------------------------------------
 @subcommand([
