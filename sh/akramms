@@ -632,9 +632,10 @@ def rerun(args):
 
         # OVERRUN will be taken  care of by `akramms overrun`
         akdf1_suspect = akdf1[~akdf1.chunk_status.isin([joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.OVERRUN])]
+        print(akdf1_suspect.columns)
         if len(akdf1_suspect) > 0:
-            joblib.print_status(akdf1, 'chunk')
-            print('Exiting after this chunk...')
+            joblib.print_status(akdf1_suspect, 'chunk')
+            print('Exiting after this combo...')
             return
 
 
