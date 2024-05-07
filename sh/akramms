@@ -621,7 +621,7 @@ def rerun(args):
     akdf0 = akdf0[~akdf0.combo_quickstatus.isin(
         [joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.EXTENT])]
 
-    for tup in akdf.itertuples(index=False):
+    for tup in akdf0.itertuples(index=False):
         scombo = '-'.join(str(x) for x in tup.combo)
         sstat = JobStatus._member_names_[tup.combo_status]
         print(f'---------------------------- {tup.exp}-{scombo}: {sstat}')
