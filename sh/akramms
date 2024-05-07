@@ -624,7 +624,8 @@ def rerun(args):
 
     for ix in range(len(akdf0)):
         akdf1 = akdf0.iloc[ix:ix+1]
-        print(akdf1)
+        akdf1c = resolve.resolve_chunk(akdf1)
+        print(akdf1c)
     return
 
 
