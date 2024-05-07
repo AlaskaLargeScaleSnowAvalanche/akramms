@@ -624,7 +624,7 @@ def rerun(args):
 
     for ix in range(len(akdf0)):
         combo = akdf0.iloc[ix].combo
-        print('combo ', combo, type(combo))
+#        print('combo ', combo, type(combo))
 
         # Look at individual chunks
         akdf1 = resolve.resolve_chunk(akdf0.iloc[ix:ix+1])
@@ -654,7 +654,7 @@ def rerun(args):
         # Re-run the Combo (which will re-run all the chunks)
 
         if len(akdf1s) > 0:
-            print(akdf1s.columns)
+#            print(akdf1s.columns)
             joblib.print_status(akdf1s, 'chunk')
             print(akdf1s[['chunkname', 'chunk_complete_stage2_cached', 'chunk_status']])
 
