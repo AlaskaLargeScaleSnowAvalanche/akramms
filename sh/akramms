@@ -623,7 +623,7 @@ def rerun(args):
     akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.UNKNOWN]
 
     for ix in range(len(akdf0)):
-        combo = akdf1.iloc[ix].combo
+        combo = akdf0.iloc[ix].combo
         print('combo ', combo)
 
         # Look at individual chunks
