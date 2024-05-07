@@ -612,6 +612,8 @@ def rerun(args):
     from akramms.util import harnutil
     from akramms import r_prepare,r_ecog
 
+    parseds = akramms.parse.parse_args(args.spec)
+
 
     # Zero in on combos that are not done
     akdf0 = resolve.resolve_to(parseds, args.level, realized=False)
