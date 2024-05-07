@@ -667,7 +667,7 @@ def rerun(args):
 
         # See if the chunk status has changed
         akdf1sb = akdf1s.copy().drop(columns=['chunk_status'])
-        akdf1sb = joblib.add_status(akdf1, 'chunk', realized=False, update=False)
+        akdf1sb = joblib.add_status(akdf1sb, 'chunk', realized=False, update=False)
 
         df = akdf1s[['chunkname', 'chunk_status']].merge(
             akdf1sb[['chunkname', 'chunk_status']],
