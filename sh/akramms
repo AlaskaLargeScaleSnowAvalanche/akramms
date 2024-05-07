@@ -663,7 +663,7 @@ def rerun(args):
         print(f'------------- Rerunning Combo: {combo}')
         makefile = make.Makefile()
         add_run_combo(expmod, makefile, combo)
-#        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
+        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
 
         # See if the chunk status has changed
         akdf1sb = akdf1s.copy().drop(columns=['chunk_status'])
