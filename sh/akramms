@@ -633,11 +633,6 @@ def rerun(args):
             return
 
 
-
-        print(akdf1c)
-    return
-
-
     for tup in akdf0.itertuples(index=False):
         scombo = '-'.join(str(x) for x in tup.combo)
         sstat = joblib.JobStatus._member_names_[tup.combo_quickstatus]
