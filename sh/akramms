@@ -444,6 +444,90 @@ def locks(args):
     from akramms.util import rqutil
     rqutil.query_locks()
 # ------------------------------------------------------------------
+def add_run_combo(makefile, combo, max_step):
+    """Adds running one full combo to the makefile"""
+
+    from akramms import r_pra_post
+
+    # -------------------- Step 2:
+    # (a) Prepare DEM files, forest files
+    # (d) Set up tile directories (AKRAMMS scenes)
+
+    # Add the experiment and combos
+    # This calls through to r_prepare.prepare_scene_rule()
+    cinfo, scene_args = expmod.add_combo(makefile, combo)    # file_info.ComboInfo
+
+    dem_mask_tif = makefile.add(domain_mask.rule(expmod, combo.idom, combo.jdom)).outputs[0]
+    dem_filled_file,sinks_file,neighbor1_file = makefile.add(r_domain_builder.neighbor1_rule(
+        cinfo.dem_file, os.path.split(cinfo.dem_file)[0], fill_sinks=True)).outputs
+
+
+    if max_step <= 2:
+        return
+
+    scene_dir = pathlib.Path(cinfo.scene_dir).resolve()
+    scene_args['scene_dir'] = scene_dir
+    add_combo_outputs = [os.path.join(scene_dir, 'scene.nc'), cinfo.dem_file, cinfo.landcover_file, cinfo.forest_file, cinfo.snow_file]
+
+    # -------------------- Step 3-6
+    # (a) ArcGIS prep
+    # (b) eCognition
+    # (c) PRA-Post ArcGIS script
+    # (d) Split releasefiles and generate chunks
+
+    print(f'----- Adding Scene: {scene_dir}')
+
+    # Run ArcGIS script + companion code to prepare files for eCognition
+    prepare1_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(scene_dir, scene_args)).outputs
+    if max_step <= 3:
+        return
+
+    prepare2_outputs = makefile.add(
+        r_prepare.data_prep_PRA2_rule(scene_dir, scene_args, prepare1_outputs)).outputs
+    #print('Number rules ', len(makefile.rule_list))
+    if max_step <= 4:
+        return
+
+
+    # Obtain name of neighbor1 graph file for DEM routing network
+    # (created above in add_experiment_fn())
+    dem_file = scene_args['dem_file']
+    dem_filled_file = dem_file.parents[0] / (dem_file.parts[-1][:-4] + '_filled.tif')
+
+    # Run eCognition
+    makefile.add(r_ecog.rule(scene_dir, scene_args, prepare2_outputs, combo.return_period, combo.forest))
+    if max_step <= 5:
+        return
+
+    # Post-Process eCognition Output (the pra_file)
+    # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
+    makefile.add(r_pra_post.pra_post_rule(
+        scene_dir, scene_args, dem_filled_file, combo.return_period,
+        combo.forest, cinfo.snow_file, clip_margin=False))    # clip_margin=False: Allow "overruns" up to Canadian border
+
+    if max_step <= 6:
+        return
+
+    # and also split into chunks.
+    # Only create chunks for PRA sizes relevant to THIS scene (based on For / NoFor)
+    ramms1_inputs = list()
+    for pra_size in expmod.pra_sizes(combo):
+        ramms1_inputs += makefile.add(r_pra_post.chunk_rule(
+            scene_dir, scene_args, combo.forest, expmod.resolution,
+            combo.return_period, pra_size)).outputs
+
+    if max_step <= 7:
+        return
+
+    # Run RAMMS Stage 1 (main chunks, no overruns)
+    makefile.add(r_ramms1.combo_rule(
+        scene_dir, scene_args['dem_file'], ramms1_inputs, submit=config.auto_submit))
+
+    if max_step <= 8:
+        return
+
+
+# ------------------------------------------------------------------
 @subcommand([
     argument('-j', type=int,
         help='Degree of parallelism to use'),
@@ -456,7 +540,7 @@ def run(args):
 
     import setuptools
     from akramms.util import harnutil
-    from akramms import r_prepare,r_ecog,r_pra_post
+    from akramms import r_prepare,r_ecog
 
     # ------------
     if args.step >= 3:
@@ -475,7 +559,8 @@ def run(args):
     # Exclude combos that have already been completely finished and archived
     # (and the x-dir might have been deleted)
     akdf0 = joblib.add_combo_quickstatus(akdf0)
-    akdf0 = akdf0[akdf0.combo_quickstatus != joblib.JobStatus.MARKED_FINISHED]
+    akdf0 = akdf0[~akdf0.combo_quickstatus.isin(
+        [joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.EXTENT])]
 #    print('aaaaaaa2 ', akdf0)
 
     # Keep combo_order
@@ -509,85 +594,35 @@ def run(args):
             for _,row1 in akdf1b.iterrows():
                 combo = row1['combo']
 
-                # -------------------- Step 2:
-                # (a) Prepare DEM files, forest files
-                # (d) Set up tile directories (AKRAMMS scenes)
-
-                # Add the experiment and combos
-                # This calls through to r_prepare.prepare_scene_rule()
-                cinfo, scene_args = expmod.add_combo(makefile, combo)    # file_info.ComboInfo
-
-                dem_mask_tif = makefile.add(domain_mask.rule(expmod, combo.idom, combo.jdom)).outputs[0]
-                dem_filled_file,sinks_file,neighbor1_file = makefile.add(r_domain_builder.neighbor1_rule(
-                    cinfo.dem_file, os.path.split(cinfo.dem_file)[0], fill_sinks=True)).outputs
-
-
-                if args.step <= 2:
-                    continue
-
-                scene_dir = pathlib.Path(cinfo.scene_dir).resolve()
-                scene_args['scene_dir'] = scene_dir
-                add_combo_outputs = [os.path.join(scene_dir, 'scene.nc'), cinfo.dem_file, cinfo.landcover_file, cinfo.forest_file, cinfo.snow_file]
-
-                # -------------------- Step 3-6
-                # (a) ArcGIS prep
-                # (b) eCognition
-                # (c) PRA-Post ArcGIS script
-                # (d) Split releasefiles and generate chunks
-
-                print(f'----- Adding Scene: {scene_dir}')
-
-                # Run ArcGIS script + companion code to prepare files for eCognition
-                prepare1_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(scene_dir, scene_args)).outputs
-                if args.step <= 3:
-                    continue
-
-                prepare2_outputs = makefile.add(
-                    r_prepare.data_prep_PRA2_rule(scene_dir, scene_args, prepare1_outputs)).outputs
-                #print('Number rules ', len(makefile.rule_list))
-                if args.step <= 4:
-                    continue
-
-
-                # Obtain name of neighbor1 graph file for DEM routing network
-                # (created above in add_experiment_fn())
-                dem_file = scene_args['dem_file']
-                dem_filled_file = dem_file.parents[0] / (dem_file.parts[-1][:-4] + '_filled.tif')
-
-                # Run eCognition
-                makefile.add(r_ecog.rule(scene_dir, scene_args, prepare2_outputs, combo.return_period, combo.forest))
-                if args.step <= 5:
-                    continue
-
-                # Post-Process eCognition Output (the pra_file)
-                # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
-                makefile.add(r_pra_post.pra_post_rule(
-                    scene_dir, scene_args, dem_filled_file, combo.return_period,
-                    combo.forest, cinfo.snow_file, clip_margin=False))    # clip_margin=False: Allow "overruns" up to Canadian border
-
-                if args.step <= 6:
-                    continue
-
-                # and also split into chunks.
-                # Only create chunks for PRA sizes relevant to THIS scene (based on For / NoFor)
-                ramms1_inputs = list()
-                for pra_size in expmod.pra_sizes(combo):
-                    ramms1_inputs += makefile.add(r_pra_post.chunk_rule(
-                        scene_dir, scene_args, combo.forest, expmod.resolution,
-                        combo.return_period, pra_size)).outputs
-
-                if args.step <= 7:
-                    continue
-
-                # Run RAMMS Stage 1 (main chunks, no overruns)
-                makefile.add(r_ramms1.combo_rule(
-                    scene_dir, scene_args['dem_file'], ramms1_inputs, submit=config.auto_submit))
-
-                if args.step <= 8:
-                    continue
-
-#            print(f'ncpu = {ncpu}')
+                add_one_combo(makefile, combo)
             makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=ncpu)
+
+# ------------------------------------------------------------------
+@subcommand([
+    argument('-j', type=int,
+        help='Degree of parallelism to use'),
+    argument('--step', type=int, default=999,
+        help='Run through this step number'),
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
+])
+def rerun(args):
+    """Steps 1-4"""
+
+    import setuptools
+    from akramms.util import harnutil
+    from akramms import r_prepare,r_ecog
+
+
+    # Zero in on combos that are not done
+    akdf0 = resolve.resolve_to(parseds, args.level, realized=False)
+    akdf0 = joblib.add_combo_quickstatus(akdf0, mtime=True)
+    akdf0 = akdf0[~akdf0.combo_quickstatus.isin(
+        [joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.EXTENT])]
+
+    for tup in akdf.itertuples(index=False):
+        scombo = '-'.join(str(x) for x in tup.combo)
+        sstat = JobStatus._member_names_[tup.combo_status]
+        print(f'---------------------------- {tup.exp}-{scombo}: {sstat}')
 
 # ------------------------------------------------------------------
 @subcommand([
