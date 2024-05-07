@@ -447,7 +447,7 @@ def locks(args):
 def add_run_combo(expmod, makefile, combo, max_step=999):
     """Adds running one full combo to the makefile"""
 
-    from akramms import r_pra_post, r_prepare
+    from akramms import r_pra_post, r_prepare, r_ecog
 
     # -------------------- Step 2:
     # (a) Prepare DEM files, forest files
@@ -540,7 +540,6 @@ def run(args):
 
     import setuptools
     from akramms.util import harnutil
-    from akramms import r_ecog
 
     # ------------
     if args.step >= 3:
@@ -610,7 +609,6 @@ def rerun(args):
 
     import setuptools
     from akramms.util import harnutil
-    from akramms import r_prepare,r_ecog
 
     parseds = akramms.parse.parse_args(args.spec)
 
