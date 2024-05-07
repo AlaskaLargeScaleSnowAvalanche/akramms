@@ -672,10 +672,14 @@ def rerun(args):
         df = akdf1s[['chunkname', 'chunk_status']].merge(
             akdf1sb[['chunkname', 'chunk_status']],
             how='left', on='chunkname')
+
         print('----- Change in status')
         print(df)
 
-        print('Exiting after this combo...')
+        # Re-running the Combo *should have* changed the chunk statuses
+        df = df[df.chunk_status_x != df.chunk_status_y]
+        if len(df) > 0:
+            print('Exiting because not all chunk statuses changed, that indicates maybe an error running RAMMS')
         return
 # ------------------------------------------------------------------
 @subcommand([
