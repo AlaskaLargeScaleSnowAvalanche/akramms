@@ -623,7 +623,9 @@ def rerun(args):
     akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.UNKNOWN]
 
     for ix in range(len(akdf0)):
-#        print(f'ix = {ix} of {len(akdf0)}')
+        combo = akdf1.iloc[ix].combo
+        print('combo ', combo)
+
         # Look at individual chunks
         akdf1 = resolve.resolve_chunk(akdf0.iloc[ix:ix+1])
 
@@ -633,11 +635,24 @@ def rerun(args):
         # OVERRUN will be taken  care of by `akramms overrun`
         akdf1s = akdf1[~akdf1.chunk_status.isin([joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.OVERRUN])]
 
+        # Reset chunks that didn't finish properly
         for tup in akdf1s.itertuples(index=False):
             expmod = akramms.parse.load_expmod(tup.exp)
             scenedir = expmod.combo_to_scenedir(tup.combo)
             chunkdir = scenedir / 'CHUNKS' / tup.chunkname
-            print(chunkdir)
+
+            # Delete the chunk
+            files = [
+                scenedir / 'ramms_stage1.txt',
+                scenedir / 'ramms_stage1' / f'{tup.chunkname}.txt',
+                scenedir / 'ramms_stage2' / f'{tup.chunkname}.txt']
+            for file in files:
+                if os.path.isfile(file):
+                    print(f'rm {file}')
+                    #os.remove(file)
+
+        # Re-run the Combo (which will re-run all the chunks)
+
 
 
         if len(akdf1s) > 0:
