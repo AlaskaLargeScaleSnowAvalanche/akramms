@@ -113,9 +113,12 @@ def read_dom(domfname, **kwargs):
 def read_reldom(relfname, **kwargs):
     """Reads a RELEASE and related DOMAIN file and merges together resulting dataframes"""
 
-#    print('xxxxx relfname ', relfname)
+    # Check for empty (dummy) file, typically written if no PRAs for a
+    # given size class.
+    if os.path.getsize(relfname) == 0:
+        return None
+
     domfname = relfname.parents[1] / 'DOMAIN' / (relfname.parts[-1][:-8] + '_dom.shp')
-#    print('xxxxx domfname ', domfname)
 
     rdf = read_rel(relfname, **kwargs)
     ddf = read_dom(domfname, **kwargs)

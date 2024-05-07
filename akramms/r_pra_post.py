@@ -74,7 +74,8 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
     # See email from Marc Christen 2023-01-23
 #    rn = f'{For}_{resolution}m_{return_period}'
 #    for pra_size in config.allowed_pra_sizes:
-    for pra_size in ['L', 'M', 'S', 'T']:    # Compute release files for all PRA sizes, even if we will only run avalanches for some.
+    allowed_pra_sizes = ['L', 'M', 'S', 'T']
+    for pra_size in allowed_pra_sizes:    # Compute release files for all PRA sizes, even if we will only run avalanches for some.
         # Copied from rammsutil.RammsName
 #        ramms_name = (scene_name, rn, pra_size)
 #        ramms_names.append(ramms_name)
@@ -138,6 +139,7 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
         os.makedirs(scene_dir / 'DOMAIN', exist_ok=True)
 
         wkt = scene_args['coordinate_system']
+        pra_sizes_written = set()
         for pra_size,cat_df in df.groupby('pra_size'):
 #            print('AA4 ', cat_df.columns)
             root = f'{scene_name}{For}_{resolution}m_{return_period}{pra_size}'
@@ -152,6 +154,16 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
             chunk.write_dom(
                 cat_df, wkt,
                 scene_dir / 'DOMAIN' / f'{root}_dom.shp')
+            pra_sizes_written.add(pra_size)
+
+
+        # Write zero-length dummy files if the given PRA size does not exist for this combo
+        pra_sizes_todo = [x for x in allowed_pra_sizes if x not in pra_sizes_written]
+        for pra_size in pra_sizes_todo:
+            root = f'{scene_name}{For}_{resolution}m_{return_period}{pra_size}'
+            for ext in ['rel', 'chull', 'dom']:
+                with open(scene_dir / 'RELEASE' / f'{root}_{ext}.shp') as out:
+                    pass
 
 
     rule = make.Rule(action, inputs, outputs)
@@ -194,6 +206,12 @@ def chunk_rule(scene_dir, scene_args, For, resolution, return_period, pra_size):
         # Read the output from r_pra_post (above)
 #        rdf = shputil.read_df(inputs[0], shape='pra').set_index('Id')
         rdf = chunk.read_reldom(inputs[0])
+
+        # Nothing to do if this PRA size class doesn't exist
+        if rdf is None:
+            with open(outputs[0], 'w') as out:
+                pass
+            return
 
         # Assign a chunkid to each avalanche
         rdf['combo'] = [level.theory_scenedir_to_combo(scene_dir)] * len(rdf.index)
