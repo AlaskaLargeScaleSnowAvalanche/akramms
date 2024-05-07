@@ -680,7 +680,7 @@ def rerun(args):
         df = df[df.chunk_status_x != df.chunk_status_y]
         if len(df) > 0:
             print('Exiting because not all chunk statuses changed, that indicates maybe an error running RAMMS')
-        return
+            return
 # ------------------------------------------------------------------
 @subcommand([
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
