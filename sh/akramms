@@ -632,6 +632,13 @@ def rerun(args):
 
         # OVERRUN will be taken  care of by `akramms overrun`
         akdf1s = akdf1[~akdf1.chunk_status.isin([joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.OVERRUN])]
+
+        for tup in akdf1s.itertuples(index=False):
+            expmod = akramms.parse.load_expmod(tup.exp)
+            scenedir = expmod.combo_to_scenedir(combo)
+            print(scenedir)
+
+
         if len(akdf1s) > 0:
             print(akdf1s.columns)
             joblib.print_status(akdf1s, 'chunk')
