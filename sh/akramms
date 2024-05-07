@@ -671,7 +671,7 @@ def rerun(args):
 
         df = akdf1s[['chunkname', 'chunk_status']].merge(
             akdf1sb[['chunkname', 'chunk_status']],
-            type='left', on='chunkname')
+            how='left', on='chunkname')
         print('----- Change in status')
         print(df)
 
