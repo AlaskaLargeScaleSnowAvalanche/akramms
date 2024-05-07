@@ -625,8 +625,7 @@ def rerun(args):
     for ix in range(len(akdf0)):
         # Look at individual chunks
         akdf1 = resolve.resolve_chunk(akdf0.iloc[ix:ix+1])
-        akdf1 = joblib.add_status(
-            akdf1, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run, ignore_statuses=ignore_statuses)
+        akdf1 = joblib.add_status(akdf1, 'chunk')
         joblib.print_status(akdf1, 'chunk')
         return
 
