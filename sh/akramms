@@ -594,7 +594,7 @@ def run(args):
             for _,row1 in akdf1b.iterrows():
                 combo = row1['combo']
 
-                add_one_combo(makefile, combo)
+                add_run_combo(makefile, combo)
             makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=ncpu)
 
 # ------------------------------------------------------------------
@@ -649,18 +649,26 @@ def rerun(args):
             for file in files:
                 if os.path.isfile(file):
                     print(f'rm {file}')
-                    #os.remove(file)
+                    os.remove(file)
 
         # Re-run the Combo (which will re-run all the chunks)
-
-
 
         if len(akdf1s) > 0:
             print(akdf1s.columns)
             joblib.print_status(akdf1s, 'chunk')
             print(akdf1s[['chunkname', 'chunk_complete_stage2_cached', 'chunk_status']])
+
+            # Make a single Makefile for this set of combos
+            print(f'------------- Rerunning Combo: {combo}')
+            makefile = make.Makefile()
+            add_run_combo(makefile, combo)
+#            makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=ncpu)
+
             print('Exiting after this combo...')
             return
+
+
+
 
 
 #    for tup in akdf0.itertuples(index=False):
