@@ -626,6 +626,8 @@ def rerun(args):
         # Look at individual chunks
         akdf1 = resolve.resolve_chunk(akdf0.iloc[ix:ix+1])
         akdf1 = joblib.add_status(akdf1, 'chunk')
+        # OVERRUN will be taken  care of by `akramms overrun`
+        akdf1 = akdf1[~akdf1.isin([joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.OVERRUN])]
         joblib.print_status(akdf1, 'chunk')
         return
 
