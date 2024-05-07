@@ -29,7 +29,7 @@ roots_w = default_roots(pathlib.PureWindowsPath, r'C:\Users\efischer\av') # r'\\
 # Differences from defaults
 #roots_l['PRJ'] = '/mnt/avalanche_sim/prj'
 #roots_w['PRJ'] = r'\\nona.dnr.state.ak.us\enggeo_projects\avalanche_sim\prj'
-roots_l['PRJ'] = pathlib.Path(os.environ['HOME']) / 'prj'
+roots_l['PRJ'] = (pathlib.Path(os.environ['HOME']) / 'prj').resolve()
 roots_w['PRJ'] = r'M:\prj'
 
 # Roots for the system we're running on
