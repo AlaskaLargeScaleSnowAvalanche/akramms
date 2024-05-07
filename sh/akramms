@@ -623,7 +623,7 @@ def rerun(args):
     akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.UNKNOWN]
 
     for ix in range(len(akdf0)):
-        prin('ix = ', ix)
+        print('ix = ', ix)
         # Look at individual chunks
         akdf1 = resolve.resolve_chunk(akdf0.iloc[ix:ix+1])
         akdf1 = joblib.add_status(akdf1, 'chunk')
