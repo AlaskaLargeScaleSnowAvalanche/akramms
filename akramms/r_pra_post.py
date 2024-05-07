@@ -162,7 +162,7 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
         for pra_size in pra_sizes_todo:
             root = f'{scene_name}{For}_{resolution}m_{return_period}{pra_size}'
             for ext in ['rel', 'chull', 'dom']:
-                with open(scene_dir / 'RELEASE' / f'{root}_{ext}.shp') as out:
+                with open(scene_dir / 'RELEASE' / f'{root}_{ext}.shp', 'w') as out:
                     pass
 
 
