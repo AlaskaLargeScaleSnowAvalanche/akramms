@@ -729,7 +729,8 @@ std::unordered_set<ix_t> avalanche_runout(
     double const *gt,    // Geotransform
     ix_t const *start_begin, ix_t const *start_end,
     double const min_alpha,
-    double const max_runout)
+    double const max_runout,
+    bool debug)
 {
     double const min_tan_alpha = tan((M_PI/180.)*min_alpha);
 
@@ -1080,11 +1081,14 @@ static PyObject* d8graph_find_domain(PyObject *module, PyObject *args, PyObject 
             (double *)PyArray_GETPTR1(geotransform, 0),
             (ix_t *)PyArray_GETPTR1(start, 0),
             (ix_t *)PyArray_GETPTR1(start, PyArray_DIM(start,0)),
-            min_alpha, max_runout));
+            min_alpha, max_runout, debug));
 
 //    PySys_WriteStdout("Flood Fill went from %ld -> %ld gridcells.\n", PyArray_DIM(start,0), seen.size());
     // No domain possible if we left the DEM domain in the runout.
-    if (seen.size() == 0) { Py_INCREF(Py_None); return Py_None; }
+    if (seen.size() == 0) {
+//        PySys_WriteStdout("d8graph returning None because nothing in seen\n");
+        Py_INCREF(Py_None); return Py_None;
+    }
 
 //if (trace) printf("BB2\n");
     // ================ Return raw results of the flood fill

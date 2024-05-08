@@ -328,6 +328,11 @@ def add_dom(rdf, dem_filled, dem_nodata, grid_info, margins, **kwargs):
 
         # Get list of gridcells covered by the PRA polygon (the "PRA Burn")
         pra_burn = rasterize.rasterize_polygon_compressed(row['pra'], grid_info)
+#        if row['Id'] == 21:
+#            print('BEGIN HHHHHHH')
+#            print(pra_burn.shape, grid_info.nx, grid_info.ny, np.sum(pra_burn))
+#            print(pra_burn)
+
 
         # Get the domain from the PRA burn
         args = ()
@@ -336,21 +341,29 @@ def add_dom(rdf, dem_filled, dem_nodata, grid_info, margins, **kwargs):
             dem_filled, dem_nodata, grid_info.geotransform, pra_burn,
             debug=1, margin=margin, **kwargs)
 
+#        if row['Id'] == 21:
+#            print('END HHHHHHH')
+
         if ret is None:
-            chull_list = _empty_list
-            domain_list = _empty_list
+            # This happens for some PRAs straddling the edge of the
+            # overall domain (eg the US-Canada border).  See comment in d8graph.cpp:
+            #    // Stop if we've hit the edge of the (valid) domain.
+            #    // Clearly a useful avalanche simulation will not be possible.
+
+            chulls.append(None)
+            doms.append(None)
         else:
             _,chull_list,domain_list = ret
-        try:
-            chull_poly = shapely.geometry.Polygon(chull_list)
-        except ValueError:
-            print('Error on PRA')
-            print(row)
-            print(chull_list)
-            raise
+            try:
+                chull_poly = shapely.geometry.Polygon(chull_list)
+            except ValueError:
+                print('Error on PRA')
+                print(row)
+                print(chull_list)
+                raise
 
-        chulls.append(chull_poly)
-        doms.append(shapely.geometry.Polygon(domain_list))
+            chulls.append(chull_poly)
+            doms.append(shapely.geometry.Polygon(domain_list))
 
     rdf['chull'] = chulls
     rdf['dom'] = doms
@@ -459,7 +472,7 @@ def write_rel(rdf, wkt, return_period, ofname, **kwargs):
 
 def write_dom(rdf, wkt, ofname, **kwargs):
     """
-    Writes the _rel.shp shapefile
+    Writes the _dom.shp shapefile
     rdf:
         Release file(s) as dataframe
         MUST CONTAIN: pra
@@ -467,11 +480,14 @@ def write_dom(rdf, wkt, ofname, **kwargs):
 
     # Select columns to write
     df = rdf.reset_index()[['Id', 'dom']]
+#    print('dddddddddddddddddddom1')
+#    print(df.columns)
+#    print(df)
     shputil.write_df(df, 'dom', 'Polygon', ofname, wkt=wkt, **kwargs)
 
 def write_chull(rdf, wkt, ofname, **kwargs):
     """
-    Writes the _rel.shp shapefile
+    Writes the _chull.shp shapefile
     rdf:
         Release file(s) loaded into dataframe
         MUST CONTAIN: pra
