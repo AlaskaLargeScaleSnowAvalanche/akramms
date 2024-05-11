@@ -457,7 +457,7 @@ def add_combo_quickstatus(akdf0, mtime=False):
         for tup in akdf1.itertuples(index=False):
             arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
             if os.path.exists(arcdir / 'archived.txt'):
-                if os.path.exists(arcdir / 'EXTENT.zip'):
+                if os.path.exists(arcdir / 'extent.gpkg') and os.path.exists(arcdir / 'extent_full.gpkg'):
                     status = JobStatus.EXTENT
                 else:
                     status = JobStatus.MARKED_FINISHED
@@ -485,7 +485,7 @@ def _finished_status(expmod, combo):
     arcdir = expmod.combo_to_scenedir(combo, 'arc')
     if not os.path.isfile(arcdir / 'archived.txt'):
         return JobStatus.UNKNOWN
-    if not os.path.isfile(arcdir / 'EXTENT.zip'):
+    if not (os.path.isfile(arcdir / 'extent.gpkg') and os.path.isfile(arcdir / 'extent_full.gpkg')):
         return JobStatus.MARKED_FINISHED
     return JobStatus.EXTENT
 
@@ -523,7 +523,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         if len(df) > 0:
             df['combo_status'] = finished_status
             if update:
-                # Do EXTENT.zip on files that only have archived.txt
+                # Do extent.gpkg on files that only have archived.txt
                 for tup in df[df.combo_status == JobStatus.MARKED_FINISHED].itertuples(index=False):
 
                     print('Finishing combo (b): {}'.format(tup.combo))

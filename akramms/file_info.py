@@ -10,7 +10,7 @@ class JobStatus(enum.IntEnum):
     FINISHED = 6     # The avalanche (or chunk or combo) has finished, and it's successful
     MARKED_FINISHED = 7       # Chunk or combo has finished, and has been marked as such (shortcut)
     ARCHIVED = 8    # For combos: It's been fully archived to an arc directory (NOT USED)
-    EXTENT = 9      # archived.txt and EXTENT.zip are written
+    EXTENT = 9      # archived.txt and extent.gpkg / extent_full.gpkg are written
     UNKNOWN = 10    # The status is unkwnown; used for quick partial status checking
 
 # ---------------------------------------------------------------------
