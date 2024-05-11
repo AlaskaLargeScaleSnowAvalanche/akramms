@@ -607,7 +607,7 @@ def run(args):
 def rerun(args):
     """Steps 1-4"""
 
-    import setuptools
+    import setuptools,shutil
     from akramms.util import harnutil
 
     parseds = akramms.parse.parse_args(args.spec)
@@ -624,7 +624,12 @@ def rerun(args):
 
     for ix in range(len(akdf0)):
         combo = akdf0.iloc[ix].combo
-#        print('combo ', combo, type(combo))
+        expmod = akramms.parse.load_expmod(akdf0.iloc[ix].exp)
+        scenedir = expmod.combo_to_scenedir(combo)
+
+        # Delete MARKED_FINISHED on combos, which at times is just plain wrong!
+        ramms_stage2 = scenedir / 'ramms_stage2'
+        shutil.rmtree(ramms_stage2, ignore_errors=True)
 
         # Look at individual chunks
         akdf1 = resolve.resolve_chunk(akdf0.iloc[ix:ix+1])
@@ -637,8 +642,6 @@ def rerun(args):
 
         # Reset chunks that didn't finish properly
         for tup in akdf1s.itertuples(index=False):
-            expmod = akramms.parse.load_expmod(tup.exp)
-            scenedir = expmod.combo_to_scenedir(tup.combo)
             chunkdir = scenedir / 'CHUNKS' / tup.chunkname
 
             # Delete the chunk
