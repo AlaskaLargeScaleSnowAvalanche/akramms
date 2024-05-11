@@ -494,6 +494,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         Resolved to combo level (theoretical, i.e. realized=False)
     """
 
+
     # Make it idempotent
     if 'combo_status' in akdf0.columns:
         return akdf0
@@ -506,6 +507,17 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
 
     # Cull combos that have finished or not yet started
     akdf0 = add_combo_quickstatus(akdf0)#, mtime=mtime)
+
+    # Write extent.gpkg
+    if update:
+        mask = (akdf0.combo_quickstatus == JobStatus.MARKED_FINISHED)
+        for exp,akdf1 in akdf0.reset_index(drop=True).groupby('exp'):
+            expmod = parse.load_expmod(exp)
+            for tup in akdf1.itertuples(index=False):
+                print('Finishing combo (b): {}'.format(tup.combo))
+                archive.finish_combo(expmod, tup.combo, dry_run=dry_run)
+
+    # -----
     mask = (~akdf0.combo_quickstatus.isin([JobStatus.MARKED_FINISHED, JobStatus.EXTENT]))
 
     renames = {'combo_quickstatus':'combo_status'}
