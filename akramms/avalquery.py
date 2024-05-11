@@ -103,7 +103,7 @@ def check_extent_sign(extent):
 def tile_rtree(expmod):
     """Put all the available tiles into an RTree"""
     domains_margin_shp = os.path.join(expmod.dir, f'{expmod.name}_domains_margin.shp')
-    domains_df = ogrutil.read_df(domains_margin_shp).df#.set_index(['idom', 'jdom'])
+    domains_df = shputil.read_df(domains_margin_shp)#.df#.set_index(['idom', 'jdom'])
     return rtreeutil.RTree(domains_df)
 
 def query_tiles(expmod, geom):
