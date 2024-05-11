@@ -1,7 +1,7 @@
 import os,collections,re,itertools,functools
 import netCDF4
 import pandas as pd
-from uafgi.util import shputil
+from uafgi.util import shputil,ogrutil,rtreeutil
 from akramms import archive,avalparse,avalfilter,parse,resolve,file_info
 from akramms.util import exputil
 import rtree.index
@@ -103,7 +103,7 @@ def check_extent_sign(extent):
 def tile_rtree(expmod):
     """Put all the available tiles into an RTree"""
     domains_margin_shp = os.path.join(expmod.dir, f'{expmod.name}_domains_margin.shp')
-    domains_df = ogrutil.read_df(domains_margin_shp).set_index(['idom', 'jdom'])
+    domains_df = ogrutil.read_df(domains_margin_shp).df#.set_index(['idom', 'jdom'])
     return rtreeutil.RTree(domains_df)
 
 def query_tiles(expmod, geom):
