@@ -678,9 +678,11 @@ def finish_combo(expmod, combo, dry_run=False):
             out.write('Combo archived\n')
  
     # ----------------- Write /vsizip/EXTENT.zip/extent.shp
-    with ioutil.TmpDir(dir=arcdir) as tdir:
-        extent_shp = tdir.location / 'extent.shp'
-        extent_full_shp = tdir.location / 'extent_full.shp'
+#    with ioutil.TmpDir(dir=arcdir) as tdir:
+    if True:
+        # Create GeoPackages so they can be spatially indexed and queried efficiently
+        extent_gpkg = arcdir / 'extent-tmp.gpkg'
+        extent_full_gpkg = arcdir / 'extent_full-tmp.gpkg'
 
         # Get a list of all the Avalanches in this (archived) combo
         scombo = expmod.name + '-' + '-'.join(str(x) for x in combo)
@@ -689,11 +691,11 @@ def finish_combo(expmod, combo, dry_run=False):
         # TODO: Look at this dataframe
 
         # Open and write the extent file (Shapefile within a Zip archive)
-        extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(str(extent_shp))
-        extent_full_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(str(extent_full_shp))
+        extent_ds = ogr.GetDriverByName("GPKG").CreateDataSource(str(extent_gpkg))
+        extent_full_ds = ogr.GetDriverByName("GPKG").CreateDataSource(str(extent_full_gpkg))
         try:
-            extent_layer = extent_ds.CreateLayer(str(extent_shp), ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
-            extent_full_layer = extent_full_ds.CreateLayer(str(extent_full_shp), ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
+            extent_layer = extent_ds.CreateLayer(str(extent_gpkg), ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
+            extent_full_layer = extent_full_ds.CreateLayer(str(extent_full_gpkg), ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
 
             # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
             extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
@@ -720,10 +722,12 @@ def finish_combo(expmod, combo, dry_run=False):
             extent_ds = None
             extent_full_ds = None
 
-        # Convert to zip file
-        _zip_dir(tdir.location, arcdir/'EXTENT-tmp.zip')
+#        # Convert to zip file
+#        _zip_dir(tdir.location, arcdir/'EXTENT-tmp.zip')
 
-    os.rename(arcdir/'EXTENT-tmp.zip', arcdir / 'EXTENT.zip')
+#    os.rename(arcdir/'EXTENT-tmp.zip', arcdir / 'EXTENT.zip')
+    os.rename(arcdir/'extent-tmp.gpkg', arcdir / 'extent.gpkg')
+    os.rename(arcdir/'extent_full-tmp.gpkg', arcdir / 'extent_full.gpkg')
 
     # --------------- (Very conservatively)
     # Delete the xdir by moving it to a todel directory.
