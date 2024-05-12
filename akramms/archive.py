@@ -299,126 +299,129 @@ def ramms_to_nc0(out_zip, id_status, ncout):
 
     base = str(out_zip)[:-8]    # Remove .out.zip
     leaf = os.path.split(base)[1]
-    with zipfile.ZipFile(f'{base}.in.zip', 'r') as in_zip:
-      with zipfile.ZipFile(f'{base}.out.zip', 'r') as out_zip:
+    try:
+        with zipfile.ZipFile(f'{base}.in.zip', 'r') as in_zip:
+          with zipfile.ZipFile(f'{base}.out.zip', 'r') as out_zip:
 
-        in_infos = in_zip.infolist()
-        out_infos = out_zip.infolist()
+            in_infos = in_zip.infolist()
+            out_infos = out_zip.infolist()
 
-        # See if this avalanche overran its domain
-        overrun = (id_status == file_info.JobStatus.OVERRUN)
+            # See if this avalanche overran its domain
+            overrun = (id_status == file_info.JobStatus.OVERRUN)
 
-        if 'status' not in ncout.variables:
-            ncv = ncout.createVariable('status', 'i')
-        ncout.variables['status'].overrun = 1 if overrun else 0
+            if 'status' not in ncout.variables:
+                ncv = ncout.createVariable('status', 'i')
+            ncout.variables['status'].overrun = 1 if overrun else 0
 
-        # Get the grid
-        gridI = pickle.loads(in_zip.read('grid.pik'))
+            # Get the grid
+            gridI = pickle.loads(in_zip.read('grid.pik'))
 
-        # http://cfconventions.org/cf-conventions/cf-conventions.html#coordinate-system
-        # Write the CRS
-        # (TODO: Move this to uafgi/gisutil.py)
-        # https://pyproj4.github.io/pyproj/latest/build_crs_cf.html
-        crs = pyproj.CRS(gridI.wkt)
-        cf_grid_mapping = crs.to_cf()
-        ncv = ncout.createVariable('grid_mapping', 'i')
-        for k,v in cf_grid_mapping.items():
-            setattr(ncv, k, v)
-        ncv.crs_wkt = gridI.wkt
-        ncv.GeoTransform = ' '.join(str(x) for x in gridI.geotransform)
+            # http://cfconventions.org/cf-conventions/cf-conventions.html#coordinate-system
+            # Write the CRS
+            # (TODO: Move this to uafgi/gisutil.py)
+            # https://pyproj4.github.io/pyproj/latest/build_crs_cf.html
+            crs = pyproj.CRS(gridI.wkt)
+            cf_grid_mapping = crs.to_cf()
+            ncv = ncout.createVariable('grid_mapping', 'i')
+            for k,v in cf_grid_mapping.items():
+                setattr(ncv, k, v)
+            ncv.crs_wkt = gridI.wkt
+            ncv.GeoTransform = ' '.join(str(x) for x in gridI.geotransform)
 
-        cf_coordinate_system = crs.cs_to_cf()
-        coord_attrs = {x['axis']: x for x in cf_coordinate_system}
-        #print(cf_coordinate_system)
-
-
-        # The .relp and .domp files
-        ncout.createDimension('two', 2)
-        nc_poly(ncout, in_zip, f'{leaf}.relp', 'relp', coord_attrs,
-            {'description': 'UNOFFICIAL release area polygon written by AKRAMMS Python code.',
-            'grid_mapping': 'grid_mapping'},
-            required=False)
-        nc_poly(ncout, in_zip, f'{leaf}.domp', 'domp', coord_attrs,
-            {'description': 'UNOFFICIAL domain polygon written by AKRAMMS Python code.',
-            'grid_mapping': 'grid_mapping'},
-            required=False)
-
-        # The .rel file
-        nc_poly(ncout, in_zip, f'{leaf}.rel', 'rel', coord_attrs,
-            {'description': 'OFFICIAL release area polygon written by RAMMS IDL code.',
-            'grid_mapping': 'grid_mapping'},
-            required=False)
-
-        # The .v?.dom files
-        # There will only be one: having more than one in the zip file is vestigal from when
-        # we thought we could process overruns without re-running RAMMS.
-        ret = nc_poly(ncout, in_zip, f'{leaf}.v1.dom', f'dom', coord_attrs,
-            {'description': f'OFFICIAL release area polygon written by RAMMS IDL code.',
-            'grid_mapping': 'grid_mapping'},
-#            'nx': gridI.nx, 'ny': gridI.ny},    # Make sure we capture the original grid dimensions so we can re-create raster later.  (NO: This turned out to be the original tile, we need the local grid, which is not stored anywhere other than the domain outline itself).
-            required=False)
-
-        # The .xyz file (SKIP)
-
-        # -----------------------------------------------------------------
-        # Read the xy-coordinates, and also values on that grid
-        with in_zip.open(f'{leaf}.xy-coord', 'r') as fin:
-            ivec, jvec = parse_xy_coord(gridI, fin)
-        with out_zip.open(f'{leaf}.out', 'r') as fin:
-            namevals = parse_out(fin)
-
-        # Determine gridcells that are ACTUALLY used
-        nzmask = namevals[0][1]>0
-        for _,val,_ in namevals[1:]:
-            nzmask = np.logical_or(nzmask, val>0)
-#        nzmask = np.logical_or(*(val>0 for _,val,_ in namevals))
-
-        # Cut out the fat!
-        ivec = ivec[nzmask]
-        jvec = jvec[nzmask]
-        namevals = [(name,val[nzmask],attrs) for name,val,attrs in namevals]
+            cf_coordinate_system = crs.cs_to_cf()
+            coord_attrs = {x['axis']: x for x in cf_coordinate_system}
+            #print(cf_coordinate_system)
 
 
-        # --------------------------------- Write the stuff we just read
-        # The .xy-coord file
-        ivec,jvec = nc_xy_coord(ncout, gridI, coord_attrs, ivec, jvec)
+            # The .relp and .domp files
+            ncout.createDimension('two', 2)
+            nc_poly(ncout, in_zip, f'{leaf}.relp', 'relp', coord_attrs,
+                {'description': 'UNOFFICIAL release area polygon written by AKRAMMS Python code.',
+                'grid_mapping': 'grid_mapping'},
+                required=False)
+            nc_poly(ncout, in_zip, f'{leaf}.domp', 'domp', coord_attrs,
+                {'description': 'UNOFFICIAL domain polygon written by AKRAMMS Python code.',
+                'grid_mapping': 'grid_mapping'},
+                required=False)
 
-        # The .out file
-        vars = nc_out(ncout, namevals,
-            attrs={'grid_mapping': 'grid_mapping'})
-            
-        max_height = vars['max_height']
+            # The .rel file
+            nc_poly(ncout, in_zip, f'{leaf}.rel', 'rel', coord_attrs,
+                {'description': 'OFFICIAL release area polygon written by RAMMS IDL code.',
+                'grid_mapping': 'grid_mapping'},
+                required=False)
 
-        # -----------------------------------
+            # The .v?.dom files
+            # There will only be one: having more than one in the zip file is vestigal from when
+            # we thought we could process overruns without re-running RAMMS.
+            ret = nc_poly(ncout, in_zip, f'{leaf}.v1.dom', f'dom', coord_attrs,
+                {'description': f'OFFICIAL release area polygon written by RAMMS IDL code.',
+                'grid_mapping': 'grid_mapping'},
+    #            'nx': gridI.nx, 'ny': gridI.ny},    # Make sure we capture the original grid dimensions so we can re-create raster later.  (NO: This turned out to be the original tile, we need the local grid, which is not stored anywhere other than the domain outline itself).
+                required=False)
 
-        # Store the bounding box
-        ncout.createDimension('lowhigh', 2)
-        ncv = ncout.createVariable('bounding_box', 'd', ('lowhigh', 'two'))
-        ncv.description = 'Oriented bounding box of region occupied by avalanche.'
-        ncv.grid_mapping = 'grid_mapping'
+            # The .xyz file (SKIP)
 
-        if len(ivec) > 0:
-            i0 = np.min(ivec)
-            i1 = np.max(ivec)
-            j0 = np.min(jvec)
-            j1 = np.max(jvec)
+            # -----------------------------------------------------------------
+            # Read the xy-coordinates, and also values on that grid
+            with in_zip.open(f'{leaf}.xy-coord', 'r') as fin:
+                ivec, jvec = parse_xy_coord(gridI, fin)
+            with out_zip.open(f'{leaf}.out', 'r') as fin:
+                namevals = parse_out(fin)
 
-            x0,y0 = gridI.to_xy(i0,j0)
-            x1,y1 = gridI.to_xy(i1,j1)
+            # Determine gridcells that are ACTUALLY used
+            nzmask = namevals[0][1]>0
+            for _,val,_ in namevals[1:]:
+                nzmask = np.logical_or(nzmask, val>0)
+    #        nzmask = np.logical_or(*(val>0 for _,val,_ in namevals))
 
-            ncv[:] = np.array([
-                [min(x0,x1), min(y0,y1)],
-                [max(x0,x1) + gridI.dx*np.sign(gridI.dx), max(y0,y1) + gridI.dy*np.sign(gridI.dy) ]])
-        else:
-            # Degenerate avalanche covered 0 gridcells.
-            # Make a dummy degenerate bounding box
-            ncv[:] = np.array([[0.,0.],[0.,0.]])
+            # Cut out the fat!
+            ivec = ivec[nzmask]
+            jvec = jvec[nzmask]
+            namevals = [(name,val[nzmask],attrs) for name,val,attrs in namevals]
 
 
-#        for attr,val in coord_attrs.items():
-#            setattr(ncv, attr, val)
-    return overrun
+            # --------------------------------- Write the stuff we just read
+            # The .xy-coord file
+            ivec,jvec = nc_xy_coord(ncout, gridI, coord_attrs, ivec, jvec)
 
+            # The .out file
+            vars = nc_out(ncout, namevals,
+                attrs={'grid_mapping': 'grid_mapping'})
+                
+            max_height = vars['max_height']
+
+            # -----------------------------------
+
+            # Store the bounding box
+            ncout.createDimension('lowhigh', 2)
+            ncv = ncout.createVariable('bounding_box', 'd', ('lowhigh', 'two'))
+            ncv.description = 'Oriented bounding box of region occupied by avalanche.'
+            ncv.grid_mapping = 'grid_mapping'
+
+            if len(ivec) > 0:
+                i0 = np.min(ivec)
+                i1 = np.max(ivec)
+                j0 = np.min(jvec)
+                j1 = np.max(jvec)
+
+                x0,y0 = gridI.to_xy(i0,j0)
+                x1,y1 = gridI.to_xy(i1,j1)
+
+                ncv[:] = np.array([
+                    [min(x0,x1), min(y0,y1)],
+                    [max(x0,x1) + gridI.dx*np.sign(gridI.dx), max(y0,y1) + gridI.dy*np.sign(gridI.dy) ]])
+            else:
+                # Degenerate avalanche covered 0 gridcells.
+                # Make a dummy degenerate bounding box
+                ncv[:] = np.array([[0.,0.],[0.,0.]])
+
+
+    #        for attr,val in coord_attrs.items():
+    #            setattr(ncv, attr, val)
+        return overrun
+    except Exception:
+        print(f'ramms_to_nc0() error on {base}.in.zip', file=sys.stderr)
+        raise
 
 # ----------------------------------------------------------
 def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=False):
@@ -720,10 +723,16 @@ def finish_combo(expmod, combo, dry_run=False):
             extent_ds = None
             extent_full_ds = None
 
-        # Convert to zip file
-        _zip_dir(tdir.location, arcdir/'EXTENT-tmp.zip')
 
-    os.rename(arcdir/'EXTENT-tmp.zip', arcdir / 'EXTENT.zip')
+        # Convert to GeoPackage
+        for full in ('', '_full'):
+            cmd = ['ogr2ogr', arcdir / f'extent{full}.gpkg', tdir.location / f'extent{full}.shp']
+            subprocess.run(cmd, check=True)
+
+#        # Convert to zip file
+#        _zip_dir(tdir.location, arcdir/'EXTENT-tmp.zip')
+#
+#    os.rename(arcdir/'EXTENT-tmp.zip', arcdir / 'EXTENT.zip')
 
     # --------------- (Very conservatively)
     # Delete the xdir by moving it to a todel directory.
