@@ -4,7 +4,9 @@ import pandas as pd
 from uafgi.util import shputil,ogrutil,rtreeutil
 from akramms import archive,avalparse,avalfilter,parse,resolve,file_info
 from akramms.util import exputil
+from akramms import joblib
 import rtree.index
+import shapely.geometry, shapely.geometry.multipolygon
 
 # =======================================================================
 # ====== Extent Processing
@@ -47,11 +49,11 @@ def extents_intersect(extent0, extent1):
     return True
 
 # -----------------------------------------------------------------
-def nc_extent(nc_fname):
+def nc_geom(nc_fname):
     """Determines the extent of an archived NetCDF file"""
     with netCDF4.Dataset(nc_fname) as nc:
         bbox = nc.variables['bounding_box'][:].reshape(-1)    # [x0,y0,x1,y1]
-    return bbox
+    return shapely.geometry.box(*bbox)
 # -----------------------------------------------------------------
 def add_margin(extent, margin):
     """Adds margin to an extent
@@ -130,29 +132,49 @@ def tiles_by_extent(expmod, extent):
 
 
 
-def filter_combos_by_extent(expmod, akdf, extent):
+def expand_combos_by_geom(expmod, akdf, geom):
     """
     expmod:
         Overall experiment
     akdf:
         Resolved to combo level
         All combos in expmod
-    extent: (x0,y0,x1,y1)
+    geom:
+        Shapely geometry combos must intersect with
     """
 
-    # --- A numeric extent is provided: filter (idom,jdom) based on it.
-    # tiles is the set of (idom,jdom) we are happy to keep
-    tiles_in_extent = {(idom,jdom)
-        for idom,jdom,dom_ext in domain_extents(expmod)
-        if extents_intersect(dom_ext, extent)}
+    # Separate list of combos into wcombo and tiles
+    wcombos = set()
+    #tiles = set()
+    for combo in akdf.combo:
+        wcombos.add(tuple(combo[:-2]))
+        #tiles.add(combo[-2:])
 
-    # Filter by tiles_in_extent (i.e. only keep combos on tiles that intersect extent)
-    ijdom = akdf.combo.map(lambda x: (x[-2],x[-1]) )    # (idom,jdom)
-    akdf = akdf[ijdom.isin(tiles_in_extent)]
+    # Throw out the list of tiles, and instead figure out which tiles
+    # (with margins) intersect geom.
+    qdf = tile_rtree(expmod).intersection(geom)
 
-    return akdf
+    # Compute Cartesian product of the two
+    combos = list()
+    for wcombo in wcombos:
+        for tup in qdf.itertuples(index=False):
+            combos.append(expmod.Combo(*(list(wcombo) + [tup.idom, tup.jdom])))
+
+    return resolve.from_combos(expmod.name, combos)
+
+#    # --- A numeric extent is provided: filter (idom,jdom) based on it.
+#    # tiles is the set of (idom,jdom) we are happy to keep
+#    tiles_in_extent = {(idom,jdom)
+#        for idom,jdom,dom_ext in domain_extents(expmod)
+#        if extents_intersect(dom_ext, extent)}
+#
+#    # Filter by tiles_in_extent (i.e. only keep combos on tiles that intersect extent)
+#    ijdom = akdf.combo.map(lambda x: (x[-2],x[-1]) )    # (idom,jdom)
+#    akdf = akdf[ijdom.isin(tiles_in_extent)]
+#
+#    return akdf
 # ---------------------------------------------------------------------
-def extent_by_tiles(expmod, akdf):
+def geom_by_tiles(expmod, akdf):
     """Produces the extent that is the union of the tiles covered by
     combos in akdf
 
@@ -162,16 +184,16 @@ def extent_by_tiles(expmod, akdf):
     # User wants extent to be same as a subdomain tile.
     # Get union of all the subdomain tiles
     ijdoms = {(x.idom, x.jdom) for x in akdf.combo}
-    tile_extents = [
+    tile_geoms = [
         expmod.gridD.sub(
             idom,jdom, expmod.resolution, expmod.resolution, margin=False) \
-            .extent(order='xyxy')
+            .bounding_box(type='shapely')
         for idom,jdom in ijdoms]
-    extent = union_extents(tile_extents)
-    return extent
+    mp = shapely.geometry.multipolygon.MultiPolygon(tile_geoms)
+    return shapely.geometry.box(*mp.bounds)
 
 # ---------------------------------------------------------------------
-def filter_avalanches_by_extent(expmod, adkf, extent):
+def filter_avalanches_by_geom(expmod, adkf, geom):
     """
     expmod:
         Overall experiment
@@ -181,23 +203,23 @@ def filter_avalanches_by_extent(expmod, adkf, extent):
     extent: (x0,y0,x1,y1)
     """
 
-    avlanche_extents = akdf['avalfile'].map(nc_extent)
-    keep = avlanche_extents.map(lambda ext: extents_intersect(ext, extent))
+    avlanche_geoms = akdf['avalfile'].map(nc_geom)
+    keep = avlanche_geoms.map(lambda geom2: geom.intersects(geom2))
     akdf = akdf[keep]
     return akdf
 # ---------------------------------------------------------------------
-def extent_by_avalanches(expmod, akdf):
-    """Produces the extent that is the union of the avalanche extents in akdf
+def geom_by_avalanches(expmod, akdf):
+    """Produces the geometry that is the union of the avalanche extents in akdf
     akdf:
         """
 
-    extents = akdf['avalfile'].map(nc_extent)
-    extent = union_extents(extents.tolist())
-    return extent
+    geoms = akdf['avalfile'].map(nc_geom)
+    geom = union_geoms(geoms.tolist())
+    return geom
 
 # ---------------------------------------------------------------------
 def query(akdf0, sextent, scenetypes={'x', 'arc'},
-    statuses=[file_info.JobStatus.OVERRUN, file_info.JobStatus.FINISHED], margin=None):
+    statuses=[file_info.JobStatus.OVERRUN, file_info.JobStatus.FINISHED], force=False):
 
     """akdf:
         Resolved to the combo level (or should work at id level too)
@@ -212,8 +234,13 @@ def query(akdf0, sextent, scenetypes={'x', 'arc'},
         'tile': Use the extent of an (idom,jdom) subdomain tile
             or
         'avalanche': Use avalanches to determine overall extent
+            (Only plot THOSE SPECIFIC AVALANCHES)
+
     include_overruns:
         Should overrun avalanches be included when resolving avalanches
+
+    force:
+        Run the query, even if not all required combos have achieved EXTENT status
 
     Returns: extent, akdf
         extent: (x0,y0,x1,y1)
@@ -225,7 +252,7 @@ def query(akdf0, sextent, scenetypes={'x', 'arc'},
     """
 
     ret_dfs = list()
-    ret_extents = list()
+    ret_geoms = list()
     for exp,akdf1 in akdf0.groupby('exp'):
 
         # Make sure they all use the same experiment
@@ -233,46 +260,58 @@ def query(akdf0, sextent, scenetypes={'x', 'arc'},
         expmod = parse.load_expmod(exp)
         extent = parse.parse_extent(expmod, sextent)    # (x0,y0,x1,y1)
 
-        extent_is_numeric = (not isinstance(extent, str))
-
-        if extent_is_numeric:
-            # --- A numeric extent is provided: filter (idom,jdom) based on it.
-            # tiles is the set of (idom,jdom) we are happy to keep
-            akdf1 = filter_combos_by_extent(expmod, akdf1, extent)
-            need_aval_filter = True
-        elif extent == 'tile':
-            # User wants extent to be same as a subdomain tile.
-            # Get union of all the subdomain tiles
-            extent = extent_by_tiles(expmod, akdf1)
-
-            # No need to further filter avalanches, the selected
-            # avalanches will fit in the extent.
-            need_aval_filter = False
-
-        # --------- Move to the avalanche (id) level
-        # Resolve to individual avalanches
-        akdf1 = resolve.resolve_chunk(akdf1, scenetypes=scenetypes)
-        akdf1 = resolve.resolve_id(akdf1, realized=True, status_col=True)
-        akdf1 = akdf1[akdf1.id_status.isin(statuses)]
-
-        # Resolve the extent to numeric
-        if extent == 'tile':
-            extent = extent_by_tiles(expmod, akdf1)
-            need_aval_filter = False
-
-        elif extent == 'aval':
+        # Create a shapely Geometry representing the area to plot
+        geom = None
+        if extent == 'aval':
             # extent='aval' means the avalanches define the extent.
             # So no need to ever filter out avalanches.
-            need_aval_filter = False
-            extent = extent_by_avalanches(expmod, akdf1)
+            geom = geom_by_avalanches(expmod, akdf1)
+
+            # Assumed to already be resolved at the ID level
+
+        else:
+            if extent == 'tile':
+                # User wants extent to be same as a subdomain tile.
+                # Get union of all the subdomain tiles
+                geom = geom_by_tiles(expmod, akdf1)
+
+            elif (not isinstance(extent, str)):
+                # Numeric extent: (x0,y0, x1,y1)
+                geom = shapely.geometry.box(2, 30, 5, 33)
+
+            else:
+                raise ValueError(f'Unknown extent: {extent}')
+
+            # Filter/expand combos to account for all tiles (with margins) that
+            # intersect the geom
+            akdf1 = expand_combos_by_geom(expmod, akdf1, geom)
+            akdf1 = joblib.add_combo_quickstatus(akdf1)
+
+            # Make sure all combos have status EXTENT, and are fully ready to query!
+            print('Query searching the following combos:')
+            #print(akdf1.columns)
+            print(akdf1[['combo', 'combo_quickstatus']])
+
+            if force:
+                akdf1 = akdf1[akdf1.combo_quickstatus == file_info.JobStatus.EXTENT]
+                print('force=True, so only combos with status == EXTENT will be included')
+
+            if not akdf1.combo_quickstatus.eq(file_info.JobStatus.EXTENT).all():
+                raise ValueError('All Combos must have status=EXTENT (9) to proceed')
 
 
-        # Finally, filter avalanches to the extent, if needed
-        if need_aval_filter:
-            akdf1 = filter_avalanches_by_extent(expmod, akdf1, extent)
+            # --------- Move to the avalanche (id) level
+            # Resolve to individual avalanches
+            akdf1 = resolve.resolve_chunk(akdf1, scenetypes=scenetypes)
+            akdf1 = resolve.resolve_id(akdf1, realized=True, status_col=True, filter_geom=geom)
+            akdf1 = akdf1[akdf1.id_status.isin(statuses)]
+
+
+        # Now akdf1 is resolved to the ID level, and it contains a
+        # credible list of avalanches to plot.
 
         ret_dfs.append(akdf1)
-        ret_extents.append(extent)
+        ret_geoms.append(geom)
 
 
     # ----------------------
@@ -280,11 +319,13 @@ def query(akdf0, sextent, scenetypes={'x', 'arc'},
     # (IF that makes sense, i.e. the two experiements are in the same projection)
 
     # Deal with margin
-    extent = union_extents(ret_extents)
-    if margin is not None:
-        extent = add_margin(extent, (margin,margin) )
+    mp = shapely.geometry.multipolygon.MultiPolygon(ret_geoms)
+    geom = shapely.geometry.box(*mp.bounds)
 
-    return extent, pd.concat(ret_dfs)
+#    if margin is not None:
+#        extent = add_margin(extent, (margin,margin) )
+
+    return geom, pd.concat(ret_dfs)
 
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------

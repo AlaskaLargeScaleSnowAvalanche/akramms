@@ -781,7 +781,7 @@ def read_reldom(arcdir_zip, ext, **kwargs):
 
     dfs = list()
     for fname in fnames:
-        dfs.append(ogrutil.read_df(fname, **kwargs))
+        dfs.append(ogrutil.read_df(fname, **kwargs).df)
 
     return pd.concat(dfs)
 # ----------------------------------------------------------

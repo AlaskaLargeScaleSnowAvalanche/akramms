@@ -461,6 +461,7 @@ def add_combo_quickstatus(akdf0, mtime=False):
                     status = JobStatus.EXTENT
                 else:
                     status = JobStatus.MARKED_FINISHED
+                print(f'Quickstatus {arcdir}: {status}')
                 mtimes.append(os.path.getmtime(arcdir / 'archived.txt'))
             else:
                 xdir = expmod.combo_to_scenedir(tup.combo, scenetype='x')

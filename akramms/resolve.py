@@ -1,6 +1,7 @@
 import itertools,re,os,functools,glob,hashlib,pickle
 import netCDF4
 import pandas as pd
+import geopandas
 from uafgi.util import shputil
 from akramms import level,parse,file_info
 
@@ -40,6 +41,13 @@ def resolve_exp(akdf):
 #        itertools.chain(type(tup)._fields, ['exp'])))
     return pd.DataFrame(orows, columns=list(akdf.columns) + ['exp'])
 
+def from_combos(exp, combos):
+    # Creates a resolved dataframe from a list of combos
+    rows = list()
+    type_combo = {'type': 'combo'}
+    for combo_order, combo in enumerate(combos):
+        rows.append((type_combo, exp, combo_order, combo))
+    return pd.DataFrame(rows, columns=('parsed', 'exp', 'combo_order', 'combo'))
 
 def resolve_combo(akdf, realized=True, scenetypes={'x','arc'}):
 
@@ -212,14 +220,24 @@ _avalRE = re.compile(r'^aval-([TSML])-(\d+)-([^-]*).nc$')
 #_out_zipRE = re.compile(r'(.*)_(\d+)\.out\.zip$')
 
 @functools.lru_cache()
-def _realized_ids(scenetype, releasefile, stage, include_overruns=False):
+def _realized_ids(scenetype, releasefile, stage, include_overruns=False, filter_geom=None):
     """Find IDs that exist on disk.
     (Cached separate function)
+
+    scenetype: 'x' or 'arc'
+
+    releasefile:
+        if scenetype == 'x':
+            Name of a releasefile
+        if scenetype == 'arc':
+            Name of an avalanche archive directory (eg: arc-100-200)
 
     include_overruns:
         Only makes sense with scenetype='arc'
     stage: 'in' or 'out'
         Whether we are looking for .in.zip files or .out.zip
+    filter_geom: Shapely Geometry
+        Only include Avalanches known to intersect with this Shapely Geometry
     Returns: {id: filename}
     """
 
@@ -246,20 +264,39 @@ def _realized_ids(scenetype, releasefile, stage, include_overruns=False):
             # Do not provide info on whether the avalanche finished or overran
             avalfiles.append((id, out_zip, None))
     elif scenetype == 'arc':
-        avaldir = releasefile
-        for name in os.listdir(avaldir):
+        arcdir = releasefile
+        extent_full = arcdir / 'extent_full.gpkg'
+
+        # Determine subset of IDs we are interestd in
+        if (filter_geom is not None) and os.path.exists(extent_full):
+
+
+            # Directory is fully archived.  Use spatial index to
+            # filter avalanches by extent
+            df = geopandas.read_file(str(extent_full))
+            dfi = df[df.geometry.intersects(filter_geom)]
+            include_ids = set(dfi.Id)
+            print(f'Filtering avalanches from {extent_full}: {len(include_ids)}')
+        else:
+            print(f'Including all avalanches from {arcdir}')
+            include_ids = None
+
+        # Look for files on disk with those IDs
+        for name in os.listdir(arcdir):
             match = _avalRE.match(name)
             if match is not None:
                 # There could be >1 avalanche of the same name: overrun and (final) not overrun.
-                overrun = (match.group(3) == 'overrun')    # Overrun info encoded in name
-                id_status = file_info.JobStatus.OVERRUN if overrun else file_info.JobStatus.FINISHED
-                avalfiles.append((int(match.group(2)), avaldir / name, id_status))
+                id = int(match.group(2))
+                if (include_ids is None) or (id in include_ids):
+                    overrun = (match.group(3) == 'overrun')    # Overrun info encoded in name
+                    id_status = file_info.JobStatus.OVERRUN if overrun else file_info.JobStatus.FINISHED
+                    avalfiles.append((int(match.group(2)), arcdir / name, id_status))
     else:
         assert False
 
     return avalfiles
 
-def resolve_id(akdf, realized=True, stage='out', status_col=False):
+def resolve_id(akdf, realized=True, stage='out', status_col=False, filter_geom=False):
     """
     stage:
         If realized, are we looking for avalanche IDs with .in.zip or .out.zip?
@@ -309,7 +346,7 @@ def resolve_id(akdf, realized=True, stage='out', status_col=False):
         # Add those IDs
         if realized:
             # Match releasefile against what's on disk
-            avalfiles = _realized_ids(tup.scenetype, tup.releasefile, stage)
+            avalfiles = _realized_ids(tup.scenetype, tup.releasefile, stage, filter_geom=filter_geom)
 #            print('avalfiles ', avalfiles)
 
             if ids is None:    # Archive-type directory, no releasefile
@@ -342,7 +379,7 @@ def resolve_id(akdf, realized=True, stage='out', status_col=False):
     return df
 
 # ------------------------------------------------------------
-def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out', status_col=False):
+def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out', status_col=False, filter_geom=False):
     """level: exp|combo|chunk|id
         Which level of detail to generate for this query.
         NOTE: level='id' is only used for QUERYING results, not for
@@ -369,7 +406,7 @@ def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out', sta
     if level == 'chunk':
         return akdf
 
-    akdf = resolve_id(akdf, realized=realized, stage=stage, status_col=status_col)
+    akdf = resolve_id(akdf, realized=realized, stage=stage, status_col=status_col, filter_geom=filter_geom)
 #    print('resolve_id ', akdf)
     if level == 'id':
         return akdf

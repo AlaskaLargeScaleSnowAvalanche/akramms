@@ -878,6 +878,8 @@ def xmosaic(args):
 #        help="Include original snowcover in the output?"),
     argument('--dry-run', action='store_true',
         help="Don't actually do the work"),
+    argument('--force', action='store_true',
+        help="Proceed even if not all required combos are finished")
 ])
 def stdmosaic(args):
     from akramms import mosaic,downscale_snow
@@ -891,7 +893,7 @@ def stdmosaic(args):
 
     # Only run for combos that are completely finished
     akdf0 = joblib.add_combo_quickstatus(akdf0, mtime=True)
-    akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED]
+    akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.EXTENT]
 
     if len(akdf0) == 0:
         raise ValueError('None of the select combos are MARKED_FINISHED.  Run akramms status --update')
@@ -921,8 +923,8 @@ def stdmosaic(args):
         if (not os.path.exists(ofname_zip)) or (os.path.getmtime(ofname_zip) < combo_quickstatus_mtime):
             mosaic.mosaic_avals_combo(
                 akdf1, 'tile', ofname_zip, statuses=args.status,
-                margin=None, snow=True, dem=True, landcover=True,
-                dry_run=args.dry_run)
+                snow=True, dem=True, landcover=True,
+                dry_run=args.dry_run, force=args.force)
 
         if (not os.path.exists(ofname_pdf)) or (os.path.getmtime(ofname_pdf) < combo_quickstatus_mtime):
             p_mosaic.plot_pdf(ofname_zip, ofname_pdf)

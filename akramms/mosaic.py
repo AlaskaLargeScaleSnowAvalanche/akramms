@@ -189,10 +189,10 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
     count = 0
     for tup in akdf.itertuples(index=False):
 
-#        # DEBUGGING
-#        count += 1
-#        if count > 100:
-#            break
+        # DEBUGGING
+        count += 1
+        if count > 100:
+            break
 
         arcdir = tup.releasefile
         if not os.path.isfile(tup.avalfile):
@@ -334,12 +334,12 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
         reldf, domdf = read_reldom(akdf)
         for cname in reldf.columns:
             print(f"{cname}: {reldf[cname].dtype}")
-        shputil.write_df(reldf, 'pra', 'Polygon', dir / 'rel.shp', wkt=gridM.wkt)
+        ogrutil.write_df(reldf, 'pra', 'Polygon', dir / 'rel.shp', wkt=gridM.wkt)
         for ext in ('shp','dbf','shx','prj'):
             ozip_write(ozip, dir / f'rel.{ext}')
 
         #reldf = archive.read_reldom(arcdir, 'dom')
-        shputil.write_df(domdf, 'dom', 'Polygon', dir / 'dom.shp', wkt=gridM.wkt)
+        ogrutil.write_df(domdf, 'dom', 'Polygon', dir / 'dom.shp', wkt=gridM.wkt)
         for ext in ('shp','dbf','shx','prj'):
             ozip_write(ozip, dir / f'dom.{ext}')
 
@@ -401,14 +401,14 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
 
 def mosaic_avals_combo(akdf, sextent, ofname,
     statuses=[file_info.JobStatus.FINISHED],
-    margin=None, snow=False, dem=False, landcover=False,
-    dry_run=False):
+    snow=False, dem=False, landcover=False,
+    dry_run=False, force=False):
 
     """General mosaic function for a bunch of avalanches and a domain
 
     akdf:
         Avalanches (in scenetype='arc') to mosiac
-        Resolved to the id level
+        Resolved to the combo level
         Must contain columns: releasefile (actually arcdir), avalfile, id
 
     sextent: One of...
@@ -431,7 +431,7 @@ def mosaic_avals_combo(akdf, sextent, ofname,
 
     # Query down to the id level
     expmod = akramms.parse.load_expmod(row0.exp)
-    extent,akdf = avalquery.query(akdf, sextent, statuses=statuses, scenetypes='arc', margin=margin)
+    geom,akdf = avalquery.query(akdf, sextent, statuses=statuses, scenetypes='arc', force=force)
 
     # Prepare snow virtual raster for query
     if snow:
@@ -448,6 +448,7 @@ def mosaic_avals_combo(akdf, sextent, ofname,
     # Do mosaic
     res = expmod.resolution
     gridG = expmod.gridD.global_grid(res, res)
+    extent = geom.bounds    # (x0,y0, x1,y1)
     gridM = expmod.gridD.subgrid(extent[0], extent[1], extent[2], extent[3], res, res)
 
     print(akdf[['exp', 'combo','id']])
@@ -456,7 +457,6 @@ def mosaic_avals_combo(akdf, sextent, ofname,
     if dry_run:
         print('Dry Run, not going further')
         return
-
 
     kwargs = dict()
     if dem:
