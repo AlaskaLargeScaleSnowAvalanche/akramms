@@ -511,10 +511,10 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
     # Write extent.gpkg
     if update:
         mask = (akdf0.combo_quickstatus == JobStatus.MARKED_FINISHED)
-        for exp,akdf1 in akdf0.reset_index(drop=True).groupby('exp'):
+        for exp,akdf1 in akdf0[mask].reset_index(drop=True).groupby('exp'):
             expmod = parse.load_expmod(exp)
             for tup in akdf1.itertuples(index=False):
-                print('Finishing combo (b): {}'.format(tup.combo))
+                print('Finishing combo (c): {}'.format(tup.combo))
                 archive.finish_combo(expmod, tup.combo, dry_run=dry_run)
 
     # -----

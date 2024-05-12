@@ -668,6 +668,8 @@ def finish_combo(expmod, combo, dry_run=False):
     xdir = expmod.combo_to_scenedir(combo, scenetype='x')
     arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
 
+#    print('xxxxxxxxx ', arcdir)
+
     control_fname = arcdir / 'archived.txt'
     if dry_run:
         print(f'If not for dry_run, I would be writing the file {extent_zip}')
@@ -724,10 +726,11 @@ def finish_combo(expmod, combo, dry_run=False):
             extent_full_ds = None
 
 
-        # Convert to GeoPackage
+        # Convert to GeoPackage (indented to maintain open temp dir)
         for full in ('', '_full'):
-            cmd = ['ogr2ogr', arcdir / f'extent{full}.gpkg', tdir.location / f'extent{full}.shp']
+            cmd = ['ogr2ogr', arcdir / f'extent{full}-tmp.gpkg', tdir.location / f'extent{full}.shp']
             subprocess.run(cmd, check=True)
+            os.rename(arcdir / f'extent{full}-tmp.gpkg', arcdir / f'extent{full}.gpkg')
 
 #        # Convert to zip file
 #        _zip_dir(tdir.location, arcdir/'EXTENT-tmp.zip')
