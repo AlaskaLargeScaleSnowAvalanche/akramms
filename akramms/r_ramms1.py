@@ -4,6 +4,7 @@ import pandas as pd
 from uafgi.util import make,shputil,gdalutil
 from akramms import config,params,process_tree,joblib,parse,file_info,parse,resolve,complete,level
 from akramms.util import paramutil,harnutil,rammsutil
+import ramms_lshm
 
 """Rules for RAMMS Stage 1 (with auto submit to Stage 2)"""
 
