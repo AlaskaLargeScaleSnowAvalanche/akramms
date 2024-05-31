@@ -109,6 +109,8 @@ def parse_xy_coord(gridI, fin):
     fmt = '<L'
     buf = fin.read(struct.calcsize(fmt))
     ncells = struct.unpack(fmt, buf)[0]
+    print('parse_xy_coords() ncells = ', ncells)
+
 
     # xvec: double64[ncells]
     buf = fin.read(ncells * 8)
@@ -163,7 +165,7 @@ def parse_out(fin):
     fmt = '<L'
     buf = fin.read(struct.calcsize(fmt))
     ncells = struct.unpack(fmt, buf)[0]
-#    print('ncells ', ncells)
+    print('parse_out() ncells = ', ncells)
 
     buf = fin.read(ncells * 4)
     max_vel = np.frombuffer(buf, dtype='<f4')
@@ -375,6 +377,7 @@ def ramms_to_nc0(out_zip, id_status, ncout):
     #        nzmask = np.logical_or(*(val>0 for _,val,_ in namevals))
 
             # Cut out the fat!
+            print(f'QQ1 lengths: {len(ivec)}, {len(jvec)}, {len(nzmask)}')
             ivec = ivec[nzmask]
             jvec = jvec[nzmask]
             namevals = [(name,val[nzmask],attrs) for name,val,attrs in namevals]
