@@ -61,14 +61,14 @@ def av2_to_av3(av2_str):
     # Figure out directory to blank out (as a string)
     match = pathRE.search(av2_str)
     dom_file = match.group(1)
-    dir = dom_file[:dom_file.rindex('\\')+1]
+    dir = dom_file[:dom_file.rindex('/')+1]
 
     # Blank out all occurrences of that dir
     av3_str = av2_str.replace(dir, '')
 
     # Go one dir up
-    dir = dir[:-1]    # Remove trailing backslash
-    dir = dir[:dir.rindex('\\')]
+    dir = dir[:-1]    # Remove trailing slash
+    dir = dir[:dir.rindex('/')]
     print(f'dir "{dir}"')
     av3_str = av3_str.replace(dir, '..')
 
@@ -131,19 +131,65 @@ def combo_control_file(scene_dir):
     return scene_dir / 'ramms_stage1.txt'
 
 # -----------------------------------------------------------------
-def run_if_remote(control_file, *args, **kwargs):
-    """Runs remotely, but ONLY if a control file does not yet exist"""
-    if not os.path.exists(control_file):
-        harnutil.run_remote(*args, **kwargs)
+#def run_if_remote(control_file, *args, **kwargs):
+#    """Runs remotely, but ONLY if a control file does not yet exist"""
+#    if not os.path.exists(control_file):
+#        harnutil.run_remote(*args, **kwargs)
+
+def _av2_to_xycoord(hconfig, av2):
+    """Job to run in parallel, to generate an xycoord file"""
+    cmd = [str(hconfig.ramms_exe), str(av2), '/', 'write_xy']
+#    print(' '.join(str(x) for x in cmd))
+    if True:
+        time.sleep(3)    # DEBUG
+    else:
+        subprocess.run(cmd, check=True)
+    print('.', end='')
+    sys.stdout.flush()
+
+def write_xycoords(hconfig, chunkdir, ncpu=1, check_timestamps=True):
+    """
+    ncpu:
+        Degree of (threaded) parallelism to use
+    """
+
+    # Generate xy-coord files
+    t0 = time.time()
+    print('    XY-COORD FILES (Python):')
+    print('    ', end='')
+
+    # Determine the .av2 files that need to be turned into .xycoord
+    av2s = list()
+    for _av2 in glob.glob(str(chunkdir / 'RESULTS/*/*/*.av2')):
+        av2 = pathlib.Path(_av2)
+        xycoord = av2.parents[0] / (av2.parts[-1].split('.',1)[0] + '.xy-coord')
+
+        if ioutil.needs_regen([xycoord], [av2], check_timestamps=check_timestamps):
+            av2s.append(av2)
+
+    # Run the jobs in parallel, and collect errors
+    pool = multiprocessing.pool.ThreadPool(processes=ncpu)
+
+    errs = list()
+    jobs=[pool.apply_async(_av2_to_xycoord, args=(hconfig, av2)) for av2 in av2s]
+    for av2,job in zip(av2s,jobs):
+        try:
+            job.get()    # Get return value, we throw it away
+        except Exception:
+            errs.append(f"Error for file {av2}")
+    t1 = time.time()
+    print('DONE')
+    print(f'    - Elapsed time (xy-coord files): {(t1-t0):0.1f} s')
+    if len(errs) > 0:
+        for err in errs:
+            print(err, file=sys.stderr)
+        raise ValueError('At least one process failed')
+
+
+
 
 def run_chunk(release_file, crf, gridI, at_front=False, submit=False, condor_priority=0):
     done_output = chunk_control_file(crf)
-
-#    crf = file_info.parse_chunk_release_file(release_file)
-    # ---------------------------------------------------------
-    # From former rammsdir rule
-
-    # ---------------------------------------------------------
 
     # Copy files from previous RAMMS Stage 1, to speed things up
     tmap = tiffmap(crf)
@@ -153,30 +199,41 @@ def run_chunk(release_file, crf, gridI, at_front=False, submit=False, condor_pri
             os.makedirs(dir0, exist_ok=True)
             shutil.copy(fname1, fname0)
 
-    chunk_dir_rel = config.roots.relpath(crf.chunk_dir)
-#    print('AA1 ', crf.chunk_dir, chunk_dir_rel, type(chunk_dir_rel))
-#    print('bb1 ', chunk_dir_rel.parts[0])
-    chunk_dir_path = config.roots_w.syspath(chunk_dir_rel, bash=True)
-    cmd = ['sh', 
-        config.roots_w.join('HARNESS', 'akramms', 'sh', 'run_ramms.sh', bash=True),
-        '--ramms-version', config.ramms_version,
-        chunk_dir_path, '1']    # '1'=stage 1
+#    chunk_dir_rel = config.roots.relpath(crf.chunk_dir)
+#    chunk_dir_path = config.roots_w.syspath(chunk_dir_rel, bash=True)
+#    cmd = ['sh', 
+#        config.roots_w.join('HARNESS', 'akramms', 'sh', 'run_ramms.sh', bash=True),
+#        '--ramms-version', config.ramms_version,
+#        chunk_dir_path, '1']    # '1'=stage 1
+#
+#    # RAMMS Stage 1 accepts inputs on stdin
+#    # rammsdist.run_on_windows_stage() calls read_inputs()
+#    dynamic_outputs = list()
+#
+#    # We don't need inputs anymore for run_remote; (but there MUST be
+#    # at least one input for RAMMS Windows interface to work)
+#    inputs = [release_file]
+#
+    hconfig = ramms_lshm.Config(
+        idl_exe=pathlib.Path(os.environ['IDL_DIR']) / 'bin' / f'idl{EXE_EXT}',
+        ramms_lshm_sav = config.roots['HARNESS'] / 'lshm' / 'build/ramms_lshm.sav',
+        ramms_exe = config.roots['HARNESS'] / 'rammscore' / f'build/ramms_aval_LHM{EXE_EXT}')
 
-    # RAMMS Stage 1 accepts inputs on stdin
-    # rammsdist.run_on_windows_stage() calls read_inputs()
-    dynamic_outputs = list()
 
-    # We don't need inputs anymore for run_remote; (but there MUST be
-    # at least one input for RAMMS Windows interface to work)
-    inputs = [release_file]
-
-    print(f'Running RAMMS Stage 1 {crf.chunk_dir}')
+    print(f'------------- RAMMS Phase 0: {crf.chunk_dir}')
     harnutil.run_queued('idl',
-        run_if_remote, done_output, inputs, cmd, None, write_inputs=True,
+        ramms_lshm.run_phase,
+        hconfig, crf.chunk_dir, 0,
         at_front=False)
 
-#        harnutil.run_remote, inputs, cmd, None, write_inputs=True,
-#        at_front=True)
+    print(f'------------- XY-COORD Files: {crf.chunk_dir}')
+    write_xycoords(hconfig, crf.chunk_dir, ncpu=config.ramms_ncpu, check_timestamps=True)
+
+    print(f'------------- RAMMS Phase 1: {crf.chunk_dir}')
+    harnutil.run_queued('idl',
+        ramms_lshm.run_phase,
+        hconfig, crf.chunk_dir, 1,
+        at_front=False)
 
     # Copy .tif files to be reused by later RAMMS Stage 1
     for fname0,fname1 in tmap:
