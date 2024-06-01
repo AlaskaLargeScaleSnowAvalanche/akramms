@@ -4,8 +4,6 @@ from akramms.util import harnutil
 from akramms import config
 import configparser
 
-
-
 Dockerfile_tpl = \
 """# syntax=docker/dockerfile:1
 FROM ubuntu:20.04
@@ -13,24 +11,8 @@ FROM ubuntu:20.04
 # Update
 RUN apt-get update
 
-# Download Wine
-RUN apt install --download-only --yes wine
-
-# Install Wine Prerequisites
-# https://serverfault.com/questions/949991/how-to-install-tzdata-on-a-ubuntu-docker-image
-RUN DEBIAN_FRONTEND=noninteractive TZ=America/Anchorage apt-get -y install tzdata
-
-# Install Wine
-RUN apt install --yes wine
-RUN dpkg --add-architecture i386
-RUN apt update
-RUN apt install --yes wine wine32 libwine
-
 # Install Python (3)
 RUN apt install --yes python3 python-is-python3
-
-# Add basic ~/.wine directory
-COPY dotwine.tar.gz /opt
 
 # Install RAMMS .exe file (and any supporting DLLs)
 ADD {ramms_distro} /opt/ramms
@@ -57,28 +39,38 @@ WORKDIR /ramms
 # (avalanche) efischer@antevorta:~/av/prj/juneau1/RAMMS/juneau130yFor/RESULTS/juneau1_For/5m_30L$ docker run -v "$(pwd)":/ramms -e avalanche=juneau1_For_5m_30L_6213 -u 1001:1001 -it ramms
 """
 
+# Identify the RAMMS version (as of the last time it was built)
+version_txt = config.HARNESS / 'rammscore' / 'build' / 'version.txt'
+with open(version_txt) as fin:
+    ramms_version = fin.read().strip()
+
+print(f'ramms_version = {ramms_version}')
+
 # Make sure we have the RAMMS version in place
-odist_parent = os.path.join(config.HARNESS, 'akramms', 'docker', 'RAMMS')
-odist = os.path.join(odist_parent, config.ramms_version)
-idist = os.path.join(config.HARNESS, 'data', 'christen', 'RAMMS', config.ramms_version)
+odist_parent = config.HARNESS / 'akramms' / 'docker' / 'RAMMS'
+odist = odist_parent / ramms_version
+idist = config.HARNESS / 'rammscore' / 'build'
 if not os.path.exists(odist):
     print('Deleting tree {}'.format(odist_parent))
     shutil.rmtree(odist_parent, ignore_errors=True)
-    shutil.copytree(idist,odist)
+    names = ('ramms_aval_LHM', 'version.txt')
+    os.makedirs(odist, exist_ok=True)
+    for name in names:
+        shutil.copy(idist / name, odist / name)
 
-
-docker_dir = os.path.join(config.HARNESS, 'akramms', 'docker')
-with config.update_docker_build() as build:    # Build ID number
+docker_dir = config.HARNESS / 'akramms' / 'docker'
+with config.update_docker_build(ramms_version) as build:    # Build ID number
 
     # Make the Dockerfile
     Dockerfile_str = stringutil.partial_format(Dockerfile_tpl,
-        ramms_distro=f'RAMMS/{config.ramms_version}',
-        ramms_version=config.ramms_version, build=build)
+        ramms_distro=f'RAMMS/{ramms_version}',
+        ramms_version=ramms_version,
+        build=build)
     with open(os.path.join(docker_dir, 'Dockerfile'), 'w') as out:
         out.write(Dockerfile_str)
 
     # Docker push, now that we have fully updated and buil versions
-    vers = f'{config.ramms_version}.{build}'
+    vers = f'{ramms_version}.{build}'
     docker_tag = f'{config.docker_host}/efischer/ramms:{vers}'
 
     # Build the Docker image on local machine

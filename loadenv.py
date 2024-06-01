@@ -25,7 +25,7 @@ pythonpath += [
     os.path.join(HARNESS, 'uafgi'),
     os.path.join(HARNESS, 'akramms'),
     os.path.join(HARNESS, 'rq'),
-    os.path.join(HARNESS, 'ramms_lshm'),
+    os.path.join(HARNESS, 'lshm'),
     SITE_PACKAGES,
 ]
 if os.path.exists(SITE_PACKAGES):

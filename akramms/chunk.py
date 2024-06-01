@@ -544,11 +544,11 @@ scenario_tpl = \
 r"""LSHM    {scenario_name}
 MODULE  AVAL
 MUXI    VARIABLE
-DIR     {remote_ramms_dir}\
-DEM     DEM\
-RELEASE RELEASE\
-DOMAIN  DOMAIN\
-FOREST  FOREST\
+DIR     {ramms_dir}/
+DEM     DEM/
+RELEASE RELEASE/
+DOMAIN  DOMAIN/
+FOREST  FOREST/
 NRCPUS  {ncpu}
 COHESION {cohesion}
 DEBUG   {debug}
@@ -568,7 +568,7 @@ def write_scenario_txt(chunk_dir, chunk_dir_final, alt_lim_top=1500, alt_lim_low
     # Create the scenario file
     kwargs = dict()
     kwargs['scenario_name'] = chunk_name
-    kwargs['remote_ramms_dir'] = config.roots.convert_to(chunk_dir_final, config.roots_w)
+    kwargs['ramms_dir'] = str(chunk_dir_final)  #config.roots.convert_to(chunk_dir_final, config.roots_w)
     kwargs['ncpu'] = str(ncpu)
     kwargs['ncpu_preprocess'] = str(ncpu_preprocess)
     kwargs['cohesion'] = str(cohesion)

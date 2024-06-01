@@ -1,7 +1,8 @@
-import os,sys,shutil,multiprocessing,pickle,zipfile,re
+import os,sys,shutil,multiprocessing,pickle,zipfile,re,pathlib,time,glob,subprocess
+import multiprocessing.pool
 import setuptools.sandbox
 import pandas as pd
-from uafgi.util import make,shputil,gdalutil
+from uafgi.util import make,shputil,gdalutil,ioutil
 from akramms import config,params,process_tree,joblib,parse,file_info,parse,resolve,complete,level
 from akramms.util import paramutil,harnutil,rammsutil
 import ramms_lshm
@@ -70,7 +71,7 @@ def av2_to_av3(av2_str):
     # Go one dir up
     dir = dir[:-1]    # Remove trailing slash
     dir = dir[:dir.rindex('/')]
-    print(f'dir "{dir}"')
+#    print(f'dir "{dir}"')
     av3_str = av3_str.replace(dir, '..')
 
     return av3_str
@@ -88,7 +89,7 @@ def compress_avalanche_inputs(crf, gridI, ids):
 
         files = [crf.avalanche_dir / f'{base}{ext}' for ext in _izip_exts]
         arcnames = [f'{base}{ext}' for ext in _izip_exts]
-        arcnames[-1] = f'{base}.v1.dom'    # First of many .dom files
+#        arcnames[-1] = f'{base}.v1.dom'    # First of many .dom files
 
         if (not os.path.exists(crf.avalanche_dir / f'{base}.in.zip')) and \
             all(file_info.is_file_good(x) for x in files):
@@ -139,9 +140,9 @@ def combo_control_file(scene_dir):
 
 def _av2_to_xycoord(hconfig, av2):
     """Job to run in parallel, to generate an xycoord file"""
-    cmd = [str(hconfig.ramms_exe), str(av2), '/', 'write_xy']
+    cmd = [str(hconfig.rammscore_exe), str(av2), '/', 'write_xy']
 #    print(' '.join(str(x) for x in cmd))
-    if True:
+    if False:
         time.sleep(3)    # DEBUG
     else:
         subprocess.run(cmd, check=True)
@@ -176,15 +177,16 @@ def write_xycoords(hconfig, chunkdir, ncpu=1, check_timestamps=True):
     for av2,job in zip(av2s,jobs):
         try:
             job.get()    # Get return value, we throw it away
-        except Exception:
-            errs.append(f"Error for file {av2}")
+        except Exception as exp:
+            errs.append(f"Error for file {av2}: {str(exp)}")
     t1 = time.time()
     print('DONE')
     print(f'    - Elapsed time (xy-coord files): {(t1-t0):0.1f} s')
     if len(errs) > 0:
         for err in errs:
             print(err, file=sys.stderr)
-        raise ValueError('At least one process failed')
+        raise exp
+#        raise ValueError('At least one process failed')
 
 
 
@@ -215,10 +217,11 @@ def run_chunk(release_file, crf, gridI, at_front=False, submit=False, condor_pri
 #    # at least one input for RAMMS Windows interface to work)
 #    inputs = [release_file]
 #
+    EXE_EXT = '.exe' if os.name=='nt' else ''
     hconfig = ramms_lshm.Config(
         idl_exe=pathlib.Path(os.environ['IDL_DIR']) / 'bin' / f'idl{EXE_EXT}',
         ramms_lshm_sav = config.roots['HARNESS'] / 'lshm' / 'build/ramms_lshm.sav',
-        ramms_exe = config.roots['HARNESS'] / 'rammscore' / f'build/ramms_aval_LHM{EXE_EXT}')
+        rammscore_exe = config.roots['HARNESS'] / 'rammscore' / f'build/ramms_aval_LHM{EXE_EXT}')
 
 
     print(f'------------- RAMMS Phase 0: {crf.chunk_dir}')
@@ -293,7 +296,7 @@ def run_chunk(release_file, crf, gridI, at_front=False, submit=False, condor_pri
         out.write('Finished RAMMS Stage 1\n')
 
 
-    return dynamic_outputs
+#    return dynamic_outputs
 
 # -----------------------------------------------------------------
 def run_combo(scene_dir, dem_file, submit=True):

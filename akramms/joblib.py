@@ -18,12 +18,10 @@ JobStatus = file_info.JobStatus    # Alias
 
 DOCKER_TAG = config.docker_tag()
 
-#requirements = opsys == 'WINDOWS'
 submit_tpl = \
-"""universe                = docker
-docker_image            = {DOCKER_TAG}
-executable              = /usr/bin/python
-arguments               = /opt/runaval.py {inout_name}
+"""universe                = vanilla
+executable              = {runaval_sh}
+arguments               = {inout_name}
 
 initialdir              = {run_dir}
 transfer_input_files    = {inout_name}.in.zip
@@ -32,6 +30,7 @@ should_transfer_files   = YES
 when_to_transfer_output = ON_EXIT
 on_exit_hold            = False
 on_exit_remove          = True
+getenv                  = False
 
 output                  = {inout_name}.job.out
 error                   = {inout_name}.job.err
@@ -41,6 +40,8 @@ request_memory          = 1000M
 priority                = {condor_priority}
 queue 1
 """
+
+
 
 def submit_job(run_dir, job_name, inout_name, condor_priority=0):#, local=False):
     """Submits an individual avalanche simulation to HTCondor, after
@@ -65,7 +66,14 @@ def submit_job(run_dir, job_name, inout_name, condor_priority=0):#, local=False)
 
 
     print('Submitting job: {}'.format(job_name))
-    submit_txt = submit_tpl.format(job_name=job_name, inout_name=inout_name, run_dir=run_dir, DOCKER_TAG=DOCKER_TAG, condor_priority=condor_priority)
+    submit_txt = submit_tpl.format(
+        job_name=job_name,
+        inout_name=inout_name,
+        run_dir=run_dir,
+        DOCKER_TAG=DOCKER_TAG,
+        condor_priority=condor_priority,
+#        python_exe = str(sys.executable),
+        runaval_sh = str(config.roots['HARNESS'] / 'akramms' / 'sh' / 'runaval.sh'))
 
     cmd = ['condor_submit', '-batch-name', job_name]
     print(' '.join(cmd) + '<<EOF')
@@ -554,6 +562,8 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         # Replace older avalanches runs with newer runs of the same ID
         # (which presumably have fixed overrun problems)
         iddf1 = overrun.drop_duplicates(iddf1)
+
+
 #        print('add_combo_status() rows')
 #        xdf = iddf1[['combo', 'pra_size', 'chunkid', 'id', 'id_status']]
 #        print('All rows ID')

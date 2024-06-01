@@ -57,7 +57,7 @@ auto_submit = True
 #ramms_version = '230401'
 #ramms_version = '230423'
 #ramms_version = '240111'
-ramms_version = '240515'
+#ramms_version = '240515'
 #docker_container_version = f'${ramms_version}.0'
 
 # Maximum number of PRAs in a RAMMS run
@@ -100,7 +100,7 @@ initial_margins = {
     'L' : 1000.
 }
 
-ramms_distro_dir = roots.join('data', 'christen', 'RAMMS', ramms_version)
+#ramms_distro_dir = roots.join('data', 'christen', 'RAMMS', ramms_version)
 
 # Host we use for Docker registry
 docker_host = 'git.akdggs.com'
@@ -108,7 +108,7 @@ builds_ini = os.path.join(HARNESS, 'akramms', 'docker', 'builds.ini')
 
 # Determine the Docker image to use to run RAMMS
 @functools.lru_cache()
-def docker_tag():
+def docker_tag(ramms_version):
     ini = configparser.ConfigParser()
     ini.read(builds_ini)
     section = ini['builds']
@@ -121,8 +121,9 @@ def docker_tag():
 # ------------------------------------------------------------
 class update_docker_build:
 
-    def __init__(self):
+    def __init__(self, ramms_version):
         self.ini = configparser.ConfigParser()
+        self.ramms_version = ramms_version
 
     def __enter__(self):
         self.ini.read(builds_ini)
@@ -130,7 +131,7 @@ class update_docker_build:
         # Determine build count for this version
         section = self.ini['builds']
         try:
-            self.build_count = int(section[ramms_version])
+            self.build_count = int(section[self.ramms_version])
         except KeyError:
             self.build_count = 0
         self.build_count += 1
@@ -143,7 +144,7 @@ class update_docker_build:
 
         # Only update if body completed successfully
         section = self.ini['builds']
-        section[ramms_version] = str(self.build_count)
+        section[self.ramms_version] = str(self.build_count)
         with ioutil.WriteIfDifferent(builds_ini) as owid:
             with open(owid.tmpfile, 'w') as out:
                 self.ini.write(out)

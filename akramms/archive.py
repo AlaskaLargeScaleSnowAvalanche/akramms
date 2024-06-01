@@ -97,7 +97,7 @@ difference_decode = np.cumsum
 #  
 # Marc
 
-def parse_xy_coord(gridI, fin):
+def parse_xy_coord_raw(fin):
     """Read the .xy-coord file"""
 
     # https://docs.python.org/3/library/struct.html
@@ -109,7 +109,7 @@ def parse_xy_coord(gridI, fin):
     fmt = '<L'
     buf = fin.read(struct.calcsize(fmt))
     ncells = struct.unpack(fmt, buf)[0]
-    print('parse_xy_coords() ncells = ', ncells)
+#    print('parse_xy_coords() ncells = ', ncells)
 
 
     # xvec: double64[ncells]
@@ -117,6 +117,11 @@ def parse_xy_coord(gridI, fin):
     xvec = np.frombuffer(buf, dtype='<f8')
     buf = fin.read(ncells * 8)
     yvec = np.frombuffer(buf, dtype='<f8')
+
+    return xvec, yvec
+
+def parse_xy_coord(gridI, fin):
+    xvec, yvec = parse_xy_coord_raw(gridI, fin)
 
     # Convert (double precision) x/y coordinates to (int) i/j
     ivec, jvec = gridI.to_ij(xvec, yvec)
@@ -158,14 +163,14 @@ def nc_xy_coord(ncout, gridI, coord_attrs, ivec, jvec):
     return ivec,jvec
 
 # --------------------------------------------------------------
-def parse_out(fin):
+def parse_out(fin, zipname=None, check=True):
     """Read the .out file"""
 
     # ncells: long
     fmt = '<L'
     buf = fin.read(struct.calcsize(fmt))
     ncells = struct.unpack(fmt, buf)[0]
-    print('parse_out() ncells = ', ncells)
+#    print('parse_out() ncells = ', ncells)
 
     buf = fin.read(ncells * 4)
     max_vel = np.frombuffer(buf, dtype='<f4')
@@ -174,6 +179,11 @@ def parse_out(fin):
     buf = fin.read(ncells * 4)
     depo = np.frombuffer(buf, dtype='<f4')
 
+    # Check that all lengths match!
+    if check:
+        vecs = [max_vel, max_height, depo]
+        if not all((vecs[0].shape == vec.shape for vec in vecs[1:])):
+            raise ValueError(f'ERROR reading .OUT IN {zipname}: lengths are {[vec.shape for vec in vecs]}')
 
     return (
         ('max_vel', max_vel, {'units': 'm s-1'}),
@@ -266,7 +276,7 @@ class OverrunChecker:
 
             # See if we hit any of the oedge gridcells
             with out_zip.open(out_names['out'], 'r') as fin:
-                namevals = parse_out(fin)
+                namevals = parse_out(fin, zipname=out_zip.filename, check=True)
                 vals = {name:val for name,val,_ in namevals}
 
             return \
@@ -368,7 +378,10 @@ def ramms_to_nc0(out_zip, id_status, ncout):
             with in_zip.open(f'{leaf}.xy-coord', 'r') as fin:
                 ivec, jvec = parse_xy_coord(gridI, fin)
             with out_zip.open(f'{leaf}.out', 'r') as fin:
-                namevals = parse_out(fin)
+                # ('max_vel', max_vel, {'units': 'm s-1'}),
+                # ('max_height', max_height, {'units': 'm'}),
+                # ('depo', depo,  {'units': 'm'}))
+                namevals = parse_out(fin, zipname=out_zip.filename, check=True)
 
             # Determine gridcells that are ACTUALLY used
             nzmask = namevals[0][1]>0
@@ -377,7 +390,7 @@ def ramms_to_nc0(out_zip, id_status, ncout):
     #        nzmask = np.logical_or(*(val>0 for _,val,_ in namevals))
 
             # Cut out the fat!
-            print(f'QQ1 lengths: {len(ivec)}, {len(jvec)}, {len(nzmask)}')
+#            print(f'QQ1 lengths: {len(ivec)}, {len(jvec)}, {len(nzmask)}')
             ivec = ivec[nzmask]
             jvec = jvec[nzmask]
             namevals = [(name,val[nzmask],attrs) for name,val,attrs in namevals]

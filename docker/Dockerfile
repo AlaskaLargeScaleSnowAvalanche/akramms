@@ -4,30 +4,14 @@ FROM ubuntu:20.04
 # Update
 RUN apt-get update
 
-# Download Wine
-RUN apt install --download-only --yes wine
-
-# Install Wine Prerequisites
-# https://serverfault.com/questions/949991/how-to-install-tzdata-on-a-ubuntu-docker-image
-RUN DEBIAN_FRONTEND=noninteractive TZ=America/Anchorage apt-get -y install tzdata
-
-# Install Wine
-RUN apt install --yes wine
-RUN dpkg --add-architecture i386
-RUN apt update
-RUN apt install --yes wine wine32 libwine
-
 # Install Python (3)
 RUN apt install --yes python3 python-is-python3
 
-# Add basic ~/.wine directory
-COPY dotwine.tar.gz /opt
-
 # Install RAMMS .exe file (and any supporting DLLs)
-ADD RAMMS/240515 /opt/ramms
-RUN echo '240515.1' >/opt/build_version.txt
+ADD RAMMS/2.0.0-1-g26d12f8 /opt/ramms
+RUN echo '2.0.0-1-g26d12f8.1' >/opt/build_version.txt
 
-ADD RAMMS/240515 /opt/ramms
+ADD RAMMS/2.0.0-1-g26d12f8 /opt/ramms
 
 # https://betterprogramming.pub/how-to-version-your-docker-images-1d5c577ebf54
 
