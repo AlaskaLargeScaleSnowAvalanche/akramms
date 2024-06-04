@@ -748,9 +748,16 @@ def xoverrun(args):
         update = True
 
     # Process overruns one combo at a time for lower latency on large experiments
+    resubmit_work = 0    # Keep track of how much work we've done, and quit to avoid a memory leak
     for ix in range(len(akdf0)):
         akdf1 = akdf0.iloc[[ix],:]    # akdf1 is just one row of akdf0
-        overrun.resubmit(akdf1, dry_run=args.dry_run, block=args.block, update=update, ignore_statuses=ignore_statuses)
+        n = overrun.resubmit(akdf1, dry_run=args.dry_run, block=args.block, update=update, ignore_statuses=ignore_statuses)
+        resubmit_work += n
+        if n>0:
+            print(f'resubmit_work = {resubmit_work}')
+#        if resubmit_work > 300:
+#            break
+
 # ------------------------------------------------------------------
 #@subcommand([
 #    argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),

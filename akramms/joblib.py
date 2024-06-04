@@ -16,14 +16,15 @@ JobStatus = file_info.JobStatus    # Alias
 #DOCKER_IMAGE = 'localhost:5000/ramms'
 #DOCKER_IMAGE = 'git.akdggs.com/efischer/ramms:230210.2'
 
-DOCKER_TAG = config.docker_tag()
+#docker_tag = config.docker_tag()
 
 #requirements = opsys == 'WINDOWS'
 submit_tpl = \
 """universe                = docker
-docker_image            = {DOCKER_TAG}
+docker_image            = {docker_tag}
 executable              = /usr/bin/python
 arguments               = /opt/runaval.py {inout_name}
+Requirements            = (Machine != "10.10.132.212")
 
 initialdir              = {run_dir}
 transfer_input_files    = {inout_name}.in.zip
@@ -58,14 +59,18 @@ def submit_job(run_dir, job_name, inout_name, condor_priority=0):#, local=False)
 
 #    if local:
 #        print('Running: {}'.format(job_name))
-#        cmd = ['docker', 'run', DOCKER_TAG, '/usr/bin/python', '/opt/runaval.py', job_name]
+#        cmd = ['docker', 'run', docker_tag, '/usr/bin/python', '/opt/runaval.py', job_name]
 #        subprocess.run(cmd, cwd=run_dir, check=True)
 #        return
 
-
+    # Identify the RAMMS version (as of the last time it was built)
+    version_txt = config.HARNESS / 'rammscore' / 'build' / 'version.txt'
+    with open(version_txt) as fin:
+        ramms_version = fin.read().strip()
+    docker_tag = config.docker_tag(ramms_version)
 
     print('Submitting job: {}'.format(job_name))
-    submit_txt = submit_tpl.format(job_name=job_name, inout_name=inout_name, run_dir=run_dir, DOCKER_TAG=DOCKER_TAG, condor_priority=condor_priority)
+    submit_txt = submit_tpl.format(job_name=job_name, inout_name=inout_name, run_dir=run_dir, docker_tag=docker_tag, condor_priority=condor_priority)
 
     cmd = ['condor_submit', '-batch-name', job_name]
     print(' '.join(cmd) + '<<EOF')

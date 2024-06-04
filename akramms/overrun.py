@@ -18,7 +18,7 @@ def rerun_ramms_stage1(akdf0, dry_run=False):
 
     # Nothing to do
     if len(akdf0) == 0:
-        return
+        return 0
 
     print('----------------- BEGIN rerun_ramms_stage1() on chunks:')
     print(akdf0[['combo', 'combo_status']])
@@ -31,7 +31,7 @@ def rerun_ramms_stage1(akdf0, dry_run=False):
 
     print('NOINPUT rows (which we will resubmit to RAMMS Stage 1):')
     print(cdf0)
-#    return
+#    return 0
 
     for (exp, combo, releasefile),cdf1 in cdf0.groupby(['exp', 'combo', 'releasefile']):
         expmod = parse.load_expmod(exp)
@@ -112,7 +112,7 @@ def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run
 
     if len(akdf0) == 0:
         print('No combos eligible to resubmit')
-        return
+        return 0
 
     # ----------------- Move to id level
     akdf0 = resolve.resolve_chunk(akdf0, scenetypes={'x'}, realized=True)
@@ -123,7 +123,7 @@ def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run
 
     if len(akdf0) == 0:
         print('No IDs need to be resubmitted')
-        return akdf0
+        return 0
 
     print('Resubmitting these avalanches...')
     joblib.print_status(akdf0, 'id')
@@ -184,6 +184,7 @@ def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run
             else:
                 rule()
 
+    return len(akdf1)
 
 def drop_duplicates(akdf):
 

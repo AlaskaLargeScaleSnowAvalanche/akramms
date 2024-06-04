@@ -68,12 +68,13 @@ max_ramms_pras = 100
 enlarge_increment = 5000.    # Enlarge domains by 5km each time.
 
 #setup_ncpu = 8
-setup_ncpu = 1    # 1 is the only value that works here
-ramms_ncpu = 8    # Native RAMMS Stage 2 (and also Stage 1 xy-coords)
+setup_ncpu = 6   # 1 is the only value that works here
+#ramms_ncpu = 6    # Native RAMMS Stage 2 (and also Stage 1 xy-coords)
+ramms_ncpu = 1    # Native RAMMS Stage 2 (and also Stage 1 xy-coords)    # Avoid memory overrun
 #ramms_ncpu_preprocess = 8    # This matters for RAMMS Stage 1 (and maybe Stage 3)
 ramms_ncpu_preprocess = 1    # 1 is fastest, due to IDL's overhead in parallelizing and the small granularity of RAMMS Stage 1
-ncpu_compress = 8    # Number of CPUs to use when compressing stuff after RAMMS Stage 1
-ncpu_archive = 8
+ncpu_compress = 6    # Number of CPUs to use when compressing stuff after RAMMS Stage 1
+ncpu_archive = 6
 poll_period = 60*5    # Seconds between polling attempts
 
 # Should we use the Redis Queue for running remote IDL commands?

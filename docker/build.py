@@ -50,7 +50,9 @@ print(f'ramms_version = {ramms_version}')
 odist_parent = config.HARNESS / 'akramms' / 'docker' / 'RAMMS'
 odist = odist_parent / ramms_version
 idist = config.HARNESS / 'rammscore' / 'build'
-if not os.path.exists(odist):
+
+
+if True or (not os.path.exists(odist)):
     print('Deleting tree {}'.format(odist_parent))
     shutil.rmtree(odist_parent, ignore_errors=True)
     names = ('ramms_aval_LHM', 'version.txt')

@@ -121,7 +121,7 @@ def parse_xy_coord_raw(fin):
     return xvec, yvec
 
 def parse_xy_coord(gridI, fin):
-    xvec, yvec = parse_xy_coord_raw(gridI, fin)
+    xvec, yvec = parse_xy_coord_raw(fin)
 
     # Convert (double precision) x/y coordinates to (int) i/j
     ivec, jvec = gridI.to_ij(xvec, yvec)
