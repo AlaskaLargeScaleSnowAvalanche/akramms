@@ -2,7 +2,7 @@
 #
 
 #import cProfile
-import importlib,pathlib
+import importlib,pathlib,time
 import netCDF4
 import numpy as np
 import pandas as pd
@@ -670,6 +670,7 @@ def rerun(args):
 
         # See if the chunk status has changed
         akdf1sb = akdf1s.copy().drop(columns=['chunk_status'])
+        time.sleep(5)    # Wait for statues to be updated in system before you re-check
         akdf1sb = joblib.add_status(akdf1sb, 'chunk', realized=False, update=False)
 
         df = akdf1s[['chunkname', 'chunk_status']].merge(
@@ -682,8 +683,11 @@ def rerun(args):
         # Re-running the Combo *should have* changed the chunk statuses
         df = df[df.chunk_status_x == df.chunk_status_y]
         if len(df) > 0:
-            print('Exiting because not all chunk statuses changed, that indicates maybe an error running RAMMS')
-            return
+            print('(Not) Exiting because not all chunk statuses changed, that indicates maybe an error running RAMMS')
+
+            # Don't exit after all: in every case I've seen so far,
+            # the status moves to INPROCESS in short order.
+            # return
 # ------------------------------------------------------------------
 @subcommand([
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),

@@ -8,10 +8,10 @@ RUN apt-get update
 RUN apt install --yes python3 python-is-python3
 
 # Install RAMMS .exe file (and any supporting DLLs)
-ADD RAMMS/2.0.0-1-g26d12f8 /opt/ramms
-RUN echo '2.0.0-1-g26d12f8.17' >/opt/build_version.txt
+ADD RAMMS/2.0.0-2-g3c6550a /opt/ramms
+RUN echo '2.0.0-2-g3c6550a.1' >/opt/build_version.txt
 
-ADD RAMMS/2.0.0-1-g26d12f8 /opt/ramms
+ADD RAMMS/2.0.0-2-g3c6550a /opt/ramms
 
 # https://betterprogramming.pub/how-to-version-your-docker-images-1d5c577ebf54
 
