@@ -127,11 +127,12 @@ def scenedir_to_chunknames(scenedir):
     chunknameRE = re.compile(r'^c-([TMSL])-(\d\d\d\d\d)$')
 
     rows = list()
-    for name in os.listdir(scenedir / 'CHUNKS'):
-        match = chunknameRE.match(name)
-        if match is None:
-            continue
-        rows.append( (match.group(1), int(match.group(2)), name) )
+    if os.path.isdir(scenedir / 'CHUNKS'):
+        for name in os.listdir(scenedir / 'CHUNKS'):
+            match = chunknameRE.match(name)
+            if match is None:
+                continue
+            rows.append( (match.group(1), int(match.group(2)), name) )
 
     return pd.DataFrame(rows, columns=('pra_size', 'chunkid', 'name'))
 

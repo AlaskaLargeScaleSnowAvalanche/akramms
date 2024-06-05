@@ -1,4 +1,4 @@
-import os,subprocess,functools,re,typing,zipfile,sys,contextlib,pathlib
+import os,subprocess,functools,re,typing,zipfile,sys,contextlib,pathlib,glob
 import htcondor
 import pandas as pd
 from uafgi.util import gdalutil
@@ -430,6 +430,21 @@ def agg_status(statuses, ignore_statuses={}):
     ret = min(status for status in counts.keys())
     return ret
 
+def is_combo_zero_size(xdir):
+    """Determines whether a combo has no avalanches in it."""
+    shps = glob.glob(str(xdir / 'RELEASE' / '*_rel.shp'))
+
+    # If no shapefiles, then it's probbly not generated yet
+    if len(shps) == 0:
+        return False
+
+    for shp in shps:
+        if os.path.getsize(shp) > 0:
+            return False
+    # At least one shapefile and all zero length: it's a zero size combo!
+    return True
+
+
 def add_combo_quickstatus(akdf0, mtime=False):
 
     """Adds a quick per-combo status field based on just whether the
@@ -473,7 +488,10 @@ def add_combo_quickstatus(akdf0, mtime=False):
                 if not os.path.exists(xdir):
                     status = JobStatus.NOINPUT
                 else:
-                    status = JobStatus.UNKNOWN
+                    if is_combo_zero_size(xdir):
+                        status = JobStatus.FINISHED
+                    else:
+                        status = JobStatus.UNKNOWN
                 if mtime:
                     mtimes.append(-1)
             combo_quickstatus.append(status)
@@ -516,7 +534,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
 
     # Write extent.gpkg
     if update:
-        mask = (akdf0.combo_quickstatus == JobStatus.MARKED_FINISHED)
+        mask = (akdf0.combo_quickstatus.isin([JobStatus.MARKED_FINISHED, JobStatus.FINISHED]))
         for exp,akdf1 in akdf0[mask].reset_index(drop=True).groupby('exp'):
             expmod = parse.load_expmod(exp)
             for tup in akdf1.itertuples(index=False):
@@ -524,7 +542,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
                 archive.finish_combo(expmod, tup.combo, dry_run=dry_run)
 
     # -----
-    mask = (~akdf0.combo_quickstatus.isin([JobStatus.MARKED_FINISHED, JobStatus.EXTENT]))
+    mask = (~akdf0.combo_quickstatus.isin([JobStatus.MARKED_FINISHED, JobStatus.FINISHED, JobStatus.EXTENT]))
 
     renames = {'combo_quickstatus':'combo_status'}
     dfs.append(akdf0[~mask].rename(columns=renames))

@@ -204,6 +204,10 @@ def chunk_rule(scene_dir, scene_args, For, resolution, return_period, pra_size):
 
     def action(tdir):
 
+        # Make top-level CHUNKS directory. This is important, in case
+        # there are no chunks in this tile!
+        os.makedirs(scene_dir / 'CHUNKS', exist_ok=True)
+
         # Read the output from r_pra_post (above)
 #        rdf = shputil.read_df(inputs[0], shape='pra').set_index('Id')
         rdf = chunk.read_reldom(inputs[0])

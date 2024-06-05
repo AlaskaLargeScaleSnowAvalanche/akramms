@@ -695,6 +695,7 @@ def finish_combo(expmod, combo, dry_run=False):
 
     # ---------------- Write the control file
     if not os.path.isfile(control_fname):
+        os.makedirs(arcdir, exist_ok=True)
         with open(control_fname, 'w') as out:
             out.write('Combo archived\n')
  

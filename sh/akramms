@@ -593,7 +593,7 @@ def run(args):
             for _,row1 in akdf1b.iterrows():
                 combo = row1['combo']
 
-                add_run_combo(expmod, makefile, combo)
+                add_run_combo(expmod, makefile, combo, max_step=args.step)
             makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=ncpu)
 
 # ------------------------------------------------------------------
