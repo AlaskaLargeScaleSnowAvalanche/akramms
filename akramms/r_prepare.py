@@ -384,6 +384,7 @@ def prepare_data2(scene_dir):
     scene_args = params.load(scene_dir)
 
     # Retrieve filenames used in data_prep_PRA.py ArcGIS script
+#    time.sleep(5)    # Wait for the result to show up
     with open(os.path.join(scene_dir, 'data_prep_PRA1.pik'), 'rb') as fin:
         vv = LVars(pickle.load(fin))
     Workspace = vv.Workspace

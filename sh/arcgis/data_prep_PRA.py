@@ -218,7 +218,7 @@ if inForest != "":
     arcpy.Intersect_analysis([IN_MEM("inForest_RasterDomain", '.shp'), IN_MEM("DEM_RasterDomain", '.shp')], IN_MEM("Intersection", '.shp'), 'ALL', '#', 'INPUT')
     if arcpy.management.GetCount(IN_MEM("Intersection", '.shp'))[0] == "0":
         arcpy.AddError("InputError:Forest and DEM do not intersect")
-        exit()
+        exit(1)
 
     # See here to build a new Raster Attribute Table
     # https://pro.arcgis.com/en/pro-app/2.8/tool-reference/data-management/build-raster-attribute-table.htm
@@ -229,9 +229,13 @@ if inForest != "":
     unique_value_count = int(arcpy.GetRasterProperties_management(inForest, "UNIQUEVALUECOUNT").getOutput(0))
     min_value = int(arcpy.GetRasterProperties_management(inForest, "MINIMUM").getOutput(0))
     max_value = int(arcpy.GetRasterProperties_management(inForest, "MAXIMUM").getOutput(0))
-    if unique_value_count != 2 or min_value != 0 or max_value != 1:
+    print('inForest stats: unique_value_count={}, min_value={}, max_value={}'.format(unique_value_count, min_value, max_value))
+    if  (unique_value_count == 1 and (min_value != 0 and min_value != 1)) or \
+        (unique_valuecount == 2 and (min_value != 0 or max_value != 1)) or \
+        or (unique_value_count > 2):
+#    if unique_value_count != 2 or min_value != 0 or max_value != 1:
         arcpy.AddError("InputError:Value range of the forest raster not conforming, reclassify raster to 0 (No Forest) and 1 (Forest)")
-        exit()
+        exit(1)
 
     # Checking Cellsize of inForest raster
     if arcpy.GetRasterProperties_management(inForest, "CELLSIZEX") != resampCellSize:
