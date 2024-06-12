@@ -108,30 +108,6 @@ def tile_rtree(expmod):
     domains_df = shputil.read_df(domains_margin_shp)#.df#.set_index(['idom', 'jdom'])
     return rtreeutil.RTree(domains_df)
 
-def query_tiles(expmod, geom):
-    """Finds all the tiles (with margin) that overlap a given OGR Geometry.
-    geom:
-        An OGR Geometry
-    Returns:
-        [(idom, jdom), (idom, jdom), ...]
-    """
-    return tile_rtree(expmod).intersection(geom)    # [(idom, jdom), (idom, jdom), ...]
-
-def tiles_by_extent(expmod, extent):
-    """Returns the (idom,jdom) of all tiles contributing avalanches
-    that might affect this extent.
-    extent: (x0,y0,x1,y1)
-    """
-
-    rt = tile_rtree(expmod)
-
-
-
-
-
-
-
-
 def expand_combos_by_geom(expmod, akdf, geom):
     """
     expmod:

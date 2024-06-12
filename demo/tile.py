@@ -30,6 +30,7 @@ def main():
         else:
 
             df = geopandas.read_file(str(extent_full))
+TODO: Use mask= instead of reading the whole thing then filtering...
             dfi = df[df.geometry.intersects(query_box)]
             print(f'{qcombo}: {len(dfi)} of {len(df)} --- {dfi.columns}')
 
