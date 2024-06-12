@@ -162,6 +162,19 @@ def add_snow(df, snowI_tif, snow_density=200.):
     """
     snow_lookup = snow.RasterLookup(snowI_tif)
 
+# DEBUGGING code
+#    for tup in df.itertuples(index=False):
+#        try:
+#            sx3 = snow_lookup.value_at_centroid(tup.pra)
+#        except IndexError:
+#            print(tup)
+#            print('pra = ', type(tup.pra), tup.pra)
+#            print('centroid = ', tup.pra.centroid)
+#            print('geo_info = ', snow_lookup.geo_info.geotransform)
+#            cent = tup.pra.centroid
+#            print('ij = ', snow_lookup.geo_info.to_ij(cent.x,centy))
+#            raise
+
     # This is a Series of tuple (j, i, sx3)
     jisx3 = df['pra'].map(snow_lookup.value_at_centroid)    # j,i,Raw snow amount [kg m-2]
 

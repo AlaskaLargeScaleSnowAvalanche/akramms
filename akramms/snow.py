@@ -52,7 +52,10 @@ class RasterLookup:
         self.centroids = list()
     
     def value_at_centroid(self, poly):
-        centroid = poly.centroid    # In scene coordinates
+        # Without convex_hull, the centroid can yield surprising results for some concave polygons,
+        # in which the centroid is OUTSIDE the bounding box of the polygon.
+        centroid = poly.convex_hull.centroid    # In scene coordinates
+
         x_scene, y_scene = (centroid.x, centroid.y)
         i,j = self.geo_info.to_ij(x_scene, y_scene)    # --> (j,i) index into data
 #        print(f'value_at_centroid({j},{i}) = {self.value[j,i]}')
