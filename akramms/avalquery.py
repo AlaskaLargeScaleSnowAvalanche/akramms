@@ -234,7 +234,7 @@ def query(akdf0, sextent, scenetypes={'x', 'arc'},
         # Make sure they all use the same experiment
         # (Because extents are queried from the experiment definition file)
         expmod = parse.load_expmod(exp)
-        extent = parse.parse_extent(expmod, sextent)    # (x0,y0,x1,y1)
+        extent = parse.parse_extent(expmod, sextent)    # (x0,y0,x1,y1) or 'tile', 'aval', etc.
 
         # Create a shapely Geometry representing the area to plot
         geom = None

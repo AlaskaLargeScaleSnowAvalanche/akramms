@@ -267,16 +267,17 @@ def _realized_ids(scenetype, releasefile, stage, include_overruns=False, filter_
         arcdir = releasefile
         extent_full = arcdir / 'extent_full.gpkg'
 
-        # Determine subset of IDs we are interestd in
+        # Determine subset of IDs (from this combo) we are interestd in, i.e. that match our bounds
         if (filter_geom is not None) and os.path.exists(extent_full):
-
-
             # Directory is fully archived.  Use spatial index to
             # filter avalanches by extent
-            df = geopandas.read_file(str(extent_full))
-            dfi = df[df.geometry.intersects(filter_geom)]
+            dfi = geopandas.read_file(str(extent_full), mask=filter_geom)
             include_ids = set(dfi.Id)
             print(f'Filtering avalanches from {extent_full}: {len(include_ids)}')
+
+
+            
+
         else:
             print(f'Including all avalanches from {arcdir}')
             include_ids = None

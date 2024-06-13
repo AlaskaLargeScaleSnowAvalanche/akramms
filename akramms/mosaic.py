@@ -8,7 +8,7 @@ from uafgi.util import cfutil,shputil,ioutil,gisutil
 from akramms import experiment,archive,file_info,avalquery,downscale_snow
 import akramms.parse
 import _mosaic
-
+import geopandas
 
 # python -m cProfile -o prof -s cumtime `which akramms` mosaic juneau1-1981-1990.qy 
 
@@ -32,8 +32,10 @@ def read_reldom(akdf0):
         scombo = '-'.join(str(x) for x in combo)
 
         # Read all _rel / _dom data in the archive dir
-        reldf = archive.read_reldom(arcdir/'RELEASE.zip', 'rel', shape='pra')
-        domdf = archive.read_reldom(arcdir/'DOMAIN.zip', 'dom', shape='dom')
+        reldf = archive.read_reldom(arcdir/'RELEASE.zip', 'rel')#, shape='pra')
+        reldf = reldf.rename(columns={'geometry': 'pra'})
+        domdf = archive.read_reldom(arcdir/'DOMAIN.zip', 'dom')#, shape='dom')
+        domdf = domdf.rename(columns={'geometry': 'dom'})
 
         # Filter down to just what we need
         df = akdf1[['id']]
@@ -121,7 +123,7 @@ def new_extent_shp(dir, gridM, combo):
 
 
 
-def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
+def mosaic_avals_id(gridM, akdf0, ofname_zip, tdir,
     rho=300, vars=_mosaic_keys,
     dem_fn=None, landcover_fn=None, snow_fn=None):
 
@@ -131,7 +133,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
         Sub-grid (of global gridG) defining the extent of our mosaic domain
         When doing stdmosaic, this will be the subdomain tile WITHOUT MARGINS
         (Note that gridA is WITH MARGINS)
-    akdf:
+    akdf0:
         Avalanches (in scenetype='arc') to mosiac
         Resolved to the id level
         Must contain columns: releasefile (actually arcdir), avalfile, id
@@ -150,9 +152,19 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
         Typically taken from exp_mod
         Include these if you want DEM and landcover files added to the output.
     """
+
+
+    print('=== BEGIN mosaic_aval_combo')
+    print(akdf0)
+    for vname in ('gridM', 'ofname_zip', 'tdir', 'rho', 'vars', 'dem_fn', 'landcover_fn', 'snow_fn'):
+        val = locals()[vname]
+        print(f'{vname}: {val}')
+
+
     dir = pathlib.Path(tdir.location)
     vars_set = set(vars)
 
+    # Prepare variables for output
     shapeM = (gridM.ny, gridM.nx)
     vals = dict(
         deposition=np.zeros(shapeM, dtype='f4'),
@@ -163,190 +175,75 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
         avalanche_count=np.zeros(shapeM, dtype='i2'))
 
 
-    # Use OGR to create shapefile for avalanche outlines
-    # Create one OGR layer per combo so we can merge them later to get the metadata right.
-    extent_shps = dict()
-    for combo in akdf.combo.unique():
-        extent_shps[combo] = new_extent_shp(dir, gridM, combo)
+    # Collect extent polygons
+    dfss = {'release': list(), 'domain': list(), 'extent': list()}
+    shapedfs = list()
+    for (combo,arcdir),akdf1 in akdf0.groupby(['combo', 'releasefile']):
+        akdf1 = akdf1.sort_values('id')
 
-#        scombo = '-'.join(str(x) for x in combo)
-##        extent_shp = str(dir / f'extent-{scombo}.shp')
-#        extent_shp = f'extent-{scombo}.shp'
-#        print('Writing extent_shp ', extent_shp)
-#        if os.path.exists(extent_shp):
-#            os.remove(extent_shp)
-#        extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
-#        extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.wkt), geom_type=ogr.wkbMultiPolygon )
-#        # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
-#        extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
-#        print('extent_Id = ', extent_Id)
-#
-#        extent_shps[combo] = _ExtentShp(scombo, extent_shp, extent_ds, extent_layer, extent_Id)
+        # --------------- Read polygon files: PRAs, domains and extents
+        # (All using geopandas, with .Id and .geometry columns)
+        dfs = (
+            ('release', archive.read_reldom(arcdir/'RELEASE.zip', 'rel')),
+            ('domain', archive.read_reldom(arcdir/'DOMAIN.zip', 'dom')),
+            ('extent', geopandas.read_file(str(arcdir/'extent.gpkg'))))
+        ids = set(akdf1.id)
+        for vname,val in dfs:
+            dfss[vname].append(val[val.Id.isin(ids)])
 
-#    for aval_i,fname in enumerate(avals):
-#    print(akdf.columns)
-    akdf = akdf.sort_values('id')
-    count = 0
-    for tup in akdf.itertuples(index=False):
+        # -------------- Update the mosaic (in memory)
+        count = 0
+        for tup in akdf1.itertuples(index=False):
+            # DEBUGGING
+            count += 1
+            if count > 100:
+                break
 
-        # DEBUGGING
-        count += 1
-        if count > 100:
-            break
+            if not os.path.isfile(tup.avalfile):
+                print(f'Missing avalanche file: {tup.avalfile}')
+                continue
 
-        arcdir = tup.releasefile
-        if not os.path.isfile(tup.avalfile):
-            print(f'Missing avalanche file: {tup.avalfile}')
-            continue
+            print(f'mosaic: {tup.avalfile}')
+            with netCDF4.Dataset(tup.avalfile) as nc:
+                nc.set_always_mask(False)
 
-        print(f'mosaic: {tup.avalfile}')
-        with netCDF4.Dataset(tup.avalfile) as nc:
-            nc.set_always_mask(False)
+                # --------------- gridA is the subdomain tile, WITH MARGIN
+                # Geotransform of this avalanche's local grid
+                # TODO: Store Geotransform as machine-precision doubles in the file
+                gridA_gt = np.array([float(x) for x in nc.variables['grid_mapping'].GeoTransform.split(' ')])
 
-            # --------------- gridA is the subdomain tile, WITH MARGIN
-            # Geotransform of this avalanche's local grid
-            # TODO: Store Geotransform as machine-precision doubles in the file
-            gridA_gt = np.array([float(x) for x in nc.variables['grid_mapping'].GeoTransform.split(' ')])
-            gridA_wkt = nc.variables['grid_mapping'].crs_wkt
+                # ---------- Copy raster into the overall mosaic
+                # C++ extension does the real work
+                args = (
+                    nc.variables['i_diff'][:],
+                    nc.variables['j_diff'][:],
+                    gridA_gt[0], gridA_gt[3],
+                    nc.variables['max_vel'][:].astype('f4'),
+                    nc.variables['max_height'][:].astype('f4'),
+                    nc.variables['depo'][:].astype('f4'),
+                    rho,
+                    gridM.nx, gridM.x0, gridM.dx,
+                    gridM.ny, gridM.y0, gridM.dy,
+                    vals['deposition'],
+                    vals['max_height'],
+                    vals['max_velocity'],
+                    vals['max_pressure'],
+                    vals['domain_count'],
+                    vals['avalanche_count'])
+                _mosaic.mosaic(*args)
 
-#            print('gridM GT: ', gridM.geotransform)
-#            print('gridA GT: ', gridA_gt)
-
-
-            # --------------- Determine gridL, an x/y oriented grid (subgrid of the tile) containing the avalanche.
-            i_diff = nc.variables['i_diff'][:]
-            j_diff = nc.variables['j_diff'][:]
-            iA = np.cumsum(i_diff)
-            jA = np.cumsum(j_diff)
-
-            # ------------ Polygonize the extent
-            # Create a sub-grid gridL around just the avalanche (fast polygonize)
-            iL_min = np.min(iA) - 2
-            iL_max = np.max(iA) + 3
-            jL_min = np.min(jA) - 2
-            jL_max = np.max(jA) + 3
-
-#            # DEBUG
-#            iL_min = 0
-#            jL_min = 0
-
-
-            iL = iA - iL_min    # Vector operation
-            jL = jA - jL_min
-            gridL_gt = np.array(gridA_gt, dtype='i8')
-            gridL_gt[0] += gridL_gt[1] * iL_min
-            gridL_gt[3] += gridL_gt[5] * jL_min
-            gridL = gisutil.RasterInfo(
-                nc.variables['grid_mapping'].crs_wkt,
-                iL_max - iL_min,
-                jL_max - jL_min,
-                gridL_gt)
-
-
-#            # DEBUG
-#            gridL = gridM
-#            iL = iA
-#            jL = jA
-
-            # Read avalanche output as values on list-of-gridcells
-            max_vel = nc.variables['max_vel'][:].astype('f4')
-            max_height = nc.variables['max_height'][:].astype('f4')
-            depo = nc.variables['depo'][:].astype('f4')
-
-            # On March 5, 2024 Marc Christen wrote:
-            # > These outlines are defined as an envelope of grid cells
-            # > of an avalanche, where
-            # >   Flow-depth > 0.25m AND
-            # >   velocity > 1m/s
-            nzmask_val = np.zeros(max_vel.shape, dtype=np.int32)
-            nzmask_val[np.logical_and(max_height > 0.25, max_vel > 1.0)] = tup.id
-
-            # Burn the gridcells that are part of our grid
-            # (already pared down)
-            nzmaskL = np.zeros((gridL.ny, gridL.nx), dtype=np.int32)
-            nzmaskL[jL,iL] = nzmask_val    # This will get written into the attribute table
-
-            nzmask_ds = gdalutil.raster_ds((gridL, nzmaskL, 0))
-            nzmask_band = nzmask_ds.GetRasterBand(1)
-
-            # Produces a separate polygon for each different (non-zero) value in nzmaskL
-            # Since we've only set things to tup.id, we will only get Polygon(s) for that.
-            # The pixel value is placed in the Id attribute
-            # Polygonize docs: https://gdal.org/api/gdal_alg.html (search for GDALPolygonize)
-            gdal.Polygonize(nzmask_band, nzmask_band,
-                extent_shps[tup.combo].layer, extent_shps[tup.combo].Id)
-
-            # ---------- Copy raster into the overall mosaic
-            # C++ extension does the real work
-            args = (
-                i_diff, j_diff,
-#                nc.variables['i_diff'][:],
-#                nc.variables['j_diff'][:],
-                gridA_gt[0], gridA_gt[3],
-                max_vel, max_height, depo,
-#                nc.variables['max_vel'][:].astype('f4'),
-#                nc.variables['max_height'][:].astype('f4'),
-#                nc.variables['depo'][:].astype('f4'),
-                rho,
-                gridM.nx, gridM.x0, gridM.dx,
-                gridM.ny, gridM.y0, gridM.dy,
-                vals['deposition'],
-                vals['max_height'],
-                vals['max_velocity'],
-                vals['max_pressure'],
-                vals['domain_count'],
-                vals['avalanche_count'])
-            _mosaic.mosaic(*args)
-
-    # Write output GeoTIFF and Zip it up
+    # ========== Write output GeoTIFF and Zip it up
     os.makedirs(ofname_zip.parents[0], exist_ok=True)
     with zipfile.ZipFile(ofname_zip, mode='w', compression=zipfile.ZIP_STORED) as ozip:
 
-        # Close extent.shp files, merge, and store in the mosaic zip file
-        final_extent_shp = str(dir / f'extent.shp')
-        scombo_fnames = [(x.scombo, x.shp) for x in extent_shps.values()]
-        # Close the files in OGR by making things garbage collect
-        for key in list(extent_shps.keys()):
-            del extent_shps[key]
-#        extent_shps = None    # Close the files with OGR
-        xdfs = list()
-        for (scombo, extent_shp) in scombo_fnames:
-#            print('RRRRRRRRReading ', extent_shp)
-            xsh = ogrutil.read_df(extent_shp)
-            xsh.df['combo'] = scombo
-#            print('RRRRRRRRR 1833', xdf.loc[xdf.Id==1833][['Id','combo']])
-            xdfs.append(xsh.df)
-        xdf = pd.concat(xdfs)
-        xdf['combo'] = xdf['combo'].astype('string')
+        # --------------------- Write shape dataframes to shapefiles
+        for vname, dfs in dfss.items():
+            df = pd.concat(dfs)
+            df.to_file(dir / f'{vname}.shp')
+            for ext in ('prj', 'shp', 'dbf', 'shx'):
+                ozip_write(ozip, dir / f'{vname}.{ext}')
 
-#        print([(col,xdf[col].dtype) for col in xdf.columns])
-#        shputil.write_df(xdf, 'shape', 'MultiPolygon', final_extent_shp, wkt=gridM.wkt)
-        ogrutil.write_df(xsh._replace(df=xdf), final_extent_shp)
-
-        # Copy the extent.shp files we created above (extent_layer / extent_ds)
-        for ext in ('shp','dbf','shx','prj'):
-            ozip_write(ozip, dir / f'extent.{ext}')
-
-
-        box_poly = gridM.bounding_box
-
-        # Shapefiles
-        reldf, domdf = read_reldom(akdf)
-        for cname in reldf.columns:
-            print(f"{cname}: {reldf[cname].dtype}")
-        ogrutil.write_df(reldf, 'pra', 'Polygon', dir / 'rel.shp', wkt=gridM.wkt)
-        for ext in ('shp','dbf','shx','prj'):
-            ozip_write(ozip, dir / f'rel.{ext}')
-
-        #reldf = archive.read_reldom(arcdir, 'dom')
-        ogrutil.write_df(domdf, 'dom', 'Polygon', dir / 'dom.shp', wkt=gridM.wkt)
-        for ext in ('shp','dbf','shx','prj'):
-            ozip_write(ozip, dir / f'dom.{ext}')
-
-
-        # Other variables
-#        print('vars ', vars)
-#        for vname, val in vars.items():
+        # ------------------- Other variables
         for vname in vars:
             if vname in {'dem', 'landcover'}:
                 continue    # Already handled above
@@ -366,14 +263,14 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
         # Land Cover
         if landcover_fn is not None:
             ofn = os.path.join(tdir.location, 'landcover.tif')
-            landcover_fn(box_poly, ofn)
+            landcover_fn(gridM.bounding_box(), ofn)
             ozip_write(ozip, ofn)
             ozip_write(ozip, os.path.join(tdir.location, 'landcover.tif.aux.xml'))
             ozip_write(ozip, os.path.join(tdir.location, 'landcover.tfw'))
 
         # DEM
         if dem_fn is not None:
-            dem_fn(box_poly, dir / 'dem0.tif')
+            dem_fn(gridM.bounding_box(), dir / 'dem0.tif')
 
             # gdal.Warp() does not create TFW files, but gdalwarp command does.
 #            options = ['COMPRESS=LZW', 'TFW=YES']
@@ -390,7 +287,7 @@ def mosaic_avals_id(gridM, akdf, ofname_zip, tdir,
 
         # Snowfile
         if snow_fn is not None:
-            snow_fn(box_poly, dir / 'snow.tif')
+            snow_fn(gridM.bounding_box(), dir / 'snow.tif')
 
             # No need to reduce resolution for such a smooth file, only negligable space savings
             #options = ['COMPRESS=LZW', 'TFW=YES']
@@ -424,14 +321,24 @@ def mosaic_avals_combo(akdf, sextent, ofname,
         Name of output filename
     """
 
+
+
+    print('=== BEGIN mosaic_aval_combo')
+    print(akdf)
+    for vname in ('sextent', 'ofname', 'statuses', 'snow', 'dem', 'landcover', 'dry_run', 'force'):
+        val = locals()[vname]
+        print(f'{vname}: {val}')
+
     # Make sure they all use the same experiment
     # (Because extents are queried from the experiment definition file)
     row0 = akdf.iloc[0]
     assert all(x == row0.exp for x in akdf.exp)
 
-    # Query down to the id level
+    # Query down to the id level (expands to neigbhoring tiles as well)
     expmod = akramms.parse.load_expmod(row0.exp)
     geom,akdf = avalquery.query(akdf, sextent, statuses=statuses, scenetypes='arc', force=force)
+
+    print(f'geom = {geom}')
 
     # Prepare snow virtual raster for query
     if snow:
@@ -441,6 +348,7 @@ def mosaic_avals_combo(akdf, sextent, ofname,
 
         # Create virtual raster to query
         snowfile_vrt = downscale_snow.snowfile_vrt(snowfile_argss)
+        print('snowfile_vrt = ', snowfile_vrt)
 
     if not ofname.parts[-1].endswith('.zip'):
         raise ValueError('--output must specify a .zip file')
@@ -471,6 +379,7 @@ def mosaic_avals_combo(akdf, sextent, ofname,
     os.makedirs(ofname.parents[0], exist_ok=True)
     with ioutil.TmpDir(ofname.parents[0]) as tdir:
         mosaic_avals_id(gridM, akdf, ofname, tdir, **kwargs)
+    print('=== END mosaic_aval_combo')
 
 # ---------------------------------------------------------------------------------
 def consolidate_by_forest(expmod, akdf0):

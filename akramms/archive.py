@@ -5,7 +5,7 @@ import concurrent.futures
 import numpy as np
 import pandas as pd
 import netCDF4
-import pyproj
+import pyproj,geopandas
 from uafgi.util import gdalutil,shputil,ncutil,ioutil,ogrutil,gdalutil,gisutil
 from akramms import config,parse,file_info,resolve,overrun
 import xyedge
@@ -798,7 +798,9 @@ def read_reldom(arcdir_zip, ext, **kwargs):
 
     dfs = list()
     for fname in fnames:
-        dfs.append(ogrutil.read_df(fname, **kwargs).df)
+        print(f'------- archive.read_reldom() Reading shapefile: {fname}')
+#        dfs.append(ogrutil.read_df(fname, **kwargs).df)
+        dfs.append(geopandas.read_file(fname))
 
     return pd.concat(dfs)
 # ----------------------------------------------------------
@@ -865,6 +867,11 @@ def polygonize_extent(aval, tup_id,
             aval.max_vel > 0),
             aval.depo > 0)] = tup_id
     else:
+        # On March 5, 2024 Marc Christen wrote:
+        # > These outlines are defined as an envelope of grid cells
+        # > of an avalanche, where
+        # >   Flow-depth > 0.25m AND
+        # >   velocity > 1m/s
         nzmask_val[np.logical_and(
             aval.max_height > 0.25, aval.max_vel > 1.0)] = tup_id
 
