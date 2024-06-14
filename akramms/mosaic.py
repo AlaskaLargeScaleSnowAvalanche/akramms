@@ -97,11 +97,6 @@ _mosaic_metadata = {
 _avoid = ('dem', 'landcover')    # Only include these if user provides fetch fn
 _mosaic_keys = list(x for x in _mosaic_metadata.keys() if x not in _avoid)
 
-def ozip_write(ozip, fname):
-    """Writes with truncated arcname"""
-    ozip.write(fname, arcname=os.path.split(fname)[1])
-
-
 class _ExtentShp(typing.NamedTuple):
     scombo: str
     shp: str
@@ -123,7 +118,19 @@ def new_extent_shp(dir, gridM, combo):
 
 
 
-def mosaic_avals_id(gridM, akdf0, ofname_zip, tdir,
+class Mosaic(typing.NamedTuple):
+    """Mosaic Data Structure, ready to write out to disk."""
+    rasters: dict    # {'deposition': (meta, np.array), ...}
+    vectors: dict    # {'release': df, 'domain': df, 'extent': df}
+
+#    def __init__(self, name, rasters, vectors):
+#        self.name = name
+#        self.rasters = rasters
+#        self.vectors = vectors
+#        self._tdir = 
+#        self.tifdir = tifdir
+
+def mosaic_avals_id(gridM, akdf0, tifdir,
     rho=300, vars=_mosaic_keys,
     dem_fn=None, landcover_fn=None, snow_fn=None):
 
@@ -151,17 +158,20 @@ def mosaic_avals_id(gridM, akdf0, ofname_zip, tdir,
         Functions to extract the DEM and landcover defs, respectively.
         Typically taken from exp_mod
         Include these if you want DEM and landcover files added to the output.
+    Returns: Mosaic
+        Data structure to write
     """
 
+    mos = Mosaic(dict(), dict())
 
     print('=== BEGIN mosaic_aval_combo')
     print(akdf0)
-    for vname in ('gridM', 'ofname_zip', 'tdir', 'rho', 'vars', 'dem_fn', 'landcover_fn', 'snow_fn'):
+    for vname in ('gridM', 'ofname_zip', 'tifdir', 'rho', 'vars', 'dem_fn', 'landcover_fn', 'snow_fn'):
         val = locals()[vname]
         print(f'{vname}: {val}')
 
 
-    dir = pathlib.Path(tdir.location)
+    #tifdirdir = pathlib.Path(tdir.location)
     vars_set = set(vars)
 
     # Prepare variables for output
@@ -173,7 +183,9 @@ def mosaic_avals_id(gridM, akdf0, ofname_zip, tdir,
         max_pressure=np.zeros(shapeM, dtype='f4'),
         domain_count=np.zeros(shapeM, dtype='i2'),
         avalanche_count=np.zeros(shapeM, dtype='i2'))
-
+    for vname,val in vals.items():
+        if vname in vars:
+            mos.raster[vname] = val
 
     # Collect extent polygons
     dfss = {'release': list(), 'domain': list(), 'extent': list()}
@@ -196,8 +208,8 @@ def mosaic_avals_id(gridM, akdf0, ofname_zip, tdir,
         for tup in akdf1.itertuples(index=False):
             # DEBUGGING
             count += 1
-            if count > 100:
-                break
+#            if count > 100:
+#                break
 
             if not os.path.isfile(tup.avalfile):
                 print(f'Missing avalanche file: {tup.avalfile}')
@@ -233,67 +245,76 @@ def mosaic_avals_id(gridM, akdf0, ofname_zip, tdir,
                 _mosaic.mosaic(*args)
 
     # ========== Write output GeoTIFF and Zip it up
+    # --------------------- Write shape dataframes to shapefiles
+    for vname, dfs in dfss.items():
+        mos.vectors[vname] = pd.concat(dfs)
+
+    # ------------------- Other TIFF variables (written  directly into tifdir)
+    for vname in vars:
+        if vname in {'dem', 'landcover'}:
+            continue    # Already handled above
+        val = vals[vname]
+        gdal_type,_meta = _mosaic_metadata[vname]
+        meta = dict(_meta)
+        if vname == 'max_pressure':
+            meta['rho'] = f'{rho} [kg m-3]'
+        if 'source_units' in meta:
+            val = cfutil.convert(val, meta['source_units'], meta['units'])
+        gdalutil.write_raster(tifdir / f'{vname}.tif', gridM, val, 0, type=gdal_type, metadata=meta)
+
+    # These are last so they appear as lower layers in QGIS
+    # Land Cover
+    if landcover_fn is not None:
+        landcover_fn(gridM.bounding_box(), tifdir / 'landcover.tif')
+
+    # DEM
+    if dem_fn is not None:
+        dem0_tif = tifdir / 'dem0.tif'
+        dem_fn(gridM.bounding_box(), dir / 'dem0.tif')
+
+        cmd = ['gdalwarp', '-tr', '30', '30', '-co', 'TFW=YES', '-co', 'PROFILE=BASE',
+            str(dir / 'dem0.tif'), str(dir / 'dem.tif')]
+        subprocess.run(cmd, check=True)
+        os.remove(dem0_tif)
+
+    # Snowfile
+    if snow_fn is not None:
+        snow_fn(gridM.bounding_box(), tifdir / 'snow.tif')
+
+    return mos
+
+
+# -----------------------------------------------------------------------------
+def ozip_write(ozip, fname):
+    """Writes with truncated arcname"""
+    ozip.write(fname, arcname=os.path.split(fname)[1])
+
+
+def write_mosaic_zip(mos, tifdir, ofname_zip):
+
+    # ========== Write output GeoTIFF and Zip it up
     os.makedirs(ofname_zip.parents[0], exist_ok=True)
     with zipfile.ZipFile(ofname_zip, mode='w', compression=zipfile.ZIP_STORED) as ozip:
 
         # --------------------- Write shape dataframes to shapefiles
-        for vname, dfs in dfss.items():
+        for vname, dfs in mos.vectors.items():
             df = pd.concat(dfs)
             df.to_file(dir / f'{vname}.shp')
             for ext in ('prj', 'shp', 'dbf', 'shx'):
                 ozip_write(ozip, dir / f'{vname}.{ext}')
 
         # ------------------- Other variables
-        for vname in vars:
-            if vname in {'dem', 'landcover'}:
-                continue    # Already handled above
-            val = vals[vname]
-            gdal_type,_meta = _mosaic_metadata[vname]
-            meta = dict(_meta)
-            if vname == 'max_pressure':
-                meta['rho'] = f'{rho} [kg m-3]'
-            if 'source_units' in meta:
-                val = cfutil.convert(val, meta['source_units'], meta['units'])
-            ofn = os.path.join(tdir.location, f'{vname}.tif')
+        for vname, (val, meta) in mos.raster.items():
+            ofn = dir /  f'{vname}.tif'
             gdalutil.write_raster(ofn, gridM, val, 0, type=gdal_type, metadata=meta)
             ozip_write(ozip, ofn)
             ozip_write(ozip, os.path.join(tdir.location, f'{vname}.tfw'))
 
-        # These are last so they appear as lower layers in QGIS
-        # Land Cover
-        if landcover_fn is not None:
-            ofn = os.path.join(tdir.location, 'landcover.tif')
-            landcover_fn(gridM.bounding_box(), ofn)
-            ozip_write(ozip, ofn)
-            ozip_write(ozip, os.path.join(tdir.location, 'landcover.tif.aux.xml'))
-            ozip_write(ozip, os.path.join(tdir.location, 'landcover.tfw'))
 
-        # DEM
-        if dem_fn is not None:
-            dem_fn(gridM.bounding_box(), dir / 'dem0.tif')
-
-            # gdal.Warp() does not create TFW files, but gdalwarp command does.
-#            options = ['COMPRESS=LZW', 'TFW=YES']
-#            gdal.Warp(str(dir / 'dem.tif'), str(dir / 'dem0.tif'), xRes=30, yRes=30, options=options)
-#gdal_translate -co TFW=YES -co PROFILE=BASELINE dem.tif demx.tif
-#gdalwarp -tr 30 30 -co TFW=UES -co PROFILE=BASE dem.tif x.tif
-
-            cmd = ['gdalwarp', '-tr', '30', '30', '-co', 'TFW=YES', '-co', 'PROFILE=BASE',
-                str(dir / 'dem0.tif'), str(dir / 'dem.tif')]
-            subprocess.run(cmd, check=True)
-
-            ozip_write(ozip, dir / 'dem.tif')
-            ozip_write(ozip, os.path.join(dir, 'dem.tfw'))
-
-        # Snowfile
-        if snow_fn is not None:
-            snow_fn(gridM.bounding_box(), dir / 'snow.tif')
-
-            # No need to reduce resolution for such a smooth file, only negligable space savings
-            #options = ['COMPRESS=LZW', 'TFW=YES']
-            #gdal.Warp(str(dir / 'snow.tif'), str(dir / 'snow0.tif'), xRes=30, yRes=30, options=options)
-            ozip_write(ozip, dir / 'snow.tif')
-            ozip_write(ozip, os.path.join(dir, 'snow.tfw'))
+        # ------------------- Landcover, etc. files
+        for name in sorted(os.listdir(mos.tifdir)):
+            ozip_write(ozip, mos.tifdir / name)
+# -----------------------------------------------------------------------------
 
 
 def mosaic_avals_combo(akdf, sextent, ofname,
@@ -378,7 +399,9 @@ def mosaic_avals_combo(akdf, sextent, ofname,
 #    with ioutil.TmpDir(ofname.parents[0]) as tdir:
     os.makedirs(ofname.parents[0], exist_ok=True)
     with ioutil.TmpDir(ofname.parents[0]) as tdir:
-        mosaic_avals_id(gridM, akdf, ofname, tdir, **kwargs)
+        tifdir = pathlib.Path(tdir.location)
+        mos = mosaic_avals_id(gridM, akdf, tifdir, **kwargs)
+        write_mosaic_zip(mos, tifdir, ofname)
     print('=== END mosaic_aval_combo')
 
 # ---------------------------------------------------------------------------------
