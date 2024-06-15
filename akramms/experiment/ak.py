@@ -223,6 +223,12 @@ def spiral_domains(x0, y0):
     # (Code usese x/y and i/j interchangibly here)
     high_priority = [
         (110, 42), (109,42),    # Haines and West: Avalanche of 2024-2-2
+
+        (91,42), (91,41), (91, 40),  # Cordova
+        (90, 42), (90, 41), (90,40),
+#        (90, 40), (91, 40),     # Cordova
+#        (90, 41), (91, 41), 
+#        (90, 42), (91, 42), 
     ]
     for xy in high_priority:
         if xy in dij:
