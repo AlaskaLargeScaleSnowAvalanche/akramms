@@ -764,6 +764,9 @@ def finish_combo(expmod, combo, dry_run=False):
             shutil.rmtree(odir)
         shutil.move(xdir, odir)
 
+        # Now delete it for good
+        shutil.rmtree(odir, ignore_errors=True)
+
 
 # ----------------------------------------------------------
 def read_reldom(arcdir_zip, ext, **kwargs):
