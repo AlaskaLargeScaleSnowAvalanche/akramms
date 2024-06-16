@@ -1,4 +1,4 @@
-import os,collections,sys,itertools
+import os,collections,sys,itertools,functools
 import numpy as np
 import schema
 from uafgi.util import schemautil,shputil,gisutil,ulam
@@ -88,12 +88,14 @@ combo_sql_types = {
     'jdom': 'int4',
 }
 
-
 combo_keys = list(combo_schema.schema.keys())
 _Combo = collections.namedtuple('Combo', combo_keys)
 class Combo(_Combo):
     def __repr__(self):
-        return '-'.join(str(x) for x in self)
+        strs = [str(x) for x in self]
+        strs[-2] = '{:03d}'.format(self[-2])
+        strs[-1] = '{:03d}'.format(self[-1])
+        return '-'.join(strs)
 # -------------------------------------------------------------
 def combo_to_scenedir(combo, scenetype='x'):
     trial_name = f'{name}-{combo.snow_dataset}-{combo.year0}-{combo.year1}-{combo.downscale_algo}-{combo.forest}-{combo.return_period}'
@@ -201,13 +203,37 @@ def add_combo(makefile, combo):
 
 
 # -------------------------------------------------------------
-def all_domains():
+@functools.lru_cache()
+def all_tiles():
     domains_margin_shp = os.path.join(dir, 'ak_domains_margin.shp')
     domains_df = shputil.read_df(domains_margin_shp)
     domains_df = domains_df.set_index(['idom', 'jdom'])
     domains_ij = domains_df.index.tolist()
 #    domains_ij = [(row.idom, row.jdom) for row in domains_df.itertuples(index=False)]
     return domains_ij
+
+
+def juneau_tiles():
+    """Tiles of greater Juneau region"""
+    all_tiles = set(all_tiles())
+    for jdom in range(44, 46):
+        for idom in range(149, 152):
+            if (idom, jdom) in all_tiles:
+                yield (idom, jdom)
+
+def cordova_tiles():
+    return [
+        (91,42), (91,41), (91, 40),  # Cordova
+        (90, 42), (90, 41), (90,40),
+    ]
+
+def haines_tiles():
+    all_tiles = set(all_tiles())
+    for jdom in range(41, 44):
+        for idom in range(109, 111):
+            if (idom, jdom) in all_tiles:
+                yield (idom, jdom)
+
 
 
 def spiral_domains(x0, y0):
@@ -217,19 +243,20 @@ def spiral_domains(x0, y0):
 #    return
 
 
-    dij = set(all_domains())
+    dij = set(all_tiles())
 
     # High prioirty domains
     # (Code usese x/y and i/j interchangibly here)
-    high_priority = [
-        (110, 42), (109,42),    # Haines and West: Avalanche of 2024-2-2
-
-        (91,42), (91,41), (91, 40),  # Cordova
-        (90, 42), (90, 41), (90,40),
-#        (90, 40), (91, 40),     # Cordova
-#        (90, 41), (91, 41), 
-#        (90, 42), (91, 42), 
-    ]
+#    high_priority = [
+#        (110, 42), (109,42),    # Haines and West: Avalanche of 2024-2-2
+#
+#        (91,42), (91,41), (91, 40),  # Cordova
+#        (90, 42), (90, 41), (90,40),
+##        (90, 40), (91, 40),     # Cordova
+##        (90, 41), (91, 41), 
+##        (90, 42), (91, 42), 
+#    ]
+    high_priority = itertools.chain(cordova_tiles(), haines_tiles(), juneau_tiles())
     for xy in high_priority:
         if xy in dij:
             yield xy

@@ -9,6 +9,7 @@ from akramms import experiment,archive,file_info,avalquery,downscale_snow
 import akramms.parse
 import _mosaic
 import geopandas
+from akramms.plot import p_mosaic
 
 # python -m cProfile -o prof -s cumtime `which akramms` mosaic juneau1-1981-1990.qy 
 
@@ -166,7 +167,7 @@ def mosaic_avals_id(gridM, akdf0, tifdir,
 
     print('=== BEGIN mosaic_aval_combo')
     print(akdf0)
-    for vname in ('gridM', 'ofname_zip', 'tifdir', 'rho', 'vars', 'dem_fn', 'landcover_fn', 'snow_fn'):
+    for vname in ('gridM', 'tifdir', 'rho', 'vars', 'dem_fn', 'landcover_fn', 'snow_fn'):
         val = locals()[vname]
         print(f'{vname}: {val}')
 
@@ -185,7 +186,7 @@ def mosaic_avals_id(gridM, akdf0, tifdir,
         avalanche_count=np.zeros(shapeM, dtype='i2'))
     for vname,val in vals.items():
         if vname in vars:
-            mos.raster[vname] = val
+            mos.rasters[vname] = val
 
     # Collect extent polygons
     dfss = {'release': list(), 'domain': list(), 'extent': list()}
@@ -269,13 +270,16 @@ def mosaic_avals_id(gridM, akdf0, tifdir,
 
     # DEM
     if dem_fn is not None:
-        dem0_tif = tifdir / 'dem0.tif'
-        dem_fn(gridM.bounding_box(), dir / 'dem0.tif')
+        dem_fn(gridM.bounding_box(), tifdir / 'dem0.tif')
 
         cmd = ['gdalwarp', '-tr', '30', '30', '-co', 'TFW=YES', '-co', 'PROFILE=BASE',
-            str(dir / 'dem0.tif'), str(dir / 'dem.tif')]
+            str(tifdir / 'dem0.tif'), str(tifdir / 'dem.tif')]
         subprocess.run(cmd, check=True)
-        os.remove(dem0_tif)
+        try:
+            os.remove(tifdir / 'dem0.tif')
+            os.remove(tifdir / 'dem0.tfw')
+        except OSError:
+            pass
 
     # Snowfile
     if snow_fn is not None:
@@ -285,39 +289,7 @@ def mosaic_avals_id(gridM, akdf0, tifdir,
 
 
 # -----------------------------------------------------------------------------
-def ozip_write(ozip, fname):
-    """Writes with truncated arcname"""
-    ozip.write(fname, arcname=os.path.split(fname)[1])
-
-
-def write_mosaic_zip(mos, tifdir, ofname_zip):
-
-    # ========== Write output GeoTIFF and Zip it up
-    os.makedirs(ofname_zip.parents[0], exist_ok=True)
-    with zipfile.ZipFile(ofname_zip, mode='w', compression=zipfile.ZIP_STORED) as ozip:
-
-        # --------------------- Write shape dataframes to shapefiles
-        for vname, dfs in mos.vectors.items():
-            df = pd.concat(dfs)
-            df.to_file(dir / f'{vname}.shp')
-            for ext in ('prj', 'shp', 'dbf', 'shx'):
-                ozip_write(ozip, dir / f'{vname}.{ext}')
-
-        # ------------------- Other variables
-        for vname, (val, meta) in mos.raster.items():
-            ofn = dir /  f'{vname}.tif'
-            gdalutil.write_raster(ofn, gridM, val, 0, type=gdal_type, metadata=meta)
-            ozip_write(ozip, ofn)
-            ozip_write(ozip, os.path.join(tdir.location, f'{vname}.tfw'))
-
-
-        # ------------------- Landcover, etc. files
-        for name in sorted(os.listdir(mos.tifdir)):
-            ozip_write(ozip, mos.tifdir / name)
-# -----------------------------------------------------------------------------
-
-
-def mosaic_avals_combo(akdf, sextent, ofname,
+def mosaic_avals_combo(akdf, sextent, tifdir,
     statuses=[file_info.JobStatus.FINISHED],
     snow=False, dem=False, landcover=False,
     dry_run=False, force=False):
@@ -338,15 +310,13 @@ def mosaic_avals_combo(akdf, sextent, ofname,
             or
         'avalanche': Use avalanches to determine overall extent
 
-    ofname:
-        Name of output filename
     """
 
 
 
     print('=== BEGIN mosaic_aval_combo')
     print(akdf)
-    for vname in ('sextent', 'ofname', 'statuses', 'snow', 'dem', 'landcover', 'dry_run', 'force'):
+    for vname in ('sextent', 'statuses', 'snow', 'dem', 'landcover', 'dry_run', 'force'):
         val = locals()[vname]
         print(f'{vname}: {val}')
 
@@ -371,8 +341,8 @@ def mosaic_avals_combo(akdf, sextent, ofname,
         snowfile_vrt = downscale_snow.snowfile_vrt(snowfile_argss)
         print('snowfile_vrt = ', snowfile_vrt)
 
-    if not ofname.parts[-1].endswith('.zip'):
-        raise ValueError('--output must specify a .zip file')
+#    if not ofname.parts[-1].endswith('.zip'):
+#        raise ValueError('--output must specify a .zip file')
 
     # Do mosaic
     res = expmod.resolution
@@ -395,14 +365,9 @@ def mosaic_avals_combo(akdf, sextent, ofname,
     if snow:
         kwargs['snow_fn'] = lambda box_poly,ofname: downscale_snow.extract_snow(snowfile_vrt, box_poly, ofname)
 
-#    with ioutil.TmpDir(tdir='tmp', remove=False) as tdir:
-#    with ioutil.TmpDir(ofname.parents[0]) as tdir:
-    os.makedirs(ofname.parents[0], exist_ok=True)
-    with ioutil.TmpDir(ofname.parents[0]) as tdir:
-        tifdir = pathlib.Path(tdir.location)
-        mos = mosaic_avals_id(gridM, akdf, tifdir, **kwargs)
-        write_mosaic_zip(mos, tifdir, ofname)
+    ret = mosaic_avals_id(gridM, akdf, tifdir, **kwargs)
     print('=== END mosaic_aval_combo')
+    return ret
 
 # ---------------------------------------------------------------------------------
 def consolidate_by_forest(expmod, akdf0):
@@ -429,3 +394,166 @@ def consolidate_by_forest(expmod, akdf0):
 
         akdf1s.append(akdf1)
     return akdf1s
+# ---------------------------------------------------------------------------------
+class MosaicWriter:
+
+    def __init__(self, expmod):
+        """statuss: [status, ...]
+            Which stauses of avalanches are bieng plotted
+        """
+        self.expmod = expmod
+
+#    def name(self, combo):
+#        """Determines a generic name for a combo"""
+#        scombo = str(combo)
+#        return f'{self.expmod.name}-{scombo}-{self.sstatus}'
+
+
+def _ozip_write(ozip, fname):
+    """Writes with truncated arcname"""
+    ozip.write(fname, arcname=os.path.split(fname)[1])
+
+class ZipMosaicWriter(MosaicWriter):
+
+    def ofnames(self, name):
+        """Returns a dict of files written for a combo"""
+#        name = self.name(combo)
+        return {
+            'zip': self.expmod.dir / 'mosaic' / f'{name}.zip',
+            'pdf': self.expmod.dir / 'plot' / f'{name}.pdf'}
+
+    def needs_regen(self, name, combo_mtime):
+        """
+        combo_mtime:
+            Last time the underlying data for this combo(s) was regenerated.
+        """
+        ofnames = self.ofnames(name)
+        for ofname in ofnames.values():
+            if (not os.path.isfile(ofname)) or (os.path.getmtime(ofname) < combo_mtime):
+                return True
+        return False
+
+    def write(self, name, mos, tifdir):
+        """Writes to file(s)
+        name:
+            Name used to create output file(s)
+        mos: Mosaic
+            Data structure containing stuff to write
+        tifdir:
+            Temporary directory where intermediate outputs are stored
+        """
+        # ========== Write output GeoTIFF and Zip it up
+        ofnames = self.ofnames(name)
+        print(f"Writing {ofnames['zip']}")
+        os.makedirs(ofnames['zip'].parents[0], exist_ok=True)
+        with zipfile.ZipFile(ofnames['zip'], mode='w', compression=zipfile.ZIP_STORED) as ozip:
+
+            # --------------------- Write shape dataframes to shapefiles
+            for vname, df in mos.vectors.items():
+                df.to_file(tifdir / f'{vname}.shp')
+#                for ext in ('prj', 'shp', 'dbf', 'shx'):
+#                    _ozip_write(ozip, tifdir / f'{vname}.{ext}')
+
+#            # ------------------- Other variables
+#            for vname, (val, meta) in mos.rasters.items():
+#                gdalutil.write_raster(tifdir /  f'{vname}.tif', gridM, val, 0, type=gdal_type, metadata=meta)
+#                _ozip_write(ozip, tifdir /  f'{vname}.tif')
+#                _ozip_write(ozip, tifdir / f'{vname}.tfw')
+
+            # ------------------- Landcover, etc. files
+            for name in sorted(os.listdir(tifdir)):
+                print(f'Adding to zip: {name}')
+                _ozip_write(ozip, tifdir / name)
+
+
+        # ================ Plot to reference PDF
+        p_mosaic.plot_pdf(ofnames['zip'], ofnames['pdf'])
+
+# ---------------------------------------------------------------------------------
+
+
+_tifdir_names = [
+    'avalanche_count.tfw',
+    'avalanche_count.tif',
+    'dem.tfw',
+    'dem.tif',
+    'deposition.tfw',
+    'deposition.tif',
+    'domain.cpg',
+    'domain.dbf',
+    'domain.prj',
+    'domain.shp',
+    'domain.shx',
+    'domain_count.tfw',
+    'domain_count.tif',
+    'extent.cpg',
+    'extent.dbf',
+    'extent.prj',
+    'extent.shp',
+    'extent.shx',
+    'landcover.tfw',
+    'landcover.tif',
+    'landcover.tif.aux.xml',
+    'max_height.tfw',
+    'max_height.tif',
+    'max_pressure.tfw',
+    'max_pressure.tif',
+    'max_velocity.tfw',
+    'max_velocity.tif',
+    'release.cpg',
+    'release.dbf',
+    'release.prj',
+    'release.shp',
+    'release.shx',
+    'snow.tfw',
+    'snow.tif']
+
+        
+class PublishMosaicWriter(MosaicWriter):
+
+    def ofname(self, scombo, tifdir_name):
+        """Determines the final filename for a file in the tifdir
+        name:
+            Name of the overall output (eg combo)
+        tifdir_name:
+            Filename inside of tifdir"""
+        lcombo = scombo.split('-')
+        base = tifdir_name.split('.',1)[0]
+        return self.expmod.dir / 'publish' / ('-'.join(lcombo[:-3])) / base / f'{scombo}-{tifdir_name}'
+
+    def needs_regen(self, name, combo_mtime):
+        """
+        combo_mtime:
+            Last time the underlying data for this combo(s) was regenerated.
+        """
+        for ofname in (self.ofname(name, tifdir_name) for tifdir_name in _tifdir_names):
+            print('Checking ', ofname)
+            if (not os.path.isfile(ofname)) or (os.path.getmtime(ofname) < combo_mtime):
+                return True
+        return False
+
+    def write(self, name, mos, tifdir):
+        """Writes to file(s)
+        name:
+            Name used to create output file(s)
+        mos: Mosaic
+            Data structure containing stuff to write
+        tifdir:
+            Temporary directory where intermediate outputs are stored
+        """
+        # ========== Write output GeoTIFF and Zip it up
+
+        # --------------------- Write shape dataframes to shapefiles
+        for vname, df in mos.vectors.items():
+            df.to_file(tifdir / f'{vname}.shp')
+
+        for tifdir_name in sorted(os.listdir(tifdir)):
+            ofname = self.ofname(name, tifdir_name)
+            print(f'Writing file: {ofname}')
+            os.makedirs(ofname.parents[0], exist_ok=True)
+            os.rename(tifdir / tifdir_name, ofname)
+
+
+# ---------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------
