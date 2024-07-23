@@ -519,6 +519,11 @@ def _finished_status(expmod, combo):
         return JobStatus.MARKED_FINISHED
     return JobStatus.EXTENT
 
+@functools.lru_cache()
+def _ignore_ids(expmod):
+    rows = [(row[0], row[1], True) for row in expmod.ignore_ids()]
+    return pd.DataFrame(rows, columns=['combo', 'id', 'ignore'])
+
 #def _noid_status(row):
 #    """Determines status for a combo with no avalanches in it."""
 #    xdir = expmod.combo_to_scenedir(row['combo'], scenetype='x')
@@ -586,16 +591,10 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         iddf1 = add_id_status(iddf1, update=update, dry_run=dry_run)
 
         # Remove jobs we wish to ignore
-        iddf1 = iddf1.merge(expmod.ignore_ids(), how='left', on=['combo', 'id'])
-        row = iddf1[iddf1.id_status == 1].iloc[0]
-        print('fxxxxxx1 ', row)
-        print('type1 ', type(row['combo']))
-
-
+        iddf1 = iddf1.merge(_ignore_ids(expmod), how='left', on=['combo', 'id'])
         iddf1['ignore'] = iddf1.ignore.fillna(False).astype(bool)
-        print(iddf1.ignore)
+
         iddf1 = iddf1[~iddf1.ignore]
-        print('fxxxxxxxxxxxxxx ', iddf1[iddf1.id_status == 1])#.iloc[0])
 
         # Replace older avalanches runs with newer runs of the same ID
         # (which presumably have fixed overrun problems)
