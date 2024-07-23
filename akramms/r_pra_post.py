@@ -50,6 +50,8 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
            Margin to add around convex hull to minimum bounding rectangle.
     """
 
+
+
 #    scene_args = params.load(scene_dir)
 
     # Main input and output files: THESE MUST BE FIRST
@@ -135,6 +137,9 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
         # This can happen if the PRA is on the US-Canada border.
         # For more info see chunk.py and d8graph.cpp
         df = df[df.dom.notna()]
+
+        # Drop PRAs we've decided to drop
+#$$$$$$$
 
         # Write out one top-level shapefile per pra_size
         os.makedirs(scene_dir / 'RELEASE', exist_ok=True)
