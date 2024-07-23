@@ -118,23 +118,25 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
 
         # Clip to the non-margin part of the local grid (subdomain)
         gridI,dem_mask,_ = gdalutil.read_raster(dem_mask_tif)
-        df = chunk.clip(df, gridI,dem_mask, scene_args['domain'])
+        if len(df) > 0:
+            df = chunk.clip(df, gridI,dem_mask, scene_args['domain'])
 
         # Add PRA size designation of T,S,M,L
         # Adds column: pra_size
-        df = chunk.add_pra_size(df)
+        if len(df) > 0:
+            df = chunk.add_pra_size(df)
 
-        # Compute the avalanche domains (domain builder algo)
-        # Adds columns: chull, dom
-        df = chunk.add_dom(
-            df, dem_filled, dem_nodata, grid_info,
-            margins=config.initial_margins,
-            **kwargs)
+            # Compute the avalanche domains (domain builder algo)
+            # Adds columns: chull, dom
+            df = chunk.add_dom(
+                df, dem_filled, dem_nodata, grid_info,
+                margins=config.initial_margins,
+                **kwargs)
 
-        # Drop PRAs that have no domain.
-        # This can happen if the PRA is on the US-Canada border.
-        # For more info see chunk.py and d8graph.cpp
-        df = df[df.dom.notna()]
+            # Drop PRAs that have no domain.
+            # This can happen if the PRA is on the US-Canada border.
+            # For more info see chunk.py and d8graph.cpp
+            df = df[df.dom.notna()]
 
         # Write out one top-level shapefile per pra_size
         os.makedirs(scene_dir / 'RELEASE', exist_ok=True)
@@ -142,20 +144,21 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
 
         wkt = scene_args['coordinate_system']
         pra_sizes_written = set()
-        for pra_size,cat_df in df.groupby('pra_size'):
-            root = f'{scene_name}{For}_{resolution}m_{return_period}{pra_size}'
-            chunk.write_rel(
-                cat_df, wkt, return_period,
-                scene_dir / 'RELEASE' / f'{root}_rel.shp')
+        if len(df) > 0:
+            for pra_size,cat_df in df.groupby('pra_size'):
+                root = f'{scene_name}{For}_{resolution}m_{return_period}{pra_size}'
+                chunk.write_rel(
+                    cat_df, wkt, return_period,
+                    scene_dir / 'RELEASE' / f'{root}_rel.shp')
 
-            chunk.write_chull(
-                cat_df, wkt,
-                scene_dir / 'RELEASE' / f'{root}_chull.shp')
+                chunk.write_chull(
+                    cat_df, wkt,
+                    scene_dir / 'RELEASE' / f'{root}_chull.shp')
 
-            chunk.write_dom(
-                cat_df, wkt,
-                scene_dir / 'DOMAIN' / f'{root}_dom.shp')
-            pra_sizes_written.add(pra_size)
+                chunk.write_dom(
+                    cat_df, wkt,
+                    scene_dir / 'DOMAIN' / f'{root}_dom.shp')
+                pra_sizes_written.add(pra_size)
 
 
         # Write zero-length dummy files if the given PRA size does not exist for this combo

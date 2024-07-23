@@ -201,11 +201,19 @@ def add_combo(makefile, combo):
 
 
 # -------------------------------------------------------------
+# Degenerate tiles we do NOT want to run
+_exclude_tiles = {
+    (123, 56),
+    (102,44),
+    (96,43),
+    (90,45),}
+
 def all_domains():
     domains_margin_shp = os.path.join(dir, 'ak_domains_margin.shp')
     domains_df = shputil.read_df(domains_margin_shp)
     domains_df = domains_df.set_index(['idom', 'jdom'])
     domains_ij = domains_df.index.tolist()
+    domains_ij = [ij for ij in domains_ij if ij not in _exclude_tiles]
 #    domains_ij = [(row.idom, row.jdom) for row in domains_df.itertuples(index=False)]
     return domains_ij
 
