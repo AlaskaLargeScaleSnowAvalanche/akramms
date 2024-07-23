@@ -1,5 +1,6 @@
 import os,subprocess,functools,re,typing,zipfile,sys,contextlib,pathlib,glob
 import htcondor
+import numpy as np
 import pandas as pd
 from uafgi.util import gdalutil
 from akramms import config,file_info,parse,level,complete,resolve,archive,overrun,params
@@ -430,9 +431,14 @@ def agg_status(statuses, ignore_statuses={}):
     ret = min(status for status in counts.keys())
     return ret
 
-def is_combo_zero_size(xdir):
+def is_combo_zero_size(expmod, combo, xdir):
     """Determines whether a combo has no avalanches in it."""
-    shps = glob.glob(str(xdir / 'RELEASE' / '*_rel.shp'))
+
+    shps = list()
+    for pra_size in expmod.pra_sizes(combo):
+        shps += glob.glob(str(xdir / 'RELEASE' / f'*{pra_size}_rel.shp'))
+
+#    shps = glob.glob(str(xdir / 'RELEASE' / '*_rel.shp'))
 
     # If no shapefiles, then it's probbly not generated yet
     if len(shps) == 0:
@@ -488,7 +494,7 @@ def add_combo_quickstatus(akdf0, mtime=False):
                 if not os.path.exists(xdir):
                     status = JobStatus.NOINPUT
                 else:
-                    if is_combo_zero_size(xdir):
+                    if is_combo_zero_size(expmod, tup.combo, xdir):
                         status = JobStatus.FINISHED
                     else:
                         status = JobStatus.UNKNOWN
@@ -512,6 +518,11 @@ def _finished_status(expmod, combo):
     if not (os.path.isfile(arcdir / 'extent.gpkg') and os.path.isfile(arcdir / 'extent_full.gpkg')):
         return JobStatus.MARKED_FINISHED
     return JobStatus.EXTENT
+
+#def _noid_status(row):
+#    """Determines status for a combo with no avalanches in it."""
+#    xdir = expmod.combo_to_scenedir(row['combo'], scenetype='x')
+#    glob.glob(xdir / 
 
 def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_statuses={}):
     """akdf:
@@ -574,6 +585,18 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
         iddf1 = resolve.resolve_id(rfdf1, realized=realized)
         iddf1 = add_id_status(iddf1, update=update, dry_run=dry_run)
 
+        # Remove jobs we wish to ignore
+        iddf1 = iddf1.merge(expmod.ignore_ids(), how='left', on=['combo', 'id'])
+        row = iddf1[iddf1.id_status == 1].iloc[0]
+        print('fxxxxxx1 ', row)
+        print('type1 ', type(row['combo']))
+
+
+        iddf1['ignore'] = iddf1.ignore.fillna(False).astype(bool)
+        print(iddf1.ignore)
+        iddf1 = iddf1[~iddf1.ignore]
+        print('fxxxxxxxxxxxxxx ', iddf1[iddf1.id_status == 1])#.iloc[0])
+
         # Replace older avalanches runs with newer runs of the same ID
         # (which presumably have fixed overrun problems)
         iddf1 = overrun.drop_duplicates(iddf1)
@@ -591,7 +614,19 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
             .rename(columns={'id_status': 'combo_status'})
         akdf1 = akdf1.merge(combo_status, how='left', left_on='combo', right_index=True)
 #        print('combo_status ', akdf1[['combo', 'combo_status']])
+
         akdf1['combo_status'] = akdf1.combo_status.fillna(JobStatus.NOINPUT).astype(int)
+
+#        # 
+#        for i,row in akdf1.iterrows():
+#            if np.isnan(row['combo_status']):
+#
+#                # No avalanches available for this combo.  That is OK
+#                # if the combo had no avalanches to begin wtih.
+#                print(row)
+#
+#            print(i,row['combo_status'])
+
 
         # --------------------------------------------
         if update:

@@ -114,6 +114,14 @@ def pra_sizes(combo):
     """Determimes the PRA sizes we will compute in this experiment, for a given Combo."""
     return _pra_sizes[combo.forest]
 
+# Avalanches that just wouldn't compute; so we ignore them when looking at job status
+@functools.lru_cache()
+def ignore_ids():
+    return pd.DataFrame([
+        ( Combo('ccsm', 1981, 2010, 'lapse', 'NoFor', 300, 123, 50), 203, True),
+        ], columns=['combo', 'id', 'ignore'])
+
+
 # -------------------------------------------------------------
 def add_dem(makefile, idom, jdom, sanity_check=True):
     exp_mod = sys.modules[__name__]    # This module
