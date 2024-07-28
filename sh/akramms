@@ -946,7 +946,7 @@ def stdmosaic(args):
                     akdf1, 'tile', tifdir, statuses=args.status,
                     snow=True, dem=True, landcover=True,
                     dry_run=args.dry_run, force=args.force)
-                mwriter.write(name, mos, tifdir)
+                mwriter.write(name, mos, tifdir, ijdom=(ocombo.idom, ocombo.jdom))
 
 
 @subcommand(name='loaddb')

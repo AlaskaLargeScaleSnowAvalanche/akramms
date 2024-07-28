@@ -133,7 +133,7 @@ class Mosaic(typing.NamedTuple):
 
 def mosaic_avals_id(gridM, akdf0, tifdir,
     rho=300, vars=_mosaic_keys,
-    dem_fn=None, landcover_fn=None, snow_fn=None):
+    dem_fn=None, landcover_fn=None, snow_fn=None, ijdom=None):
 
     """General mosaic function for a bunch of avalanches and a domain
 
@@ -433,7 +433,7 @@ class ZipMosaicWriter(MosaicWriter):
                 return True
         return False
 
-    def write(self, name, mos, tifdir):
+    def write(self, name, mos, tifdir, ijdom=None):
         """Writes to file(s)
         name:
             Name used to create output file(s)
@@ -450,15 +450,11 @@ class ZipMosaicWriter(MosaicWriter):
 
             # --------------------- Write shape dataframes to shapefiles
             for vname, df in mos.vectors.items():
+                # Add idom/jdom to the shapefile before writing
+                if ijdom is not None:
+                    df['idom'] = ijdom[0]
+                    df['jdom'] = ijdom[1]
                 df.to_file(tifdir / f'{vname}.shp')
-#                for ext in ('prj', 'shp', 'dbf', 'shx'):
-#                    _ozip_write(ozip, tifdir / f'{vname}.{ext}')
-
-#            # ------------------- Other variables
-#            for vname, (val, meta) in mos.rasters.items():
-#                gdalutil.write_raster(tifdir /  f'{vname}.tif', gridM, val, 0, type=gdal_type, metadata=meta)
-#                _ozip_write(ozip, tifdir /  f'{vname}.tif')
-#                _ozip_write(ozip, tifdir / f'{vname}.tfw')
 
             # ------------------- Landcover, etc. files
             for name in sorted(os.listdir(tifdir)):
@@ -547,7 +543,7 @@ class PublishMosaicWriter(MosaicWriter):
                 return True
         return False
 
-    def write(self, name, mos, tifdir):
+    def write(self, name, mos, tifdir, ijdom=None):
         """Writes to file(s)
         name:
             Name used to create output file(s)
@@ -560,6 +556,10 @@ class PublishMosaicWriter(MosaicWriter):
 
         # --------------------- Write shape dataframes to shapefiles
         for vname, df in mos.vectors.items():
+            # Add idom/jdom to the shapefile before writing
+            if ijdom is not None:
+                df['idom'] = ijdom[0]
+                df['jdom'] = ijdom[1]
             df.to_file(tifdir / f'{vname}.shp')
 
         for tifdir_name in sorted(os.listdir(tifdir)):
