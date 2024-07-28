@@ -475,13 +475,13 @@ _tifdir_names = [
     'dem.tif',
     'deposition.tfw',
     'deposition.tif',
-    'domain.cpg',
-    'domain.dbf',
-    'domain.prj',
-    'domain.shp',
-    'domain.shx',
-    'domain_count.tfw',
-    'domain_count.tif',
+#    'domain.cpg',
+#    'domain.dbf',
+#    'domain.prj',
+#    'domain.shp',
+#    'domain.shx',
+#    'domain_count.tfw',
+#    'domain_count.tif',
     'extent.cpg',
     'extent.dbf',
     'extent.prj',
@@ -556,6 +556,11 @@ class PublishMosaicWriter(MosaicWriter):
 
         # --------------------- Write shape dataframes to shapefiles
         for vname, df in mos.vectors.items():
+
+            # Don't publish domain or domain_count files
+            if vname in {'domain'}:
+                continue
+
             # Add idom/jdom to the shapefile before writing
             if ijdom is not None:
                 df['idom'] = ijdom[0]
@@ -563,8 +568,12 @@ class PublishMosaicWriter(MosaicWriter):
             df.to_file(tifdir / f'{vname}.shp')
 
         for tifdir_name in sorted(os.listdir(tifdir)):
+            # Don't publish domain or domain_count files
+            if tifdir_name.startswith('domain_count'):
+                continue
+
             ofname = self.ofname(name, tifdir_name)
-            print(f'Writing file: {ofname}')
+            print(f'Writing file {tifdir_name}: {ofname}')
             os.makedirs(ofname.parents[0], exist_ok=True)
             os.rename(tifdir / tifdir_name, ofname)
 
