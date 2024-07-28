@@ -519,7 +519,11 @@ class PublishMosaicWriter(MosaicWriter):
             Filename inside of tifdir"""
         lcombo = scombo.split('-')
         base = tifdir_name.split('.',1)[0]
-        return self.expmod.dir / 'publish' / ('-'.join(lcombo[:-3])) / base / f'{scombo}-{tifdir_name}'
+
+        return \
+            self.expmod.dir.parents[0] / (self.expmod.dir.parts[-1] + '_publish') / \
+            ('-'.join(lcombo[:-3])) / base / f'{scombo}-{tifdir_name}'
+
 
     def needs_regen(self, name, combo_mtime):
         """
