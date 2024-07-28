@@ -517,8 +517,19 @@ class PublishMosaicWriter(MosaicWriter):
             Name of the overall output (eg combo)
         tifdir_name:
             Filename inside of tifdir"""
+
+        # Make sure things are named All; and not NoFor or For.
+        # Because mosaics include both For and NoFor elements,
+        # depending on PRA size.
+        scombo = scombo.replace('NoFor', 'All').replace('For', 'All')
         lcombo = scombo.split('-')
         base = tifdir_name.split('.',1)[0]
+
+
+        # Eg:
+        # ...ak_publish/
+        #    ak-ccsm-1981-2010-lapse-For-30/   ('-'.join(lcombo[:-3]))
+        #    release/ak-ccsm-1981-2010-lapse-For-30-91-42-F-release.dbf
 
         return \
             self.expmod.dir.parents[0] / (self.expmod.dir.parts[-1] + '_publish') / \
