@@ -264,7 +264,7 @@ def _in_domain(gridI, dem_mask, xmin,ymin,xmax,ymax, pra):
     centroid = pra.centroid
     x,y = centroid.x, centroid.y
 
-    # See if it's in the natural margin
+    # See if it's in the natural margin of this tile
     if not ((x >= xmin) and (x < xmax) and (y >= ymin) and (y < ymax)):
         return False
 

@@ -121,6 +121,8 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
         # Clip to the non-margin part of the local grid (subdomain)
         gridI,dem_mask,_ = gdalutil.read_raster(dem_mask_tif)
         if len(df) > 0:
+            # dem_mask: clip to portions in USA (not Canada)
+            # scene_args['domain']: Clip to tile boundary
             df = chunk.clip(df, gridI,dem_mask, scene_args['domain'])
 
         # Add PRA size designation of T,S,M,L

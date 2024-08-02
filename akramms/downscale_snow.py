@@ -273,7 +273,7 @@ def lapse_by_distance_from_coast(cdistA):
     mask_in = np.logical_and(cdistA >= dc0, cdistA < dc1)
     lapseA[mask_in] = lr0 + slope * (cdistA[mask_in] - dc0)
 
-    # Lapse rate from cells >= 240km from coase
+    # Lapse rate from cells >= 240km from coast
     mask_in = (cdistA >= dc1)
     lapseA[mask_in] = lr1
 
