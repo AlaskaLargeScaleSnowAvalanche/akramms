@@ -36,12 +36,14 @@ def snowfile_vrt(snowfile_argss):
     """
 
     snowfiles = [snowfile(*x) for x in snowfile_argss]
-    snowdir = snowfiles[0].parents[0]
     snowfile_glob = snowfile(*(snowfile_argss[0][:-2] + ('*','*')))
-    ofname = snowfile_glob.parents[0] / (snowfile_glob.parts[-1][:-8] + '.vrt')  # _*_*.tif -> .vrt
+#    snowdir_publish = snowfiles[0].parents[0]
+    snowdir_publish = snowfile_glob.parents[2] / (snowfile_glob.parts[-3]+'_publish') / snowfile_glob.parts[-2]
+#    ofname = snowfile_glob.parents[0] / (snowfile_glob.parts[-1][:-8] + '.vrt')  # _*_*.tif -> .vrt
+    ofname = snowdir_publish / (snowfile_glob.parts[-1][:-8] + '.vrt')  # _*_*.tif -> .vrt
 
     #print(snowfiles)
-    #print(snowdir)
+    #print(snowdir_publish)
     #print(snowfile_glob)
     #print(ofname)
 
@@ -65,9 +67,12 @@ def snowfile_vrt(snowfile_argss):
         # Include ALL appropriate snowfiles in the VRT, not just the
         # snowfile(s) needed for now.
         cmd.append(ofname)
-        cmd += [os.path.relpath(x, snowdir) for x in sorted(glob.glob(str(snowfile_glob)))]
+        cmd += [os.path.relpath(x, snowdir_publish) for x in sorted(glob.glob(str(snowfile_glob)))]
         print(f'** Regenerating {ofname}')
-        subprocess.run(cmd, cwd=snowdir, check=True)
+#        print(cmd)
+#        sys.exit(0)
+        os.makedirs(snowdir_publish, exist_ok=True)
+        subprocess.run(cmd, cwd=snowdir_publish, check=True)
 
     return ofname
 

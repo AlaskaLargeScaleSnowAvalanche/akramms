@@ -329,6 +329,10 @@ def mosaic_avals_combo(akdf, sextent, tifdir,
     expmod = akramms.parse.load_expmod(row0.exp)
     geom,akdf = avalquery.query(akdf, sextent, statuses=statuses, scenetypes='arc', force=force)
 
+    # No avalanches, so nothing to write
+    if len(akdf) == 0:
+        return None
+
     print(f'geom = {geom}')
 
     # Prepare snow virtual raster for query

@@ -922,6 +922,7 @@ def stdmosaic(args):
     plan = list()
     exp = akdf0.iloc[0].exp
     expmod = akramms.parse.load_expmod(exp)
+    publish_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + '_publish')
     mwriter = mosaic.PublishMosaicWriter(expmod)
     for akdf1 in mosaic.consolidate_by_forest(expmod, akdf0):
 # No need to sort
@@ -940,13 +941,14 @@ def stdmosaic(args):
         # Write the combo
         combo_quickstatus_mtime = akdf1.combo_quickstatus_mtime.max()
         if mwriter.needs_regen(name, combo_quickstatus_mtime):
-            with ioutil.TmpDir(expmod.dir) as tdir:
+            with ioutil.TmpDir(publish_dir) as tdir:
                 tifdir = pathlib.Path(tdir.location)
                 mos = mosaic.mosaic_avals_combo(
                     akdf1, 'tile', tifdir, statuses=args.status,
                     snow=True, dem=True, landcover=True,
                     dry_run=args.dry_run, force=args.force)
-                mwriter.write(name, mos, tifdir, ijdom=(ocombo.idom, ocombo.jdom))
+                if mos is not None:    # There were some avalanches to plot...
+                    mwriter.write(name, mos, tifdir, ijdom=(ocombo.idom, ocombo.jdom))
 
 
 @subcommand(name='loaddb')

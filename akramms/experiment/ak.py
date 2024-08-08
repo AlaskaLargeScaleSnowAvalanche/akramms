@@ -94,7 +94,8 @@ combo_keys = list(combo_schema.schema.keys())
 _Combo = collections.namedtuple('Combo', combo_keys)
 class Combo(_Combo):
     def __repr__(self):
-        return '-'.join(str(x) for x in self)
+        return f'{self.snow_dataset}-{self.year0:04d}-{self.year1:04d}-{self.downscale_algo}-{self.forest}-{self.return_period}-{self.idom:03d}-{self.jdom:03d}'
+#        return '-'.join(str(x) for x in self)
 # -------------------------------------------------------------
 def combo_to_scenedir(combo, scenetype='x'):
     trial_name = f'{name}-{combo.snow_dataset}-{combo.year0}-{combo.year1}-{combo.downscale_algo}-{combo.forest}-{combo.return_period}'

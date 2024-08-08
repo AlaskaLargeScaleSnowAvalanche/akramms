@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import netCDF4
 import pyproj,geopandas
+import fiona.errors
 from uafgi.util import gdalutil,shputil,ncutil,ioutil,ogrutil,gdalutil,gisutil
 from akramms import config,parse,file_info,resolve,overrun
 import xyedge
@@ -803,7 +804,13 @@ def read_reldom(arcdir_zip, ext, **kwargs):
     for fname in fnames:
         print(f'------- archive.read_reldom() Reading shapefile: {fname}')
 #        dfs.append(ogrutil.read_df(fname, **kwargs).df)
-        dfs.append(geopandas.read_file(fname))
+        try:
+            dfs.append(geopandas.read_file(fname))
+        except fiona.errors.DriverError:
+            # Eg fiona.errors.DriverError: '/vsizip///mnt/avalanche_sim/prj/ak/ak-ccsm-1981-2010-lapse-For-30/arc-088-042/RELEASE.zip/x-088-042For_10m_30L_rel.shp' not recognized as a supported file format.
+            # This happens with zero-length shapefiles inside a .zip file
+            # Ignore it because it's zero length.
+            pass
 
     return pd.concat(dfs)
 # ----------------------------------------------------------
