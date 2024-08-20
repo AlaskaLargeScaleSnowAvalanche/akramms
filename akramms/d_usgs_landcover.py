@@ -40,3 +40,5 @@ def extract(poly, ofname):
 
 # ------------------------------------------------------------------
 
+
+# https://gis.stackexchange.com/questions/349818/resample-raster-from-one-resolution-to-another-with-gdal-python-api
