@@ -19,7 +19,7 @@ def main():
 
     # Resample DEM to 100m resolution
     dem_tif = exp.dir / 'dem' / f'ak_dem_{idom:03d}_{jdom:03d}.tif'
-    snow_tif = exp.dir / 'snow' / f'ak_snow_{idom:03d}_{jdom:03d}.tif'
+    snow_tif = exp.dir / 'snow' / f'ak_ccsm_1981_2010_lapse_{idom:03d}_{jdom:03d}.tif'
     print('dem_tif ', dem_tif)
     with ioutil.TmpDir() as tdir:
         xyres = 60    # Resample to 100m
@@ -29,6 +29,7 @@ def main():
             xRes=xyres, yRes=xyres, resampleAlg='average')
         ds = None
 
+#        snow_tif_lr = snow_tif    # For some reason gdalwarp isn't working here
         snow_tif_lr = tdir.location / snow_tif.parts[-1]
         ds = gdal.Warp(snow_tif_lr, snow_tif,
             xRes=xyres, yRes=xyres, resampleAlg='average')
@@ -56,13 +57,23 @@ def main():
             ax, dem_data,
             transform=map_crs, extent=map_extent)
 
+        # ---------- Plot snow
+        # This follows E3SM convention for precip
+        # See here for suggested colormaps
+        # https://docs.e3sm.org/e3sm_diags/_build/html/master/colormaps.html
+        cmap,_,_ = cptutil.read_cpt('palettes/WhiteBlueGreenYellowRed.cpt')
+        cmap = cptutil.discrete_cmap(14, cmap)
+
         snow_grid, snow_data, snow_nd = gdalutil.read_raster(snow_tif_lr)
+        vmin = np.nanmin(snow_data)
+        vmax = np.nanmax(snow_data)
+        print('vmin vmax ', vmin, vmax)
         pcm_snow = ax.pcolormesh(
             subgrid.centersx, subgrid.centersy, snow_data,
             alpha=0.5, rasterized=True,
-            transform=map_crs)#, cmap=cmap)#, vmin=0, vmax=2000)
+            transform=map_crs, cmap=cmap, vmin=0, vmax=700)
 
-        ofname = pathlib.Path('./fig03.pdf')
+        ofname = pathlib.Path('./fig07.pdf')
         with TrimmedPdf(ofname) as tname:
             fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res version; add margin so text is not cut off
 

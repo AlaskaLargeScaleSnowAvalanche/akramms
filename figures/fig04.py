@@ -32,7 +32,7 @@ def main():
 #    map_extent = (320000, 1510*1000, 710000, 1425*1000)    # xmin, xmax, ymin, ymax; ymin in South
     map_extent = (125*1000, 1580*1000, 710000, 1425*1000)    # xmin, xmax, ymin, ymax; ymin in South
 
-    for year0,year1 in ((1981,1990), (2051,2060)):
+    for year0,year1 in ((1981,2010), (2031,2060)):
         fig,ax = plt.subplots(
             nrows=1,ncols=1,
             subplot_kw={'projection': map_crs},
