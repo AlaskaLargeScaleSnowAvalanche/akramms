@@ -310,6 +310,17 @@ def lapse_by_distance_from_coast(cdistA):
 
 
 # -----------------------------------------------------------------
+def read_sx3_multi(sx3_files):
+    sx3A,sx3A_nd = wrfutil.read_raw(sx3_files[0], 'sx3', fill_holes=True, keep_time=True)    # NOTE: All gridcells are expected to have data
+    for sx3_file in sx3_files[1:]:
+        sx3x,_ = wrfutil.read_raw(sx3_file, 'sx3', fill_holes=True, keep_time=True)
+        sx3A = np.maximum(sx3A, sx3x)
+
+    if len(sx3A.shape) == 3:
+        sx3A = sx3A[0,:]    # Get rid of Time dimension
+
+    return sx3A,sx3A_nd
+
 def downscale_sx3_with_lapse(sx3_files, geo_nc, distance_from_coastA_tif, dem_tif, ofname):
     """
     sx3_files: (gridA)
@@ -326,13 +337,7 @@ def downscale_sx3_with_lapse(sx3_files, geo_nc, distance_from_coastA_tif, dem_ti
     """
     # Read input from WRF: Take the max of an entire year range.
     gridA = wrfutil.wrf_info(geo_nc)
-    sx3A,sx3A_nd = wrfutil.read_raw(sx3_files[0], 'sx3', fill_holes=True, keep_time=True)    # NOTE: All gridcells are expected to have data
-    for sx3_file in sx3_files[1:]:
-        sx3x,_ = wrfutil.read_raw(sx3_file, 'sx3', fill_holes=True, keep_time=True)
-        sx3A = np.maximum(sx3A, sx3x)
-
-    if len(sx3A.shape) == 3:
-        sx3A = sx3A[0,:]    # Get rid of Time dimension
+    sx3A,sx3A_nd = read_sx3_multi(sx3_files)
 
     # Construct output grid (and also read the DEM, which might be useful elsewhere)
     gridI, elevI, elevI_nd = gdalutil.read_raster(dem_tif)
