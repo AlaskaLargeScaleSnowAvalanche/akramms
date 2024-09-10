@@ -73,7 +73,7 @@ def main():
             alpha=0.5, rasterized=True,
             transform=map_crs, cmap=cmap, vmin=0, vmax=700)
 
-        ofname = pathlib.Path('./fig07.pdf')
+        ofname = pathlib.Path('./fig10.pdf')
         with TrimmedPdf(ofname) as tname:
             fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res version; add margin so text is not cut off
 
