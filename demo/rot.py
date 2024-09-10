@@ -21,4 +21,5 @@ ax = floating_axes.FloatingSubplot(fig, 111, grid_helper=h)
 
 fig.add_subplot(ax)
 
-plt.show()
+#plt.show()
+fig.savefig('x.pdf', bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res ve
