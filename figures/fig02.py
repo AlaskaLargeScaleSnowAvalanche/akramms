@@ -93,8 +93,6 @@ def main():
         ofname = pathlib.Path('./fig02.pdf')
         with TrimmedPdf(ofname) as tname:
             fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res ver
-        return
-
 
         # ---------- The colorbar
         fig,axs = plt.subplots(
