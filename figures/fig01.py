@@ -19,6 +19,7 @@ geo_nc = ccsm_dir / 'geo_southeast.nc'    # Describes grid
 def main():
     map_crs = cartopy.crs.epsg(3338)    # Alaska Albers
     map_extent = ((320-100)*1000, (1510+300)*1000, (710-300)*1000, (1425+100)*1000)    # xmin, xmax, ymin, ymax; ymin in South
+#    map_extent = ((320-160)*1000, (1510+300)*1000, (710-390)*1000, (1425+200)*1000)    # xmin, xmax, ymin, ymax; ymin in South
 
 #    map_extent = (-320000, 1510*1000, 110000, 1425*1000)    # xmin, xmax, ymin, ymax; ymin in South
 
