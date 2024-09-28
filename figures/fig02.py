@@ -9,12 +9,27 @@ import akramms.experiment.ak as exp
 from akfigs import *
 from uafgi.util import gdalutil,cptutil,ioutil,cartopyutil
 import matplotlib.colors
+import akfigs
 # \caption{Elevation data from Juneau area}
 
 # Line2D Properties: https://matplotlib.org/stable/api/_as_gen/matplotlib.lines.Line2D.html#matplotlib.lines.Line2D
 
+def _discrete_cmap(N, base_cmap, nkeep):
+    """Create an N-bin discrete colormap from the specified input map"""
+
+    # Note that if base_cmap is a string or None, you can simply do
+    #    return plt.cm.get_cmap(base_cmap, N)
+    # The following works for string, None, or a colormap instance:
+
+    base = matplotlib.pyplot.cm.get_cmap(base_cmap)
+    color_list = base(np.linspace(0, 1, N))[:nkeep]
+    cmap_name = base.name + str(N)
+#    print('cccccccccccccccccccccccccccc ', color_list)
+    return base.from_list(cmap_name, color_list, nkeep)
+
+
 def main():
-    map_crs = cartopy.crs.epsg(3338)    # Alaska Albers
+    map_crs = akfigs.map_crs()
 
     idom,jdom = (113,45)    # Juneau tile
 
@@ -56,6 +71,7 @@ def main():
 
         # ------- Plot bed elevations EVERYWHERE
         cmap,_,_ = cptutil.read_cpt('palettes/geo_0_2000.cpt', scale=4000)    # Convert to m
+        cmap = _discrete_cmap(10, cmap,6)
         print('dem_data shape ', dem_data.shape)
 #        dem_data[0:300, 0:300] = 0
 #        dem_data[300:600, 0:300] = 20
@@ -69,7 +85,7 @@ def main():
         pcm_elev = ax.pcolormesh(
             subgrid.centersx, subgrid.centersy, dem_data,
             alpha=0.5, rasterized=True,
-            transform=map_crs, cmap=cmap, vmin=0, vmax=2000)
+            transform=map_crs, cmap=cmap, vmin=0, vmax=1200)
 
 
 #        ofname = pathlib.Path('./fig02.png')
@@ -89,7 +105,14 @@ def main():
             subgrid.centersx, subgrid.centersy, glacier_data,
             alpha=0.5, rasterized=True,
             transform=map_crs, cmap=glacier_cmap)
-        
+
+        # Add graticules
+        gl = ax.gridlines(draw_labels=True,
+              linewidth=0.3, color='white', alpha=0.5, x_inline=False, y_inline=False, dms=True, linestyle='-')
+        gl.xlabel_style = {'size': 8}
+        gl.ylabel_style = {'size': 8}
+        gl.ylabels_right = False
+
         ofname = pathlib.Path('./fig02.pdf')
         with TrimmedPdf(ofname) as tname:
             fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res ver
@@ -100,14 +123,48 @@ def main():
     #        subplot_kw={'projection': map_crs},
             figsize=(8.5,5.5))
         cbar_ax = axs
-        cbar = fig.colorbar(pcm_elev, ax=cbar_ax)
-        cbar.ax.tick_params(labelsize=20)
+        cbar = fig.colorbar(pcm_elev, ax=cbar_ax, ticks=[0,200,400,600,800,1000,1200])
+        cbar.ax.set_yticklabels(['0 m', '200', '400', '600', '800', '1000', '1200 m',])
+        cbar.ax.tick_params(labelsize=12)
         cbar_ax.remove()   # https://stackoverflow.com/questions/40813148/save-colorbar-for-scatter-plot-separately
 
         ofname = pathlib.Path('geo_cbar.pdf')
         with TrimmedPdf(ofname) as tname:
             fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res version; add margin so text is not cut off
 
+
+    # ==================================================================
+    # Make the inset map
+#    imap_extent = (-820*1000, 1900*1000, 0*1000, 2400*1000)
+    # Same as fig01 map_extent, 
+    imap_extent = akfigs.sealaska_map_extent
+
+    fig,ax = plt.subplots(
+        nrows=1,ncols=1,
+        subplot_kw={'projection': map_crs},
+        figsize=(2.5,1.5))
+    ax.set_extent(imap_extent, crs=map_crs)
+
+    ax.add_image(cartopy.io.img_tiles.OSM(cache=True), 6, alpha=1)    # Use level 7 (lower # is coarser)
+#    ax.coastlines(resolution='50m', color='grey', linewidth=0.5)
+
+    # The overall bounding box
+    bbox_feature = akfigs.wrf_bbox_feature()
+    ax.add_feature(bbox_feature, facecolor='none', edgecolor='brown', lw=1.0, linestyle='--')
+
+
+    # The original map bounds
+    map_extent_feature = cartopy.feature.ShapelyFeature(gisutil.xxyy_to_poly(*map_extent), map_crs)
+    ax.add_feature(map_extent_feature, facecolor='none', edgecolor='blue', lw=0.5)
+
+    # Outline this map (so the inset map looks inset)
+    imap_extent_feature = cartopy.feature.ShapelyFeature(gisutil.xxyy_to_poly(*imap_extent), map_crs)
+    ax.add_feature(imap_extent_feature, facecolor='none', edgecolor='black', lw=2.0)
+
+
+    ofname = pathlib.Path('./fig02-inset.pdf')
+    with akfigs.TrimmedPdf(ofname) as tname:
+        fig.savefig(tname, dpi=300, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
 
 
 

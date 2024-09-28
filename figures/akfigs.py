@@ -1,6 +1,8 @@
 import os,subprocess
 import cartopy
 from akramms import config
+from uafgi.util import wrfutil,cartopyutil,gisutil
+from akramms import config
 
 PALETTES = config.HARNESS / 'akramms' / 'palettes'
 OSM_DIR = config.HARNESS / 'data' / 'openstreetmap'
@@ -56,3 +58,27 @@ def plot_cities(ax, marker_kwargs=None, text_kwargs=None):
         ax.plot(lon, lat, transform=cartopy.crs.PlateCarree(), **(marker_kwargs if marker_kwargs is not None else _cities_marker_kwargs))
         # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.text.html
         ax.text(lon, lat, f'  {city_name}', transform=cartopy.crs.PlateCarree(), **(text_kwargs if text_kwargs is not None else _cities_text_kwargs))
+
+def map_crs():
+    # HACK: Increase the bounds that this projection is allowed to display
+    crs = cartopy.crs.epsg(3338)    # Alaska Albers
+    bb = crs.bounds
+#    crs.bounds = (bb[0], bb[1]+100*1000, bb[2]-100*1000, bb[3])
+    crs.bounds = (bb[0], bb[1]+300*1000, -1000, bb[3])
+    print('bounds ', crs.bounds)
+    return crs
+
+allalaska_map_extent = (-820*1000, 1900*1000, 0*1000, 2400*1000)
+sealaska_map_extent = ((320-180)*1000, 1670*1000, 300*1000, (1425+230)*1000)    # xmin, xmax, ymin, ymax; ymin in South
+
+ccsm_dir = config.HARNESS / 'data' / 'lader' / 'sx3'#pathlib.Path(os.environ['HOME']) / 'av/data/lader/sx3'
+geo_nc = ccsm_dir / 'geo_southeast.nc'    # Describes grid
+
+
+def wrf_bbox_feature():
+    # The overall bounding box (as a Shapely polygon)
+    snow_grid = wrfutil.wrf_info(geo_nc)
+    snow_crs = cartopyutil.crs(snow_grid.wkt)
+    bbox = snow_grid.bounding_box()
+    return cartopy.feature.ShapelyFeature(bbox, snow_crs)
+    

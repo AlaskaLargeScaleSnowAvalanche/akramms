@@ -4,7 +4,7 @@ import cartopy.io.img_tiles
 from akramms import config
 import matplotlib.pyplot as plt
 import akramms.experiment.ak as exp
-from uafgi.util import wrfutil,cartopyutil
+from uafgi.util import wrfutil,cartopyutil,gisutil
 import akfigs
 
 
@@ -17,7 +17,8 @@ geo_nc = ccsm_dir / 'geo_southeast.nc'    # Describes grid
 # Line2D Properties: https://matplotlib.org/stable/api/_as_gen/matplotlib.lines.Line2D.html#matplotlib.lines.Line2D
 
 def main():
-    map_crs = cartopy.crs.epsg(3338)    # Alaska Albers
+    #map_crs = cartopy.crs.epsg(3338)    # Alaska Albers
+    map_crs = akfigs.map_crs()
     map_extent = ((320-30)*1000, (1510+0)*1000, (710-0)*1000, (1425+30)*1000)    # xmin, xmax, ymin, ymax; ymin in South
 
 #    map_extent = (-320000, 1510*1000, 110000, 1425*1000)    # xmin, xmax, ymin, ymax; ymin in South
@@ -25,7 +26,7 @@ def main():
     fig,ax = plt.subplots(
         nrows=1,ncols=1,
         subplot_kw={'projection': map_crs},
-        figsize=(8.5,5.5))
+        figsize=(7.2,5.5))
     ax.set_extent(map_extent, map_crs)
 
     ax.add_image(cartopy.io.img_tiles.OSM(cache=True), 7, alpha=1)    # Use level 7 (lower # is coarser)
@@ -106,12 +107,60 @@ def main():
 
     akfigs.plot_cities(ax,
         text_kwargs=dict(
-            fontdict = {'size': 4, 'color': 'blue', 'fontweight': 'bold'}),
+            fontdict = {'size': 8, 'color': 'blue', 'fontweight': 'bold'}),
         marker_kwargs=dict(
             marker='*', markersize=2, color='black', alpha=0.9))
+
+    # Add graticules
+    gl = ax.gridlines(draw_labels=True,
+          linewidth=0.3, color='grey', alpha=0.5, x_inline=False, y_inline=False, dms=True, linestyle='-')
+    gl.xlabel_style = {'size': 9}
+    gl.ylabel_style = {'size': 9}
+    gl.ylabels_bottom = False
+
 
     ofname = pathlib.Path('./fig05.pdf')
     with akfigs.TrimmedPdf(ofname) as tname:
         fig.savefig(tname, dpi=300, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
+
+
+
+    # ==================================================================
+    # Make the inset map
+#    imap_extent = (-820*1000, 1900*1000, 0*1000, 2400*1000)
+    # Same as fig01 map_extent, 
+    imap_extent = (-820*1000, 2500*1000, -100*1000, 2400*1000)
+#    imap_extent = akfigs.allalaska_map_extent
+
+    fig,ax = plt.subplots(
+        nrows=1,ncols=1,
+        subplot_kw={'projection': map_crs},
+        figsize=(2.5,1.5))
+    ax.set_extent(imap_extent, crs=map_crs)
+
+    ax.add_image(cartopy.io.img_tiles.OSM(cache=True), 6, alpha=1)    # Use level 7 (lower # is coarser)
+#    ax.coastlines(resolution='50m', color='grey', linewidth=0.5)
+
+    # The overall bounding box
+    bbox_feature = akfigs.wrf_bbox_feature()
+    ax.add_feature(bbox_feature, facecolor='none', edgecolor='brown', lw=1.0, linestyle='--')
+
+
+    # The original map bounds
+    map_extent_feature = cartopy.feature.ShapelyFeature(gisutil.xxyy_to_poly(*map_extent), map_crs)
+    ax.add_feature(map_extent_feature, facecolor='none', edgecolor='blue', lw=0.5)
+
+    # Outline this map (so the inset map looks inset)
+    imap_extent_feature = cartopy.feature.ShapelyFeature(gisutil.xxyy_to_poly(*imap_extent), map_crs)
+    ax.add_feature(imap_extent_feature, facecolor='none', edgecolor='black', lw=2.0)
+
+
+    ofname = pathlib.Path('./fig05-inset.pdf')
+    with akfigs.TrimmedPdf(ofname) as tname:
+        fig.savefig(tname, dpi=300, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
+
+
+
+
 
 main()

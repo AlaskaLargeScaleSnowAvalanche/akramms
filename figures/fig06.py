@@ -15,10 +15,19 @@ import shapely.geometry.multipolygon
 
 ak_work_dir = exp.dir.parents[0] / (exp.dir.parts[-1] + '_work')
 
+# Original dups, these were deemed too ugly
+#_dup_coords = [
+#    # (idom, jdom, Id)
+#    ((112,43,12093), (112,44,2479)),
+#    ((112,43,12094), (112,44,2480)),
+#]
+
+idom0,jdom0 = (105,43)
+idom1,jdom1 = (105,44)
 _dup_coords = [
     # (idom, jdom, Id)
-    ((112,43,12093), (112,44,2479)),
-    ((112,43,12094), (112,44,2480)),
+    ((105,43,6946), (105,44,1754)),
+    ((105,43,6886), (105,44,1758)),
 ]
 
 
@@ -26,13 +35,17 @@ def main():
     map_crs = cartopy.crs.epsg(3338)    # Alaska Albers
 
     #map_extent = subgrid.extent(order='xxyy')
-    map_extent = (1096*1000, 1100*1000,   1139*1000, 1141*1000)
+#    map_extent = (1096*1000, 1100*1000,   1139*1000, 1141*1000)
 
 
 #    subgrid = exp.gridD.sub(112, 43, 100, 100, margin=True)
 #    map_extent = subgrid.extent(order='xxyy')
 
-
+    extent0 = exp.gridD.sub(idom0, jdom0, 100, 100, margin=False).extent(order='xxyy')
+    extent1 = exp.gridD.sub(idom1, jdom1, 100, 100, margin=False).extent(order='xxyy')
+#    map_extent = (extent0[0], extent1[1], extent1[2], extent0[3])
+    map_extent = (extent0[0]+2*1000, extent0[0]+5*1000, extent0[2]-1*1000, extent0[2]+1*1000)
+#    map_extent = extent0
 
     for idup in (0,1):
 
@@ -45,25 +58,12 @@ def main():
 
 
     #    for idom,jdom in ((112,43), (112,44)):    # Dups span two adjacent tiles
-        for idom,jdom in ((112,43),):     # Margins overlap
+        for idom,jdom in ((idom0,jdom0),):     # Margins overlap
             # Resample DEM to 100m resolution
             dem_tif = exp.dir / 'dem' / f'ak_dem_{idom:03d}_{jdom:03d}.tif'
             landcover_tif = exp.dir / 'landcover' / f'ak_landcover_{idom:03d}_{jdom:03d}.tif'
             print('dem_tif ', dem_tif)
             with ioutil.TmpDir() as tdir:
-    #            xyres = 10    # Resample to 60m
-    #
-    #            print('AA1')
-    #            dem_tif_lr = tdir.location / dem_tif.parts[-1]
-    #            ds = gdal.Warp(dem_tif_lr, dem_tif,
-    #                xRes=xyres, yRes=xyres, resampleAlg='average')
-    #            ds = None
-    #
-    #            print('AA2')
-    #            landcover_tif_lr = tdir.location / landcover_tif.parts[-1]
-    #            ds = gdal.Warp(landcover_tif_lr, landcover_tif,
-    #                xRes=xyres, yRes=xyres, resampleAlg='average')
-    #            ds = None
 
                 # Grid the tile images are defined on.
                 subgrid = exp.gridD.sub(idom, jdom, 10, 10, margin=True)
@@ -87,7 +87,7 @@ def main():
                 print('AA5')
                 img = plt.imread(str(landcover_tif))
                 img_landcover = ax.imshow(
-                    img, origin='upper', transform=map_crs, extent=img_extent, alpha=0.8)
+                    img, origin='upper', transform=map_crs, extent=img_extent, alpha=0.4)
                 print('AA6')
 
 
@@ -117,13 +117,20 @@ def main():
         ax.add_feature(shape_feature, facecolor='none', alpha=.6, edgecolor='black', linestyle='--', lw=1)
         subgrid = exp.gridD.sub(idom, jdom, 10, 10, margin=True)
 
-        centroid = pra_multi.convex_hull.centroid
-        deltay = 500 if jdom == 43 else -500
+#        centroid = pra_multi.convex_hull.centroid
+        deltay = 50 if jdom == 43 else -50
         ax.text(
-            centroid.x, centroid.y + deltay, f'({idom},{jdom})', transform=map_crs, verticalalignment='center', horizontalalignment='center',
+            map_extent[0], extent0[0] + deltay,
+            #centroid.x, centroid.y + deltay,
+            f'({idom},{jdom})', transform=map_crs, verticalalignment='center', horizontalalignment='center',
             fontdict = {'fontweight': 'bold'})
 
-
+        # Add graticules
+        gl = ax.gridlines(draw_labels=True,
+              linewidth=0.3, color='navy', alpha=0.4, x_inline=False, y_inline=False, dms=True, linestyle='-')
+        gl.xlabel_style = {'size': 9}
+        gl.ylabel_style = {'size': 9}
+        gl.xlabels_top = False
 
         ofname = pathlib.Path(f'./fig06-{idup}.pdf')
         with TrimmedPdf(ofname) as tname:

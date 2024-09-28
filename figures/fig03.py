@@ -7,7 +7,7 @@ from akramms import config
 import matplotlib.pyplot as plt
 import akramms.experiment.ak as exp
 from akfigs import *
-from uafgi.util import gdalutil,cptutil,ioutil,cartopyutil
+from uafgi.util import gdalutil,cptutil,ioutil,cartopyutil,nlcdcodes
 # \caption{Elevation data from Juneau area}
 
 # Line2D Properties: https://matplotlib.org/stable/api/_as_gen/matplotlib.lines.Line2D.html#matplotlib.lines.Line2D
@@ -58,33 +58,43 @@ def main():
             transform=map_crs, extent=map_extent)
 
         img = plt.imread(landcover_tif_lr)
+        print(type(img), img.shape)
         img_landcover = ax.imshow(
             img, origin='upper', transform=map_crs, extent=map_extent, alpha=0.8)
 
-#        pcm_landcover = ax.pcolormesh(
-#            subgrid.centersx, subgrid.centersy, landcover_data,
-#            alpha=0.5, rasterized=True,
-#            transform=map_crs)#, cmap=cmap)#, vmin=0, vmax=2000)
+        # Get unique set of RGB values in img
+        # https://stackoverflow.com/questions/40936160/how-to-efficiently-convert-2d-numpy-array-into-1d-numpy-array-of-tuples
+        shp = img.shape
+        imgT = img.reshape((shp[0]*shp[1],shp[2])).T
+        rgbs = set(zip(imgT[0], imgT[1], imgT[2]))
 
+        # Figure out which NLCD codes are used
+        rgb2nlcd = {(x.R,x.G,x.B): x for x in nlcdcodes.codes if len(x.label) > 0}
+        nlcds = set(rgb2nlcd[rgb].code for rgb in rgbs)
+        print('nlcds ', nlcds)
+
+        # Add graticules
+        gl = ax.gridlines(draw_labels=True,
+              linewidth=0.3, color='white', alpha=0.5, x_inline=False, y_inline=False, dms=True, linestyle='-')
+        gl.xlabel_style = {'size': 9}
+        gl.ylabel_style = {'size': 9}
+        gl.ylabels_right = False
+
+        # Write output
         ofname = pathlib.Path('./fig03.pdf')
         with TrimmedPdf(ofname) as tname:
             fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res version; add margin so text is not cut off
 
-#        # ---------- The colorbar
-#        fig,axs = plt.subplots(
-#            nrows=1,ncols=1,
-#    #        subplot_kw={'projection': map_crs},
-#            figsize=(8.5,5.5))
-#        cbar_ax = axs
-#        cbar = fig.colorbar(pcm_elev, ax=cbar_ax)
-#        cbar.ax.tick_params(labelsize=20)
-#        cbar_ax.remove()   # https://stackoverflow.com/questions/40813148/save-colorbar-for-scatter-plot-separately
-#
-#        ofname = pathlib.Path('geo_cbar.pdf')
-#        with TrimmedPdf(ofname) as tname:
-#            fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res version; add margin so text is not cut off
 
 
+    # ====================== NLCD Table
+    ofname = pathlib.Path('./fig03-nlcd.tex')
+    with open(ofname, 'w') as out:
+        for x in nlcdcodes.codes:
+            if x.code in nlcds:
+                out.write(f"\\colorpatch{{{x.R}}}{{{x.G}}}{{{x.B}}} & {x.label} \\\\\n")
+#            if len(x.label) == 0:
+#                continue
 
 
 main()
