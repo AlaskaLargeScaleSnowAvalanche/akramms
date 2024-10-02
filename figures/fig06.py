@@ -9,7 +9,7 @@ import akramms.experiment.ak as exp
 from akfigs import *
 from uafgi.util import gdalutil,cptutil,ioutil,cartopyutil
 import shapely.geometry.multipolygon 
-# \caption{Elevation data from Juneau area}
+import akfigs
 
 # Line2D Properties: https://matplotlib.org/stable/api/_as_gen/matplotlib.lines.Line2D.html#matplotlib.lines.Line2D
 
@@ -52,7 +52,7 @@ def main():
         fig,ax = plt.subplots(
             nrows=1,ncols=1,
             subplot_kw={'projection': map_crs},
-            figsize=(8.5,5.5))
+            figsize=(5.5,5.5))
         ax.set_extent(map_extent, map_crs)
         ax.set_facecolor((20./255, 30./255, 53./255))
 
@@ -87,7 +87,7 @@ def main():
                 print('AA5')
                 img = plt.imread(str(landcover_tif))
                 img_landcover = ax.imshow(
-                    img, origin='upper', transform=map_crs, extent=img_extent, alpha=0.4)
+                    img, origin='upper', transform=map_crs, extent=img_extent, alpha=0.6)
                 print('AA6')
 
 
@@ -118,19 +118,24 @@ def main():
         subgrid = exp.gridD.sub(idom, jdom, 10, 10, margin=True)
 
 #        centroid = pra_multi.convex_hull.centroid
-        deltay = 50 if jdom == 43 else -50
+        deltay = 100 if jdom == 43 else -100
         ax.text(
-            map_extent[0], extent0[0] + deltay,
+            map_extent[0]+ 400, extent0[2] + deltay,
             #centroid.x, centroid.y + deltay,
             f'({idom},{jdom})', transform=map_crs, verticalalignment='center', horizontalalignment='center',
-            fontdict = {'fontweight': 'bold'})
+            fontdict = {'fontweight': 'bold', 'size': 12})
 
         # Add graticules
         gl = ax.gridlines(draw_labels=True,
-              linewidth=0.3, color='navy', alpha=0.4, x_inline=False, y_inline=False, dms=True, linestyle='-')
+              linewidth=0.3, color='navy', alpha=0.5, x_inline=False, y_inline=False,
+            dms=False,    # Degrees/Minutes/Seconds vs. Decimal
+            linestyle='-')
         gl.xlabel_style = {'size': 9}
         gl.ylabel_style = {'size': 9}
-        gl.xlabels_top = False
+        if idup == 0:
+            gl.xlabels_bottom = False
+        else:
+            gl.xlabels_top = False
 
         ofname = pathlib.Path(f'./fig06-{idup}.pdf')
         with TrimmedPdf(ofname) as tname:
@@ -149,8 +154,6 @@ def main():
 #        ofname = pathlib.Path('geo_cbar.pdf')
 #        with TrimmedPdf(ofname) as tname:
 #            fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res version; add margin so text is not cut off
-
-
 
 
 main()

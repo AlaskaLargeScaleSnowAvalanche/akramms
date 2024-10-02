@@ -2,7 +2,7 @@ import os,pathlib
 import numpy as np
 #import scipy
 from akramms import config,params
-from uafgi.util import gdalutil,wrfutil,cartopyutil,cptutil
+from uafgi.util import gdalutil,wrfutil,cartopyutil,cptutil,gisutil
 from osgeo import gdalconst
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -10,7 +10,7 @@ import seaborn
 import akfigs,aklapse
 import akramms.experiment.ak as exp
 from akramms import downscale_snow
-
+import cartopy.io.img_tiles
 
 # =================================================================
 #dfc_tif = exp.dir / 'ak_DFC.tif'
@@ -47,9 +47,12 @@ if True:
 # =================================================
 # Plot the empirical lapse rate!
 if True:
-    map_crs = cartopyutil.crs('+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs')
+    map_crs = akfigs.map_crs()
+    map_extent = (155*1000, 1680*1000, 510*1000, 1645*1000)    # xmin, xmax, ymin, ymax; ymin in South  (Same as fig04)
 
-    map_extent = ((320-30)*1000, (1510+0)*1000, (710-0)*1000, (1425+30)*1000)    # xmin, xmax, ymin, ymax; ymin in South
+#    map_crs = cartopyutil.crs('+proj=aea +lat_0=50 +lon_0=-154 +lat_1=55 +lat_2=65 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs')
+
+#    map_extent = ((320-30)*1000, (1510+0)*1000, (710-0)*1000, (1425+30)*1000)    # xmin, xmax, ymin, ymax; ymin in South
 
     fig,ax = plt.subplots(
         nrows=1,ncols=1,
@@ -84,7 +87,7 @@ if True:
 
     akfigs.plot_cities(ax,
         text_kwargs=dict(
-            fontdict = {'size': 4, 'color': 'blue', 'fontweight': 'bold'}),
+            fontdict = {'size': 8, 'color': 'black', 'fontweight': 'bold'}),
         marker_kwargs=dict(
             marker='*', markersize=2, color='black', alpha=0.9))
 
@@ -97,15 +100,49 @@ if True:
     fig,axs = plt.subplots(
         nrows=1,ncols=1,
 #        subplot_kw={'projection': map_crs},
-        figsize=(2.8,2.8))
+        figsize=(108/25.4,108/25.4))
     cbar_ax = axs
     km = 1000.
-    cbar = fig.colorbar(pcm_lapse, ax=cbar_ax)
-#        ticks=[90*km,140*km, 190*km, 240*km])
-#    cbar.ax.set_yticklabels(['90 km', '140', '190', '240'])
-    cbar.ax.tick_params(labelsize=12)
+    cbar = fig.colorbar(pcm_lapse, ax=cbar_ax,
+        ticks=[0.,0.05,0.1,0.15,0.2,0.25,0.3])
+    cbar.ax.set_yticklabels(['0.00 m/km', '0.05', '0.10', '0.15', '0.20', '0.25', '.30 m/km'])
+    cbar.ax.tick_params(labelsize=10)
     cbar_ax.remove()   # https://stackoverflow.com/questions/40813148/save-colorbar-for-scatter-plot-separately
 
     ofname = pathlib.Path('fig07-cbar.pdf')
     with akfigs.TrimmedPdf(ofname) as tname:
         fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res version; add margin so text is not cut off
+
+    # ==================================================================
+    # Make the inset map
+#    imap_extent = (-820*1000, 1900*1000, 0*1000, 2400*1000)
+    # Same as fig01 map_extent, 
+    imap_extent = (-820*1000, 2500*1000, -100*1000, 2400*1000)
+#    imap_extent = akfigs.allalaska_map_extent
+
+    fig,ax = plt.subplots(
+        nrows=1,ncols=1,
+        subplot_kw={'projection': map_crs},
+        figsize=(2.5,1.5))
+    ax.set_extent(imap_extent, crs=map_crs)
+
+    ax.add_image(cartopy.io.img_tiles.OSM(cache=True), 6, alpha=1)    # Use level 7 (lower # is coarser)
+#    ax.coastlines(resolution='50m', color='grey', linewidth=0.5)
+
+    # The overall bounding box
+    bbox_feature = akfigs.wrf_bbox_feature()
+    ax.add_feature(bbox_feature, facecolor='none', edgecolor='brown', lw=1.0, linestyle='--')
+
+
+    # The original map bounds
+    map_extent_feature = cartopy.feature.ShapelyFeature(gisutil.xxyy_to_poly(*map_extent), map_crs)
+    ax.add_feature(map_extent_feature, facecolor='none', edgecolor='blue', lw=0.5)
+
+    # Outline this map (so the inset map looks inset)
+    imap_extent_feature = cartopy.feature.ShapelyFeature(gisutil.xxyy_to_poly(*imap_extent), map_crs)
+    ax.add_feature(imap_extent_feature, facecolor='none', edgecolor='black', lw=2.0)
+
+
+    ofname = pathlib.Path('./fig07-inset.pdf')
+    with akfigs.TrimmedPdf(ofname) as tname:
+        fig.savefig(tname, dpi=300, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off

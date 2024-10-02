@@ -51,7 +51,7 @@ def main():
 
     # Add graticules
     gl = ax.gridlines(draw_labels=True,
-          linewidth=0.3, color='gray', alpha=0.5, x_inline=False, y_inline=False, dms=True, linestyle='-')
+          linewidth=0.3, color='gray', alpha=0.5, x_inline=False, y_inline=False, dms=False, linestyle='-')
     gl.xlabel_style = {'size': 9}
     gl.ylabel_style = {'size': 9}
 
