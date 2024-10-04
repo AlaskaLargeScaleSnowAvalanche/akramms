@@ -10,14 +10,15 @@ from akfigs import *
 from uafgi.util import gdalutil,cptutil,ioutil,cartopyutil
 import shapely.geometry.multipolygon
 # \caption{Elevation data from Juneau area}
+import akfigs
 
 import matplotlib.patches
 
 # Line2D Properties: https://matplotlib.org/stable/api/_as_gen/matplotlib.lines.Line2D.html#matplotlib.lines.Line2D
 
 
-idom0,idom1 = (102,111)
-jdom0,jdom1 = (41,44)
+idom0,idom1 = (107,115)
+jdom0,jdom1 = (41,48)
 
 
 
@@ -39,6 +40,9 @@ def main():
     xx,yy = index_box.exterior.coords.xy
     map_extent = (xx[0], xx[1], yy[2], yy[0])
 
+    print('map_extent ', map_extent)
+    return
+
     fig,ax = plt.subplots(
         nrows=1,ncols=1,
         subplot_kw={'projection': map_crs},
@@ -50,8 +54,8 @@ def main():
     # Resample DEM to 100m resolution
     with ioutil.TmpDir() as tdir:
         for idom in range(idom0,idom1):
-#            for jdom in range(jdom0,jdom1):
-            for jdom in range(jdom0,jdom0+1):
+            for jdom in range(jdom0,jdom1):
+#            for jdom in range(jdom0,jdom0+1):
 
                 print('ijdom ', idom, jdom)
 
@@ -79,37 +83,8 @@ def main():
                 ds = None
 
                 dem_grid, dem_data, dem_nd = gdalutil.read_raster(dem_tif_lr)
-                dem_data[dem_data <= 0] = np.nan
-
-
-                # Get mask for plotting
-                sg = exp.gridD.sub(idom, jdom, xyres, xyres, margin=False)
-                xt = sg.extent('xxyy')
-                x0,x1,y0,y1 = xt
-                # https://matplotlib.org/stable/gallery/shapes_and_collections/path_patch.html
-                pth = matplotlib.path.Path
-                path_data = [
-                    (pth.MOVETO, (x0,y0)),
-                    (pth.LINETO, (x0,y1)),
-                    (pth.LINETO, (x1,y1)),
-                    (pth.LINETO, (x1,y0)),
-                    (pth.CLOSEPOLY, (x0,y0))]
-                codes,verts = zip(*path_data)
-                path = matplotlib.path.Path(verts,codes)
-                # https://github.com/SciTools/cartopy/issues/1603
-#                patch = matplotlib.patches.PathPatch(path, transform=ax.transData)
-
-
-                path = cartopy.mpl.patch.geos_to_path(exp.gridD.poly(idom, jdom, margin=False))[0]
-                print('path ', path)
-                bbox = matplotlib.transforms.Bbox([[x0,y0],[x1,y1]])
-
-
-
-                # https://matplotlib-users.narkive.com/Kmgvq1hY/clipping-a-plot-inside-a-polygon
-**** SEE HERE...
-https://matplotlib-users.narkive.com/Kmgvq1hY/clipping-a-plot-inside-a-polygon
-                patch = matplotlib.patches.Rectangle((x0,y1), x1-x0, y0-y1)
+                dem_mask = (dem_data <= 0)
+                dem_data[dem_mask] = np.nan
 
 
                 # ------- Plot bed elevations EVERYWHERE
@@ -129,17 +104,34 @@ https://matplotlib-users.narkive.com/Kmgvq1hY/clipping-a-plot-inside-a-polygon
                 snow_grid, snow_data, snow_nd = gdalutil.read_raster(snow_tif_lr)
                 vmin = np.nanmin(snow_data)
                 vmax = np.nanmax(snow_data)
+                snow_data[dem_mask] = np.nan
                 print('vmin vmax ', vmin, vmax)
                 # https://stackoverflow.com/questions/56649160/clip-off-pcolormesh-outside-of-circular-set-boundary-in-cartopy
                 pcm_snow = ax.pcolormesh(
                     subgrid.centersx, subgrid.centersy, snow_data,
                     alpha=0.5, rasterized=True,
                     transform=map_crs, cmap=cmap, vmin=0, vmax=700)
-#                    clip_box=bbox)
-#                    clip_path=(path, ax.transAxes))
-#                pcm_snow.set_clip_path((path, ax.transAxes))
-#                ax.clip_to_bbox(bbox)    # https://scitools.org.uk/cartopy/docs/v0.17/whats_new.html
-#                pcm_snow.set_clip_on(True)
+
+
+                pcm_snow.set_clip_path(cartopyutil.poly_clip_path(ax, exp.gridD.poly(idom, jdom, margin=False)))
+
+        akfigs.plot_cities(ax,
+            only={'Haines', 'Juneau'},
+            text_kwargs=dict(
+                fontdict = {'size': 8, 'color': 'red', 'fontweight': 'bold'}),
+            marker_kwargs=dict(
+                marker='*', markersize=2, color='red', alpha=0.9))
+
+
+        # Add graticules
+        gl = ax.gridlines(draw_labels=True,
+              linewidth=0.3, color='grey', alpha=0.5, x_inline=False, y_inline=False, dms=False, linestyle='-')
+        gl.xlabel_style = {'size': 9}
+        gl.ylabel_style = {'size': 9}
+        gl.xlabels_top = False        
+        gl.ylabels_right = False
+
+
 
         ofname = pathlib.Path('./fig10.pdf')
         with TrimmedPdf(ofname) as tname:
@@ -159,6 +151,40 @@ https://matplotlib-users.narkive.com/Kmgvq1hY/clipping-a-plot-inside-a-polygon
 #        with TrimmedPdf(ofname) as tname:
 #            fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res version; add margin so text is not cut off
 
+
+        # ==================================================================
+        # Make the inset map
+    #    imap_extent = (-820*1000, 1900*1000, 0*1000, 2400*1000)
+        # Same as fig01 map_extent, 
+        imap_extent = (-520*1000, 2500*1000, -00*1000, 2400*1000)
+    #    imap_extent = akfigs.allalaska_map_extent
+
+        fig,ax = plt.subplots(
+            nrows=1,ncols=1,
+            subplot_kw={'projection': map_crs},
+            figsize=(2.5,1.5))
+        ax.set_extent(imap_extent, crs=map_crs)
+
+        ax.add_image(cartopy.io.img_tiles.OSM(cache=True), 6, alpha=1)    # Use level 7 (lower # is coarser)
+    #    ax.coastlines(resolution='50m', color='grey', linewidth=0.5)
+
+        # The overall bounding box
+        bbox_feature = akfigs.wrf_bbox_feature()
+        ax.add_feature(bbox_feature, facecolor='none', edgecolor='brown', lw=1.0, linestyle='--')
+
+
+        # The original map bounds
+        map_extent_feature = cartopy.feature.ShapelyFeature(gisutil.xxyy_to_poly(*map_extent), map_crs)
+        ax.add_feature(map_extent_feature, facecolor='none', edgecolor='blue', lw=0.5)
+
+        # Outline this map (so the inset map looks inset)
+        imap_extent_feature = cartopy.feature.ShapelyFeature(gisutil.xxyy_to_poly(*imap_extent), map_crs)
+        ax.add_feature(imap_extent_feature, facecolor='none', edgecolor='black', lw=2.0)
+
+
+        ofname = pathlib.Path('./fig10-inset.pdf')
+        with akfigs.TrimmedPdf(ofname) as tname:
+            fig.savefig(tname, dpi=300, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
 
 
 

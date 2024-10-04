@@ -63,7 +63,7 @@ def doplot(section, xdata_tif, ofname, map_extent=None, idom=113, jdom=45, xyres
         fig,ax = plt.subplots(
             nrows=1,ncols=1,
             subplot_kw={'projection': map_crs},
-            figsize=(8.5,5.5))
+            figsize=(3.0,3.0))
         ax.set_extent(map_extent, map_crs)
         ax.set_facecolor((82./255,117./255,168./255))    # LANDSAT color for open water
 
@@ -137,7 +137,7 @@ def colorbar():
         fig,axs = plt.subplots(
             nrows=1,ncols=1,
     #        subplot_kw={'projection': map_crs},
-            figsize=(8.5,5.5))
+            figsize=(2.5,2.5))
         cbar_ax = axs
         cbar = fig.colorbar(pcm_elev, ax=cbar_ax)
         cbar.ax.tick_params(labelsize=20)

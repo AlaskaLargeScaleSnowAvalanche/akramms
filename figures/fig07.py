@@ -91,6 +91,14 @@ if True:
         marker_kwargs=dict(
             marker='*', markersize=2, color='black', alpha=0.9))
 
+    # Add graticules
+    gl = ax.gridlines(draw_labels=True,
+          linewidth=0.3, color='grey', alpha=0.5, x_inline=False, y_inline=False, dms=False, linestyle='-')
+    gl.xlabel_style = {'size': 9}
+    gl.ylabel_style = {'size': 9}
+    gl.xlabels_top = False        
+    gl.ylabels_right = False
+
     ofname = pathlib.Path('./fig07.pdf')
     with akfigs.TrimmedPdf(ofname) as tname:
         fig.savefig(tname, dpi=300, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off

@@ -50,14 +50,15 @@ _cities_marker_kwargs = dict(marker='o', markersize=2, color='blue', alpha=0.5)
 _cities_text_kwargs = dict(
             fontdict = {'size': 4, 'color': 'black'})
 
-def plot_cities(ax, marker_kwargs=None, text_kwargs=None):
+def plot_cities(ax, marker_kwargs=None, text_kwargs=None, only=None):
     # Plot Juneau and other cities
     # https://scitools.org.uk/cartopy/docs/latest/tutorials/understanding_transform.html
     for lon, lat, city_name in SECities:
-#        lon,lat = (-134.4201, 58.3005)
-        ax.plot(lon, lat, transform=cartopy.crs.PlateCarree(), **(marker_kwargs if marker_kwargs is not None else _cities_marker_kwargs))
-        # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.text.html
-        ax.text(lon, lat, f'  {city_name}', transform=cartopy.crs.PlateCarree(), **(text_kwargs if text_kwargs is not None else _cities_text_kwargs))
+        if (only is None) or (city_name in only):
+    #        lon,lat = (-134.4201, 58.3005)
+            ax.plot(lon, lat, transform=cartopy.crs.PlateCarree(), **(marker_kwargs if marker_kwargs is not None else _cities_marker_kwargs))
+            # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.text.html
+            ax.text(lon, lat, f'  {city_name}', transform=cartopy.crs.PlateCarree(), **(text_kwargs if text_kwargs is not None else _cities_text_kwargs))
 
 def map_crs():
     # HACK: Increase the bounds that this projection is allowed to display
