@@ -260,7 +260,7 @@ def query(akdf0, sextent, scenetypes={'x', 'arc'},
 
             # Filter/expand combos to account for all tiles (with margins) that
             # intersect the geom
-            akdf1 = expand_combos_by_geom(expmod, akdf1, geom)
+            akdf1 = expand_combos_by_geom(expmod, akdf1, geom)   # This finds avalanches in neighboring tiles!!!
             akdf1 = joblib.add_combo_quickstatus(akdf1)
 
             # Make sure all combos have status EXTENT, and are fully ready to query!

@@ -197,9 +197,9 @@ def mosaic_avals_id(gridM, akdf0, tifdir,
         # --------------- Read polygon files: PRAs, domains and extents
         # (All using geopandas, with .Id and .geometry columns)
         dfs = (
-            ('release', archive.read_reldom(arcdir/'RELEASE.zip', 'rel')),
+            ('release', archive.read_reldom(arcdir/'RELEASE.zip', 'rel')),    # Polygons will be repeated for For and NoFor cases.
             ('domain', archive.read_reldom(arcdir/'DOMAIN.zip', 'dom')),
-            ('extent', geopandas.read_file(str(arcdir/'extent.gpkg'))))
+            ('extent', geopandas.read_file(str(arcdir/'extent.gpkg'))))   # >1 polygon per ID
         ids = set(akdf1.id)
         for vname,val in dfs:
             dfss[vname].append(val[val.Id.isin(ids)])

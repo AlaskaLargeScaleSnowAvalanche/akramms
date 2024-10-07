@@ -237,7 +237,7 @@ def _realized_ids(scenetype, releasefile, stage, include_overruns=False, filter_
     stage: 'in' or 'out'
         Whether we are looking for .in.zip files or .out.zip
     filter_geom: Shapely Geometry
-        Only include Avalanches known to intersect with this Shapely Geometry
+        Only include Avalanches known to intersect with this Shapely Geometry (based on extent_full)
     Returns: {id: filename}
     """
 
