@@ -679,13 +679,69 @@ def read_nc(avalfile):
 
 
 
+def write_extent_gpkg(expmod, combo, extent_gpkg, extent_full_gpkg, tdir):
+
+    # ----------------- Write /vsizip/EXTENT.zip/extent.shp
+    extent_shp = tdir.location / 'extent.shp'
+    extent_full_shp = tdir.location / 'extent_full.shp'
+
+    # Get a list of all the Avalanches in this (archived) combo
+#    scombo = expmod.name + '-' + '-'.join(str(x) for x in combo)
+    scombo = expmod.name + '-' + str(combo)
+    parseds = parse.parse_args([scombo])
+    akdf = resolve.resolve_to(parseds, 'id', realized=True, scenetypes={'arc'})
+
+    # Open and write the extent file (Shapefile within a Zip archive)
+    extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(str(extent_shp))
+    extent_full_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(str(extent_full_shp))
+    try:
+        extent_layer = extent_ds.CreateLayer(str(extent_shp), ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
+        extent_full_layer = extent_full_ds.CreateLayer(str(extent_full_shp), ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
+
+        # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
+        extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
+        extent_full_Id = extent_full_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
+
+        # Read avalanches, compute extent, and write into extent file
+        nrow = len(akdf)
+        n = 0
+        print(f'Polygonizing {nrow} avalanche extents (user and full)', end='')
+        sys.stdout.flush()
+        for tup in akdf.sort_values('id').itertuples(index=False):
+            if n%100 == 0:
+                print('.', end='')
+                sys.stdout.flush()
+            if not os.path.isfile(tup.avalfile):
+                raise ValueError(f'Missing avalanche file: {tup.avalfile}')
+
+            aval = read_nc(tup.avalfile)
+            polygonize_extent(aval, tup.id, extent_layer, extent_Id, full=False)
+            polygonize_extent(aval, tup.id, extent_full_layer, extent_full_Id, full=True)
+            n += 1
+        print('Done!')
+    finally:
+        extent_ds = None
+        extent_full_ds = None
+
+
+    # Convert to GeoPackage (indented to maintain open temp dir)
+    for shp,gpkg in ((extent_shp, extent_gpkg), (extent_full_shp, extent_full_gpkg)):
+        gpkg_tmp = gpkg.parents[0] / (gpkg.parts[-1][:-5] + '-tmp.gpkg')
+        cmd = ['ogr2ogr', gpkg_tmp, shp]
+        subprocess.run(cmd, check=True)
+        os.rename(gpkg_tmp, gpkg)
+
+
+
+
+
+
+
 
 def finish_combo(expmod, combo, dry_run=False):
 
     xdir = expmod.combo_to_scenedir(combo, scenetype='x')
     arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
-
-#    print('xxxxxxxxx ', arcdir)
 
     control_fname = arcdir / 'archived.txt'
     if dry_run:
@@ -702,58 +758,11 @@ def finish_combo(expmod, combo, dry_run=False):
  
     # ----------------- Write /vsizip/EXTENT.zip/extent.shp
     with ioutil.TmpDir(dir=arcdir) as tdir:
-        extent_shp = tdir.location / 'extent.shp'
-        extent_full_shp = tdir.location / 'extent_full.shp'
 
-        # Get a list of all the Avalanches in this (archived) combo
-        scombo = expmod.name + '-' + '-'.join(str(x) for x in combo)
-        parseds = parse.parse_args([scombo])
-        akdf = resolve.resolve_to(parseds, 'id', realized=True, scenetypes={'arc'})
-        # TODO: Look at this dataframe
-
-        # Open and write the extent file (Shapefile within a Zip archive)
-        extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(str(extent_shp))
-        extent_full_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(str(extent_full_shp))
-        try:
-            extent_layer = extent_ds.CreateLayer(str(extent_shp), ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
-            extent_full_layer = extent_full_ds.CreateLayer(str(extent_full_shp), ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
-
-            # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
-            extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
-            extent_full_Id = extent_full_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
-
-            # Read avalanches, compute extent, and write into extent file
-            nrow = len(akdf)
-            n = 0
-            print(f'Polygonizing {nrow} avalanche extents (user and full)', end='')
-            sys.stdout.flush()
-            for tup in akdf.sort_values('id').itertuples(index=False):
-                if n%100 == 0:
-                    print('.', end='')
-                    sys.stdout.flush()
-                if not os.path.isfile(tup.avalfile):
-                    raise ValueError(f'Missing avalanche file: {tup.avalfile}')
-
-                aval = read_nc(tup.avalfile)
-                polygonize_extent(aval, tup.id, extent_layer, extent_Id, full=False)
-                polygonize_extent(aval, tup.id, extent_full_layer, extent_full_Id, full=True)
-                n += 1
-            print('Done!')
-        finally:
-            extent_ds = None
-            extent_full_ds = None
-
-
-        # Convert to GeoPackage (indented to maintain open temp dir)
-        for full in ('', '_full'):
-            cmd = ['ogr2ogr', arcdir / f'extent{full}-tmp.gpkg', tdir.location / f'extent{full}.shp']
-            subprocess.run(cmd, check=True)
-            os.rename(arcdir / f'extent{full}-tmp.gpkg', arcdir / f'extent{full}.gpkg')
-
-#        # Convert to zip file
-#        _zip_dir(tdir.location, arcdir/'EXTENT-tmp.zip')
-#
-#    os.rename(arcdir/'EXTENT-tmp.zip', arcdir / 'EXTENT.zip')
+        write_extent_gpkg(expmod, combo,
+            arcdir / f'extent.gpkg',
+            arcdir / f'extent_full.gpkg',
+            tdir)
 
     # --------------- (Very conservatively)
     # Delete the xdir by moving it to a todel directory.
@@ -872,10 +881,17 @@ def polygonize_extent(aval, tup_id,
     # >   velocity > 1m/s
     nzmask_val = np.zeros(aval.max_vel.shape, dtype=np.int32)
     if full:
-        nzmask_val[np.logical_and(np.logical_and(
+        #nzmask_val[np.logical_and(np.logical_and(
+        #    aval.max_height > 0,
+        #    aval.max_vel > 0),
+        #    aval.depo > 0)] = tup_id
+
+        # Do not require depo>0 because there will be parts of extent
+        # that are not also covered by extent_full.
+        nzmask_val[np.logical_and(
             aval.max_height > 0,
-            aval.max_vel > 0),
-            aval.depo > 0)] = tup_id
+            aval.max_vel > 0)] = tup_id
+
     else:
         # On March 5, 2024 Marc Christen wrote:
         # > These outlines are defined as an envelope of grid cells
@@ -902,7 +918,20 @@ def polygonize_extent(aval, tup_id,
 
 
 # ----------------------------------------------------------
+def redone_extent_gpkgs(expmod, combo):
+    """Determines filenames of the re-done extent GPKG files.
+    (The ones in the standard read-only ak/ directory are wront."""
 
+    arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
+    swcombo = arcdir.parts[-2]    # Eg: 'ak-ccsm-1981-2010-lapse-For-30'
+    sijdom = arcdir.parts[-1][4:]    # Eg: 111-044
+    expdir_ext = expmod.dir.parents[0] / (expmod.dir.parts[-1] + '_ext')
+
+    odir = expdir_ext / swcombo / 'extent'
+    extent_gpkg = odir  / f'{swcombo}-{sijdom}-extent.gpkg'
+    extent_full_gpkg =  odir / f'{swcombo}-{sijdom}-extent_full.gpkg'
+
+    return extent_gpkg, extent_full_gpkg
 
 #TODO: Add T/S/M/L categorization to netCDF file
 #Add authorship metadata to netCDF file

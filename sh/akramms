@@ -817,6 +817,32 @@ def xoverrun(args):
 #    archive.archive_ids(akdf, debug=args.debug, dry_run=args.dry_run, archive_overruns=args.overrun)
 
 # ------------------------------------------------------------------
+@subcommand(name='redo_extent', args=[
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser.')
+])
+def redo_extent(args):
+
+    """Rewrites the extent.gpkg files into a new location because the
+    originals were wrong."""
+
+    from akramms import archive
+
+    # Identify archived avalanches for use in the mosaic
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
+
+    for tup in akdf.itertuples(index=False):
+        print('---- Redoing extent: {tup.combo}')
+        combo = tup.combo
+        expmod = akramms.parse.load_expmod(tup.exp)
+
+        extent_gpkg, extent_full_gpkg = archive.redone_extent_gpkgs(expmod, combo)
+
+        os.makedirs(odir, exist_ok=True)
+        with ioutil.TmpDir(odir) as tdir:
+            archive.write_extent_gpkg(expmod, combo, extent_gpkg, extent_full_gpkg, tdir)
+
+# ------------------------------------------------------------------
 # https://stackoverflow.com/questions/3844801/check-if-all-elements-in-a-list-are-identical
 def all_equal(iterable):
     g = groupby(iterable)
@@ -864,6 +890,7 @@ def xmosaic(args):
         args.status, args.margin,
         args.snow, args.dem, args.landcover,
         args.dry_run)
+
 
 #    else:
 #        with open(args.query, 'rb') as fin:

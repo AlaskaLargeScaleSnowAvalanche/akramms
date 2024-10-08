@@ -4,7 +4,7 @@ import pandas as pd
 import zipfile,netCDF4
 from osgeo import gdal,ogr
 from uafgi.util import gdalutil,ogrutil
-from uafgi.util import cfutil,shputil,ioutil,gisutil
+from uafgi.util import cfutil,shputil,ioutil,gisutil,rasterize
 from akramms import experiment,archive,file_info,avalquery,downscale_snow
 import akramms.parse
 import _mosaic
@@ -94,6 +94,12 @@ _mosaic_metadata = {
     'domain_count': (gdal.GDT_Int16, {
         'description': 'Number of avalanches hitting this gridcell',
     }),
+    'pra_count': (gdal.GDT_Int16, {
+        'description': 'Number of PRAs hitting this gridcell',
+    }),
+    'pra_centroid_count': (gdal.GDT_Int16, {
+        'description': 'Number of PRAs centered on this gridcell',
+    }),
 }
 _avoid = ('dem', 'landcover')    # Only include these if user provides fetch fn
 _mosaic_keys = list(x for x in _mosaic_metadata.keys() if x not in _avoid)
@@ -105,17 +111,17 @@ class _ExtentShp(typing.NamedTuple):
     layer: object
     Id: object
 
-def new_extent_shp(dir, gridM, combo):
-    scombo = '-'.join(str(x) for x in combo)
-    extent_shp = str(dir / f'extent-{scombo}.shp')
-    print('Writing extent_shp ', extent_shp)
-    if os.path.exists(extent_shp):
-        os.remove(extent_shp)
-    extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
-    extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.wkt), geom_type=ogr.wkbMultiPolygon )
-    # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
-    extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
-    return _ExtentShp(scombo, extent_shp, extent_ds, extent_layer, extent_Id)
+#def new_extent_shp(dir, gridM, combo):
+#    scombo = '-'.join(str(x) for x in combo)
+#    extent_shp = str(dir / f'extent-{scombo}.shp')
+#    print('Writing extent_shp ', extent_shp)
+#    if os.path.exists(extent_shp):
+#        os.remove(extent_shp)
+#    extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
+#    extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.wkt), geom_type=ogr.wkbMultiPolygon )
+#    # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
+#    extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
+#    return _ExtentShp(scombo, extent_shp, extent_ds, extent_layer, extent_Id)
 
 
 
@@ -131,7 +137,7 @@ class Mosaic(typing.NamedTuple):
 #        self._tdir = 
 #        self.tifdir = tifdir
 
-def mosaic_avals_id(gridM, akdf0, tifdir,
+def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
     rho=300, vars=_mosaic_keys,
     dem_fn=None, landcover_fn=None, snow_fn=None, ijdom=None):
 
@@ -183,7 +189,9 @@ def mosaic_avals_id(gridM, akdf0, tifdir,
         max_velocity=np.zeros(shapeM, dtype='f4'),
         max_pressure=np.zeros(shapeM, dtype='f4'),
         domain_count=np.zeros(shapeM, dtype='i2'),
-        avalanche_count=np.zeros(shapeM, dtype='i2'))
+        avalanche_count=np.zeros(shapeM, dtype='i2'),
+        pra_centroid_count=np.zeros(shapeM, dtype='i2'),
+        pra_count=np.zeros(shapeM, dtype='i2'))
     for vname,val in vals.items():
         if vname in vars:
             mos.rasters[vname] = val
@@ -195,14 +203,43 @@ def mosaic_avals_id(gridM, akdf0, tifdir,
         akdf1 = akdf1.sort_values('id')
 
         # --------------- Read polygon files: PRAs, domains and extents
+        # Use the redone extent.gpkg files
+        extent_gpkg, extent_full_gpkg = archive.redone_extent_gpkgs(expmod, combo)
+
+        # Auto-generate if not exists
+        if not os.path.isfile(extent_gpkg):
+            odir = extent_gpkg.parents[0]
+            with ioutil.TmpDir(odir) as tdir:
+                archive.write_extent_gpkg(expmod, combo, extent_gpkg, extent_full_gpkg, tdir)
+
         # (All using geopandas, with .Id and .geometry columns)
         dfs = (
-            ('release', archive.read_reldom(arcdir/'RELEASE.zip', 'rel')),    # Polygons will be repeated for For and NoFor cases.
+            ('release', archive.read_reldom(arcdir/'RELEASE.zip', 'rel')),    # Includes ALL For and NoFor Polygons
             ('domain', archive.read_reldom(arcdir/'DOMAIN.zip', 'dom')),
-            ('extent', geopandas.read_file(str(arcdir/'extent.gpkg'))))   # >1 polygon per ID
+            ('extent', geopandas.read_file(str(extent_gpkg))))   # >1 polygon per ID
         ids = set(akdf1.id)
         for vname,val in dfs:
+            # Select out only polyg`ons pertaining to this combo (whether For or NoFor)
             dfss[vname].append(val[val.Id.isin(ids)])
+
+        # -------------- Rasterize ("burn") the release polygons
+        pra_count_1d = vals['pra_count'].reshape(-1)
+        pra_centroid_count = vals['pra_centroid_count']
+        reldf = dfss['release'][-1]    # Most recent relase polygons read, and cut down by IDs
+        for pra in reldf.geometry:
+
+            # -------------- pra_count: burn area of PRA into the raster
+            # TODO: It might be gaster to rasterize directly onto the grids.
+            # But that's more code to write.
+            ixs = rasterize.rasterize_polygon_compressed(pra, gridM)
+            pra_count_1d[ixs] += 1
+
+            # -------------- pra_centroid_count: Just one point per PRA
+            centroid = pra.centroid
+            x,y = centroid.x, centroid.y
+            i,j = gridM.to_ij(x,y)
+            if (i >= 0) and (j >= 0) and (i < gridM.nx) and (j < gridM.ny):
+                pra_centroid_count[j,i] += 1
 
         # -------------- Update the mosaic (in memory)
         count = 0
@@ -369,7 +406,7 @@ def mosaic_avals_combo(akdf, sextent, tifdir,
     if snow:
         kwargs['snow_fn'] = lambda box_poly,ofname: downscale_snow.extract_snow(snowfile_vrt, box_poly, ofname)
 
-    ret = mosaic_avals_id(gridM, akdf, tifdir, **kwargs)
+    ret = mosaic_avals_id(expmod, gridM, akdf, tifdir, **kwargs)
     print('=== END mosaic_aval_combo')
     return ret
 
@@ -487,6 +524,10 @@ _tifdir_names = [
 #    'domain.shx',
 #    'domain_count.tfw',
 #    'domain_count.tif',
+    'pra_count.tfw',
+    'pra_count.tif',
+    'pra_centroid_count.tfw',
+    'pra_centroid_count.tif',
     'extent.cpg',
     'extent.dbf',
     'extent.prj',
@@ -509,7 +550,7 @@ _tifdir_names = [
     'snow.tfw',
     'snow.tif']
 
-        
+
 class PublishMosaicWriter(MosaicWriter):
 
     def ofname(self, scombo, tifdir_name):
