@@ -209,6 +209,7 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
         # Auto-generate if not exists
         if not os.path.isfile(extent_gpkg):
             odir = extent_gpkg.parents[0]
+            os.makedirs(odir, exist_ok=True)
             with ioutil.TmpDir(odir) as tdir:
                 archive.write_extent_gpkg(expmod, combo, extent_gpkg, extent_full_gpkg, tdir)
 
@@ -220,7 +221,11 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
         ids = set(akdf1.id)
         for vname,val in dfs:
             # Select out only polyg`ons pertaining to this combo (whether For or NoFor)
-            dfss[vname].append(val[val.Id.isin(ids)])
+            subdf = val[val.Id.isin(ids)]
+            # Put in idom / jdom
+            subdf['idom'] = combo.idom
+            subdf['jdom'] = combo.jdom
+            dfss[vname].append(subdf)
 
         # -------------- Rasterize ("burn") the release polygons
         pra_count_1d = vals['pra_count'].reshape(-1)
@@ -229,9 +234,11 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
         for pra in reldf.geometry:
 
             # -------------- pra_count: burn area of PRA into the raster
-            # TODO: It might be gaster to rasterize directly onto the grids.
+            # TODO: It might be faster to rasterize directly onto the grids.
             # But that's more code to write.
+#            print('ssssssshape ', gridM.nx, gridM.ny, vals['pra_count'].shape, pra_count_1d.shape)
             ixs = rasterize.rasterize_polygon_compressed(pra, gridM)
+#            ixs = ixs[(ixs >= 0) & (ixs < len(pra_count_1d))]    # Elimate out-of-range indices from polygon that extended beyond our domain
             pra_count_1d[ixs] += 1
 
             # -------------- pra_centroid_count: Just one point per PRA
@@ -493,9 +500,9 @@ class ZipMosaicWriter(MosaicWriter):
             # --------------------- Write shape dataframes to shapefiles
             for vname, df in mos.vectors.items():
                 # Add idom/jdom to the shapefile before writing
-                if ijdom is not None:
-                    df['idom'] = ijdom[0]
-                    df['jdom'] = ijdom[1]
+#                if ijdom is not None:
+#                    df['idom'] = ijdom[0]
+#                    df['jdom'] = ijdom[1]
                 df.to_file(tifdir / f'{vname}.shp')
 
             # ------------------- Landcover, etc. files
@@ -608,9 +615,9 @@ class PublishMosaicWriter(MosaicWriter):
                 continue
 
             # Add idom/jdom to the shapefile before writing
-            if ijdom is not None:
-                df['idom'] = ijdom[0]
-                df['jdom'] = ijdom[1]
+#            if ijdom is not None:
+#                df['idom'] = ijdom[0]
+#                df['jdom'] = ijdom[1]
             df.to_file(tifdir / f'{vname}.shp')
 
         for tifdir_name in sorted(os.listdir(tifdir)):

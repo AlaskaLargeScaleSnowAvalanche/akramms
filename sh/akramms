@@ -968,6 +968,7 @@ def stdmosaic(args):
         # Write the combo
         combo_quickstatus_mtime = akdf1.combo_quickstatus_mtime.max()
         if mwriter.needs_regen(name, combo_quickstatus_mtime):
+            os.makedirs(publish_dir, exist_ok=True)
             with ioutil.TmpDir(publish_dir) as tdir:
                 tifdir = pathlib.Path(tdir.location)
                 mos = mosaic.mosaic_avals_combo(
