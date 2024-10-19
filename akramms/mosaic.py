@@ -197,7 +197,6 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
             mos.rasters[vname] = val
 
     # Collect extent polygons
-    dfss = {'release': list(), 'domain': list(), 'extent': list()}
     shapedfs = list()
     for (combo,arcdir),akdf1 in akdf0.groupby(['combo', 'releasefile']):
         akdf1 = akdf1.sort_values('id')
@@ -214,32 +213,72 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
                 archive.write_extent_gpkg(expmod, combo, extent_gpkg, extent_full_gpkg, tdir)
 
         # (All using geopandas, with .Id and .geometry columns)
-        dfs = (
+        dfs0 = (
             ('release', archive.read_reldom(arcdir/'RELEASE.zip', 'rel')),    # Includes ALL For and NoFor Polygons
             ('domain', archive.read_reldom(arcdir/'DOMAIN.zip', 'dom')),
             ('extent', geopandas.read_file(str(extent_gpkg))))   # >1 polygon per ID
         ids = set(akdf1.id)
-        for vname,val in dfs:
-            # Select out only polyg`ons pertaining to this combo (whether For or NoFor)
+        dfs1 = dict()
+        for vname,val in dfs0:
+            # Select out only polygons pertaining to this combo (whether For or NoFor)
             subdf = val[val.Id.isin(ids)]
             # Put in idom / jdom
             subdf['idom'] = combo.idom
             subdf['jdom'] = combo.jdom
-            dfss[vname].append(subdf)
+            dfs1[vname] = subdf
+
 
         # -------------- Rasterize ("burn") the release polygons
-        pra_count_1d = vals['pra_count'].reshape(-1)
+#        pra_count_1d = vals['pra_count'].reshape(-1)
         pra_centroid_count = vals['pra_centroid_count']
-        reldf = dfss['release'][-1]    # Most recent relase polygons read, and cut down by IDs
-        for pra in reldf.geometry:
+        reldf = dfs1['release']    # Most recent relase polygons read, and cut down by IDs
+        # Grid these PRAs were originally computed on, including margin
+        forest_tif = expmod.dir / 'forest' / f'{expmod.name}_forest_{combo.idom:03d}_{combo.jdom:03d}.tif'
+        forest30_grid, forest30_data, forest30_nd = gdalutil.read_raster(forest_tif)    # forest_grid includes margin
 
-            # -------------- pra_count: burn area of PRA into the raster
-            # TODO: It might be faster to rasterize directly onto the grids.
-            # But that's more code to write.
-#            print('ssssssshape ', gridM.nx, gridM.ny, vals['pra_count'].shape, pra_count_1d.shape)
-            ixs = rasterize.rasterize_polygon_compressed(pra, gridM)
-#            ixs = ixs[(ixs >= 0) & (ixs < len(pra_count_1d))]    # Elimate out-of-range indices from polygon that extended beyond our domain
-            pra_count_1d[ixs] += 1
+        # Resample forest to same grid as everything else
+        tile_grid = expmod.gridD.sub(combo.idom, combo.jdom, abs(gridM.dx), abs(gridM.dy), margin=True)
+        forest_data = gdalutil.regrid(
+            forest30_data, forest30_grid, forest30_nd,
+            tile_grid, forest30_nd)
+
+#        for pra in reldf.geometry:
+        ids = set()
+        for id,pra in reldf['geometry'].items():
+
+            # Indices of gridcells hit by this polygon, on the tile grid (with margin)
+            iit,jjt = rasterize.rasterize_polygon_ij(pra, forest_grid)
+
+            # Figure out how many of the gridcells in this PRA have forest
+            forest_total = np.sum(forest_data[np.ix_(jjt,iit)])
+            forest_frac = forest_total / len(iit)
+            if forest_frac >= 0.5: #forest_threshold:    # Discard PRAs >50% forest
+                continue
+            ids.add(id)
+
+
+            # Translate indices to gridM, and then clip.
+            ioff,joff = gisutil.offset_diff(forest_grid, gridM)    # Computes forest_grid - gridM
+            iit += ioff    # This will subtract from iit, resulting in indices for gridM
+            jjt += joff
+            mask_in = np.logical_and(np.logical_and(np.logical_and(
+                iit >= 0, iit < gridM.nx),
+                jjt >= 0), jjt < gridM.ny)
+            iit = iit[mask_in]
+            jjt = jjt[mask_in]
+
+            # Translate indices to 1D and update pra_count
+            vals['pra_count'][np.ix_(jjt, iit) += 1
+#            ijt = jjt * gridM.nx + iit
+#            pra_count[ijt] += 1
+
+
+
+#            # -------------- pra_count: burn area of PRA into the raster
+#            # TODO: It might be faster to rasterize directly onto the grids.
+#            # But that's more code to write.
+#            ixs = rasterize.rasterize_polygon_compressed(pra, gridM)
+#            pra_count_1d[ixs] += 1
 
             # -------------- pra_centroid_count: Just one point per PRA
             centroid = pra.centroid
@@ -247,6 +286,12 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
             i,j = gridM.to_ij(x,y)
             if (i >= 0) and (j >= 0) and (i < gridM.nx) and (j < gridM.ny):
                 pra_centroid_count[j,i] += 1
+
+        # Get final set of Avalanches
+        dfss = {'release': list(), 'domain': list(), 'extent': list()}
+        for vname,val in dfs1.items():
+            subdf = val[val.Id.isin(ids)]
+            dfss[vname].append(subdf)
 
         # -------------- Update the mosaic (in memory)
         count = 0
