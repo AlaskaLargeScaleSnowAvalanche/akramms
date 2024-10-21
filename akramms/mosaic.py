@@ -236,8 +236,12 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
         forest_tif = expmod.dir / 'forest' / f'{expmod.name}_forest_{combo.idom:03d}_{combo.jdom:03d}.tif'
         forest30_grid, forest30_data, forest30_nd = gdalutil.read_raster(forest_tif)    # forest_grid includes margin
 
+        dem_tif = expmod.dir / 'dem' / f'{expmod.name}_dem_{combo.idom:03d}_{combo.jdom:03d}.tif'
+        dem_grid = gdalutil.read_grid(dem_tif)
+
         # Resample forest to same grid as everything else
-        tile_grid = expmod.gridD.sub(combo.idom, combo.jdom, abs(gridM.dx), abs(gridM.dy), margin=True)
+#        tile_grid = expmod.gridD.sub(combo.idom, combo.jdom, abs(gridM.dx), abs(gridM.dy), margin=True)
+        tile_grid = dem_grid
         forest_data = gdalutil.regrid(
             forest30_data, forest30_grid, forest30_nd,
             tile_grid, forest30_nd)
@@ -247,7 +251,7 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
         for id,pra in reldf['geometry'].items():
 
             # Indices of gridcells hit by this polygon, on the tile grid (with margin)
-            iit,jjt = rasterize.rasterize_polygon_ij(pra, forest_grid)
+            iit,jjt = rasterize.rasterize_polygon_ij(pra, tile_grid)
 
             # Figure out how many of the gridcells in this PRA have forest
             forest_total = np.sum(forest_data[np.ix_(jjt,iit)])
@@ -258,7 +262,8 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
 
 
             # Translate indices to gridM, and then clip.
-            ioff,joff = gisutil.offset_diff(forest_grid, gridM)    # Computes forest_grid - gridM
+            ioff,joff = gisutil.offset_diff(tile_grid, gridM)    # Computes forest_grid - gridM
+#            print('ioff, joff = ', ioff, joff)
             iit += ioff    # This will subtract from iit, resulting in indices for gridM
             jjt += joff
             mask_in = np.logical_and(np.logical_and(np.logical_and(
@@ -268,7 +273,7 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
             jjt = jjt[mask_in]
 
             # Translate indices to 1D and update pra_count
-            vals['pra_count'][np.ix_(jjt, iit) += 1
+            vals['pra_count'][np.ix_(jjt, iit)] += 1
 #            ijt = jjt * gridM.nx + iit
 #            pra_count[ijt] += 1
 
