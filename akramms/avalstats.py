@@ -15,12 +15,11 @@ def _section(expmod, combo):
     section =  expmod.name + '-' + '-'.join(lcombo[:-2])
     return section
 
-def _read_ocean(expmod, combo, vname, imosaic_grid):
+def _read_ocean(expmod, idom, jdom, imosaic_grid):
     """Read the ocean mask"""
     global _last_landcover_tif, _last_ocean_mask
 
-    section = _section(expmod, combo)
-    imosaic_tif = publish_dir / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}.tif'
+    landcover_tif = expmod.dir / 'landcover' / f'{expmod.name}_landcover_{idom:03d}_{jdom:03d}.tif'
 
     # Handle memoize / LRU cache
     if landcover_tif == _last_landcover_tif:
@@ -47,26 +46,30 @@ def _read_ocean(expmod, combo, vname, imosaic_grid):
 
 # ------------------------------------------------------------------
 # Read each different variable
+def rbind(fn, *rargs):
+    def _fn(*largs):
+        return fn(*itertools.chain(largs, rargs))
+    return _fn
 
 
-def _read_land(combo):
+def _read_land(expmod, combo):
+    """Variable = 1 for land gridcells, 0 for ocean"""
 
-
-
-
-
-
-def regrid_stdmosaic(expmod, combo, vname, res):
-
+    # Get imosaic_grid
     section = _section(expmod, combo)
+    vname = 'avalanche_count'    # Any name works
+    publish_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + '_publish')
+    imosaic_tif = publish_dir / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}.tif'
+    imosaic_grid = gdalutil.read_grid(imosaic_tif)
+
+    ocean_mask = _read_ocean(expmod, combo.idom, combo.jdom, imosaic_grid)
+    return imosaic_grid, np.logical_not(ocean_mask).astype('d'), -1e10
+
+def _read_thresh(vname, expmod, combo):
+    """Thresholds a "count" variable to 0 or 1"""
 
     publish_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + '_publish')
-    stats_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats_{res}')
-
-#    imosaic_tif = publish_dir / vname / f'{expmod.name}_vname_{combo.idom:03d}_{combo.jdom:03d}.tif'
-    omosaic_tif = stats_dir / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}-stats{res}.tif'
-#    omosaic_tif = stats_dir / section / vname / f'{expmod.name}_vname_{combo.idom:03d}_{combo.jdom:03d}_stats_{res}.tif'
-    landcover_tif = expmod.dir / 'landcover' / f'{expmod.name}_landcover_{combo.idom:03d}_{combo.jdom:03d}.tif'
+    imosaic_tif = publish_dir / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}.tif'
 
     # Read the variable
     imosaic_grid, imosaic_data, imosaic_nd = gdalutil.read_raster(imosaic_tif)
@@ -75,9 +78,63 @@ def regrid_stdmosaic(expmod, combo, vname, res):
     assert imosaic_nd == 0
 
     # Use the ocean mask to set nodata values
-    ocean_mask = _read_ocean(landcover_tif, imosaic_grid)
+    ocean_mask = _read_ocean(expmod, combo.idom, combo.jdom, imosaic_grid)
     mosaic_nd = -1e10
     imosaic_data[ocean_mask] = imosaic_nd
+
+    return imosaic_grid, imosaic_data, mosaic_nd
+
+def _read_double(expmod, combo, vname):
+    """No Thresholding, variable already double"""
+
+    publish_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + '_publish')
+    imosaic_tif = publish_dir / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}.tif'
+
+    # Read the variable
+    imosaic_grid, imosaic_data, imosaic_nd = gdalutil.read_raster(imosaic_tif)
+#    imosaic_data = np.clip(imosaic_data, None, 1)
+    imosaic_data = imosaic_data.astype('d')
+    assert imosaic_nd == 0
+
+    # Use the ocean mask to set nodata values
+    ocean_mask = _read_ocean(expmod, combo.idom, combo.jdom, imosaic_grid)
+    mosaic_nd = -1e10
+    imosaic_data[ocean_mask] = imosaic_nd
+
+    return imosaic_grid, imosaic_data, mosaic_nd
+
+def _by_area(grid):
+    return 1. / (grid.dx * grid.dy)
+
+def _by_1(grid):
+    return 1
+
+def stats_vars = {
+    'extent': (_read_land, 
+
+
+
+    'land': _read_land,
+    'avalanche_count': (_read_thresh, _by_area, 'extent %', '1'),
+    'pra_centroid_count': (_read_thresh, _by_area, 'count', 'avy m-2'),
+    'pra_count': (_read_thresh, _
+    'max_height': _read_double,
+    'max_pressure': _read_double,
+    'max_velocity': _read_double,
+    'deposition': _read_double,
+}
+
+
+def regrid_stdmosaic(expmod, combo, vname, res):
+
+    section = _section(expmod, combo)
+
+    stats_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats_{res}')
+
+    omosaic_tif = stats_dir / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}-stats{res}.tif'
+#    omosaic_tif = stats_dir / section / vname / f'{expmod.name}_vname_{combo.idom:03d}_{combo.jdom:03d}_stats_{res}.tif'
+
+    imosaic_grid, imosaic_data, imosaic_nd = stats_vars[vname](expmod, combo, vname)
 
     # Construct stats grid (at low resolution), used for averaging
     onx = int(round(imosaic_grid.nx * np.abs(imosaic_grid.dx) / res))
@@ -91,15 +148,15 @@ def regrid_stdmosaic(expmod, combo, vname, res):
 
     # Regrid mosaic to the stats grid
     stats_data = gdalutil.regrid(
-        imosaic_data, imosaic_grid, mosaic_nd,
-        stats_grid, mosaic_nd,
+        imosaic_data, imosaic_grid, imosaic_nd,
+        stats_grid, imosaic_nd,
         resample_algo=gdalconst.GRA_Average)
 
     print(f'Writing {omosaic_tif}')
     os.makedirs(omosaic_tif.parents[0], exist_ok=True)
     gdalutil.write_raster(
         omosaic_tif,
-        stats_grid, stats_data, mosaic_nd)
+        stats_grid, stats_data, imosaic_nd)
 
 
 def stats_combo(akdf0, res=1000):
@@ -128,6 +185,5 @@ def stats_combo(akdf0, res=1000):
         combo = combo._replace(forest='All')
         print('combo ', combo)
 
-        res = 1000
-        for vname in ('pra_count',):
+        for vname in stats_vars.keys():
             regrid_stdmosaic(expmod, combo, vname, res)
