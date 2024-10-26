@@ -498,32 +498,6 @@ def mosaic_avals_combo(akdf, sextent, tifdir,
     return ret
 
 # ---------------------------------------------------------------------------------
-def consolidate_by_forest(expmod, akdf0):
-    """Combines For / NoFor pairs for stdmosaic operations.
-    Raises an error if any unmatched rows are found in the input.
-
-    akdf0:
-        Resolved by combo.  (Single exp only)
-    Returns: [akdf1, akdf1, ...]
-        Each akdf1 contains two rows of akdf0 with matching For/NoFor pairs.
-    """
-
-    # This should ALWAYS work.  'forest' is a REQUIRED key in Combos
-    # If it fails it will throw a ValueError.
-    forest_ix = expmod.combo_keys.index('forest')
-
-    akdf0['combo_noforest'] = akdf0.combo.map( lambda combo: tuple((combo[:forest_ix],)+combo[forest_ix+1:]) )
-#    akdf0['forest'] = akdf0.combo.map(lambda combo: combo[forest_ix])
-
-    akdf1s = list()
-    for combo_noforest,akdf1 in akdf0.groupby('combo_noforest'):
-#        # This error check isn't actually correct, there are some degenerate cases...
-#        if len(akdf1) != 2:
-#            raise ValueError(f'ERROR: Need both For and NoFor pair to proceed further, we have only: {akdf1.combo.tolist()}')
-
-        akdf1s.append(akdf1)
-    return akdf1s
-# ---------------------------------------------------------------------------------
 class MosaicWriter:
 
     def __init__(self, expmod):
