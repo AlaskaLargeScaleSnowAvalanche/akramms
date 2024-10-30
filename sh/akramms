@@ -903,7 +903,7 @@ def stats(args):
     parseds = akramms.parse.parse_args(args.spec)
     akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
 
-    avalstats.stats_combo(akdf, res=args.res)
+    avalstats.stats_combo(akdf, ress=[100,1000,10000])
 
 
 

@@ -1,4 +1,4 @@
-import os,copy,functools
+import os,copy,functools,itertools
 import numpy as np
 from osgeo import gdalconst
 from uafgi.util import gisutil, gdalutil
@@ -47,8 +47,8 @@ def _read_ocean(expmod, idom, jdom, imosaic_grid):
 # ------------------------------------------------------------------
 # Read each different variable
 def rbind(fn, *rargs):
-    def _fn(*largs):
-        return fn(*itertools.chain(largs, rargs))
+    def _fn(*largs, **kwargs):
+        return fn(*itertools.chain(largs, rargs), **kwargs)
     return _fn
 
 
@@ -65,9 +65,10 @@ def _read_land(expmod, combo):
     ocean_mask = _read_ocean(expmod, combo.idom, combo.jdom, imosaic_grid)
     return imosaic_grid, np.logical_not(ocean_mask).astype('d'), -1e10
 
-def _read_thresh(vname, expmod, combo):
+def _read_thresh(expmod, combo, vname):
     """Thresholds a "count" variable to 0 or 1"""
 
+    section = _section(expmod, combo)
     publish_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + '_publish')
     imosaic_tif = publish_dir / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}.tif'
 
@@ -109,32 +110,27 @@ def _by_area(grid):
 def _by_1(grid):
     return 1
 
-def stats_vars = {
-    'extent': (_read_land, 
-
-
-
-    'land': _read_land,
-    'avalanche_count': (_read_thresh, _by_area, 'extent %', '1'),
-    'pra_centroid_count': (_read_thresh, _by_area, 'count', 'avy m-2'),
-    'pra_count': (_read_thresh, _
-    'max_height': _read_double,
-    'max_pressure': _read_double,
-    'max_velocity': _read_double,
-    'deposition': _read_double,
+stats_vars = {
+    'land': (_read_land, _by_area, '1'),
+    'avy_extent': (rbind(_read_thresh, 'avalanche_count'), _by_1, '1'),
+    'count': (rbind(_read_thresh, 'pra_centroid_count'), _by_area, 'km-2'),
+    'release_extent': (rbind(_read_thresh, 'pra_count'), _by_area, '1'),
 }
 
 
 def regrid_stdmosaic(expmod, combo, vname, res):
+    read_fn, scale_fn, sunits = stats_vars[vname]
 
     section = _section(expmod, combo)
 
-    stats_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats_{res}')
+    stats_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats') / f'{res}'
 
     omosaic_tif = stats_dir / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}-stats{res}.tif'
-#    omosaic_tif = stats_dir / section / vname / f'{expmod.name}_vname_{combo.idom:03d}_{combo.jdom:03d}_stats_{res}.tif'
 
-    imosaic_grid, imosaic_data, imosaic_nd = stats_vars[vname](expmod, combo, vname)
+    if os.path.isfile(omosaic_tif):
+        return
+
+    imosaic_grid, imosaic_data, imosaic_nd = read_fn(expmod, combo)
 
     # Construct stats grid (at low resolution), used for averaging
     onx = int(round(imosaic_grid.nx * np.abs(imosaic_grid.dx) / res))
@@ -159,7 +155,7 @@ def regrid_stdmosaic(expmod, combo, vname, res):
         stats_grid, stats_data, imosaic_nd)
 
 
-def stats_combo(akdf0, res=1000):
+def stats_combo(akdf0, ress=[1000]):
 
     """
 
@@ -186,4 +182,5 @@ def stats_combo(akdf0, res=1000):
         print('combo ', combo)
 
         for vname in stats_vars.keys():
-            regrid_stdmosaic(expmod, combo, vname, res)
+            for res in ress:
+                regrid_stdmosaic(expmod, combo, vname, res)
