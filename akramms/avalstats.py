@@ -130,7 +130,11 @@ def regrid_stdmosaic(expmod, combo, vname, res):
     if os.path.isfile(omosaic_tif):
         return
 
-    imosaic_grid, imosaic_data, imosaic_nd = read_fn(expmod, combo)
+    try:
+        imosaic_grid, imosaic_data, imosaic_nd = read_fn(expmod, combo)
+    except FileNotFoundError:
+        print(f'No input file, skipping: {combo}')
+        return
 
     # Construct stats grid (at low resolution), used for averaging
     onx = int(round(imosaic_grid.nx * np.abs(imosaic_grid.dx) / res))
@@ -176,7 +180,8 @@ def stats_combo(akdf0, ress=[1000]):
 
     for akdf1 in avalquery.consolidate_by_forest(expmod, akdf0):
         # Change For/NoFor to All
-        combo = akdf1.combo[0]
+        combo = akdf1.combo.iloc[0]
+
 #        exp = akdf1.exp[0]
         combo = combo._replace(forest='All')
         print('combo ', combo)
