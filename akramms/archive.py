@@ -532,7 +532,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
                     for k,v in status_attrs.items():
                         setattr(ncv, k, v)
 
-                    ncv.combo = '{exp}-{scombo}'
+                    ncv.combo = f'{exp}-{scombo}'
                     ncv.releasefile_timestamp = releasefile_timestamp
                     ncv.avalanche_timestamp = out_zip_dtime.isoformat()
                     try:
