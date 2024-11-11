@@ -1,8 +1,8 @@
 import bisect,os,typing,shutil
 import numpy as np
 import pandas as pd
-import shapely
-from uafgi.util import rasterize,shputil
+import shapely,pyproj,geopandas
+from uafgi.util import rasterize
 import d8graph
 from akramms.util import rammsutil
 from akramms import snow,config,file_info,level,params,domain_mask
@@ -84,7 +84,12 @@ def read_rel(relfname, **kwargs):
     """
 
     # Read _rel shapefile
-    reldf = shputil.read_df(relfname, shape='pra', **kwargs)
+#    reldf = shputil.read_df(relfname, shape='pra', **kwargs)
+    reldf = geopandas.read_file(relfname, **kwargs).rename_geometry('pra')
+    print('Read ', relfname)
+    print('reldf ', reldf.columns)
+    print(reldf.index)
+    print(reldf)
     if 'Id' in reldf:
         reldf = reldf.drop('fid', axis=1)
     else:
@@ -105,8 +110,9 @@ def read_dom(domfname, **kwargs):
     Returns: df
         Index set to Id column
     """
-
-    return shputil.read_df(domfname, shape='dom', **kwargs) \
+    df = geopandas.read_file(domfname, **kwargs).rename_geometry('dom')
+#    return shputil.read_df(domfname, shape='dom', **kwargs) \
+    return df \
         .drop('fid', axis=1) \
         .set_index('Id')
 # -----------------------------------------------------------
@@ -122,6 +128,10 @@ def read_reldom(relfname, **kwargs):
 
     rdf = read_rel(relfname, **kwargs)
     ddf = read_dom(domfname, **kwargs)
+
+    # Remove geometry columns
+    rdf = pd.DataFrame(rdf)
+    ddf = pd.DataFrame(ddf)
 
     # Drop rows with missing domain
     df = rdf.merge(ddf[['dom']], left_index=True, right_index=True)
@@ -481,7 +491,10 @@ def write_rel(rdf, wkt, return_period, ofname, **kwargs):
 
 #    ofname.parents[0].mkdir(parents=True, exist_ok=True)
     os.makedirs(ofname.parents[0], exist_ok=True)
-    shputil.write_df(df, 'pra', 'Polygon', ofname, wkt=wkt, **kwargs)
+#    shputil.write_df(df, 'pra', 'Polygon', ofname, wkt=wkt, **kwargs)
+    crs = pyproj.CRS.from_user_input(wkt)
+    df = geopandas.GeoDataFrame(df, geometry='pra')
+    df.to_file(ofname, crs=crs, **kwargs)
 
 def write_dom(rdf, wkt, ofname, **kwargs):
     """
@@ -493,10 +506,10 @@ def write_dom(rdf, wkt, ofname, **kwargs):
 
     # Select columns to write
     df = rdf.reset_index()[['Id', 'dom']]
-#    print('dddddddddddddddddddom1')
-#    print(df.columns)
-#    print(df)
-    shputil.write_df(df, 'dom', 'Polygon', ofname, wkt=wkt, **kwargs)
+#    shputil.write_df(df, 'dom', 'Polygon', ofname, wkt=wkt, **kwargs)
+    df = geopandas.GeoDataFrame(df, geometry='dom')
+    crs = pyproj.CRS.from_user_input(wkt)
+    df.to_file(ofname, crs=crs, **kwargs)
 
 def write_chull(rdf, wkt, ofname, **kwargs):
     """
@@ -508,7 +521,10 @@ def write_chull(rdf, wkt, ofname, **kwargs):
 
     # Select columns to write
     df = rdf.reset_index()[['Id', 'chull']]
-    shputil.write_df(df, 'chull', 'Polygon', ofname, wkt=wkt, **kwargs)
+    df = geopandas.GeoDataFrame(df, geometry='chull')
+#    shputil.write_df(df, 'chull', 'Polygon', ofname, wkt=wkt, **kwargs)
+    crs = pyproj.CRS.from_user_input(wkt)
+    df.to_file(ofname, crs=crs, **kwargs)
 
 # -----------------------------------------------------------
 def dem_forest_links(scene_args, chunk_dir, oslope_name, For):
@@ -656,13 +672,15 @@ def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
     os.makedirs(chunk_dir / 'RELEASE', exist_ok=True)
     ofname = chunk_dir / 'RELEASE' / f'{ci.slope_name}_{ci.avalanche_name}_rel.shp'
     _dfx = dfc.reset_index()[['area_m2', 'Mean_DEM', 'Mean_Slope', 'Scene_reso', 'Id', 'i', 'j', 'sx3', 'd0star', 'slopecorr', 'Wind', f'd0_{ci.return_period}', f'VOL_{ci.return_period}', 'pra']]
-    shputil.write_df(_dfx, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
-    
+#    shputil.write_df(_dfx, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
+    _dfx.to_file(ofname, crs=pyproj.CRS.from_user_input(scene_args['coordinate_sytem']), **kwargs)
+
     # Write the _dom.shp file 
     os.makedirs(chunk_dir / 'DOMAIN', exist_ok=True)
     ofname = chunk_dir / 'DOMAIN' / f'{ci.slope_name}_{ci.avalanche_name}_dom.shp'
     _dfx = dfc.reset_index()[['Id', 'dom']]
-    shputil.write_df(_dfx, 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
+#    shputil.write_df(_dfx, 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
+    _dfx.to_file(ofname, crs=pyproj.CRS.from_user_input(scene_args['coordinate_sytem']), **kwargs)
 
 #    os.rename(chunk_dir, chunk_dir_final)
     return chunk_dir_final

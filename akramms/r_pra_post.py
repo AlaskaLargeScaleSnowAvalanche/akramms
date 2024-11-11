@@ -2,10 +2,11 @@ import pathlib
 import scipy.spatial
 import pandas as pd
 import shapely
+import geopandas
 from osgeo import gdal
 from akramms import params,process_tree,chunk,level,file_info
 from akramms.util import rammsutil
-from uafgi.util import shputil,gdalutil,wrfutil,make,cfutil,ioutil,rasterize
+from uafgi.util import gdalutil,wrfutil,make,cfutil,ioutil,rasterize
 import os,sys
 import subprocess
 import json
@@ -99,8 +100,10 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
         # Load the polygons (output of eCognition)
         # Reads columns: area_m2 Mean_DEM Mean_Slope Scene_reso
         print('======== Reading {}'.format(inputs[0]))
-        df = shputil.read_df(inputs[0], shape='pra')
-        df = df.rename(columns={'fid': 'Id'})    # RAMMS etc. want it named "Id"
+#        df = shputil.read_df(inputs[0], shape='pra')
+        df = geopandas.read_file(inputs[0]).rename_geometry('pra')    # Has index
+#        df = df.rename(columns={'fid': 'Id'})    # RAMMS etc. want it named "Id"
+        df = df.reset_index().rename(columns={'index': 'Id'})  # RAMMS etc. want it named "Id"
 
         # Adds columns: j,i,sx3
         df = chunk.add_snow(df, snowI_tif, snow_density=200.)

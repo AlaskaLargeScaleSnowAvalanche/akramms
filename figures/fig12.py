@@ -17,6 +17,23 @@ pub_dir = exp.dir.parents[0] / (exp.dir.parts[-1] + '_publish')
 
 # Line2D Properties: https://matplotlib.org/stable/api/_as_gen/matplotlib.lines.Line2D.html#matplotlib.lines.Line2D
 
+def colorbar():
+
+        # ---------- The colorbar
+        fig,axs = plt.subplots(
+            nrows=1,ncols=1,
+    #        subplot_kw={'projection': map_crs},
+            figsize=(2.5,2.5))
+        cbar_ax = axs
+        cbar = fig.colorbar(pcm_elev, ax=cbar_ax)
+        cbar.ax.tick_params(labelsize=20)
+        cbar_ax.remove()   # https://stackoverflow.com/questions/40813148/save-colorbar-for-scatter-plot-separately
+
+        ofname = pathlib.Path('geo_cbar.pdf')
+        with TrimmedPdf(ofname) as tname:
+            fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res version; add margin so text is not cut off
+
+
 def doplot(section, xdata_tif, ofname, map_extent=None, idom=113, jdom=45, xyres=10, vminmax=None, cpt='palettes/WhiteBlueGreenYellowRed.cpt', ncpt=14):
     map_crs = cartopy.crs.epsg(3338)    # Alaska Albers
 
@@ -109,9 +126,26 @@ def doplot(section, xdata_tif, ofname, map_extent=None, idom=113, jdom=45, xyres
         if vminmax is not None:
             kwargs['vmin'] = vminmax[0]
             kwargs['vmax'] = vminmax[1]
-        ax.pcolormesh(
+        print('Plotting with kwargs ', kwargs)
+        pcm = ax.pcolormesh(
             tilegrid.centersx, tilegrid.centersy,
             xdata_data, **kwargs)
+
+
+        # ---------- The colorbar
+        fig,axs = plt.subplots(
+            nrows=1,ncols=1,
+    #        subplot_kw={'projection': map_crs},
+            figsize=(2.5,2.5))
+        cbar_ax = axs
+        cbar = fig.colorbar(pcm_elev, ax=cbar_ax)
+        cbar.ax.tick_params(labelsize=20)
+        cbar_ax.remove()   # https://stackoverflow.com/questions/40813148/save-colorbar-for-scatter-plot-separately
+
+        ofname = pathlib.Path('geo_cbar.pdf')
+        with TrimmedPdf(ofname) as tname:
+            fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res version; add margin so text is not cut off
+
 
 
 #        # ---------- Plot Extent
@@ -131,21 +165,6 @@ def doplot(section, xdata_tif, ofname, map_extent=None, idom=113, jdom=45, xyres
 
 
 
-def colorbar():
-
-        # ---------- The colorbar
-        fig,axs = plt.subplots(
-            nrows=1,ncols=1,
-    #        subplot_kw={'projection': map_crs},
-            figsize=(2.5,2.5))
-        cbar_ax = axs
-        cbar = fig.colorbar(pcm_elev, ax=cbar_ax)
-        cbar.ax.tick_params(labelsize=20)
-        cbar_ax.remove()   # https://stackoverflow.com/questions/40813148/save-colorbar-for-scatter-plot-separately
-
-        ofname = pathlib.Path('geo_cbar.pdf')
-        with TrimmedPdf(ofname) as tname:
-            fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res version; add margin so text is not cut off
 
 
 def main():
@@ -155,16 +174,21 @@ def main():
         section = 'ak-ccsm-1981-2010-lapse-All-30'
 
         svar = 'max_height'
-        xdata_tif = pub_dir / section / 'max_height' / f'{section}-{idom:d}-{jdom:d}-F-{svar}.tif'
-        doplot(section, xdata_tif, f'fig12_{city}_max_height.pdf', idom=idom, jdom=jdom, xyres=xyres, vminmax=(0,5), ncpt=10)
+        xdata_tif = pub_dir / section / 'max_height' / f'{section}-{idom:03d}-{jdom:03d}-F-{svar}.tif'
+        doplot(section, xdata_tif, f'fig12_{city}_max_height.pdf', idom=idom, jdom=jdom, xyres=xyres, vminmax=(0,3),
+            cpt='palettes/ath_2024.cpt', ncpt=10)
 
+        # 0-300 kPa scale same as used in Buehler paper:
+        # https://nhess.copernicus.org/preprints/nhess-2022-11/nhess-2022-11-ATC1.pdf
         svar = 'max_pressure'
-        xdata_tif = pub_dir / section / 'max_pressure' / f'{section}-{idom:d}-{jdom:d}-F-{svar}.tif'
-        doplot(section, xdata_tif, f'fig12_{city}_max_pressure.pdf', idom=idom, jdom=jdom, xyres=xyres, vminmax=(0,600), ncpt=10)
+        xdata_tif = pub_dir / section / 'max_pressure' / f'{section}-{idom:03d}-{jdom:03d}-F-{svar}.tif'
+        doplot(section, xdata_tif, f'fig12_{city}_max_pressure.pdf', idom=idom, jdom=jdom, xyres=xyres, vminmax=(0,300),
+            cpt='palettes/ath_2024.cpt', ncpt=10)
 
         svar = 'max_velocity'
-        xdata_tif = pub_dir / section / 'max_velocity' / f'{section}-{idom:d}-{jdom:d}-F-{svar}.tif'
-        doplot(section, xdata_tif, f'fig12_{city}_max_velocity.pdf', idom=idom, jdom=jdom, xyres=xyres)#, vminmax=(0,10), ncpt=10)
+        xdata_tif = pub_dir / section / 'max_velocity' / f'{section}-{idom:03d}-{jdom:03d}-F-{svar}.tif'
+        doplot(section, xdata_tif, f'fig12_{city}_max_velocity.pdf', idom=idom, jdom=jdom, xyres=xyres, #vminmax=(0,10),
+            cpt='palettes/ath_2024.cpt', ncpt=10)
 
 
 
