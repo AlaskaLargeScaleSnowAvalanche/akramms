@@ -1,7 +1,8 @@
 import os,collections,sys,itertools
 import numpy as np
 import schema
-from uafgi.util import schemautil,shputil,gisutil,ulam
+import geopandas
+from uafgi.util import schemautil,gisutil,ulam,shputil
 from akramms import downscale_snow
 from akramms import config, r_experiment
 from akramms import r_prepare,r_domain_builder,file_info
@@ -219,7 +220,7 @@ _exclude_tiles = {
 
 def all_domains():
     domains_margin_shp = os.path.join(dir, 'ak_domains_margin.shp')
-    domains_df = shputil.read_df(domains_margin_shp)
+    domains_df = shputil.read_df_noshapes(domains_margin_shp)
     domains_df = domains_df.set_index(['idom', 'jdom'])
     domains_ij = domains_df.index.tolist()
     domains_ij = [ij for ij in domains_ij if ij not in _exclude_tiles]

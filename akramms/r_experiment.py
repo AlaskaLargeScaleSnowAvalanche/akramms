@@ -6,7 +6,7 @@ import numpy as np
 from osgeo import ogr,gdal
 import shapely
 import pandas as pd
-from uafgi.util import make,gisutil,shputil,gdalutil
+from uafgi.util import make,gisutil,gdalutil
 from akramms import config
 from akramms import downscale_snow
 #from akramms import d_ifsar, d_usgs_landcover
@@ -94,10 +94,20 @@ def r_active_domains(exp_mod):
         df.idom = df.idom.astype('int32')
         df.jdom = df.jdom.astype('int32')
 #        df = df.astype({'idom':'int', 'jdom':'int'})
+        df = geopandas.GeoDataFrame(df, geometry='domain')
 
         os.makedirs(exp_mod.dir, exist_ok=True)
-        shputil.write_df(df[['idom', 'jdom', 'domain']], 'domain', 'MultiPolygon', domains_shp, wkt=exp_mod.wkt, zip_format=True)
-        shputil.write_df(df[['idom', 'jdom', 'domain_margin']], 'domain_margin', 'MultiPolygon', domains_margin_shp, wkt=exp_mod.wkt, zip_format=True)
+
+        # https://stackoverflow.com/questions/67088140/exporting-a-geopandas-dataframe-to-a-zipped-shapefile-directly
+        # shputil.write_df(df[['idom', 'jdom', 'domain']], 'domain', 'MultiPolygon', domains_shp, wkt=exp_mod.wkt, zip_format=True)
+        geopandas.GeoDataFrame(df[['idom', 'jdom', 'domain']], geometry='domain').to_file(
+            domains_zip, driver='ESRI Shapefile', crs=pyproj.CRS.from_user_input(exp_mod.wkt)
+
+
+        # shputil.write_df(df[['idom', 'jdom', 'domain_margin']], 'domain_margin', 'MultiPolygon', domains_margin_shp, wkt=exp_mod.wkt, zip_format=True)
+        geopandas.GeoDataFrame(df[['idom', 'jdom', 'domain_margin']], geometry='domain_margin').to_file(
+            domains_margin_zip, driver='ESRI Shapefile', crs=pyproj.CRS.from_user_input(exp_mod.wkt)
+        
 
     return make.Rule(action, [exp_mod.experiment_region_zip],
         [domains_shp, domains_margin_shp, domains_zip, domains_margin_zip])

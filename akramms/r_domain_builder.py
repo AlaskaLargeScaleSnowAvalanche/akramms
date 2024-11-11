@@ -4,7 +4,8 @@ import numpy as np
 import shapely
 import d8graph
 import sys
-from uafgi.util import shputil,shapelyutil,gdalutil,make,gisutil,rasterize
+from uafgi.util import shapelyutil,gdalutil,make,gisutil,rasterize
+import geopandas
 
 # --------------------------------------------------------------------
 def read_neighbor1(neighbor1_file):
@@ -89,8 +90,9 @@ def burn_pra_rule(dem_file, pra_file, pra_burn_file):#, ix0, ix1):
         grid_info = gdalutil.grid_info(dem_file)
 
         # Read the PRAs from the shapefile
-        pras_df = shputil.read_df(pra_file)
-#        pras_df = pras_df.head(10)    # DEBUG
+#        pras_df = shputil.read_df(pra_file)
+        pras_df = geopandas.read_file(pra_file).rename_geometry('shape')
+
 
         # Burn the PRAs into rasters; and extract lists of start_cells
         pra_burns = list()
@@ -218,7 +220,8 @@ def domain_rule(dem_filled_file, release_file, chull_file, domain_file, min_alph
 #        print('Sample dem_filled[18729844] = {}'.format(dem_filled.reshape(-1)[18729844]))
 
         # Read the PRAs
-        pras_df = shputil.read_df(release_file)
+#        pras_df = shputil.read_df(release_file)
+        pras_df = geopandas.read_file(release_file).rename_geometry('shape')
 #        with gzip.open(pra_burn_file, 'rb') as fin:
 #            _ = pickle.load(fin)    # grid_info
 #            pra_burns = pickle.load(fin)
@@ -259,11 +262,16 @@ def domain_rule(dem_filled_file, release_file, chull_file, domain_file, min_alph
         # Store chulls as a Shapefile
         chulls_df = pras_df[['Id']]
         chulls_df['shape'] = chulls
-        shputil.write_df(chulls_df, 'shape', 'Polygon', chull_file, wkt=grid_info.wkt)
+        # shputil.write_df(chulls_df, 'shape', 'Polygon', chull_file, wkt=grid_info.wkt)
+        chulls_df = geopandas.GeoDataFrame(chulls_df, geometry='shape')
+        chulls.to_file(chull_file, crs=pyproj.CRS.from_user_input(grid_info.wkt))
 
         # Store domains as a Shapefile
         domains_df = pras_df[['Id']]
         domains_df['shape'] = domains
-        shputil.write_df(domains_df, 'shape', 'Polygon', domain_file, wkt=grid_info.wkt)
+        # shputil.write_df(domains_df, 'shape', 'Polygon', domain_file, wkt=grid_info.wkt)
+        domains_df = geopandas.GeoDataFrame(domains_df, geometry='shape')
+        domains.to_file(domain_file, crs=pyproj.CRS.from_user_input(grid_info.wkt))
+
 
     return make.Rule(action, [dem_filled_file, release_file], outputs)

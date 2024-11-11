@@ -1,6 +1,6 @@
 import shutil,os,re,zipfile,glob,datetime,time,subprocess,sys
 import netCDF4
-from uafgi.util import shputil,ncutil
+from uafgi.util import ncutil
 from akramms import ncaval,r_ramms,config
 from akramms import avalparse
 from akramms.util import exputil

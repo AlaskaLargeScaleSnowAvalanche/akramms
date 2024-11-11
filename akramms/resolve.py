@@ -157,7 +157,7 @@ def resolve_chunk(akdf, scenetypes={'x'}, realized=True):
                 if parsed_ids is not None:
                     # If query specified IDs, only include this chunk
                     # if it has at least one of those IDs.
-                    rdf = shputil.read_df(releasefile, read_shapes=False)
+                    rdf = shputil.read_df_noshapes(releasefile, read_shapes=False)
                     rdf = rdf[rdf.Id.isin(parsed_ids)]
                     if len(rdf) == 0:
                         continue
@@ -338,7 +338,7 @@ def resolve_id(akdf, realized=True, stage='out', status_col=False, filter_geom=F
         else:
             # Read the releasefile
             if tup.scenetype == 'x':
-                df = shputil.read_df(tup.releasefile, read_shapes=False)
+                df = shputil.read_df_noshapes(tup.releasefile, read_shapes=False)
                 ids = df['Id'].tolist()
                 #print(f'Reading releasefile {tup.releasefile}: {ids}')
             else:

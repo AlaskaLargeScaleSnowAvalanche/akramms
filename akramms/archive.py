@@ -7,7 +7,7 @@ import pandas as pd
 import netCDF4
 import pyproj,geopandas
 import fiona.errors
-from uafgi.util import gdalutil,shputil,ncutil,ioutil,ogrutil,gdalutil,gisutil
+from uafgi.util import gdalutil,ncutil,ioutil,ogrutil,gdalutil,gisutil,shputil
 from akramms import config,parse,file_info,resolve,overrun
 import xyedge
 
@@ -469,7 +469,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
 
         # Read the shapefile this avalanche came from, so we can copy
         # info into the NetCDF file.
-        rdf = shputil.read_df(releasefile, read_shapes=False)
+        rdf = shputil.read_df_noshapes(releasefile, read_shapes=False)
         rdf = rdf.set_index('Id')
 
         for tup in akdf1.reset_index(drop=True).itertuples(index=False):

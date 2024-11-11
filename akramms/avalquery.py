@@ -1,7 +1,7 @@
 import os,collections,re,itertools,functools
 import netCDF4
 import pandas as pd
-from uafgi.util import shputil,ogrutil,rtreeutil
+from uafgi.util import ogrutil,rtreeutil
 from akramms import archive,avalparse,avalfilter,parse,resolve,file_info
 from akramms.util import exputil
 from akramms import joblib
@@ -71,9 +71,10 @@ def tile_extents(exp_mod):
 
     # Load set of extents
     domains_shp = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains.shp')
-    df = shputil.read_df(domains_shp, read_shapes=True)
+#    df = shputil.read_df(domains_shp, read_shapes=True)
+    df = geopandas.read_file(domains_shp)
     for _,row in df.iterrows():
-        xx,yy = row['shape'].exterior.coords.xy
+        xx,yy = row.geometry.exterior.coords.xy
 #        yield row.idom,row.jdom,(xx[0],yy[0], xx[2],yy[2])    # Convert to an Extent-type list of (x0,y0,x1,y1)
         # TODO: This version is just until we rewrite the domains file
         yield row.ix,row.iy,(
@@ -105,8 +106,9 @@ def check_extent_sign(extent):
 def tile_rtree(expmod):
     """Put all the available tiles into an RTree"""
     domains_margin_shp = os.path.join(expmod.dir, f'{expmod.name}_domains_margin.shp')
-    domains_df = shputil.read_df(domains_margin_shp)#.df#.set_index(['idom', 'jdom'])
-    return rtreeutil.RTree(domains_df)
+#    domains_df = shputil.read_df(domains_margin_shp)#.df#.set_index(['idom', 'jdom'])
+    domains_df = geopandas.read_file(domains_margin_shp)
+    return rtreeutil.RTree(domains_df, shapecol='geometry')
 
 def expand_combos_by_geom(expmod, akdf, geom):
     """

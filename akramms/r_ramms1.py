@@ -253,7 +253,8 @@ def run_chunk(release_file, crf, gridI, at_front=False, submit=False, condor_pri
 #    gridI = gdalutil.read_grid(dem_file)
 
     # Compress Avalanche inputs, ready for Docker container
-    df = shputil.read_df(release_file, read_shapes=False)
+    df = shputil.read_df_noshapes(release_file)
+    #df = shputil.read_df(release_file, read_shapes=False)
     all_ids = list(df['Id'])
     procs = list()
     for ids in striped_chunks(all_ids, config.ncpu_compress):

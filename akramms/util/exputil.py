@@ -49,7 +49,7 @@ def _release_df(scene_dir):
     dfs = list()
     for fname in _release_files(scene_dir):
         #jb = rammsutil.parse_release_file(fname)
-        df = shputil.read_df(fname, read_shapes=False)
+        df = shputil.read_df_noshapes(fname, read_shapes=False)
         if not ('pra_size' in df):
             pra_size = fname[-9]    # Ends in X_rel.shp
             df['pra_size'] = pra_size

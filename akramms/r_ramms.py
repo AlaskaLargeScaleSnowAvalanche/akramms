@@ -62,7 +62,7 @@ def parse_aval_log(log_in):
 # -------------------------------------------------------
 def job_ids(release_file):
     """Reads a release file, and returns a (sorted) list of PRA IDs in that file."""
-    release_df = shputil.read_df(release_file, read_shapes=False)
+    release_df = shputil.read_df_noshapes(release_file)
     return sorted(list(release_df['Id']))
 # --------------------------------------------------------
 

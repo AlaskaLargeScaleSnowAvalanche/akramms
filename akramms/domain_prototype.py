@@ -1,5 +1,6 @@
 import collections,itertools,sys
-from uafgi.util import gdalutil,shapelyutil,shputil,gisutil
+from uafgi.util import gdalutil,shapelyutil,gisutil
+import geopandas
 import numpy as np
 
 
@@ -394,13 +395,14 @@ pras_file = '/Users/eafischer2/av/prj/juneau1/juneau1_For_5m_30L_rel.shp'
 dem_file = '/Users/eafischer2/av/data/wolken/BaseData_AKAlbers/Juneau_IFSAR_DTM_AKAlbers_EPSG_3338.tif'
 
 def main0():
-    pras_df = shputil.read_df(pras_file)
+    #pras_df = shputil.read_df(pras_file)
+    pras_df = geopandas.read_file(pras_file)
     row = pras_df.iloc[0]
     print(row)
-    print(row.shape)
+    print(row.geometry)
 
 
-    find_domain(row.shape, dem_file)
+    find_domain(row.geometry, dem_file)
 
 
 #main()
