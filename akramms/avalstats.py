@@ -15,7 +15,7 @@ def _section(expmod, combo):
     section =  expmod.name + '-' + '-'.join(lcombo[:-2])
     return section
 
-def _read_ocean(expmod, idom, jdom, imosaic_grid, tdir):
+def _read_ocean_data(expmod, idom, jdom, imosaic_grid, tdir):
     """Read the ocean mask"""
     global _last_idom_jdom, _last_ocean_mask
 
@@ -24,31 +24,21 @@ def _read_ocean(expmod, idom, jdom, imosaic_grid, tdir):
     landcover_tif = tdir.filename(suffix='.tif')
     expmod.extract_landcover(ijpoly, landcover_tif)
 
-#    landcover_tif = expmod.dir / 'landcover' / f'{expmod.name}_landcover_{idom:03d}_{jdom:03d}.tif'
-
-    # Handle memoize / LRU cache
-    if (idom,jdom) == _last_idom_jdom:
-        return _last_ocean_mask
-
     landcover30_grid, landcover30_data, landcover30_nd = gdalutil.read_raster(landcover_tif)    # landcover_grid includes margin
 
     ocean30_mask = (landcover30_data == 11)
     ocean30_nd = 100    # Doesn't really matter, ocean30_data is either 0 or 1
 
-    ocean30_data = np.zeros(landcover30_data.shape, dtype=np.int8)
+    ocean30_data = np.zeros(landcover30_data.shape)
     ocean30_data[ocean30_mask] = 1
 
     # Regrid ocean mask to same grid as mosaic
     ocean_data = gdalutil.regrid(
         ocean30_data, landcover30_grid, ocean30_nd,
-        imosaic_grid, ocean30_nd)
-    ocean_mask = (ocean_data != 0)
+        imosaic_grid, ocean30_nd,
+        resample_algo=gdalconst.GRA_Average)
 
-    # Handle memoize
-    _last_idom_jdom = (idom, jdom)
-    _last_ocean_mask = ocean_mask
-    return ocean_mask
-
+    return ocean_data
 # ------------------------------------------------------------------
 # Read each different variable
 def rbind(fn, *rargs):
@@ -71,7 +61,7 @@ def _read_thresh(expmod, combo, tdir, vname):
     assert imosaic_nd == 0
 
     # Use the ocean mask to set nodata values
-    ocean_mask = _read_ocean(expmod, combo.idom, combo.jdom, imosaic_grid, tdir)
+    ocean_mask = (_read_ocean_data(expmod, combo.idom, combo.jdom, imosaic_grid, tdir) != 0)
     mosaic_nd = -1e10
     imosaic_data[ocean_mask] = imosaic_nd
 
@@ -90,7 +80,7 @@ def _read_double(expmod, combo, tdir, vname):
     assert imosaic_nd == 0
 
     # Use the ocean mask to set nodata values
-    ocean_mask = _read_ocean(expmod, combo.idom, combo.jdom, imosaic_grid, tdir)
+    ocean_mask = (_read_ocean_data(expmod, combo.idom, combo.jdom, imosaic_grid, tdir) != 0)
     mosaic_nd = -1e10
     imosaic_data[ocean_mask] = imosaic_nd
 
@@ -224,33 +214,37 @@ def stats_wcombo(akdf0, ress=[1000]):
 def stats_landcover(expmod, ress):
     ifnamess = {res: list() for res in ress}
     for idom,jdom in expmod.all_domains():
+        print('idom jdom ', idom, jdom)
 
         for res in ress:
             # Get filename
             stats_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats') / f's{res}' / 'land'
             os.makedirs(stats_dir, exist_ok=True)
             ofname = stats_dir / f'land-{idom:03d}-{jdom:03d}.tif'
+#            print('land ', ofname)
+            ifnamess[res].append(ofname)
             if os.path.isfile(ofname):
                 continue
 
             # Get imosaic_grid
-            ogrid = expmod.gridD.sub(idom, jdom, expmod.resolution, expmod.resolution)
+            ogrid = expmod.gridD.sub(idom, jdom, res, res, margin=False)#expmod.resolution, expmod.resolution)
 
             with ioutil.TmpDir(stats_dir) as tdir:
-                ocean_mask = _read_ocean(expmod, idom, jdom, ogrid, tdir)
+                ocean_data = _read_ocean_data(expmod, idom, jdom, ogrid, tdir)
 
-            land_data = np.logical_not(ocean_mask).astype('d')
+            land_data = 1.0 - ocean_data
             land_nd = -1e10
 
             # Write it out        
             gdalutil.write_raster(ofname, ogrid, land_data, land_nd)
-            ifnamess[res].append(ofname)
 
     # Convert to single .tif
-    ostats_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats') / 'tif' / f's{res}'
+    tif_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats') / 'tif'
     for res,ifnames in ifnamess.items():
-        ofname_vrt = ostats_dir / f'land-s{res}.vrt'
-        ofname_tif = ostats_dir / f'land-s{res}.tif'
+#        print('xxxx ', res, ifnames)
+        ofname_vrt = tif_dir / f's{res}' / f'land-s{res}.vrt'
+        ofname_tif = tif_dir / f's{res}' / f'land-s{res}.tif'
+#        print('ofname_tif ', ofname_tif)
         gdalutil.build_vrt(ifnames, ofname_vrt)
         cmd = ['gdal_translate', ofname_vrt, ofname_tif]
         subprocess.run(cmd, check=True)

@@ -101,12 +101,11 @@ def r_active_domains(exp_mod):
         # https://stackoverflow.com/questions/67088140/exporting-a-geopandas-dataframe-to-a-zipped-shapefile-directly
         # shputil.write_df(df[['idom', 'jdom', 'domain']], 'domain', 'MultiPolygon', domains_shp, wkt=exp_mod.wkt, zip_format=True)
         geopandas.GeoDataFrame(df[['idom', 'jdom', 'domain']], geometry='domain').to_file(
-            domains_zip, driver='ESRI Shapefile', crs=pyproj.CRS.from_user_input(exp_mod.wkt)
+            domains_zip, driver='ESRI Shapefile', crs=pyproj.CRS.from_user_input(exp_mod.wkt))
 
 
         # shputil.write_df(df[['idom', 'jdom', 'domain_margin']], 'domain_margin', 'MultiPolygon', domains_margin_shp, wkt=exp_mod.wkt, zip_format=True)
-        geopandas.GeoDataFrame(df[['idom', 'jdom', 'domain_margin']], geometry='domain_margin').to_file(
-            domains_margin_zip, driver='ESRI Shapefile', crs=pyproj.CRS.from_user_input(exp_mod.wkt)
+        geopandas.GeoDataFrame(df[['idom', 'jdom', 'domain_margin']], geometry='domain_margin').to_file(domains_margin_zip, driver='ESRI Shapefile', crs=pyproj.CRS.from_user_input(exp_mod.wkt))
         
 
     return make.Rule(action, [exp_mod.experiment_region_zip],
