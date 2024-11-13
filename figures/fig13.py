@@ -35,7 +35,7 @@ def main():
     stat30_tif = tif_dir / f's{sres}' / f'ak-ccsm-1981-2010-lapse-All-30-avy_extent-s{sres}.tif'
     stat30_grid, stat30_data, stat30_nd = gdalutil.read_raster(stat30_tif)
 
-    stat300_tif = tif_dir / f's{sres}' / f'ak-ccsm-1981-2010-lapse-All-300-avy_extent-s{sres}.tif'
+    stat300_tif = tif_dir / f's{sres}' / f'ak-ccsm-2031-2060-lapse-All-30-avy_extent-s{sres}.tif'
     stat_grid, stat300_data, stat_nd = gdalutil.read_raster(stat300_tif)
 
     stat_data = stat300_data - stat30_data
@@ -63,7 +63,7 @@ def main():
         stat_grid.centersx, stat_grid.centersy, stat_data,
         #alpha=0.5, rasterized=True,
         rasterized=True,
-        transform=map_crs, cmap=cmap, vmin=-0.05, vmax=0.20)
+        transform=map_crs, cmap=cmap, vmin=-0.20, vmax=0.20)
     pcm_stat.set_facecolor('yellow')
 
 
