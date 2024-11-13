@@ -15,7 +15,7 @@ def _section(expmod, combo):
     section =  expmod.name + '-' + '-'.join(lcombo[:-2])
     return section
 
-def _read_ocean_data(expmod, idom, jdom, imosaic_grid, tdir):
+def _read_land_data(expmod, idom, jdom, imosaic_grid, tdir):
     """Read the ocean mask"""
     global _last_idom_jdom, _last_ocean_mask
 
@@ -26,19 +26,20 @@ def _read_ocean_data(expmod, idom, jdom, imosaic_grid, tdir):
 
     landcover30_grid, landcover30_data, landcover30_nd = gdalutil.read_raster(landcover_tif)    # landcover_grid includes margin
 
-    ocean30_mask = (landcover30_data == 11)
-    ocean30_nd = 100    # Doesn't really matter, ocean30_data is either 0 or 1
+    # 11 = ocean, 0 = outside domain
+    land30_mask = np.logical_and(landcover30_data != 11, landcover30_data != 0)
+    land30_nd = 100    # Doesn't really matter, land30_data is either 0 or 1
 
-    ocean30_data = np.zeros(landcover30_data.shape)
-    ocean30_data[ocean30_mask] = 1
+    land30_data = np.zeros(landcover30_data.shape)
+    land30_data[land30_mask] = 1
 
-    # Regrid ocean mask to same grid as mosaic
-    ocean_data = gdalutil.regrid(
-        ocean30_data, landcover30_grid, ocean30_nd,
-        imosaic_grid, ocean30_nd,
+    # Regrid land mask to same grid as mosaic
+    land_data = gdalutil.regrid(
+        land30_data, landcover30_grid, land30_nd,
+        imosaic_grid, land30_nd,
         resample_algo=gdalconst.GRA_Average)
 
-    return ocean_data
+    return land_data
 # ------------------------------------------------------------------
 # Read each different variable
 def rbind(fn, *rargs):
@@ -61,7 +62,7 @@ def _read_thresh(expmod, combo, tdir, vname):
     assert imosaic_nd == 0
 
     # Use the ocean mask to set nodata values
-    ocean_mask = (_read_ocean_data(expmod, combo.idom, combo.jdom, imosaic_grid, tdir) != 0)
+    ocean_mask = (_read_land_data(expmod, combo.idom, combo.jdom, imosaic_grid, tdir) == 0)
     mosaic_nd = -1e10
     imosaic_data[ocean_mask] = imosaic_nd
 
@@ -80,7 +81,7 @@ def _read_double(expmod, combo, tdir, vname):
     assert imosaic_nd == 0
 
     # Use the ocean mask to set nodata values
-    ocean_mask = (_read_ocean_data(expmod, combo.idom, combo.jdom, imosaic_grid, tdir) != 0)
+    ocean_mask = (_read_ocean_data(expmod, combo.idom, combo.jdom, imosaic_grid, tdir) == 0)
     mosaic_nd = -1e10
     imosaic_data[ocean_mask] = imosaic_nd
 
@@ -211,6 +212,10 @@ def stats_wcombo(akdf0, ress=[1000]):
                 cmd = ['gdal_translate', ofname_vrt, ofname_tif]
                 subprocess.run(cmd, check=True)
 # --------------------------------------------------------------------------
+
+
+
+
 def stats_landcover(expmod, ress):
     ifnamess = {res: list() for res in ress}
     for idom,jdom in expmod.all_domains():
@@ -230,9 +235,7 @@ def stats_landcover(expmod, ress):
             ogrid = expmod.gridD.sub(idom, jdom, res, res, margin=False)#expmod.resolution, expmod.resolution)
 
             with ioutil.TmpDir(stats_dir) as tdir:
-                ocean_data = _read_ocean_data(expmod, idom, jdom, ogrid, tdir)
-
-            land_data = 1.0 - ocean_data
+                land_data = _read_land_data(expmod, idom, jdom, ogrid, tdir)
             land_nd = -1e10
 
             # Write it out        

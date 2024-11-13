@@ -240,10 +240,10 @@ def spiral_domains(x0, y0):
     # High prioirty domains
     # (Code usese x/y and i/j interchangibly here)
     high_priority = [
+        (90, 41), (91, 41), (90, 42), (91, 42),    # Cordova
         (110, 42), (109,42),    # Haines and West: Avalanche of 2024-2-2
 
-        (91,42), (91,41), (91, 40),  # Cordova
-        (90, 42), (90, 41), (90,40),
+        (91, 40), (90, 40),  # More Cordova
 #        (90, 40), (91, 40),     # Cordova
 #        (90, 41), (91, 41), 
 #        (90, 42), (91, 42), 
@@ -279,6 +279,14 @@ def full():
             for return_period in [30,300]:
                 for forest in ('NoFor','For'):
                     yield Combo(snow, year0, year1, downscale_algo, forest, return_period, idom, jdom)
+
+def cordova():
+    for year0,year1 in [(1981,2010)]:
+        for return_period in [30,300]:
+            for idom,jdom in [        (90, 41), (91, 41), (90, 42), (91, 42)]:    # Cordova
+                for forest in ('NoFor','For'):
+                    yield Combo('ccsm', year0, year1, 'lapse', forest, return_period, idom, jdom)
+
 
 # -----------------------------------------------------------------
 def juneau():
