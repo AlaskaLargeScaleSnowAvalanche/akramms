@@ -68,7 +68,7 @@ def rule(scene_dir, scene_args, inputs, return_period, For):
 #    _For = '_For' if forest else '_NoFor'
     outputs = list()
     for ext in ('.dbf', '.prj', '.shp', '.shx'):
-        outputs.append(os.path.join(scene_dir, f'PRA_{rpcat}', f'PRA_{rp}y{_For}{ext}'))
+        outputs.append(os.path.join(scene_dir, f'PRA_{rpcat}', f'PRA_{rp}y{ext}'))
 
 #    for rp in process_tree.return_periods:    # [10,30,100,300]
 #        rpcat = process_tree.return_period_category[rp]
@@ -106,10 +106,10 @@ def rule(scene_dir, scene_args, inputs, return_period, For):
         # ----------
 
         # Import Connect to images in <scene_dir>/eCog
-        cmd += ['image-dir=/mnt/eCog', f'import-connector=PRA_import_{rpcat}', f'import-connector-file=/mnt/eCog/PRA_import_{rpcat}{_For}est.xml']
+        cmd += ['image-dir=/mnt/eCog', f'import-connector=PRA_import_{rpcat}', f'import-connector-file=/mnt/eCog/PRA_import_{rpcat}.xml']
 
         # Add the appropriate ruleset
-        cmd += [f'ruleset=/mnt/eCog/GHK_{return_period:d}y{_For}.dcp']
+        cmd += [f'ruleset=/mnt/eCog/GHK_{return_period:d}y.dcp']
 
         # Place for output
         # eCognition writes out files with problems in the projection.
@@ -121,7 +121,7 @@ def rule(scene_dir, scene_args, inputs, return_period, For):
 
         # See if there's anything to see in a log file
         # unfortunately not much.
-        cmd += [f'--log-file=/mnt/eCog/GHK_{return_period:d}y{_For}.log']
+        cmd += [f'--log-file=/mnt/eCog/GHK_{return_period:d}y.log']
 
         # Run eCognition (in Docker container)!
         print(' '.join(cmd))

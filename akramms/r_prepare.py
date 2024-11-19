@@ -69,9 +69,7 @@ def prepare_scene_rule(xscene_dir, defaults=dict(), **kwargs):
         with open(os.path.join(scene_dir, 'scene.cdl'), 'w') as out:
             subprocess.run(cmd, stdout=out)
 
-    inputs = [kwargs['dem_file'], kwargs['snow_file']]
-    if 'forest_file' in kwargs:
-        inputs.append(kwargs['forest_file'])
+    inputs = [kwargs['dem_file'], kwargs['snow_file'], kwargs['forest_file']]
     outputs = [os.path.join(xscene_dir, 'scene.nc')]
 
     return make.Rule(action, inputs, outputs), _make_scene_args(xscene_dir, defaults, kwargs)
@@ -130,6 +128,8 @@ def prepare_data(scene_dir):
         ('inPerimeter', 'clip_file')]:
         if scene_arg in scene_args:
             script_args[script_arg] = str(scene_args[scene_arg])
+
+    
 
     # Generate the weighting kernel file
     kernel_txt = os.path.join(scene_dir, 'stats_kernel.txt')
@@ -283,29 +283,28 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
     print("combining binary layers...")
     SlopeCurvRuggedness_in = np.logical_and(np.logical_and(Slope_in, Curv_in), Ruggedness_in)
     #-------------------------------------------------------------------------------
-    if vv.inForest is not None:
 
-        # Forest may not be the same geometry / resolution as DEM
-        # Forest is boolean dataset 1/0
-        iForest_r = gdalutil.read_raster(vv.inForest)
-        oForest_data = gdalutil.regrid(
-            iForest_r.data, iForest_r.grid, iForest_r.nodata,
-            Slope_r.grid, iForest_r.nodata)
-        iForest_r = None    # Release memory
-        Forest_out = (oForest_data == 0)
-        oForest_data = None    # Release memory
+    # Forest may not be the same geometry / resolution as DEM
+    # Forest is boolean dataset 1/0
+    iForest_r = gdalutil.read_raster(vv.inForest)
+    oForest_data = gdalutil.regrid(
+        iForest_r.data, iForest_r.grid, iForest_r.nodata,
+        Slope_r.grid, iForest_r.nodata)
+    iForest_r = None    # Release memory
+    Forest_out = (oForest_data == 0)
+    oForest_data = None    # Release memory
 
-        # https://stackoverflow.com/questions/10454316/how-to-project-and-resample-a-grid-to-match-another-grid-with-gdal-python
-#        iForest_ds = gdal.Open(str(vv.inFOrest))
-#        oForest_ds = gdalutil.clone_geometry('MEM', '', Slope_r.grad_info, 1, gdal.GDT_Byte)
-#gdal.ReprojectImage(src, dst, src_proj, match_proj, gdalconst.GRA_Bilinear)
+    # https://stackoverflow.com/questions/10454316/how-to-project-and-resample-a-grid-to-match-another-grid-with-gdal-python
+#    iForest_ds = gdal.Open(str(vv.inFOrest))
+#    oForest_ds = gdalutil.clone_geometry('MEM', '', Slope_r.grad_info, 1, gdal.GDT_Byte)
+#.ReprojectImage(src, dst, src_proj, match_proj, gdalconst.GRA_Bilinear)
 
 
-        # Boolean Overlay: Slope AND Curvature AND Ruggedness AND Forest
-#        print('inForest ', vv.inForest)
-#        Forest_r = gdalutil.read_raster(vv.inForest)
-#        Forest_in = (Forest_r.data != 0)
-        SlopeCurvRuggednessForest_in = np.logical_and(SlopeCurvRuggedness_in, Forest_out)
+    # Boolean Overlay: Slope AND Curvature AND Ruggedness AND Forest
+#    print('inForest ', vv.inForest)
+#    Forest_r = gdalutil.read_raster(vv.inForest)
+#    Forest_in = (Forest_r.data != 0)
+    SlopeCurvRuggednessForest_in = np.logical_and(SlopeCurvRuggedness_in, Forest_out)
 
     #-------------------------------------------------------------------------------
     print("writing out PRA_raw...")
@@ -316,20 +315,12 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
     # See note above (search for "PAM")
 #    options = ['COMPRESS=LZW', 'TFW=YES', 'GDAL_PAM_ENABLED=YES', 'ESRI_XML_PAM=YES']
 
-    # NoForest
-    PRA_raw_NoForest = ECOG(f"{vv.Name}__PRA_raw_{name_scenario}_NoForest.tif")
-    val = np.zeros(SlopeCurvRuggedness_in.shape)#, dtype='i')
-    val[SlopeCurvRuggedness_in] = 200
-    val[mask_out] = onodata
-    gdalutil.write_raster(PRA_raw_NoForest, Slope_r.grid, val, onodata, type=gdal.GDT_Byte)#, options=options)
-
     # Forest
-    if vv.inForest is not None:
-        PRA_raw_Forest = ECOG(f"{vv.Name}__PRA_raw_{name_scenario}_Forest.tif")
-        val = np.zeros(SlopeCurvRuggednessForest_in.shape)#, dtype='i')
-        val[SlopeCurvRuggednessForest_in] = 200
-        val[mask_out] = onodata
-        gdalutil.write_raster(PRA_raw_Forest, Slope_r.grid, val, onodata, type=gdal.GDT_Byte)#, options=options)
+    PRA_raw = ECOG(f"{vv.Name}__PRA_raw_{name_scenario}.tif")
+    val = np.zeros(SlopeCurvRuggednessForest_in.shape)#, dtype='i')
+    val[SlopeCurvRuggednessForest_in] = 200
+    val[mask_out] = onodata
+    gdalutil.write_raster(PRA_raw, Slope_r.grid, val, onodata, type=gdal.GDT_Byte)#, options=options)
 
 
 # -----------------------------------------------------------------
@@ -472,13 +463,13 @@ import_xml_tpl = """<?xml version="1.0" encoding="UTF-8"?>
 				<TagString>{froot}_Slope.tif</TagString>
 			</ImageLayer>
 			<ImageLayer channel="1" alias="PRA_raw" driver="GDAL">
-				<TagString>{froot}__PRA_raw_{freq}{_Forest}.tif</TagString>
+				<TagString>{froot}__PRA_raw_{freq}.tif</TagString>
 			</ImageLayer>
 		</SceneDefinition>
 	</ImportDefinition>
 </ImportDefinitions>
 """
-def import_xml_str(scene_args, freq, forest):
+def import_xml_str(scene_args, freq):
     """Generates text for the ...import....xml file
     freq: 'frequent' | 'extreme'
     """
@@ -488,13 +479,12 @@ def import_xml_str(scene_args, freq, forest):
         'froot': '/mnt/eCog/{}'.format(scene_args['name']),    # Runs on mounted drive inside Docker container
         'scene_name': scene_args['name'],
         'freq': freq,
-        '_Forest' : '_Forest' if forest else '_NoForest',
         'layer': '{layer}',    # Leave this for eCognition
     }
     return import_xml_tpl.format(**args)
 # ---------------------------------------------------------------------------
 
-def data_prep_PRA2_rule(scene_dir, scene_args, inputs):
+def data_prep_PRA2_rule(scene_dir, combo, scene_args, inputs):
     """
     inputs:
         Outputs from data_prep_PRA1_rule
@@ -505,18 +495,14 @@ def data_prep_PRA2_rule(scene_dir, scene_args, inputs):
 
     # xml import files
     for freq in ('frequent', 'extreme'):
-        for forest in ((True,False) if scene_args.get('forest_file', None) else (False,)):
-            _Forest = '_Forest' if forest else '_NoForest'
-            import_xml = os.path.join(scene_dir, 'eCog', f'PRA_import_{freq}{_Forest}.xml')
-            outputs.append(import_xml)
+        import_xml = os.path.join(scene_dir, 'eCog', f'PRA_import_{freq}.xml')
+        outputs.append(import_xml)
 
     # GHK Files
     for return_period in scene_args['return_periods']:
-        for forest in (False, True):
-            _For = '_For' if forest else '_NoFor'
-            ofname = os.path.join(scene_dir, 'eCog',
-                f'GHK_{return_period:d}y{_For}.dcp')
-            outputs.append(ofname)
+        ofname = os.path.join(scene_dir, 'eCog',
+            f'GHK_{return_period:d}y.dcp')
+        outputs.append(ofname)
 
     def action(tdir):
 
@@ -529,12 +515,10 @@ def data_prep_PRA2_rule(scene_dir, scene_args, inputs):
 
         # Write import...xml files 
         for freq in ('frequent', 'extreme'):
-            for forest in ((True,False) if scene_args.get('forest_file', None) else (False,)):
-                _Forest = '_Forest' if forest else '_NoForest'
-                import_xml = os.path.join(ecog_dir, f'PRA_import_{freq}{_Forest}.xml')
-                outputs.append(import_xml)
-                with open(import_xml, 'w') as out:
-                    out.write(import_xml_str(scene_args, freq, forest))
+            import_xml = os.path.join(ecog_dir, f'PRA_import_{freq}.xml')
+            outputs.append(import_xml)
+            with open(import_xml, 'w') as out:
+                out.write(import_xml_str(scene_args, freq))
 
         # Generate the required process trees
         for return_period in scene_args['return_periods']:
@@ -544,14 +528,12 @@ def data_prep_PRA2_rule(scene_dir, scene_args, inputs):
             odir = os.path.join(scene_dir, f'PRA_{return_period_category}')
             os.makedirs(odir, exist_ok=True)
 
-            for forest in (False, True):
-                _For = '_For' if forest else '_NoFor'
-                ofname = os.path.join(scene_dir, 'eCog',
-                    f'GHK_{return_period:d}y{_For}.dcp')
-                outputs.append(ofname)
-                with open(ofname, 'w') as out:
-                    # scene_dir=/mnt because this runs in a docker container
-                    out.write(process_tree.get(scene_args, '/mnt', return_period, forest))
+            ofname = os.path.join(scene_dir, 'eCog',
+                f'GHK_{return_period:d}y.dcp')
+            outputs.append(ofname)
+            with open(ofname, 'w') as out:
+                # scene_dir=/mnt because this runs in a docker container
+                out.write(process_tree.get(scene_args, '/mnt', return_period))
 
 
         # Copy DEM to eCog folder

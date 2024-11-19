@@ -493,7 +493,7 @@ def add_run_combo(expmod, makefile, combo, max_step=999):
         return
 
     prepare2_outputs = makefile.add(
-        r_prepare.data_prep_PRA2_rule(scene_dir, scene_args, prepare1_outputs)).outputs
+        r_prepare.data_prep_PRA2_rule(scene_dir, combo, scene_args, prepare1_outputs)).outputs
     #print('Number rules ', len(makefile.rule_list))
     if max_step <= 4:
         return

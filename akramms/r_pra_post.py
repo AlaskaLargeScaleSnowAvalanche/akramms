@@ -62,7 +62,7 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
 #    For = 'For' if forest else 'NoFor'
 
     # eCognition filename conventions
-    pra_file = process_tree.pra_file(scene_args, return_period, For)
+    pra_file = process_tree.pra_file(scene_args, return_period)
     inputs.append(pra_file)    # This rule does NOT use the burn files for domains...
 
     # Use the DEM mask
@@ -232,7 +232,9 @@ def chunk_rule(scene_dir, scene_args, For, resolution, return_period, pra_size):
             return
 
         # Assign a chunkid to each avalanche
-        rdf['combo'] = [level.theory_scenedir_to_combo(scene_dir)] * len(rdf.index)
+        combo = level.theory_scenedir_to_combo(scene_dir)
+        print('ccccccccombo1 ', tuple(combo))
+        rdf['combo'] = [combo] * len(rdf.index)
         rdf['pra_size'] = pra_size
         rdf = chunk.set_new_chunkinfo(rdf, scene_args)
         rdf = chunk.add_chunkid(rdf, scene_dir, append=False)

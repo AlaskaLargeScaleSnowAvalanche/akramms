@@ -4,9 +4,9 @@ import functools
 import math,os,subprocess
 import numpy as np
 from osgeo import ogr,gdal
-import shapely
+import shapely,geopandas,pyproj
 import pandas as pd
-from uafgi.util import make,gisutil,gdalutil
+from uafgi.util import make,gisutil,gdalutil,shputil
 from akramms import config
 from akramms import downscale_snow
 #from akramms import d_ifsar, d_usgs_landcover
@@ -39,11 +39,11 @@ def r_active_domains(exp_mod):
 
 
     # Load the experiment_region as a Shapely Multipolygon
-    domains_shp = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains.shp')
-    domains_margin_shp = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains_margin.shp')
+    domains_shp = exp_mod.dir / f'{exp_mod.name}_domains.shp'
+    domains_margin_shp = exp_mod.dir / f'{exp_mod.name}_domains_margin.shp'
 
-    domains_zip = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains.zip')
-    domains_margin_zip = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains_margin.zip')
+    domains_zip = exp_mod.dir / f'{exp_mod.name}_domains.zip'
+    domains_margin_zip = exp_mod.dir / f'{exp_mod.name}_domains_margin.zip'
 
     def action(tdir):
         # Load the experiment region and convert to Shapely Polygon
@@ -101,12 +101,13 @@ def r_active_domains(exp_mod):
         # https://stackoverflow.com/questions/67088140/exporting-a-geopandas-dataframe-to-a-zipped-shapefile-directly
         # shputil.write_df(df[['idom', 'jdom', 'domain']], 'domain', 'MultiPolygon', domains_shp, wkt=exp_mod.wkt, zip_format=True)
         geopandas.GeoDataFrame(df[['idom', 'jdom', 'domain']], geometry='domain').to_file(
-            domains_zip, driver='ESRI Shapefile', crs=pyproj.CRS.from_user_input(exp_mod.wkt))
+            str(domains_shp), driver='ESRI Shapefile', crs=pyproj.CRS.from_user_input(exp_mod.wkt))
+        shputil.shp_to_zip(domains_shp, domains_zip)
 
 
         # shputil.write_df(df[['idom', 'jdom', 'domain_margin']], 'domain_margin', 'MultiPolygon', domains_margin_shp, wkt=exp_mod.wkt, zip_format=True)
-        geopandas.GeoDataFrame(df[['idom', 'jdom', 'domain_margin']], geometry='domain_margin').to_file(domains_margin_zip, driver='ESRI Shapefile', crs=pyproj.CRS.from_user_input(exp_mod.wkt))
-        
+        geopandas.GeoDataFrame(df[['idom', 'jdom', 'domain_margin']], geometry='domain_margin').to_file(str(domains_margin_shp), driver='ESRI Shapefile', crs=pyproj.CRS.from_user_input(exp_mod.wkt))
+        shputil.shp_to_zip(domains_margin_shp, domains_margin_zip)
 
     return make.Rule(action, [exp_mod.experiment_region_zip],
         [domains_shp, domains_margin_shp, domains_zip, domains_margin_zip])

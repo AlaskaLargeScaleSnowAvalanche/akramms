@@ -408,7 +408,7 @@
 	<CustProcAlgrList></CustProcAlgrList>
 	<ExternalCustProcAlgrList></ExternalCustProcAlgrList>
 	<ProcessList>
-		<ProcBase Name="Process tree {return_period:d}y{_For}" bLoopChg="0" bExpand="1" bActive="1" bAutoName="0" bSubrtn="0">
+		<ProcBase Name="Process tree {return_period:d}y" bLoopChg="0" bExpand="1" bActive="1" bAutoName="0" bSubrtn="0">
 			<LcnsInfo sLcnsId="" sPwd=""></LcnsInfo>
 			<vrblValMaxCycle>
 				<DValue value="1." type="double"></DValue>
@@ -1439,9 +1439,9 @@
 									<DValue value="2" type="int" name="eExportMode"></DValue>
 									<DValue value="ObjectShapes001" type="string" name="strExportItem"></DValue>
 									<DValue value="-1" type="procVarId" name="vrblExportItem"></DValue>
-									<DValue value="{scene_dir}/PRA_{return_period_category}/PRA_{return_period:d}y{_For}.xml" type="string" name="strExportPath"></DValue>
+									<DValue value="{scene_dir}/PRA_{return_period_category}/PRA_{return_period:d}y.xml" type="string" name="strExportPath"></DValue>
 									<DValue value="0" type="bool" name="bExportSeries"></DValue>
-									<DValue value="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?>&#xA;&lt;ExportInfo SingleFilePerWksp=&quot;0&quot; SingleFilePerItem=&quot;1&quot; ExportItem=&quot;ExportList&quot; ExportType=&quot;ExpList&quot; DriverID=&quot;ELS&quot; ExportPath=&quot;{scene_dir}/PRA_{return_period_category}/PRA_{return_period:d}y{_For}.xml&quot;>&lt;/ExportInfo>" type="string" name="strExportItemInfo"></DValue>
+									<DValue value="&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?>&#xA;&lt;ExportInfo SingleFilePerWksp=&quot;0&quot; SingleFilePerItem=&quot;1&quot; ExportItem=&quot;ExportList&quot; ExportType=&quot;ExpList&quot; DriverID=&quot;ELS&quot; ExportPath=&quot;{scene_dir}/PRA_{return_period_category}/PRA_{return_period:d}y.xml&quot;>&lt;/ExportInfo>" type="string" name="strExportItemInfo"></DValue>
 									<DValue value="temporary" type="string" name="valExportTempLayer"></DValue>
 									<DValue type="vector" name="vColInfo">
 									<Values>
@@ -1573,7 +1573,7 @@
 		</ProcBase>
 	</ProcessList>
 	<ExportedItems>
-		<item name="ExportList" type="ExpList" driver="ELS" ext="xml" path="{scene_dir}/PRA_{return_period_category}/PRA_{return_period:d}y{_For}.xml"></item>
+		<item name="ExportList" type="ExpList" driver="ELS" ext="xml" path="{scene_dir}/PRA_{return_period_category}/PRA_{return_period:d}y.xml"></item>
 	</ExportedItems>
 	<LcnsIds></LcnsIds>
 </eCog.Proc>

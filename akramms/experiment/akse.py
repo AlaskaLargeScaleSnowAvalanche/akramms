@@ -11,7 +11,7 @@ from akramms import d_ifsar, d_usgs_landcover
 
 # Root directory of studies in this experiment
 name = __name__.rsplit('.', 1)[-1]    # e_alaska
-dir = config.roots['PRJ'] / name
+dir = config.roots['PRJ'] / name / 'db'
 publish_dir = config.roots['PRJ'] / f'{name}_publish'
 
 # Map coordinate system we use
@@ -94,6 +94,7 @@ combo_keys = list(combo_schema.schema.keys())
 _Combo = collections.namedtuple('Combo', combo_keys)
 class Combo(_Combo):
     def __repr__(self):
+#        print('ccccccccccombo ', tuple(self))
         return f'{self.snow_dataset}-{self.year0:04d}-{self.year1:04d}-{self.downscale_algo}-{self.forest}-{self.return_period}-{self.idom:03d}-{self.jdom:03d}'
 #        return '-'.join(str(x) for x in self)
 # -------------------------------------------------------------
@@ -142,14 +143,10 @@ def add_combo(makefile, combo):
 #        dem_tif, os.path.split(dem_tif)[0], fill_sinks=True)).outputs
 
     # Forest File
-    if combo.forest == 'For':
-        landcover_tif = makefile.add(r_experiment.r_landcover(
-            exp_mod, combo.idom, combo.jdom)).outputs[0]
-        forest_tif = makefile.add(r_experiment.r_forest(
-            exp_mod, combo.idom, combo.jdom)).outputs[0]
-    else:
-        landcover_tif = None
-        forest_tif = None
+    landcover_tif = makefile.add(r_experiment.r_landcover(
+        exp_mod, combo.idom, combo.jdom)).outputs[0]
+    forest_tif = makefile.add(r_experiment.r_forest(
+        exp_mod, combo.idom, combo.jdom)).outputs[0]
 
     # Snow downscaling
     if combo.downscale_algo == 'lapse':
@@ -177,8 +174,7 @@ def add_combo(makefile, combo):
         forests=((1 if combo.forest=='For' else 0),),
         dem_file=dem_tif,
         snow_file=sx3I_tif)
-    if combo.forest == 'For':
-        kwargs['forest_file'] = forest_tif
+    kwargs['forest_file'] = forest_tif
 
     # Print out what we've got!
     print('------ Rules to Prepare Scene:')

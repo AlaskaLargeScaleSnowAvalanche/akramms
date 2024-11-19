@@ -85,21 +85,24 @@ def theory_scenedir_to_combo(scenedir, exp_mod=None):
     scenedir = pathlib.Path(scenedir)
 
     # Get idom, jdom
-#    print('scenedir ', scenedir)
-#    print('xxxxxxxxxxxxxxxxx ', scenedir.parts[-1])
 
     match = scenedirRE.match(scenedir.parts[-1])
     idom = int(match.group(2))
     jdom = int(match.group(3))
 
-    # Get the rest of the combo
-    sparts = scenedir.parts[-2].split('-')[1:] + [idom, jdom]
-
     # Get the exp_mod if needed
     if exp_mod is None:
-        exp_mod = parse.load_expmod(scenedir.parts[-3])
+        exp_name = scenedir.parts[-3]
+        if exp_name == 'db':
+            exp_name = scenedir.parts[-4]
 
-    return exp_mod.Combo(*sparts)
+        exp_mod = parse.load_expmod(exp_name)
+
+    # Get the rest of the combo
+    sparts = scenedir.parts[-2].split('-')[1:] + [idom, jdom]
+    parts = [field.validate(x) for field,x in zip(exp_mod.combo_schema.schema.values(), sparts)]
+    print('pppppppparts ', parts)
+    return exp_mod.Combo(*parts)
 # -----------------------------------------------------------
 def commonprefix(ini_strlist):
     from itertools import takewhile

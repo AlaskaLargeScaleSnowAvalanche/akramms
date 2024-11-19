@@ -86,17 +86,18 @@ def read_rel(relfname, **kwargs):
     # Read _rel shapefile
 #    reldf = shputil.read_df(relfname, shape='pra', **kwargs)
     reldf = geopandas.read_file(relfname, **kwargs).rename_geometry('pra')
-    print('Read ', relfname)
-    print('reldf ', reldf.columns)
-    print(reldf.index)
-    print(reldf)
+#    print('Read ', relfname)
+#    print('reldf ', reldf.columns)
+#    print(reldf.index)
+#    print(reldf)
     if 'Id' in reldf:
-        reldf = reldf.drop('fid', axis=1)
-    else:
-        # Release file written by eCog
-        reldf = reldf.rename(columns={'fid': 'Id'})
+        # This will be the case for files NOT written by eCog
+        reldf = reldf.set_index('Id')
 
-    return reldf.set_index('Id')
+    # The index functions as the PRA Id.
+    # If this is a file written by eCog, that is already the case.
+    # Otherwise the PRA Id is stored in the Id column.
+    return reldf
 # -----------------------------------------------------------
 def read_dom(domfname, **kwargs):
     """Reads a single _rel.shp and _dom.shp and merges them together.
@@ -112,9 +113,7 @@ def read_dom(domfname, **kwargs):
     """
     df = geopandas.read_file(domfname, **kwargs).rename_geometry('dom')
 #    return shputil.read_df(domfname, shape='dom', **kwargs) \
-    return df \
-        .drop('fid', axis=1) \
-        .set_index('Id')
+    return df.set_index('Id')
 # -----------------------------------------------------------
 def read_reldom(relfname, **kwargs):
     """Reads a RELEASE and related DOMAIN file and merges together resulting dataframes"""
@@ -673,14 +672,16 @@ def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
     ofname = chunk_dir / 'RELEASE' / f'{ci.slope_name}_{ci.avalanche_name}_rel.shp'
     _dfx = dfc.reset_index()[['area_m2', 'Mean_DEM', 'Mean_Slope', 'Scene_reso', 'Id', 'i', 'j', 'sx3', 'd0star', 'slopecorr', 'Wind', f'd0_{ci.return_period}', f'VOL_{ci.return_period}', 'pra']]
 #    shputil.write_df(_dfx, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
-    _dfx.to_file(ofname, crs=pyproj.CRS.from_user_input(scene_args['coordinate_sytem']), **kwargs)
+    _dfx = geopandas.GeoDataFrame(_dfx, geometry='pra')
+    _dfx.to_file(ofname, crs=pyproj.CRS.from_user_input(scene_args['coordinate_system']))
 
     # Write the _dom.shp file 
     os.makedirs(chunk_dir / 'DOMAIN', exist_ok=True)
     ofname = chunk_dir / 'DOMAIN' / f'{ci.slope_name}_{ci.avalanche_name}_dom.shp'
     _dfx = dfc.reset_index()[['Id', 'dom']]
 #    shputil.write_df(_dfx, 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
-    _dfx.to_file(ofname, crs=pyproj.CRS.from_user_input(scene_args['coordinate_sytem']), **kwargs)
+    _dfx = geopandas.GeoDataFrame(_dfx, geometry='dom')
+    _dfx.to_file(ofname, crs=pyproj.CRS.from_user_input(scene_args['coordinate_system']))
 
 #    os.rename(chunk_dir, chunk_dir_final)
     return chunk_dir_final
