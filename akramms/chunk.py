@@ -85,7 +85,7 @@ def read_rel(relfname, **kwargs):
 
     # Read _rel shapefile
 #    reldf = shputil.read_df(relfname, shape='pra', **kwargs)
-    reldf = geopandas.read_file(relfname, **kwargs).rename_geometry('pra')
+    reldf = geopandas.read_file(str(relfname), **kwargs).rename_geometry('pra')
 #    print('Read ', relfname)
 #    print('reldf ', reldf.columns)
 #    print(reldf.index)
@@ -111,7 +111,7 @@ def read_dom(domfname, **kwargs):
     Returns: df
         Index set to Id column
     """
-    df = geopandas.read_file(domfname, **kwargs).rename_geometry('dom')
+    df = geopandas.read_file(str(domfname), **kwargs).rename_geometry('dom')
 #    return shputil.read_df(domfname, shape='dom', **kwargs) \
     return df.set_index('Id')
 # -----------------------------------------------------------
