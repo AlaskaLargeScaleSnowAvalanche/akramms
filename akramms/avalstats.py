@@ -9,10 +9,10 @@ _last_idom_jdom = None
 _last_ocean_mask = None
 
 @functools.lru_cache()
-def _section(expmod, combo):
+def _section(expmod, combo, bar='-'):
     # Get name of section within publish eg: ak-ccsm-1981-2010-lapse-All-30
     lcombo = str(combo).split('-')
-    section =  expmod.name + '-' + '-'.join(lcombo[:-2])
+    section =  expmod.name + bar + bar.join(lcombo[:-2])
     return section
 
 def _read_land_data(expmod, idom, jdom, imosaic_grid, tdir):
@@ -46,6 +46,14 @@ def rbind(fn, *rargs):
     def _fn(*largs, **kwargs):
         return fn(*itertools.chain(largs, rargs), **kwargs)
     return _fn
+
+
+def _read_snow(expmod, combo, tdir, imosaic_grid):
+    tile_grid = expmod.gridD.sub(combo.idom, combo.jdom, abs(gridM.dx), abs(gridM.dy), margin=True)
+
+    snow_fname = expmod.dir / 'snow' / f'{combo.name}_{combo.snow_dataset}_{combo.year0}_{combo.year1}_{combo.downscale_algo}_{combo.idom:03d}_{combo.jdom:03d}'
+    snow10_grid, snow10_data, snow10_nd = gdalutil.read_raster(snow_fname)
+    return snow10_data
 
 
 def _read_thresh(expmod, combo, tdir, vname):
@@ -94,10 +102,10 @@ def _by_1(grid):
     return 1
 
 stats_vars = {
-#    'land': (_read_land, _by_1, '1'),
-    'avy_extent': (rbind(_read_thresh, 'avalanche_count'), _by_1, '1'),
-    'count': (rbind(_read_thresh, 'pra_centroid_count'), _by_area, 'km-2'),
-    'release_extent': (rbind(_read_thresh, 'pra_count'), _by_1, '1'),
+##    'land': (_read_land, _by_1, '1'),#    'avy_extent': (rbind(_read_thresh, 'avalanche_count'), _by_1, '1'),
+#    'count': (rbind(_read_thresh, 'pra_centroid_count'), _by_area, 'km-2'),
+#    'release_extent': (rbind(_read_thresh, 'pra_count'), _by_1, '1'),
+    'snow': (_read_snow, _by_1, '1'),
 }
 
 
@@ -120,15 +128,17 @@ def regrid_stdmosaic(expmod, combo, vname, res):
         print(f'No input file, skipping: {combo}')
         return
 
-    # Construct stats grid (at low resolution), used for averaging
-    onx = int(round(imosaic_grid.nx * np.abs(imosaic_grid.dx) / res))
-    ony = int(round(imosaic_grid.ny * np.abs(imosaic_grid.dy) / res))
-    gt = copy.copy(imosaic_grid.geotransform)
-    gt[1] = res * np.sign(imosaic_grid.geotransform[1])    # dx
-    gt[5] = res * np.sign(imosaic_grid.geotransform[5])   # dy
-    stats_grid = gisutil.RasterInfo(
-        imosaic_grid.wkt, onx, ony,
-        gt)
+#    # Construct stats grid (at low resolution), used for averaging
+#    onx = int(round(imosaic_grid.nx * np.abs(imosaic_grid.dx) / res))
+#    ony = int(round(imosaic_grid.ny * np.abs(imosaic_grid.dy) / res))
+#    gt = copy.copy(imosaic_grid.geotransform)
+#    gt[1] = res * np.sign(imosaic_grid.geotransform[1])    # dx
+#    gt[5] = res * np.sign(imosaic_grid.geotransform[5])   # dy
+#    stats_grid = gisutil.RasterInfo(
+#        imosaic_grid.wkt, onx, ony,
+#        gt)
+    stats_grid = expmod.gridD.sub(combo.idom, combo.jdom, res, res, margin=False)
+
 
     # Regrid mosaic to the stats grid
     stats_data = gdalutil.regrid(
@@ -219,7 +229,7 @@ def stats_wcombo(akdf0, ress=[1000]):
 def stats_landcover(expmod, ress):
     ifnamess = {res: list() for res in ress}
     for idom,jdom in expmod.all_domains():
-        print('idom jdom ', idom, jdom)
+#        print('idom jdom ', idom, jdom)
 
         for res in ress:
             # Get filename

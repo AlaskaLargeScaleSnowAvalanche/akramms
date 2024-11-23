@@ -112,11 +112,7 @@ def parse_expset(expset, load=True):
     expset = match.group(2)
     ret = {'type': 'expset', 'exp': exp, 'expset': expset}
     if load:
-        try:
-            ret['expmod'] = load_expmod(exp)
-        except ModuleNotFoundError:
-            pass    # Maybe the Python file for this experiment isn't available
-
+        ret['expmod'] = load_expmod(exp)
         ret['expset_fn'] = getattr(ret['expmod'], expset)
     return ret
 
