@@ -48,12 +48,12 @@ def rbind(fn, *rargs):
     return _fn
 
 
-def _read_snow(expmod, combo, tdir, imosaic_grid):
-    tile_grid = expmod.gridD.sub(combo.idom, combo.jdom, abs(gridM.dx), abs(gridM.dy), margin=True)
+def _read_snow(expmod, combo, tdir):
+#    tile_grid = expmod.gridD.sub(combo.idom, combo.jdom, expmod.resolution, expmod.resolution, margin=True)
 
-    snow_fname = expmod.dir / 'snow' / f'{combo.name}_{combo.snow_dataset}_{combo.year0}_{combo.year1}_{combo.downscale_algo}_{combo.idom:03d}_{combo.jdom:03d}'
-    snow10_grid, snow10_data, snow10_nd = gdalutil.read_raster(snow_fname)
-    return snow10_data
+    snow_fname = expmod.dir / 'snow' / f'{expmod.name}_{combo.snow_dataset}_{combo.year0}_{combo.year1}_{combo.downscale_algo}_{combo.idom:03d}_{combo.jdom:03d}.tif'
+    print('snow_fname ', snow_fname)
+    return gdalutil.read_raster(snow_fname)
 
 
 def _read_thresh(expmod, combo, tdir, vname):
@@ -190,7 +190,7 @@ def stats_combo(akdf0, ress=[1000]):
 def stats_wcombo(akdf0, ress=[1000]):
 
     # Compute per-tile stats
-#    stats_combo(akdf0, ress=ress)
+    stats_combo(akdf0, ress=ress)
 
     # Consolidate
     exp = akdf0.exp[0]
