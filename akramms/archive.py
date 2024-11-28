@@ -774,8 +774,9 @@ def finish_combo(expmod, combo, dry_run=False):
             shutil.rmtree(odir)
         shutil.move(xdir, odir)
 
-        ## Now delete it for good
-        #shutil.rmtree(odir, ignore_errors=True)
+        # Now delete it for good
+        if config.delete_xdir:
+            shutil.rmtree(odir, ignore_errors=True)
 
 
 # ----------------------------------------------------------

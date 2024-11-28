@@ -81,6 +81,9 @@ poll_period = 60*5    # Seconds between polling attempts
 queue = {'arcgis': True, 'ecognition': True, 'idl': True}
 #queue = {'arcgis': False, 'ecognition': True, 'idl': True}
 
+# Remove the x-directories when archiving to the arc-directories?
+delete_xdir = False
+
 # ------------------------------
 # DEBUG parameters
 #allowed_pra_sizes = ['L']
