@@ -104,6 +104,11 @@ initial_margins = {
     'L' : 1000.
 }
 
+# Remove PRAs below this elevation [m] (clean up the coastline)
+elevation_cutoff = 100.
+# Remove PRAs of area less than  this [m^2]
+area_cutoff = 1000.
+
 #ramms_distro_dir = roots.join('data', 'christen', 'RAMMS', ramms_version)
 
 # Host we use for Docker registry
