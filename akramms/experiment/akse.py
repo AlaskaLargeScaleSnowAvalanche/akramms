@@ -11,8 +11,9 @@ from akramms import d_ifsar, d_usgs_landcover
 
 # Root directory of studies in this experiment
 name = __name__.rsplit('.', 1)[-1]    # e_alaska
-dir = config.roots['PRJ'] / name / 'db'
-publish_dir = config.roots['PRJ'] / f'{name}_publish'
+root_dir = config.roots['PRJ'] / name
+dir = root_dir / 'db'
+publish_dir = root_dir / 'publish'
 
 # Map coordinate system we use
 epsg = 3338    # Same as WKT; see https://espg.io
