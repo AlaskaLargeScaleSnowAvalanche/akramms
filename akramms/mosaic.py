@@ -214,97 +214,32 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
                 archive.write_extent_gpkg(expmod, combo, extent_gpkg, extent_full_gpkg, tdir)
 
         # (All using geopandas, with .Id and .geometry columns)
-        dfs0 = (
+        dfs = (
             ('release', archive.read_reldom(arcdir/'RELEASE.zip', 'rel')),    # Includes ALL For and NoFor Polygons
             ('domain', archive.read_reldom(arcdir/'DOMAIN.zip', 'dom')),
             ('extent', geopandas.read_file(str(extent_gpkg))))   # >1 polygon per ID
         ids = set(akdf1.id)
-        dfs1 = dict()
-        for vname,val in dfs0:
-            # Select out only polygons pertaining to this combo (whether For or NoFor)
+        for vname,val in dfs:
+            # Select out only polyg`ons pertaining to this combo (whether For or NoFor)
             subdf = val[val.Id.isin(ids)]
             # Put in idom / jdom
             subdf['idom'] = combo.idom
             subdf['jdom'] = combo.jdom
-            dfs1[vname] = subdf
-
+            dfss[vname].append(subdf)
 
         # -------------- Rasterize ("burn") the release polygons
         pra_count_1d = vals['pra_count'].reshape(-1)
         pra_centroid_count = vals['pra_centroid_count']
-        reldf = dfs1['release']    # Most recent relase polygons read, and cut down by IDs
-        # Grid these PRAs were originally computed on, including margin
-        forest_tif = expmod.dir / 'forest' / f'{expmod.name}_forest_{combo.idom:03d}_{combo.jdom:03d}.tif'
-        forest30_grid, forest30_data, forest30_nd = gdalutil.read_raster(forest_tif)    # forest_grid includes margin
-        forest30_data[forest30_data == forest30_nd] = 0
+        reldf = dfss['release'][-1]    # Most recent relase polygons read, and cut down by IDs
+        for pra in reldf.geometry:
 
-        dem_tif = expmod.dir / 'dem' / f'{expmod.name}_dem_{combo.idom:03d}_{combo.jdom:03d}.tif'
-        dem_grid = gdalutil.read_grid(dem_tif)
-
-        # Resample forest to same grid as everything else
-#        tile_grid = expmod.gridD.sub(combo.idom, combo.jdom, abs(gridM.dx), abs(gridM.dy), margin=True)
-        tile_grid = dem_grid
-#        print('tile_grid ', tile_grid.nx, tile_grid.ny, tile_grid.geotransform)
-#        return
-
-        print('FOREST forest30_nd = ', forest30_nd)
-        forest_data = gdalutil.regrid(
-            forest30_data, forest30_grid, forest30_nd,
-            tile_grid, forest30_nd)
-        forest_data_1d = forest_data.reshape(-1)
-        forest_data[forest_data == forest30_nd] = 0
-
-#        for pra in reldf.geometry:
-        ids = list()
-        for id,pra in (reldf.set_index('Id'))['geometry'].items():
-#            # DEBUG
-#            if len(ids) > 100:
-#                break
-
-
-            # Indices of gridcells hit by this polygon, on the tile grid (with margin)
-            iit,jjt = rasterize.rasterize_polygon_ij(pra, tile_grid)
-
-            # Figure out how many of the gridcells in this PRA have forest
-#            forest_total = np.sum(forest_data[np.ix_(jjt,iit)])
-            ijt = jjt * tile_grid.nx + iit
-            forest_total = np.sum(forest_data_1d[ijt])
-            forest_frac = forest_total / len(iit)
-#            print('forest_data ', forest_data_1d[ijt])
-            if id >= 9179 and id < 9200:
-                print('FOREST ', id, forest_total, len(iit), forest_frac)
-# DEBUG:Do not throw out for now
-            if forest_frac >= 0.5: #forest_threshold:    # Discard PRAs >50% forest
-                continue
-            ids.append(id)
-
-
-            # Translate indices to gridM, and then clip.
-            ioff,joff = gisutil.offset_diff(tile_grid, gridM)    # Computes forest_grid - gridM
-#            print('ioff, joff = ', ioff, joff)
-            iit += ioff    # This will subtract from iit, resulting in indices for gridM
-            jjt += joff
-#            print('Grid nxy ', gridM.nx, gridM.ny)
-#            print('i: ', iit)
-#            print('j: ', jjt)
-            mask_in = np.logical_and(np.logical_and(np.logical_and(
-                iit >= 0, iit < gridM.nx),
-                jjt >= 0), jjt < gridM.ny)
-            iit = iit[mask_in]
-            jjt = jjt[mask_in]
-
-            # Translate indices to 1D and update pra_count
-#            vals['pra_count'][np.ix_(jjt, iit)] += 1
-            ijt = jjt * gridM.nx + iit
-            pra_count_1d[ijt] += 1
-
-
-
-#            # -------------- pra_count: burn area of PRA into the raster
-#            # TODO: It might be faster to rasterize directly onto the grids.
-#            # But that's more code to write.
-#            ixs = rasterize.rasterize_polygon_compressed(pra, gridM)
-#            pra_count_1d[ixs] += 1
+            # -------------- pra_count: burn area of PRA into the raster
+            # TODO: It might be faster to rasterize directly onto the grids.
+            # But that's more code to write.
+#            print('ssssssshape ', gridM.nx, gridM.ny, vals['pra_count'].shape, pra_count_1d.shape)
+            ixs = rasterize.rasterize_polygon_compressed(pra, gridM)
+#            ixs = ixs[(ixs >= 0) & (ixs < len(pra_count_1d))]    # Elimate out-of-range indices from polygon that extended beyond our domain
+            pra_count_1d[ixs] += 1
 
             # -------------- pra_centroid_count: Just one point per PRA
             centroid = pra.centroid
@@ -313,24 +248,9 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
             if (i >= 0) and (j >= 0) and (i < gridM.nx) and (j < gridM.ny):
                 pra_centroid_count[j,i] += 1
 
-
-
-        # Get final set of Avalanches
-#        print('ids ', ids)
-        ids = set(ids)
-        for vname,val in dfs1.items():
-            subdf = val[val.Id.isin(ids)]
-#            print('ids ', len(ids), len(subdf))
-#            print('val.Id ', val.Id)
-            dfss[vname].append(subdf)
-
         # -------------- Update the mosaic (in memory)
         count = 0
         for tup in akdf1.itertuples(index=False):
-            # Only mosaic PRAs selected above
-            if tup.id not in ids:
-                continue
-
             # DEBUGGING
             count += 1
 #            if count > 100:
