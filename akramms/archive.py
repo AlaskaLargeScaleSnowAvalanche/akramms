@@ -926,7 +926,7 @@ def redone_extent_gpkgs(expmod, combo):
     arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
     swcombo = arcdir.parts[-2]    # Eg: 'ak-ccsm-1981-2010-lapse-For-30'
     sijdom = arcdir.parts[-1][4:]    # Eg: 111-044
-    expdir_ext = expmod.dir.parents[0] / (expmod.dir.parts[-1] + '_ext')
+    expdir_ext = expmod.dir.parents[0] / 'ext'
 
     odir = expdir_ext / swcombo / 'extent'
     extent_gpkg = odir  / f'{swcombo}-{sijdom}-extent.gpkg'

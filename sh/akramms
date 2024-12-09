@@ -951,7 +951,7 @@ def stdmosaic(args):
     plan = list()
     exp = akdf0.iloc[0].exp
     expmod = akramms.parse.load_expmod(exp)
-    publish_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + '_publish')
+    publish_dir = expmod.dir.parents[0] / 'publish'
     mwriter = mosaic.PublishMosaicWriter(expmod)
     for akdf1 in avalquery.consolidate_by_forest(expmod, akdf0):
 # No need to sort
