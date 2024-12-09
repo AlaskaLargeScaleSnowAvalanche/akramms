@@ -1,6 +1,7 @@
 import os,collections,re,itertools,functools
 import netCDF4
 import pandas as pd
+import geopandas
 from uafgi.util import ogrutil,rtreeutil
 from akramms import archive,avalparse,avalfilter,parse,resolve,file_info
 from akramms.util import exputil

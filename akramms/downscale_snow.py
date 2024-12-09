@@ -38,7 +38,8 @@ def snowfile_vrt(snowfile_argss):
     snowfiles = [snowfile(*x) for x in snowfile_argss]
     snowfile_glob = snowfile(*(snowfile_argss[0][:-2] + ('*','*')))
 #    snowdir_publish = snowfiles[0].parents[0]
-    snowdir_publish = snowfile_glob.parents[2] / (snowfile_glob.parts[-3]+'_publish') / snowfile_glob.parts[-2]
+#    snowdir_publish = snowfile_glob.parents[2] / (snowfile_glob.parts[-3]+'_publish') / snowfile_glob.parts[-2]
+    snowdir_publish = snowfile_glob.parents[2] / 'publish' / snowfile_glob.parts[-2]
 #    ofname = snowfile_glob.parents[0] / (snowfile_glob.parts[-1][:-8] + '.vrt')  # _*_*.tif -> .vrt
     ofname = snowdir_publish / (snowfile_glob.parts[-1][:-8] + '.vrt')  # _*_*.tif -> .vrt
 

@@ -60,8 +60,7 @@ def _read_thresh(expmod, combo, tdir, vname):
     """Thresholds a "count" variable to 0 or 1"""
 
     section = _section(expmod, combo)
-    publish_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + '_publish')
-    imosaic_tif = publish_dir / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}.tif'
+    imosaic_tif = expmod.root_dir / 'publish' / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}.tif'
 
     # Read the variable
     imosaic_grid, imosaic_data, imosaic_nd = gdalutil.read_raster(imosaic_tif)
@@ -79,8 +78,7 @@ def _read_thresh(expmod, combo, tdir, vname):
 def _read_double(expmod, combo, tdir, vname):
     """No Thresholding, variable already double"""
 
-    publish_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + '_publish')
-    imosaic_tif = publish_dir / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}.tif'
+    imosaic_tif =expmod.root_dir / 'publish' / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}.tif'
 
     # Read the variable
     imosaic_grid, imosaic_data, imosaic_nd = gdalutil.read_raster(imosaic_tif)

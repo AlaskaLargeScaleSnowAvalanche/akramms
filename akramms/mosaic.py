@@ -630,12 +630,12 @@ class PublishMosaicWriter(MosaicWriter):
 
 
         # Eg:
-        # ...ak_publish/
+        # ...publish/
         #    ak-ccsm-1981-2010-lapse-For-30/   ('-'.join(lcombo[:-3]))
         #    release/ak-ccsm-1981-2010-lapse-For-30-91-42-F-release.dbf
 
         return \
-            self.expmod.dir.parents[0] / (self.expmod.dir.parts[-1] + '_publish') / \
+            self.expmod.dir.parents[0] / 'publish' / \
             ('-'.join(lcombo[:-3])) / base / f'{scombo}-{tifdir_name}'
 
 
