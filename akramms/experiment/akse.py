@@ -215,7 +215,7 @@ _exclude_tiles = {
     (90,45),}
 
 def all_domains():
-    domains_margin_shp = os.path.join(dir, 'ak_domains_margin.shp')
+    domains_margin_shp = os.path.join(dir, f'{name}_domains_margin.shp')
     domains_df = shputil.read_df_noshapes(domains_margin_shp)
     domains_df = domains_df.set_index(['idom', 'jdom'])
     domains_ij = domains_df.index.tolist()
