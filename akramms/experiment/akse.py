@@ -276,10 +276,12 @@ def full():
                 for forest in ('NoFor','For'):
                     yield Combo(snow, year0, year1, downscale_algo, forest, return_period, idom, jdom)
 
-def cordova():
+def sample():
     for year0,year1 in [(1981,2010)]:
         for return_period in [30,300]:
-            for idom,jdom in [        (90, 41), (91, 41), (90, 42), (91, 42)]:    # Cordova
+            for idom,jdom in [        (90, 41), (91, 41), (90, 42), (91, 42),    # Cordova
+                (110, 42), (109,42),    # Haines and West: Avalanche of 2024-2-2
+                (113, 45)]:    # Juneau
                 for forest in ('NoFor','For'):
                     yield Combo('ccsm', year0, year1, 'lapse', forest, return_period, idom, jdom)
 # -----------------------------------------------------------------
