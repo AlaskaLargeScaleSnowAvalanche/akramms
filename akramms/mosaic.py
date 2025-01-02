@@ -14,6 +14,58 @@ from akramms.plot import p_mosaic
 
 # python -m cProfile -o prof -s cumtime `which akramms` mosaic juneau1-1981-1990.qy 
 
+_mosaic_metadata = {
+    'dem': (gdal.GDT_Float32, {
+        'description': 'IFSAR Digital elevation model',
+        'units': 'm'
+    }),
+
+    'landcover': (gdal.GDT_Int16, {
+        'description': 'USGS Land cover types',
+        'units': 'm'
+    }),
+
+    'deposition': (gdal.GDT_Float32, {
+        'description': 'Maximum deposition from any avalanche',
+        'units': 'm'
+    }),
+    'max_height': (gdal.GDT_Float32, {
+        'description': 'Maximum depth of snow attained',
+        'units': 'm',
+    }),
+    'max_velocity': (gdal.GDT_Float32, {
+        'description': 'Maximum snow speed from any avalanche',
+        'units': 'm s-1',
+    }),
+    'max_pressure': (gdal.GDT_Float32, {
+        'description': 'Maximum pressure from any avalanche',
+        'source_units': 'Pa',    # Convert Pa to kPa
+        'units': 'kPa',
+    }),
+    'avalanche_count': (gdal.GDT_Int16, {
+        'description': 'Number of avalanches hitting this gridcell',
+    }),
+    'domain_count': (gdal.GDT_Int16, {
+        'description': 'Number of avalanches hitting this gridcell',
+    }),
+    'pra_count': (gdal.GDT_Int16, {
+        'description': 'Number of PRAs hitting this gridcell',
+    }),
+    'pra_centroid_count': (gdal.GDT_Int16, {
+        'description': 'Number of PRAs centered on this gridcell',
+    }),
+}
+_avoid = ('dem', 'landcover')    # Only include these if user provides fetch fn
+_mosaic_keys = list(x for x in _mosaic_metadata.keys() if x not in _avoid)
+
+
+class Mosaic(typing.NamedTuple):
+    """Mosaic Data Structure, ready to write out to disk."""
+    rasters: dict    # {'deposition': (meta, np.array), ...}
+    vectors: dict    # {'release': df, 'domain': df, 'extent': df}
+
+# ---------------------------------------------------------------------------
+
 def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
     rho=300, vars=_mosaic_keys,
     dem_fn=None, landcover_fn=None, snow_fn=None, ijdom=None):
@@ -74,21 +126,21 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
             mos.rasters[vname] = val
 
     # Collect extent polygons
-    dfss = {'release': list(), 'domain': list(), 'extent': list()}
+    dfss = {'release': list(), 'domain': list(), 'extent_christen': list()}
     shapedfs = list()
     for (combo,arcdir),akdf1 in akdf0.groupby(['combo', 'releasefile']):
         akdf1 = akdf1.sort_values('id')
 
         # --------------- Read polygon files: PRAs, domains and extents
         # Use the redone extent.gpkg files
-        extent_christen_gpkg = extent.write_gpkg(expmod, combo, 'christen', tdir)
-        extent_full_gpkg = extent.write_gpkg(expmod, combo, 'full', tdir)
+        extent_christen_gpkg = extent.write_gpkg(expmod, combo, 'christen')
+        extent_full_gpkg = extent.write_gpkg(expmod, combo, 'full')
 
         # (All using geopandas, with .Id and .geometry columns)
         dfs = (
             ('release', archive.read_reldom(arcdir/'RELEASE.zip', 'rel')),    # Includes ALL For and NoFor Polygons
             ('domain', archive.read_reldom(arcdir/'DOMAIN.zip', 'dom')),
-            ('extent_christen', geopandas.read_file(str(extent_christen))))   # >1 polygon per ID
+            ('extent_christen', geopandas.read_file(str(extent_christen_gpkg))))   # >1 polygon per ID
         ids = set(akdf1.id)
         for vname,val in dfs:
             # Select out only polygons pertaining to this combo (whether For or NoFor)
@@ -121,7 +173,7 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
 
         # -------------- Update the mosaic (in memory)
         count = 0
-        for tup in akdf1.itertuples(index=False):
+        for tup in akdf1.itertuples(index=False):    # Iterate through each avalanche (tup.avalfile)
             # DEBUGGING
             count += 1
 #            if count > 100:
@@ -160,7 +212,7 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
                     vals['avalanche_count'])
                 _mosaic.mosaic(*args)
 
-        extent_tetra30_gpkg = extent.write_gpkg(expmod, combo, 'tetra30', tdir,
+        extent_tetra30_gpkg = extent.write_gpkg(expmod, combo, 'tetra30',
             mask_kwargs=dict(max_pressure=vals['max_pressure']))
 
     # ========== Write output GeoTIFF and Zip it up

@@ -44,6 +44,7 @@ def _mask_filter_christen(nzmask_val, aval, tup_id):
 def _mask_filter_tetra30(nzmask_val, aval, tup_id, max_pressure=None):
     """SEVERE: Return period less than 30 years; AND/OR Impact
     pressure greater than or equal to 30 kPa"""
+    print('xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx ', nzmask_val.shape, max_pressure.shape)
     nzmask_val[max_pressure > 30] = tup_id
 
 # ----------------------------------------------------------------------------
@@ -123,125 +124,6 @@ def polygonize_extent(combo, aval, tup_id,
 
 
 # ----------------------------------------------------------
-def read_reldom(akdf0):
-    """
-    akdf0:
-        Avalanches (in scenetype='arc') to mosiac
-        Resolved to the id level
-        Must contain columns: releasefile (actually arcdir), avalfile, id
-    eturns: reldf, domdf
-        Dataframes with columns as read from _rel and _dom shapefiles.
-        Rows same as akdf0
-    """
-    reldfs = list()
-    domdfs = list()
-    for (combo,arcdir),akdf1 in akdf0.groupby(['combo', 'releasefile']):
-        scombo = '-'.join(str(x) for x in combo)
-
-        # Read all _rel / _dom data in the archive dir
-        reldf = archive.read_reldom(arcdir/'RELEASE.zip', 'rel')#, shape='pra')
-        reldf = reldf.rename(columns={'geometry': 'pra'})
-        domdf = archive.read_reldom(arcdir/'DOMAIN.zip', 'dom')#, shape='dom')
-        domdf = domdf.rename(columns={'geometry': 'dom'})
-
-        # Filter down to just what we need
-        df = akdf1[['id']]
-
-        reldf = df.merge(reldf, how='left', left_on='id', right_on='Id')
-        reldf = reldf.drop('id', axis=1)
-        reldf['pra_size'] = reldf['pra_size'].astype('string')
-        reldf['combo'] = scombo
-        reldf['combo'] = reldf['combo'].astype('string')
-        
-        reldfs.append(reldf)
-
-        domdf = df.merge(domdf, how='left', left_on='id', right_on='Id')
-        domdf = domdf.drop('id', axis=1)
-        domdf['combo'] = scombo
-        domdf['combo'] = domdf['combo'].astype('string')
-        domdfs.append(domdf)
-
-    reldf = pd.concat(reldfs)
-    domdf = pd.concat(domdfs)
-
-    return reldf, domdf
-# ----------------------------------------------------------
-_mosaic_metadata = {
-    'dem': (gdal.GDT_Float32, {
-        'description': 'IFSAR Digital elevation model',
-        'units': 'm'
-    }),
-
-    'landcover': (gdal.GDT_Int16, {
-        'description': 'USGS Land cover types',
-        'units': 'm'
-    }),
-
-    'deposition': (gdal.GDT_Float32, {
-        'description': 'Maximum deposition from any avalanche',
-        'units': 'm'
-    }),
-    'max_height': (gdal.GDT_Float32, {
-        'description': 'Maximum depth of snow attained',
-        'units': 'm',
-    }),
-    'max_velocity': (gdal.GDT_Float32, {
-        'description': 'Maximum snow speed from any avalanche',
-        'units': 'm s-1',
-    }),
-    'max_pressure': (gdal.GDT_Float32, {
-        'description': 'Maximum pressure from any avalanche',
-        'source_units': 'Pa',    # Convert Pa to kPa
-        'units': 'kPa',
-    }),
-    'avalanche_count': (gdal.GDT_Int16, {
-        'description': 'Number of avalanches hitting this gridcell',
-    }),
-    'domain_count': (gdal.GDT_Int16, {
-        'description': 'Number of avalanches hitting this gridcell',
-    }),
-    'pra_count': (gdal.GDT_Int16, {
-        'description': 'Number of PRAs hitting this gridcell',
-    }),
-    'pra_centroid_count': (gdal.GDT_Int16, {
-        'description': 'Number of PRAs centered on this gridcell',
-    }),
-}
-_avoid = ('dem', 'landcover')    # Only include these if user provides fetch fn
-_mosaic_keys = list(x for x in _mosaic_metadata.keys() if x not in _avoid)
-
-class _ExtentShp(typing.NamedTuple):
-    scombo: str
-    shp: str
-    ds: object
-    layer: object
-    Id: object
-
-#def new_extent_shp(dir, gridM, combo):
-#    scombo = '-'.join(str(x) for x in combo)
-#    extent_shp = str(dir / f'extent-{scombo}.shp')
-#    print('Writing extent_shp ', extent_shp)
-#    if os.path.exists(extent_shp):
-#        os.remove(extent_shp)
-#    extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
-#    extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.wkt), geom_type=ogr.wkbMultiPolygon )
-#    # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
-#    extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
-#    return _ExtentShp(scombo, extent_shp, extent_ds, extent_layer, extent_Id)
-
-
-
-class Mosaic(typing.NamedTuple):
-    """Mosaic Data Structure, ready to write out to disk."""
-    rasters: dict    # {'deposition': (meta, np.array), ...}
-    vectors: dict    # {'release': df, 'domain': df, 'extent': df}
-
-#    def __init__(self, name, rasters, vectors):
-#        self.name = name
-#        self.rasters = rasters
-#        self.vectors = vectors
-#        self._tdir = 
-#        self.tifdir = tifdir
 
 
 def write_gpkg(expmod, combo, extent_type, overwrite=False, mask_kwargs={}):
@@ -292,9 +174,9 @@ def write_gpkg(expmod, combo, extent_type, overwrite=False, mask_kwargs={}):
                 if not os.path.isfile(tup.avalfile):
                     raise ValueError(f'Missing avalanche file: {tup.avalfile}')
 
-                aval = read_nc(tup.avalfile)
+                aval = archive.read_nc(tup.avalfile)
 
-                archive.polygonize_extent(combo, aval, tup.id, extent_layer, extent_Id, extent_type=extent_type, mask_kwargs=mask_kwargs)
+                polygonize_extent(combo, aval, tup.id, extent_layer, extent_Id, extent_type=extent_type, mask_kwargs=mask_kwargs)
                 n += 1
             print('Done!')
         finally:
@@ -303,9 +185,9 @@ def write_gpkg(expmod, combo, extent_type, overwrite=False, mask_kwargs={}):
 
         # Convert to GeoPackage (indented to maintain open temp dir)
         extent_gpkg_tmp = extent_gpkg.parents[0] / (extent_gpkg.parts[-1][:-5] + '-tmp.gpkg')
-        cmd = ['ogr2ogr', extent_gpkg_tmp, shp]
+        cmd = ['ogr2ogr', extent_gpkg_tmp, extent_shp]
         subprocess.run(cmd, check=True)
-        os.rename(extent_gpkg, extent_gpkg)
+        os.rename(extent_gpkg_tmp, extent_gpkg)
 
         return extent_gpkg
 
