@@ -5,154 +5,14 @@ import zipfile,netCDF4
 from osgeo import gdal,ogr
 from uafgi.util import gdalutil,ogrutil
 from uafgi.util import cfutil,ioutil,gisutil,rasterize
-from akramms import experiment,archive,file_info,avalquery,downscale_snow
+from akramms import experiment,archive,file_info,avalquery,downscale_snow,extent
 import akramms.parse
+from akramms import resolve
 import _mosaic
 import geopandas
 from akramms.plot import p_mosaic
 
 # python -m cProfile -o prof -s cumtime `which akramms` mosaic juneau1-1981-1990.qy 
-
-
-# ===================================================================
-
-# ----------------------------------------------------------
-def read_reldom(akdf0):
-    """
-    akdf0:
-        Avalanches (in scenetype='arc') to mosiac
-        Resolved to the id level
-        Must contain columns: releasefile (actually arcdir), avalfile, id
-    eturns: reldf, domdf
-        Dataframes with columns as read from _rel and _dom shapefiles.
-        Rows same as akdf0
-    """
-    reldfs = list()
-    domdfs = list()
-    for (combo,arcdir),akdf1 in akdf0.groupby(['combo', 'releasefile']):
-        scombo = '-'.join(str(x) for x in combo)
-
-        # Read all _rel / _dom data in the archive dir
-        reldf = archive.read_reldom(arcdir/'RELEASE.zip', 'rel')#, shape='pra')
-        reldf = reldf.rename(columns={'geometry': 'pra'})
-        domdf = archive.read_reldom(arcdir/'DOMAIN.zip', 'dom')#, shape='dom')
-        domdf = domdf.rename(columns={'geometry': 'dom'})
-
-        # Filter down to just what we need
-        df = akdf1[['id']]
-
-        reldf = df.merge(reldf, how='left', left_on='id', right_on='Id')
-        reldf = reldf.drop('id', axis=1)
-        reldf['pra_size'] = reldf['pra_size'].astype('string')
-        reldf['combo'] = scombo
-        reldf['combo'] = reldf['combo'].astype('string')
-        
-        reldfs.append(reldf)
-
-        domdf = df.merge(domdf, how='left', left_on='id', right_on='Id')
-        domdf = domdf.drop('id', axis=1)
-        domdf['combo'] = scombo
-        domdf['combo'] = domdf['combo'].astype('string')
-        domdfs.append(domdf)
-
-    reldf = pd.concat(reldfs)
-    domdf = pd.concat(domdfs)
-
-    return reldf, domdf
-# ----------------------------------------------------------
-_mosaic_metadata = {
-    'dem': (gdal.GDT_Float32, {
-        'description': 'IFSAR Digital elevation model',
-        'units': 'm'
-    }),
-
-    'landcover': (gdal.GDT_Int16, {
-        'description': 'USGS Land cover types',
-        'units': 'm'
-    }),
-
-    'deposition': (gdal.GDT_Float32, {
-        'description': 'Maximum deposition from any avalanche',
-        'units': 'm'
-    }),
-    'max_height': (gdal.GDT_Float32, {
-        'description': 'Maximum depth of snow attained',
-        'units': 'm',
-    }),
-    'max_velocity': (gdal.GDT_Float32, {
-        'description': 'Maximum snow speed from any avalanche',
-        'units': 'm s-1',
-    }),
-    'max_pressure': (gdal.GDT_Float32, {
-        'description': 'Maximum pressure from any avalanche',
-        'source_units': 'Pa',    # Convert Pa to kPa
-        'units': 'kPa',
-    }),
-    'avalanche_count': (gdal.GDT_Int16, {
-        'description': 'Number of avalanches hitting this gridcell',
-    }),
-    'domain_count': (gdal.GDT_Int16, {
-        'description': 'Number of avalanches hitting this gridcell',
-    }),
-    'pra_count': (gdal.GDT_Int16, {
-        'description': 'Number of PRAs hitting this gridcell',
-    }),
-    'pra_centroid_count': (gdal.GDT_Int16, {
-        'description': 'Number of PRAs centered on this gridcell',
-    }),
-}
-_avoid = ('dem', 'landcover')    # Only include these if user provides fetch fn
-_mosaic_keys = list(x for x in _mosaic_metadata.keys() if x not in _avoid)
-
-class _ExtentShp(typing.NamedTuple):
-    scombo: str
-    shp: str
-    ds: object
-    layer: object
-    Id: object
-
-#def new_extent_shp(dir, gridM, combo):
-#    scombo = '-'.join(str(x) for x in combo)
-#    extent_shp = str(dir / f'extent-{scombo}.shp')
-#    print('Writing extent_shp ', extent_shp)
-#    if os.path.exists(extent_shp):
-#        os.remove(extent_shp)
-#    extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
-#    extent_layer = extent_ds.CreateLayer(extent_shp, ogrutil.to_srs(gridM.wkt), geom_type=ogr.wkbMultiPolygon )
-#    # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
-#    extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
-#    return _ExtentShp(scombo, extent_shp, extent_ds, extent_layer, extent_Id)
-
-
-
-class Mosaic(typing.NamedTuple):
-    """Mosaic Data Structure, ready to write out to disk."""
-    rasters: dict    # {'deposition': (meta, np.array), ...}
-    vectors: dict    # {'release': df, 'domain': df, 'extent': df}
-
-#    def __init__(self, name, rasters, vectors):
-#        self.name = name
-#        self.rasters = rasters
-#        self.vectors = vectors
-#        self._tdir = 
-#        self.tifdir = tifdir
-
-
-def redone_extent_gpkgs(expmod, combo, extent_types):
-    """Determines filenames of the re-done extent GPKG files.
-    (The ones in the standard read-only ak/ directory are wront."""
-
-    arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
-    swcombo = arcdir.parts[-2]    # Eg: 'ak-ccsm-1981-2010-lapse-For-30'
-    sijdom = arcdir.parts[-1][4:]    # Eg: 111-044
-    expdir_ext = expmod.dir.parents[0] / 'ext'
-
-    odir = expdir_ext / swcombo / 'extent'
-    extent_gpkgs = [odir / f'{swcombo}-{sijdom}-extent_{etyp}.gpkg'
-        for etyp in extent_types]
-
-    return extent_gpkgs
-
 
 def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
     rho=300, vars=_mosaic_keys,
@@ -221,22 +81,14 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
 
         # --------------- Read polygon files: PRAs, domains and extents
         # Use the redone extent.gpkg files
-        extent_types = ('christen', 'full')
-        extent_gpkgs = redone_extent_gpkgs(expmod, combo, extent_types)
-
-        # Auto-generate if not exists
-        if not os.path.isfile(extent_gpkgs[0]):
-            odir = extent_gpkgs[0].parents[0]
-            os.makedirs(odir, exist_ok=True)
-            with ioutil.TmpDir(odir) as tdir:
-                archive.write_extent_gpkgs(expmod, combo, odir, extent_types, tdir)
-TODO: write_extent_gpkg() should only write one file.
+        extent_christen_gpkg = extent.write_gpkg(expmod, combo, 'christen', tdir)
+        extent_full_gpkg = extent.write_gpkg(expmod, combo, 'full', tdir)
 
         # (All using geopandas, with .Id and .geometry columns)
         dfs = (
             ('release', archive.read_reldom(arcdir/'RELEASE.zip', 'rel')),    # Includes ALL For and NoFor Polygons
             ('domain', archive.read_reldom(arcdir/'DOMAIN.zip', 'dom')),
-            ('extent_christen', geopandas.read_file(str(extent_gpkgs[0]))))   # >1 polygon per ID
+            ('extent_christen', geopandas.read_file(str(extent_christen))))   # >1 polygon per ID
         ids = set(akdf1.id)
         for vname,val in dfs:
             # Select out only polygons pertaining to this combo (whether For or NoFor)
@@ -308,8 +160,8 @@ TODO: write_extent_gpkg() should only write one file.
                     vals['avalanche_count'])
                 _mosaic.mosaic(*args)
 
-        extent_gpkg_t30s = redone_extent_gpkgs(expmod, combo, ('tetra30',))
-
+        extent_tetra30_gpkg = extent.write_gpkg(expmod, combo, 'tetra30', tdir,
+            mask_kwargs=dict(max_pressure=vals['max_pressure']))
 
     # ========== Write output GeoTIFF and Zip it up
     # --------------------- Write shape dataframes to shapefiles
@@ -438,7 +290,6 @@ def mosaic_avals_combo(akdf, sextent, tifdir,
     ret = mosaic_avals_id(expmod, gridM, akdf, tifdir, **kwargs)
     print('=== END mosaic_aval_combo')
     return ret
-
 # ---------------------------------------------------------------------------------
 class MosaicWriter:
 
