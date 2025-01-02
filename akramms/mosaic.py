@@ -137,6 +137,23 @@ class Mosaic(typing.NamedTuple):
 #        self._tdir = 
 #        self.tifdir = tifdir
 
+
+def redone_extent_gpkgs(expmod, combo, extent_types):
+    """Determines filenames of the re-done extent GPKG files.
+    (The ones in the standard read-only ak/ directory are wront."""
+
+    arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
+    swcombo = arcdir.parts[-2]    # Eg: 'ak-ccsm-1981-2010-lapse-For-30'
+    sijdom = arcdir.parts[-1][4:]    # Eg: 111-044
+    expdir_ext = expmod.dir.parents[0] / 'ext'
+
+    odir = expdir_ext / swcombo / 'extent'
+    extent_gpkgs = [odir / f'{swcombo}-{sijdom}-extent_{etyp}.gpkg'
+        for etyp in extent_types]
+
+    return extent_gpkgs
+
+
 def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
     rho=300, vars=_mosaic_keys,
     dem_fn=None, landcover_fn=None, snow_fn=None, ijdom=None):
@@ -204,23 +221,25 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
 
         # --------------- Read polygon files: PRAs, domains and extents
         # Use the redone extent.gpkg files
-        extent_gpkg, extent_full_gpkg = archive.redone_extent_gpkgs(expmod, combo)
+        extent_types = ('christen', 'full')
+        extent_gpkgs = redone_extent_gpkgs(expmod, combo, extent_types)
 
         # Auto-generate if not exists
-        if not os.path.isfile(extent_gpkg):
-            odir = extent_gpkg.parents[0]
+        if not os.path.isfile(extent_gpkgs[0]):
+            odir = extent_gpkgs[0].parents[0]
             os.makedirs(odir, exist_ok=True)
             with ioutil.TmpDir(odir) as tdir:
-                archive.write_extent_gpkg(expmod, combo, extent_gpkg, extent_full_gpkg, tdir)
+                archive.write_extent_gpkgs(expmod, combo, odir, extent_types, tdir)
+TODO: write_extent_gpkg() should only write one file.
 
         # (All using geopandas, with .Id and .geometry columns)
         dfs = (
             ('release', archive.read_reldom(arcdir/'RELEASE.zip', 'rel')),    # Includes ALL For and NoFor Polygons
             ('domain', archive.read_reldom(arcdir/'DOMAIN.zip', 'dom')),
-            ('extent', geopandas.read_file(str(extent_gpkg))))   # >1 polygon per ID
+            ('extent_christen', geopandas.read_file(str(extent_gpkgs[0]))))   # >1 polygon per ID
         ids = set(akdf1.id)
         for vname,val in dfs:
-            # Select out only polyg`ons pertaining to this combo (whether For or NoFor)
+            # Select out only polygons pertaining to this combo (whether For or NoFor)
             subdf = val[val.Id.isin(ids)]
             # Put in idom / jdom
             subdf['idom'] = combo.idom
@@ -288,6 +307,9 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
                     vals['domain_count'],
                     vals['avalanche_count'])
                 _mosaic.mosaic(*args)
+
+        extent_gpkg_t30s = redone_extent_gpkgs(expmod, combo, ('tetra30',))
+
 
     # ========== Write output GeoTIFF and Zip it up
     # --------------------- Write shape dataframes to shapefiles
@@ -509,11 +531,11 @@ _tifdir_names = [
     'pra_count.tif',
     'pra_centroid_count.tfw',
     'pra_centroid_count.tif',
-    'extent.cpg',
-    'extent.dbf',
-    'extent.prj',
-    'extent.shp',
-    'extent.shx',
+    'extent_christen.cpg',
+    'extent_christen.dbf',
+    'extent_christen.prj',
+    'extent_christen.shp',
+    'extent_christen.shx',
     'landcover.tfw',
     'landcover.tif',
     'landcover.tif.aux.xml',

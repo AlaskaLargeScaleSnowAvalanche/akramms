@@ -94,9 +94,13 @@ combo_sql_types = {
 combo_keys = list(combo_schema.schema.keys())
 _Combo = collections.namedtuple('Combo', combo_keys)
 class Combo(_Combo):
+    def base_str(self):
+        return f'{self.snow_dataset}-{self.year0:04d}-{self.year1:04d}-{self.downscale_algo}-{self.forest}-{self.return_period}'
     def __repr__(self):
+        return f'{self.base_str()}-{self.idom:03d}-{self.jdom:03d}'
+
 #        print('ccccccccccombo ', tuple(self))
-        return f'{self.snow_dataset}-{self.year0:04d}-{self.year1:04d}-{self.downscale_algo}-{self.forest}-{self.return_period}-{self.idom:03d}-{self.jdom:03d}'
+#        return f'{self.snow_dataset}-{self.year0:04d}-{self.year1:04d}-{self.downscale_algo}-{self.forest}-{self.return_period}-{self.idom:03d}-{self.jdom:03d}'
 #        return '-'.join(str(x) for x in self)
 # -------------------------------------------------------------
 def combo_to_scenedir(combo, scenetype='x'):
@@ -276,8 +280,8 @@ def full():
                 for forest in ('NoFor','For'):
                     yield Combo(snow, year0, year1, downscale_algo, forest, return_period, idom, jdom)
 
-def sample():
-    for year0,year1 in [(1981,2010)]:
+def urban():
+    for year0,year1 in [(1981,2010), (2031,2060)]:
         for return_period in [30,300]:
             for idom,jdom in [        (90, 41), (91, 41), (90, 42), (91, 42),    # Cordova
                 (110, 42), (109,42),    # Haines and West: Avalanche of 2024-2-2

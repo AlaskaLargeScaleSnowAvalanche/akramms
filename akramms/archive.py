@@ -679,11 +679,10 @@ def read_nc(avalfile):
 
 
 
-def write_extent_gpkg(expmod, combo, extent_gpkg, extent_full_gpkg, tdir):
+def write_extent_gpkgs(expmod, combo, arcdir, extent_types, tdir):
 
     # ----------------- Write /vsizip/EXTENT.zip/extent.shp
-    extent_shp = tdir.location / 'extent.shp'
-    extent_full_shp = tdir.location / 'extent_full.shp'
+    extent_shps = [tdir.location / f'extent_{et}.shp' for et in extent_types]
 
     # Get a list of all the Avalanches in this (archived) combo
 #    scombo = expmod.name + '-' + '-'.join(str(x) for x in combo)
@@ -692,15 +691,20 @@ def write_extent_gpkg(expmod, combo, extent_gpkg, extent_full_gpkg, tdir):
     akdf = resolve.resolve_to(parseds, 'id', realized=True, scenetypes={'arc'})
 
     # Open and write the extent file (Shapefile within a Zip archive)
-    extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(str(extent_shp))
-    extent_full_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(str(extent_full_shp))
+    extent_dss = [
+        ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(str(eshp))
+        for eshp in extent_shps]
+
     try:
-        extent_layer = extent_ds.CreateLayer(str(extent_shp), ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
-        extent_full_layer = extent_full_ds.CreateLayer(str(extent_full_shp), ogrutil.to_srs(expmod.wkt), geom_type=ogr.wkbMultiPolygon )
+        extent_layers = [
+            eds.CreateLayer(str(eshp), ogrutil.to_srs(expmod.wkt),
+                geom_type=ogr.wkbMultiPolygon)
+            for eds,eshp in zip(extent_dss, extent_shps)]
 
         # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
-        extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
-        extent_full_Id = extent_full_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
+        extent_Ids = [
+            ely.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
+            for ely in extent_layers]
 
         # Read avalanches, compute extent, and write into extent file
         nrow = len(akdf)
@@ -715,26 +719,21 @@ def write_extent_gpkg(expmod, combo, extent_gpkg, extent_full_gpkg, tdir):
                 raise ValueError(f'Missing avalanche file: {tup.avalfile}')
 
             aval = read_nc(tup.avalfile)
-            polygonize_extent(aval, tup.id, extent_layer, extent_Id, full=False)
-            polygonize_extent(aval, tup.id, extent_full_layer, extent_full_Id, full=True)
+            for etyp,elyr,eId in zip(extent_types, extent_layers, extent_Ids):
+                polygonize_extent(combo, aval, tup.id, elyr, eId, extent_type=etyp)
             n += 1
         print('Done!')
     finally:
-        extent_ds = None
-        extent_full_ds = None
+        extent_dss = None
 
 
     # Convert to GeoPackage (indented to maintain open temp dir)
-    for shp,gpkg in ((extent_shp, extent_gpkg), (extent_full_shp, extent_full_gpkg)):
+    extent_gpkgs = [arcdir / f'extent_{et}.shp' for et in extent_types]
+    for shp,gpkg in zip(extent_shps, extent_gpkgs):
         gpkg_tmp = gpkg.parents[0] / (gpkg.parts[-1][:-5] + '-tmp.gpkg')
         cmd = ['ogr2ogr', gpkg_tmp, shp]
         subprocess.run(cmd, check=True)
         os.rename(gpkg_tmp, gpkg)
-
-
-
-
-
 
 
 
@@ -757,12 +756,8 @@ def finish_combo(expmod, combo, dry_run=False):
             out.write('Combo archived\n')
  
     # ----------------- Write /vsizip/EXTENT.zip/extent.shp
-    with ioutil.TmpDir(dir=arcdir) as tdir:
-
-        write_extent_gpkg(expmod, combo,
-            arcdir / f'extent.gpkg',
-            arcdir / f'extent_full.gpkg',
-            tdir)
+#    with ioutil.TmpDir(dir=arcdir) as tdir:
+#        write_extent_gpkg(expmod, combo, arcdir, tdir)
 
     # --------------- (Very conservatively)
     # Delete the xdir by moving it to a todel directory.
@@ -824,8 +819,37 @@ def read_reldom(arcdir_zip, ext, **kwargs):
 
     return pd.concat(dfs)
 # ----------------------------------------------------------
-def polygonize_extent(aval, tup_id,
-    extent_layer, extent_Id, full=False):
+def _mask_filter_full(nzmask_val, aval, tup_id):
+        #nzmask_val[np.logical_and(np.logical_and(
+        #    aval.max_height > 0,
+        #    aval.max_vel > 0),
+        #    aval.depo > 0)] = tup_id
+
+        # Do not require depo>0 because there will be parts of extent
+        # that are not also covered by extent_full.
+        nzmask_val[np.logical_and(
+            aval.max_height > 0,
+            aval.max_vel > 0)] = tup_id
+
+def _mask_filter_christen(nzmask_val, aval, tup_id):
+        # On March 5, 2024 Marc Christen wrote:
+        # > These outlines are defined as an envelope of grid cells
+        # > of an avalanche, where
+        # >   Flow-depth > 0.25m AND
+        # >   velocity > 1m/s
+        nzmask_val[np.logical_and(
+            aval.max_height > 0.25, aval.max_vel > 1.0)] = tup_id
+
+
+def _mask_filter_tetra30(nzmask_val, aval, tup_id):
+    """SEVERE: Return period less than 30 years; AND/OR Impact
+    pressure greater than or equal to 30 kPa"""
+    nzmask_val[aval.max_pressure > 30] = tup_id
+
+# ----------------------------------------------------------------------------
+#extent_types = ('christen', 'full', 'tetra30')
+def polygonize_extent(combo, aval, tup_id,
+    extent_layer, extent_Id, extent_type='christen'):#full=False):
 #    iA, jA, gridA_gt, crs_wkt, max_vel, max_height, depo,
 
     """Creates a polygon for the extent of an avalanche, and writes it
@@ -839,9 +863,11 @@ def polygonize_extent(aval, tup_id,
         Reference to the OGR shapefile field called "Id", where
         Avalanche Id is to be stored.
 
-    full:
-        True: polygonize all non-zero gridcells (used for SpataLite index).
-        False: polygonize using "user-level" definition of avalanche outline
+    extent_type:
+        'full': polygonize all non-zero gridcells (used for SpataLite index).
+        'christen': polygonize using "user-level" definition of avalanche outline as per Marc Christen's definition
+        'tetra30': Polygonize using Tetra Tech's 30-year criterion
+        'tetra300': Polygonize using Tetra Tech's 300-year criterion
 
     Example creating extent inputs:
       extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
@@ -875,32 +901,10 @@ def polygonize_extent(aval, tup_id,
 #    max_height = nc.variables['max_height'][:].astype('f4')
 #    depo = nc.variables['depo'][:].astype('f4')
 
-    # On March 5, 2024 Marc Christen wrote:
-    # > These outlines are defined as an envelope of grid cells
-    # > of an avalanche, where
-    # >   Flow-depth > 0.25m AND
-    # >   velocity > 1m/s
     nzmask_val = np.zeros(aval.max_vel.shape, dtype=np.int32)
-    if full:
-        #nzmask_val[np.logical_and(np.logical_and(
-        #    aval.max_height > 0,
-        #    aval.max_vel > 0),
-        #    aval.depo > 0)] = tup_id
-
-        # Do not require depo>0 because there will be parts of extent
-        # that are not also covered by extent_full.
-        nzmask_val[np.logical_and(
-            aval.max_height > 0,
-            aval.max_vel > 0)] = tup_id
-
-    else:
-        # On March 5, 2024 Marc Christen wrote:
-        # > These outlines are defined as an envelope of grid cells
-        # > of an avalanche, where
-        # >   Flow-depth > 0.25m AND
-        # >   velocity > 1m/s
-        nzmask_val[np.logical_and(
-            aval.max_height > 0.25, aval.max_vel > 1.0)] = tup_id
+    this_module = sys.modules[__name__]
+    mask_filter_fn = getattr(this_module, f'_mask_filter_{extent_type}')
+    mask_filter_fn(nzmask_val, aval, tup_id)
 
     # Burn the gridcells that are part of our grid
     # (already pared down)
@@ -919,20 +923,6 @@ def polygonize_extent(aval, tup_id,
 
 
 # ----------------------------------------------------------
-def redone_extent_gpkgs(expmod, combo):
-    """Determines filenames of the re-done extent GPKG files.
-    (The ones in the standard read-only ak/ directory are wront."""
-
-    arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
-    swcombo = arcdir.parts[-2]    # Eg: 'ak-ccsm-1981-2010-lapse-For-30'
-    sijdom = arcdir.parts[-1][4:]    # Eg: 111-044
-    expdir_ext = expmod.dir.parents[0] / 'ext'
-
-    odir = expdir_ext / swcombo / 'extent'
-    extent_gpkg = odir  / f'{swcombo}-{sijdom}-extent.gpkg'
-    extent_full_gpkg =  odir / f'{swcombo}-{sijdom}-extent_full.gpkg'
-
-    return extent_gpkg, extent_full_gpkg
 
 #TODO: Add T/S/M/L categorization to netCDF file
 #Add authorship metadata to netCDF file
