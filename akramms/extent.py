@@ -125,70 +125,93 @@ def polygonize_extent(combo, aval, tup_id,
 
 # ----------------------------------------------------------
 
+class WriteGpkg:
+    def __init__(expmod, combo, extent_dir, extent_type, tdir, overwrite=False, mask_kwargs={}):
+        self.extent_type = extent_type
 
-def write_gpkg(expmod, combo, extent_type, overwrite=False, mask_kwargs={}):
+        self.extent_gpkg = self.extent_dir / f'{swcombo}-{sijdom}-extent_{self.extent_type}.gpkg'
 
-    arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
-    swcombo = arcdir.parts[-2]    # Eg: 'ak-ccsm-1981-2010-lapse-For-30'
-    sijdom = arcdir.parts[-1][4:]    # Eg: 111-044
-    expdir_ext = expmod.dir.parents[0] / 'ext'
-
-    odir = expdir_ext / swcombo / 'extent'
-    extent_gpkg = odir / f'{swcombo}-{sijdom}-extent_{extent_type}.gpkg'
-
-    if (not overwrite) and os.path.isfile(extent_gpkg):
-        return extent_gpkg
-
-    os.makedirs(odir, exist_ok=True)
-
-    with ioutil.TmpDir(odir) as tdir:
+        os.makedirs(self.extent_dir, exist_ok=True)
+        self.tdir = tdir
 
         # ----------------- Write /vsizip/EXTENT.zip/extent.shp
-        extent_shp = tdir.location / f'extent_{extent_type}.shp'
-
-        # Get a list of all the Avalanches in this (archived) combo
-    #    scombo = expmod.name + '-' + '-'.join(str(x) for x in combo)
-        scombo = expmod.name + '-' + str(combo)
-        parseds = akramms.parse.parse_args([scombo])
-        akdf = resolve.resolve_to(parseds, 'id', realized=True, scenetypes={'arc'})
+        self.extent_shp = tdir.location / f'extent_{self.extent_type}.shp'
 
         # Open and write the extent file (Shapefile within a Zip archive)
-        extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(str(extent_shp))
+        self.extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(str(self.extent_shp))
 
-        try:
-            extent_layer = extent_ds.CreateLayer(str(extent_shp), ogrutil.to_srs(expmod.wkt),
-                    geom_type=ogr.wkbMultiPolygon)
+        self.extent_layer = self.extent_ds.CreateLayer(str(self.extent_shp), ogrutil.to_srs(expmod.wkt),
+                geom_type=ogr.wkbMultiPolygon)
 
-            # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
-            extent_Id = extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
+        # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
+        self.extent_Id = self.extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
 
-            # Read avalanches, compute extent, and write into extent file
-            nrow = len(akdf)
-            n = 0
-            print(f'Polygonizing {nrow} avalanche extents (user and full)', end='')
-            sys.stdout.flush()
-            for tup in akdf.sort_values('id').itertuples(index=False):
-                if n%100 == 0:
-                    print('.', end='')
-                    sys.stdout.flush()
-                if not os.path.isfile(tup.avalfile):
-                    raise ValueError(f'Missing avalanche file: {tup.avalfile}')
+    def __enter__(self):
+        return self
 
-                aval = archive.read_nc(tup.avalfile)
-
-                polygonize_extent(combo, aval, tup.id, extent_layer, extent_Id, extent_type=extent_type, mask_kwargs=mask_kwargs)
-                n += 1
-            print('Done!')
-        finally:
-            extent_ds = None
-
+    def __exit__(self, type, value, traceback):
+        self.extent_ds = None    # Close the file
 
         # Convert to GeoPackage (indented to maintain open temp dir)
-        extent_gpkg_tmp = extent_gpkg.parents[0] / (extent_gpkg.parts[-1][:-5] + '-tmp.gpkg')
-        cmd = ['ogr2ogr', extent_gpkg_tmp, extent_shp]
+        extent_gpkg_tmp = self.extent_gpkg.parents[0] / (self.extent_gpkg.parts[-1][:-5] + '-tmp.gpkg')
+        cmd = ['ogr2ogr', self.extent_gpkg_tmp, self.extent_shp]
         subprocess.run(cmd, check=True)
-        os.rename(extent_gpkg_tmp, extent_gpkg)
+        os.rename(self.extent_gpkg_tmp, self.extent_gpkg)
 
         return extent_gpkg
 
 
+
+    def polygonize(self, aval, id, mask_kwargs={}):
+
+        polygonize_extent(combo, aval, id, self.extent_layer, self.extent_Id, extent_type=self.extent_type, mask_kwargs=mask_kwargs)
+
+
+
+
+#
+#
+#
+#def write_gpkg(expmod, combo, extent_type, overwrite=False, mask_kwargs={}):
+#
+#    arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
+#    swcombo = arcdir.parts[-2]    # Eg: 'ak-ccsm-1981-2010-lapse-For-30'
+#    sijdom = arcdir.parts[-1][4:]    # Eg: 111-044
+#    expdir_ext = expmod.dir.parents[0] / 'ext'
+#
+#    odir = expdir_ext / swcombo / 'extent'
+#    extent_gpkg = odir / f'{swcombo}-{sijdom}-extent_{extent_type}.gpkg'
+#
+#    if (not overwrite) and os.path.isfile(extent_gpkg):
+#        return extent_gpkg
+#
+#    os.makedirs(odir, exist_ok=True)
+#
+#    with ioutil.TmpDir(odir) as tdir:
+#
+#            for tup in akdf.sort_values('id').itertuples(index=False):
+#                if n%100 == 0:
+#                    print('.', end='')
+#                    sys.stdout.flush()
+#                if not os.path.isfile(tup.avalfile):
+#                    raise ValueError(f'Missing avalanche file: {tup.avalfile}')
+#
+#                aval = archive.read_nc(tup.avalfile)
+#
+#                polygonize_extent(combo, aval, tup.id, extent_layer, extent_Id, extent_type=extent_type, mask_kwargs=mask_kwargs)
+#                n += 1
+#            print('Done!')
+#        finally:
+#            extent_ds = None
+#
+#
+#        # Convert to GeoPackage (indented to maintain open temp dir)
+#        extent_gpkg_tmp = extent_gpkg.parents[0] / (extent_gpkg.parts[-1][:-5] + '-tmp.gpkg')
+#        cmd = ['ogr2ogr', extent_gpkg_tmp, extent_shp]
+#        subprocess.run(cmd, check=True)
+#        os.rename(extent_gpkg_tmp, extent_gpkg)
+#
+#        return extent_gpkg
+#
+#
+#

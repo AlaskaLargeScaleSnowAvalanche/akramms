@@ -651,14 +651,16 @@ class ArchiveContents(typing.NamedTuple):
     """
     gridA_gt: object
     gridA_wkt: str
-    iA: object
-    jA: object
+    iiA: object
+    jjA: object
     max_vel: object
     max_height: object
     depo: object
 
 def read_nc(avalfile):
     with netCDF4.Dataset(avalfile) as nc:
+        nc.set_always_mask(False)
+
         # --------------- gridA is the subdomain tile, WITH MARGIN
         # Geotransform of this avalanche's local grid
         # TODO: Store Geotransform as machine-precision doubles in the file
@@ -671,8 +673,8 @@ def read_nc(avalfile):
 
         return ArchiveContents(
             gridA_gt=gridA_gt, gridA_wkt=gridA_wkt,
-            iA=np.cumsum(i_diff),
-            jA=np.cumsum(j_diff),
+            iiA=np.cumsum(i_diff),
+            jjA=np.cumsum(j_diff),
             max_vel=nc.variables['max_vel'][:].astype('f4'),
             max_height=nc.variables['max_height'][:].astype('f4'),
             depo=nc.variables['depo'][:].astype('f4'))

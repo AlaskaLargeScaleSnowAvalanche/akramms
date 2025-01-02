@@ -65,6 +65,14 @@ class Mosaic(typing.NamedTuple):
     vectors: dict    # {'release': df, 'domain': df, 'extent': df}
 
 # ---------------------------------------------------------------------------
+def _subset_poly_df(ids, idom, jdom, df):
+    # Select out only polygons pertaining to this combo (whether For or NoFor)
+    subdf = df[df.Id.isin(ids)]
+    # Add idom / jdom to the dataframes read via read_reldom
+    subdf['idom'] = combo.idom
+    subdf['jdom'] = combo.jdom
+    return subdf
+
 
 def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
     rho=300, vars=_mosaic_keys,
@@ -95,8 +103,7 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
         Typically taken from exp_mod
         Include these if you want DEM and landcover files added to the output.
     Returns: Mosaic
-        Data structure to write
-    """
+        Data structure to write    """
 
     mos = Mosaic(dict(), dict())
 
@@ -129,26 +136,23 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
     dfss = {'release': list(), 'domain': list(), 'extent_christen': list()}
     shapedfs = list()
     for (combo,arcdir),akdf1 in akdf0.groupby(['combo', 'releasefile']):
+
+        # Figure out where we will write extent files
+        arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
+        swcombo = arcdir.parts[-2]    # Eg: 'ak-ccsm-1981-2010-lapse-For-30'
+        sijdom = arcdir.parts[-1][4:]    # Eg: 111-044
+        expdir_ext = expmod.dir.parents[0] / 'ext'
+        extent_dir = expdir_ext / swcombo / 'extent'
+
         akdf1 = akdf1.sort_values('id')
-
-        # --------------- Read polygon files: PRAs, domains and extents
-        # Use the redone extent.gpkg files
-        extent_christen_gpkg = extent.write_gpkg(expmod, combo, 'christen')
-        extent_full_gpkg = extent.write_gpkg(expmod, combo, 'full')
-
-        # (All using geopandas, with .Id and .geometry columns)
-        dfs = (
-            ('release', archive.read_reldom(arcdir/'RELEASE.zip', 'rel')),    # Includes ALL For and NoFor Polygons
-            ('domain', archive.read_reldom(arcdir/'DOMAIN.zip', 'dom')),
-            ('extent_christen', geopandas.read_file(str(extent_christen_gpkg))))   # >1 polygon per ID
         ids = set(akdf1.id)
-        for vname,val in dfs:
-            # Select out only polygons pertaining to this combo (whether For or NoFor)
-            subdf = val[val.Id.isin(ids)]
-            # Put in idom / jdom
-            subdf['idom'] = combo.idom
-            subdf['jdom'] = combo.jdom
-            dfss[vname].append(subdf)
+
+        # --------------- Read polygon files: PRAs, domains
+        # (All using geopandas, with .Id and .geometry columns)
+        dfss['release'].append(_subset_poly_df(ids, combo.idom, combo.jdom,
+                archive.read_reldom(arcdir/'RELEASE.zip', 'rel')))
+        dfss['domain'].append(_subset_poly_df(ids, combo.idom, combo.jdom,
+                archive.read_reldom(arcdir/'DOMAIN.zip', 'dom')))
 
         # -------------- Rasterize ("burn") the release polygons
         pra_count_1d = vals['pra_count'].reshape(-1)
@@ -172,35 +176,31 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
                 pra_centroid_count[j,i] += 1
 
         # -------------- Update the mosaic (in memory)
-        count = 0
-        for tup in akdf1.itertuples(index=False):    # Iterate through each avalanche (tup.avalfile)
-            # DEBUGGING
-            count += 1
-#            if count > 100:
-#                break
+        extent_types = ('christen', 'full', 'tetra30')
+        with contextlib.ExitStack() as stack:
+            tdir = stack.enter_context(ioutil.TmpDir(extent_dir))
+            extent_writers = {
+                extent_type: stack.enter_context(extent.WriteGpkg(expmod, combo, extent_type, tdir))
+                for extent_type in extent_types}
 
-            if not os.path.isfile(tup.avalfile):
-                print(f'Missing avalanche file: {tup.avalfile}')
-                continue
+            count = 0
+            for tup in akdf1.itertuples(index=False):    # Iterate through each avalanche (tup.avalfile)
+                count += 1
+                if count%100 == 0:
+                    print('.', end='')
+                    sys.stdout.flush()
 
-            print(f'mosaic: {tup.avalfile}')
-            with netCDF4.Dataset(tup.avalfile) as nc:
-                nc.set_always_mask(False)
-
-                # --------------- gridA is the subdomain tile, WITH MARGIN
-                # Geotransform of this avalanche's local grid
-                # TODO: Store Geotransform as machine-precision doubles in the file
-                gridA_gt = np.array([float(x) for x in nc.variables['grid_mapping'].GeoTransform.split(' ')])
+                if not os.path.isfile(tup.avalfile):
+                    print(f'Missing avalanche file: {tup.avalfile}')
+                    continue
+                aval = archive.read_nc(tup.avalfile)
 
                 # ---------- Copy raster into the overall mosaic
                 # C++ extension does the real work
                 args = (
-                    nc.variables['i_diff'][:],
-                    nc.variables['j_diff'][:],
-                    gridA_gt[0], gridA_gt[3],
-                    nc.variables['max_vel'][:].astype('f4'),
-                    nc.variables['max_height'][:].astype('f4'),
-                    nc.variables['depo'][:].astype('f4'),
+                    aval.iiA, aval.jjA,
+                    aval.gridA_gt[0], aval.gridA_gt[3],
+                    aval.max_vel, aval.max_height, aval.depo,
                     rho,
                     gridM.nx, gridM.x0, gridM.dx,
                     gridM.ny, gridM.y0, gridM.dy,
@@ -212,8 +212,17 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
                     vals['avalanche_count'])
                 _mosaic.mosaic(*args)
 
-        extent_tetra30_gpkg = extent.write_gpkg(expmod, combo, 'tetra30',
-            mask_kwargs=dict(max_pressure=vals['max_pressure']))
+                extent_writers['christen'].polygonize(aval, tup.id)
+                extent_writers['full'].polygonize(aval, tup.id)
+                extent_writers['tetra30'].polygonize(aval, tup.id,
+                    mask_kwargs=dict(max_pressure=aval.max_pressure))
+
+
+        dfss['extent_christen'].append(_subset_poly_df(ids, combo.idom, combo.jdom,
+            geopandas.read_file(str(extent_writer['christen'].extent_gpkg))))    # >1 polygon per ID
+        dfss['extent_tetra30'].append(_subset_poly_df(ids, combo.idom, combo.jdom,
+            geopandas.read_file(str(extent_writer['tetra30'].extent_gpkg))))    # >1 polygon per ID
+
 
     # ========== Write output GeoTIFF and Zip it up
     # --------------------- Write shape dataframes to shapefiles
@@ -439,6 +448,11 @@ _tifdir_names = [
     'extent_christen.prj',
     'extent_christen.shp',
     'extent_christen.shx',
+    'extent_tetra30.cpg',
+    'extent_tetra30.dbf',
+    'extent_tetra30.prj',
+    'extent_tetra30.shp',
+    'extent_tetra30.shx',
     'landcover.tfw',
     'landcover.tif',
     'landcover.tif.aux.xml',

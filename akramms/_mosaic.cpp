@@ -17,8 +17,8 @@ namespace akramms {
 void mosaic_mosaic(
     // Info on the gridcells within gridA represented by RAMMS
     int const ngridA,    // Number of gridcells for this avalanche
-    int32_t *i_diff,    // Diff-encoded (i,j) of those gridcells
-    int32_t *j_diff,    // (0-based, this was determined from (x,y) values)
+    int32_t *iiA,    // NOT Diff-encoded (i,j) of those gridcells
+    int32_t *jjA,    // (0-based, this was determined from (x,y) values)
 
     // Info on subdomain tile the avalanche ran in
     double gridA_x0, double gridA_y0,    // gridA_gt[0], gridA_gt[3]
@@ -49,16 +49,16 @@ void mosaic_mosaic(
 //    PySys_WriteStdout("(deltai, deltaj) = (%d, %d)\n", deltai, deltaj);
 //    PySys_WriteStdout("deltai: %f %f\n", -(gridM_x0 - gridA_x0), gridM_dx);
 
-    int iA = 0;    // Current index in gridA
-    int jA = 0;
+//    int iA = 0;    // Current index in gridA
+//    int jA = 0;
     for (int kA=0; kA<ngridA; ++kA) {
         // Decode (i,j) indices from cumulative sum
-        iA += i_diff[kA];
-        jA += j_diff[kA];
+//        iA += i_diff[kA];
+//        jA += j_diff[kA];
 
         // Convert to (i,j) indices in gridM
-        int const iM = iA + deltai;
-        int const jM = jA + deltaj;
+        int const iM = iiA[kA] + deltai;
+        int const jM = jjA[kA] + deltaj;
 
         // Skip gridcells outside the mosaic bounds
         if ((iM < 0) || (iM >= gridM_nx) || (jM < 0) || (jM >= gridM_ny)) continue;
@@ -108,8 +108,8 @@ static PyObject *_mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwar
 {
     // Info on the gridcells within gridA represented by RAMMS
     //int ngridA;    // Number of gridcells for this avalanche
-    PyArrayObject *i_diff;    // Diff-encoded (i,j) of those gridcells
-    PyArrayObject *j_diff;    // (0-based, this was determined from (x,y) values)
+    PyArrayObject *iiA;    // Diff-encoded (i,j) of those gridcells
+    PyArrayObject *jjA;    // (0-based, this was determined from (x,y) values)
 
     // Info on subdomain tile the avalanche ran in
     double gridA_x0; double gridA_y0;    // gridA_gt[0], gridA_gt[3]
@@ -137,7 +137,7 @@ static PyObject *_mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwar
     // Parse args and kwargs
     static char const *kwlist[] = {
         // *args
-        /*"ngridA",*/ "i_diff", "j_diff",
+        /*"ngridA",*/ "iiA", "jjA",
         "gridA_x0", "gridA_y0",
         "max_velA", "max_heightA", "depoA",
         "rho",
@@ -150,8 +150,8 @@ static PyObject *_mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwar
         (char **)kwlist,
 
         //&ngridA,
-            &PyArray_Type, &i_diff,
-            &PyArray_Type, &j_diff,
+            &PyArray_Type, &iiA,
+            &PyArray_Type, &jjA,
 
         &gridA_x0, &gridA_y0,
 
@@ -173,9 +173,9 @@ static PyObject *_mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwar
         )) return NULL;
 
     // -------------------------- Typecheck and Bounds Check
-    int const ngridA = PyArray_SIZE(i_diff);
-    if (!check_array(i_diff, "i_diff", NPY_INT, "NPY_INT", ngridA)) return NULL;
-    if (!check_array(j_diff, "j_diff", NPY_INT, "NPY_INT", ngridA)) return NULL;
+    int const ngridA = PyArray_SIZE(iiA);
+    if (!check_array(iiA, "iiA", NPY_INT, "NPY_INT", ngridA)) return NULL;
+    if (!check_array(jjA, "jjA", NPY_INT, "NPY_INT", ngridA)) return NULL;
 
     if (!check_array(max_velA, "max_velA", NPY_FLOAT, "NPY_FLOAT", ngridA)) return NULL;
     if (!check_array(max_heightA, "max_heightA", NPY_FLOAT, "NPY_FLOAT", ngridA)) return NULL;
@@ -192,8 +192,8 @@ static PyObject *_mosaic_mosaic(PyObject *module, PyObject *args, PyObject *kwar
     // ------------------------------------------------------------------------
     mosaic_mosaic(
         ngridA,
-            (int32_t *)PyArray_DATA(i_diff),
-            (int32_t *)PyArray_DATA(j_diff),
+            (int32_t *)PyArray_DATA(iiA),
+            (int32_t *)PyArray_DATA(jjA),
         gridA_x0, gridA_y0,
             (float *)PyArray_DATA(max_velA),
             (float *)PyArray_DATA(max_heightA),
