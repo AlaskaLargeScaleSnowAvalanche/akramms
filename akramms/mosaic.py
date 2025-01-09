@@ -1,4 +1,4 @@
-import os,pathlib,subprocess,sys,typing
+import os,pathlib,subprocess,sys,typing,contextlib
 import numpy as np
 import pandas as pd
 import zipfile,netCDF4
@@ -7,7 +7,6 @@ from uafgi.util import gdalutil,ogrutil
 from uafgi.util import cfutil,ioutil,gisutil,rasterize
 from akramms import experiment,archive,file_info,avalquery,downscale_snow,extent
 import akramms.parse
-from akramms import resolve
 import _mosaic
 import geopandas
 from akramms.plot import p_mosaic
@@ -69,14 +68,14 @@ def _subset_poly_df(ids, idom, jdom, df):
     # Select out only polygons pertaining to this combo (whether For or NoFor)
     subdf = df[df.Id.isin(ids)]
     # Add idom / jdom to the dataframes read via read_reldom
-    subdf['idom'] = combo.idom
-    subdf['jdom'] = combo.jdom
+    subdf['idom'] = idom
+    subdf['jdom'] = jdom
     return subdf
 
 
 def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
-    rho=300, vars=_mosaic_keys,
-    dem_fn=None, landcover_fn=None, snow_fn=None, ijdom=None):
+    vars=_mosaic_keys,
+    dem_fn=None, landcover_fn=None, rho=300, snow_fn=None, ijdom=None):
 
     """General mosaic function for a bunch of avalanches and a domain
 
@@ -107,7 +106,6 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
 
     mos = Mosaic(dict(), dict())
 
-    print('=== BEGIN mosaic_aval_combo')
     print(akdf0)
     for vname in ('gridM', 'tifdir', 'rho', 'vars', 'dem_fn', 'landcover_fn', 'snow_fn'):
         val = locals()[vname]
@@ -133,7 +131,7 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
             mos.rasters[vname] = val
 
     # Collect extent polygons
-    dfss = {'release': list(), 'domain': list(), 'extent_christen': list()}
+    dfss = {'release': list(), 'domain': list(), 'extent_christen': list(), 'extent_tetra30': list()}
     shapedfs = list()
     for (combo,arcdir),akdf1 in akdf0.groupby(['combo', 'releasefile']):
 
@@ -178,12 +176,15 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
         # -------------- Update the mosaic (in memory)
         extent_types = ('christen', 'full', 'tetra30')
         with contextlib.ExitStack() as stack:
-            tdir = stack.enter_context(ioutil.TmpDir(extent_dir))
-            extent_writers = {
-                extent_type: stack.enter_context(extent.WriteGpkg(expmod, combo, extent_type, tdir))
+ #           tdir = stack.enter_context(ioutil.TmpDir(extent_dir))
+            extent_writers = {    # Not to write, just use filename
+                extent_type: extent.WriteGpkg(expmod, combo, extent_type)
+#                    expmod, combo, swcombo, sijdom, extent_dir, extent_type)
                 for extent_type in extent_types}
 
             count = 0
+            print(f'akdf1 = {len(akdf1)}')
+            print(akdf1)
             for tup in akdf1.itertuples(index=False):    # Iterate through each avalanche (tup.avalfile)
                 count += 1
                 if count%100 == 0:
@@ -212,16 +213,17 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
                     vals['avalanche_count'])
                 _mosaic.mosaic(*args)
 
-                extent_writers['christen'].polygonize(aval, tup.id)
-                extent_writers['full'].polygonize(aval, tup.id)
-                extent_writers['tetra30'].polygonize(aval, tup.id,
-                    mask_kwargs=dict(max_pressure=aval.max_pressure))
+#                extent_writers['christen'].polygonize(combo, aval, tup.id)
+#                extent_writers['full'].polygonize(combo, aval, tup.id)
+#                max_pressure = rho * aval.max_vel * aval.max_vel
+#                extent_writers['tetra30'].polygonize(combo, aval, tup.id,
+#                    mask_kwargs=dict(max_pressure=max_pressure))
 
 
         dfss['extent_christen'].append(_subset_poly_df(ids, combo.idom, combo.jdom,
-            geopandas.read_file(str(extent_writer['christen'].extent_gpkg))))    # >1 polygon per ID
+            geopandas.read_file(str(extent_writers['christen'].extent_gpkg))))    # >1 polygon per ID
         dfss['extent_tetra30'].append(_subset_poly_df(ids, combo.idom, combo.jdom,
-            geopandas.read_file(str(extent_writer['tetra30'].extent_gpkg))))    # >1 polygon per ID
+            geopandas.read_file(str(extent_writers['tetra30'].extent_gpkg))))    # >1 polygon per ID
 
 
     # ========== Write output GeoTIFF and Zip it up
@@ -348,6 +350,7 @@ def mosaic_avals_combo(akdf, sextent, tifdir,
     if snow:
         kwargs['snow_fn'] = lambda box_poly,ofname: downscale_snow.extract_snow(snowfile_vrt, box_poly, ofname)
 
+    print('=== BEGIN mosaic_avals_id')
     ret = mosaic_avals_id(expmod, gridM, akdf, tifdir, **kwargs)
     print('=== END mosaic_aval_combo')
     return ret

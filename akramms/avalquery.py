@@ -4,6 +4,7 @@ import pandas as pd
 import geopandas
 from uafgi.util import ogrutil,rtreeutil
 from akramms import archive,avalparse,avalfilter,parse,resolve,file_info
+import akramms.extent
 from akramms.util import exputil
 from akramms import joblib
 import rtree.index
@@ -271,6 +272,8 @@ def query(akdf0, sextent, scenetypes={'x', 'arc'},
             #print(akdf1.columns)
             print(akdf1[['combo', 'combo_quickstatus']])
 
+            # TODO: Now that extent files are not written during db
+            # generation, this status check will need to change.
             if force:
                 akdf1 = akdf1[akdf1.combo_quickstatus == file_info.JobStatus.EXTENT]
                 print('force=True, so only combos with status == EXTENT will be included')
@@ -278,6 +281,9 @@ def query(akdf0, sextent, scenetypes={'x', 'arc'},
             if not akdf1.combo_quickstatus.eq(file_info.JobStatus.EXTENT).all():
                 raise ValueError('All Combos must have status=EXTENT (9) to proceed')
 
+
+            # --------- Make sure the proper extent files are written
+            akramms.extent.write_combos_extents(expmod, akdf1)
 
             # --------- Move to the avalanche (id) level
             # Resolve to individual avalanches

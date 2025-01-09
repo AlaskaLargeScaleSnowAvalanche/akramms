@@ -673,8 +673,8 @@ def read_nc(avalfile):
 
         return ArchiveContents(
             gridA_gt=gridA_gt, gridA_wkt=gridA_wkt,
-            iiA=np.cumsum(i_diff),
-            jjA=np.cumsum(j_diff),
+            iiA=np.cumsum(i_diff, dtype=i_diff.dtype),
+            jjA=np.cumsum(j_diff, dtype=j_diff.dtype),
             max_vel=nc.variables['max_vel'][:].astype('f4'),
             max_height=nc.variables['max_height'][:].astype('f4'),
             depo=nc.variables['depo'][:].astype('f4'))
