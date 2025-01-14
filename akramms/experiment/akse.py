@@ -211,8 +211,9 @@ def add_combo(makefile, combo):
 
 
 # -------------------------------------------------------------
-# Degenerate tiles we do NOT want to run
+# Degenerate tiles we do NOT want to run (blacklist)
 _exclude_tiles = {
+    (112,51),
     (123, 56),
     (102,44),
     (96,43),
