@@ -41,13 +41,20 @@ def _mask_filter_christen(nzmask_val, aval, tup_id):
             aval.max_height > 0.25, aval.max_vel > 1.0)] = tup_id
 
 
-def _mask_filter_tetra30(nzmask_val, aval, tup_id, max_pressure=None):
+# TetraTech "severe": run this on the 30y
+def _mask_filter_tetra30(nzmask_val, aval, tup_id, max_pressure=None): # 
     """SEVERE: Return period less than 30 years; AND/OR Impact
     pressure greater than or equal to 30 kPa"""
     nzmask_val[max_pressure > 30] = tup_id
 
+# TetraTech "moderate" risk: run this on the 300y
+def _mask_filter_tetra1(nzmask_val, aval, tup_id, max_pressure=None): # 
+    """SEVERE: Return period less than 30 years; AND/OR Impact
+    pressure greater than or equal to 30 kPa"""
+    nzmask_val[max_pressure > 1] = tup_id
+
 # ----------------------------------------------------------------------------
-#extent_types = ('christen', 'full', 'tetra30')
+#extent_types = ('christen', 'full', 'tetra30', 'tetra1')
 def polygonize_extent(combo, aval, tup_id,
     extent_layer, extent_Id, extent_type='christen', mask_kwargs={}):#full=False):
 #    iA, jA, gridA_gt, crs_wkt, max_vel, max_height, depo,
@@ -67,7 +74,7 @@ def polygonize_extent(combo, aval, tup_id,
         'full': polygonize all non-zero gridcells (used for SpataLite index).
         'christen': polygonize using "user-level" definition of avalanche outline as per Marc Christen's definition
         'tetra30': Polygonize using Tetra Tech's 30-year criterion
-        'tetra300': Polygonize using Tetra Tech's 300-year criterion
+        'tetra1': Polygonize using Tetra Tech's 300-year criterion
 
     Example creating extent inputs:
       extent_ds = ogr.GetDriverByName("ESRI Shapefile").CreateDataSource(extent_shp)
@@ -183,9 +190,10 @@ class WriteGpkg:
 
 
 
-extent_types = ('christen', 'full', 'tetra30')
+extent_types = ('christen', 'full', 'tetra30', 'tetra1')
 def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
-    """akdf:
+    """Write the extent files for a number of combos.
+    akdf:
         Resolved to combo level (in arc dir)
     """
     
@@ -231,6 +239,8 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
                 extent_writers['full'].polygonize(combo, aval, tup.id)
                 max_pressure = rho * aval.max_vel * aval.max_vel
                 extent_writers['tetra30'].polygonize(combo, aval, tup.id,
+                    mask_kwargs=dict(max_pressure=max_pressure))
+                extent_writers['tetra1'].polygonize(combo, aval, tup.id,
                     mask_kwargs=dict(max_pressure=max_pressure))
             print()
 

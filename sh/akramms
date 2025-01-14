@@ -911,6 +911,22 @@ def stats(args):
     avalstats.stats_wcombo(akdf, ress=ress)
 
 
+@subcommand(args=[
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser.'),
+])
+def extent(args):
+    """Write the extent files related to some combos"""
+    from akramms import extent
+
+    # Identify combos
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf0 = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
+    for exp,akdf1 in akdf0.groupby('exp'):
+        # akdf1 = akdf1.sort_values('combo_order')    # Not needed
+        expmod = akramms.parse.load_expmod(exp)
+
+        extent.write_combos_extents(expmod, akdf1)
+
 
 @subcommand(args=[
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser.'),
