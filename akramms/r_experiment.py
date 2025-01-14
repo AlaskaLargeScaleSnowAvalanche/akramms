@@ -166,7 +166,8 @@ def r_forest(exp_mod, idom, jdom):
         grid_info, landcover, landcover_nd = gdalutil.read_raster(landcover_tif)
 
         # Convert to forest
-        forest = (landcover == 42)
+#        forest = (landcover == 42)
+        forest = np.isin(landcover, [41,42,43])    # NCLD Land Cover Classifications
 
         # Write it out!
         os.makedirs(os.path.split(ofname)[0], exist_ok=True)
