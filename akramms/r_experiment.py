@@ -167,7 +167,9 @@ def r_forest(exp_mod, idom, jdom):
 
         # Convert to forest
 #        forest = (landcover == 42)
-        forest = np.isin(landcover, [41,42,43])    # NCLD Land Cover Classifications
+        # Evergreen & Mixed Forests count as "forest" for us.
+        # 41=Deciduous Forest does NOT count beause much of it is smaller Alder that bends down in the face of an avalanche.
+        forest = np.isin(landcover, [42,43])    # NCLD Land Cover Classifications
 
         # Write it out!
         os.makedirs(os.path.split(ofname)[0], exist_ok=True)
