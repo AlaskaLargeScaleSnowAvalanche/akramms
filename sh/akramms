@@ -561,22 +561,10 @@ def run(args):
         setuptools.sandbox.run_setup(setup_py, cmd)
     # ------------
 
+    # --------- Compute the tiles
     parseds = akramms.parse.parse_args(args.spec)
-    akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
-    akdf0 = akdf0.reset_index(drop=True)
-
-    # Exclude combos that have already been completely finished and archived
-    # (and the x-dir might have been deleted)
-    akdf0 = joblib.add_combo_quickstatus(akdf0)
-    akdf0 = akdf0[~akdf0.combo_quickstatus.isin(
-        [joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.EXTENT])]
-#    print('aaaaaaa2 ', akdf0)
-
-    # Keep combo_order
-    for exp,akdf1 in akdf0.groupby('exp'):
-        # akdf1 = akdf1.sort_values('combo_order')    # Not needed
-        expmod = akramms.parse.load_expmod(exp)
-
+    for parsed in parseds:
+        expmod = akramms.parse.load_expmod(parsed['exp'])
         # ---------------- Step 1:
         # (a) Generate the domains and domains_margin shapefiles
 
@@ -584,10 +572,26 @@ def run(args):
         rule = r_experiment.r_active_domains(expmod)
         if not all(os.path.isfile(x) for x in rule.outputs):
             rule()
-        # -------------------------------
 
-        if args.step <= 1:
-            continue
+    if args.step <= 1:
+        return
+    # -------------------------------
+
+
+    akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)    # Needs domains_margin file
+    akdf0 = akdf0.reset_index(drop=True)
+
+    # Exclude combos that have already been completely finished and archived
+    # (and the x-dir might have been deleted)
+    akdf0 = joblib.add_combo_quickstatus(akdf0)
+    akdf0 = akdf0[~akdf0.combo_quickstatus.isin(
+        [joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.EXTENT])]
+
+    # Keep combo_order
+    for exp,akdf1 in akdf0.groupby('exp'):
+        # akdf1 = akdf1.sort_values('combo_order')    # Not needed
+        expmod = akramms.parse.load_expmod(exp)
+
 
         # Run make on chunks a few rows (combos) at a time
         ncpu = config.setup_ncpu if args.j is None else args.j
