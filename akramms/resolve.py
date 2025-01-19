@@ -170,7 +170,6 @@ def resolve_chunk(akdf, scenetypes={'x'}, realized=True):
     # First find directories containing RELEASE files
     for tup in akdf.itertuples(index=False):
         parsed = tup.parsed
-
         if parsed['type'] == 'releasefile':
             # The releasefile is just given to us!
             orows.append(itertools.chain(tup,
@@ -183,7 +182,7 @@ def resolve_chunk(akdf, scenetypes={'x'}, realized=True):
             # arcfile does not have any chunkid, so set to -1
             orows.append(itertools.chain(tup,
                 ['arc', parsed['pra_size'], -1, None]))
-        else:
+        else:    # 'parts'
             # We need to list releasefiles from a higher level
             expmod = parse.load_expmod(tup.exp)
             # combo = expmod.Combo(*tup.combo)
@@ -204,6 +203,7 @@ def resolve_chunk(akdf, scenetypes={'x'}, realized=True):
 
         if 'arc' in scenetypes:
             scenedir = expmod.combo_to_scenedir(combo, scenetype='arc')
+#            print('scenedir2 ', scenedir)
 
             # Put the arc_dir in place of the releasefile.
             if os.path.isdir(scenedir):

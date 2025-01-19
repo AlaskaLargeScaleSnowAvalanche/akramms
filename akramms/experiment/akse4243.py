@@ -13,7 +13,7 @@ from akramms import d_ifsar, d_usgs_landcover
 #name = __name__.rsplit('.', 1)[-1]    # e_alaska
 name = 'akse'    # Files are still named 'akse' even though our dir is akse4142
 #root_dir = config.roots['PRJ'] / name
-root_dir = config.roots['PRJ'] / 'akse4142'
+root_dir = config.roots['PRJ'] / 'akse4243'
 
 dir = root_dir / 'db'
 publish_dir = root_dir / 'publish'

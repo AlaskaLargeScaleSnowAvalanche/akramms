@@ -482,6 +482,7 @@ def add_combo_quickstatus(akdf0, mtime=False):
         mtimes = list()
         for tup in akdf1.itertuples(index=False):
             arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
+#            print('quickstatus ', tup.combo, arcdir)
             if os.path.exists(arcdir / 'archived.txt'):
                 if os.path.exists(arcdir / 'extent.gpkg') and os.path.exists(arcdir / 'extent_full.gpkg'):
                     status = JobStatus.EXTENT
