@@ -10,8 +10,11 @@ from akramms import d_ifsar, d_usgs_landcover
 # Top-level experimental design for Alaska
 
 # Root directory of studies in this experiment
-name = __name__.rsplit('.', 1)[-1]    # e_alaska
-root_dir = config.roots['PRJ'] / name
+#name = __name__.rsplit('.', 1)[-1]    # e_alaska
+name = 'akse'    # Files are still named 'akse' even though our dir is akse4142
+#root_dir = config.roots['PRJ'] / name
+root_dir = config.roots['PRJ'] / 'akse4142'
+
 dir = root_dir / 'db'
 publish_dir = root_dir / 'publish'
 
@@ -21,8 +24,8 @@ wkt = 'PROJCS["NAD83 / Alaska Albers",GEOGCS["GCS_North_American_1983",DATUM["D_
 resolution = 10    # 10m resolution for our DEM
 snow_density = 300    # [kg m-3], used for mosaic
 
-#forest_landcover_types = [42,43]    # NCLD Land Cover Classifications *Evergreen* and *Mixed Deciduous*
-forest_landcover_types = [42]    # NCLD Land Cover Classifications *Evergreen* only
+forest_landcover_types = [42,43]    # NCLD Land Cover Classifications *Evergreen* and *Mixed Deciduous*
+#forest_landcover_types = [42]    # NCLD Land Cover Classifications *Evergreen* only
 
 
 # ----------------------------------------------

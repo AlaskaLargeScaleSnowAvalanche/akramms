@@ -588,6 +588,8 @@ def run(args):
         [joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.EXTENT])]
 
     # Keep combo_order
+#    print('aaaaaaaaaaaakdf0 ', akdf0)
+#    print(akdf0.iloc[0])
     for exp,akdf1 in akdf0.groupby('exp'):
         # akdf1 = akdf1.sort_values('combo_order')    # Not needed
         expmod = akramms.parse.load_expmod(exp)
