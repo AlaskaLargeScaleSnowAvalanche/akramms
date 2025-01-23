@@ -76,13 +76,14 @@ ramms_ncpu_preprocess = 1    # 1 is fastest, due to IDL's overhead in paralleliz
 ncpu_compress = 6    # Number of CPUs to use when compressing stuff after RAMMS Stage 1
 ncpu_archive = 6
 poll_period = 60*5    # Seconds between polling attempts
+condor_maxjobs = 80000    # Max. number of jobs to have on HTCondor queue
 
 # Should we use the Redis Queue for running remote IDL commands?
 queue = {'arcgis': True, 'ecognition': True, 'idl': True}
 #queue = {'arcgis': False, 'ecognition': True, 'idl': True}
 
 # Remove the x-directories when archiving to the arc-directories?
-delete_xdir = False
+delete_xdir = True
 
 # ------------------------------
 # DEBUG parameters

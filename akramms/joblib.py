@@ -337,11 +337,26 @@ def _submit_jobs(akdf, condor_priority=0):
         print('submit ', jb.avalanche_dir, job_name, inout)
         submit_job(jb.avalanche_dir, job_name, inout, condor_priority=condor_priority)
 
+_totalsRE = re.compile(r'Total for query: (\d+) jobs; (\d+) completed, (\d+) removed, (\d+) idle')
+def _condorq_njobs():
+    cmd = ['condor_q',  '-totals']
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    for line in io.StringIO(proc.stdout):
+        match = _totalsRE.match(line)
+        if match is not None:
+            return int(match.group(4))
+    return None
+
 def submit_jobs(akdf, **kwargs):
     akdf = add_id_status(akdf)
 
     # Only submit jobs that are ready to go and not in process or completed or something.
     akdf = akdf[akdf.id_status == JobStatus.TODO]
+
+    # Slow down if too many jobs are in the condor queue
+    while _condorq_njobs() > 80000:
+        print(f"There are currently {njobs} jobs in the HTCondor queue.  I'm going to sleep until it dies down a bit.")
+        time.sleep(10)    # Sleep for 2 minutes
 
     print('==================== Submitting:')
     print(akdf[['combo', 'chunkid', 'id']])

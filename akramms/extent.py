@@ -207,6 +207,9 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
         os.makedirs(extent_dir, exist_ok=True)
 
         # Don't need to re-do extents if ALL output files are there
+        print('Writing extent files:')
+        for ew in extent_writers.values():
+            print('    ', ew.extent_gpkg)
         if (not overwrite) and all((os.path.isfile(extent_writer.extent_gpkg) for extent_writer in extent_writers.values())):
             continue
 
