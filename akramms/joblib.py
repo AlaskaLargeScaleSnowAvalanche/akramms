@@ -1,4 +1,4 @@
-import os,subprocess,functools,re,typing,zipfile,sys,contextlib,pathlib,glob
+import os,subprocess,functools,re,typing,zipfile,sys,contextlib,pathlib,glob,io
 import htcondor
 import numpy as np
 import pandas as pd
