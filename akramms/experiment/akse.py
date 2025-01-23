@@ -249,6 +249,7 @@ def spiral_domains(x0, y0):
 
         (91,42), (91,41), (91, 40),  # Cordova
         (90, 42), (90, 41), (90,40),
+        (89, 39),        # Valdez
 #        (90, 40), (91, 40),     # Cordova
 #        (90, 41), (91, 41), 
 #        (90, 42), (91, 42), 
@@ -289,6 +290,7 @@ def urban():
     for year0,year1 in [(1981,2010), (2031,2060)]:
         for return_period in [30,300]:
             for idom,jdom in [        (90, 41), (91, 41), (90, 42), (91, 42),    # Cordova
+                (89, 39),        # Valdez
                 (110, 42), (109,42),    # Haines and West: Avalanche of 2024-2-2
                 (113, 45)]:    # Juneau
                 for forest in ('NoFor','For'):
