@@ -359,7 +359,7 @@ def submit_jobs(akdf, **kwargs):
         if njobs < config.condor_maxjobs:
             break
         print(f"There are currently {njobs} jobs in the HTCondor queue.  I'm going to sleep until it dies down a bit.")
-        time.sleep(10)    # Sleep for 2 minutes
+        time.sleep(120)    # Sleep for 2 minutes
 
     print('==================== Submitting:')
     print(akdf[['combo', 'chunkid', 'id']])
