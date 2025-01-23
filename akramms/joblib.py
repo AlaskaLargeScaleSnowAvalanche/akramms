@@ -354,7 +354,10 @@ def submit_jobs(akdf, **kwargs):
     akdf = akdf[akdf.id_status == JobStatus.TODO]
 
     # Slow down if too many jobs are in the condor queue
-    while _condorq_njobs() > config.condor_maxjobs:
+    while True:
+        njobs = _condorq_njobs()
+        if njobs < config.condor_maxjobs:
+            break
         print(f"There are currently {njobs} jobs in the HTCondor queue.  I'm going to sleep until it dies down a bit.")
         time.sleep(10)    # Sleep for 2 minutes
 
