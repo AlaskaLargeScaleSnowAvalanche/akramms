@@ -657,6 +657,24 @@ class ArchiveContents(typing.NamedTuple):
     max_height: object
     depo: object
 
+    releasefile_attrs: dict
+        # int releasefile_attrs ;
+        #       releasefile_attrs:description = "Attributes from the RELEASE shapefile used to set up this avalanche" ;
+        #       releasefile_attrs:Id = 6740LL ;
+        #       releasefile_attrs:area_m2 = 23200. ;
+        #       releasefile_attrs:Mean_DEM = 321.708706296723 ;
+        #       releasefile_attrs:Mean_Slope = 37.0865173833124 ;
+        #       releasefile_attrs:Scene_reso = 10. ;
+        #       releasefile_attrs:i = 2110. ;
+        #       releasefile_attrs:j = 2435. ;
+        #       releasefile_attrs:sx3 = 1.32854199409485 ;
+        #       releasefile_attrs:d0star = 1.32854199409485 ;
+        #       releasefile_attrs:slopecorr = 1. ;
+        #       releasefile_attrs:Wind = 0. ;
+        #       releasefile_attrs:d0_30 = 1.32854199409485 ;
+        #       releasefile_attrs:VOL_30 = 38637.5522545201 ;
+        #       releasefile_attrs:fid = 83. ;
+
 def read_nc(avalfile):
     with netCDF4.Dataset(avalfile) as nc:
         nc.set_always_mask(False)
@@ -670,6 +688,9 @@ def read_nc(avalfile):
         # --------------- Determine gridL, an x/y oriented grid (subgrid of the tile) containing the avalanche.
         i_diff = nc.variables['i_diff'][:]
         j_diff = nc.variables['j_diff'][:]
+
+        # Release Polygon
+        rel_xy = 
 
         return ArchiveContents(
             gridA_gt=gridA_gt, gridA_wkt=gridA_wkt,

@@ -965,7 +965,7 @@ def stdmosaic(args):
 
     # Only run for combos that are completely finished
     akdf0 = joblib.add_combo_quickstatus(akdf0, mtime=True)
-    akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.EXTENT]
+    akdf0 = akdf0[akdf0.combo_quickstatus >= joblib.JobStatus.MARKED_FINISHED]
 
     if len(akdf0) == 0:
         raise ValueError('None of the select combos are MARKED_FINISHED.  Run akramms status --update')
@@ -974,17 +974,19 @@ def stdmosaic(args):
     plan = list()
     exp = akdf0.iloc[0].exp
     expmod = akramms.parse.load_expmod(exp)
-    publish_dir = expmod.dir.parents[0] / 'publish'
+    publish_dir = expmod.root_dir / 'publish'
     mwriter = mosaic.PublishMosaicWriter(expmod)
     for akdf1 in avalquery.consolidate_by_forest(expmod, akdf0):
 # No need to sort
 #        # akdf1 has two rows.  Sort to get predictable order (the 'For' row forst)
 #        akdf1 = akdf1.sort_values('combo')    # Could sort by 'forest' instead
 
+        print('AA1')
+
         # Determine output Combo name (replace For/NoFor with AllFor)
         forest_ix = expmod.combo_keys.index('forest')
         combo = akdf1.combo.tolist()[0]
-        lcombo = list(combo[:forest_ix]) + ['AllFor'] + list(combo[forest_ix+1:])
+        lcombo = list(combo[:forest_ix]) + ['All'] + list(combo[forest_ix+1:])
         ocombo = expmod.Combo(*lcombo)
         scombo = str(combo)
         sstatus = ''.join(file_info.JobStatus._member_names_[x][0] for x in sorted(args.status))
@@ -992,16 +994,87 @@ def stdmosaic(args):
 
         # Write the combo
         combo_quickstatus_mtime = akdf1.combo_quickstatus_mtime.max()
+        print('AA2')
         if mwriter.needs_regen(name, combo_quickstatus_mtime):
+            print('AA3')
+
             os.makedirs(publish_dir, exist_ok=True)
             with ioutil.TmpDir(publish_dir) as tdir:
                 tifdir = pathlib.Path(tdir.location)
+                print('AA4')
                 mos = mosaic.mosaic_avals_combo(
                     akdf1, 'tile', tifdir, statuses=args.status,
                     snow=True, dem=True, landcover=True,
                     dry_run=args.dry_run, force=args.force)
                 if mos is not None:    # There were some avalanches to plot...
                     mwriter.write(name, mos, tifdir, ijdom=(ocombo.idom, ocombo.jdom))
+
+        print('AA5')
+
+exts_by_section = {
+    'release': ('.shp', '.shx', '.cpg', '.dbf', '.prj'),
+    'extent_christen': ('.shp', '.shx', '.cpg', '.dbf', '.prj'),
+    'landcover': ('.tfw', '.tif', '.tif.aux.xml'),
+    'max_pressure': ('.tfw', '.tif', '.tif.aux.xml'),
+    'max_velocity': ('.tfw', '.tif', '.tif.aux.xml'),
+    'snow': ('.tfw', '.tif'),
+}
+
+def section_exts(sections):
+    rets = list()
+    for section in sections:
+        for ext in exts_by_section[section]:
+            yield (section, ext)
+
+@subcommand(args=[
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser.'),
+    argument('--output', '-o', required=True,
+        help='output filename'),
+    argument('--section', '-s', nargs='*',
+        default=['landcover', 'max_pressure', 'release', 'extent_christen'],
+        help='Sections of published files to package up'),
+])
+def pubextract(args):
+    """Extract data from stdmosaic and re-publish in per-combo zip files"""
+
+    import zipfile
+    from akramms import mosaic
+
+#    odir = pathlib.Path(args.output)
+
+    # Identify combos
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf0 = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
+
+    # Decide what we want to extract
+#    for section in ['release', 'max_pressure', 'landcover', 
+
+    with zipfile.ZipFile(args.output, 'w', compression=zipfile.ZIP_DEFLATED) as ozip:
+
+        # Process extract
+        exp = akdf0.iloc[0].exp
+        expmod = akramms.parse.load_expmod(exp)
+        publish_dir = expmod.root_dir / 'publish'
+        mwriter = mosaic.PublishMosaicWriter(expmod)
+        for akdf1 in avalquery.consolidate_by_forest(expmod, akdf0):
+
+            for fname in mosaic.fnames(expmod, akdf1.iloc[0].combo, section_exts(args.section)):
+                exists = os.path.isfile(fname)
+                print(fname, exists)
+                if exists:
+                    ozip.write(str(fname), arcname=fname.parts[-1])
+
+
+
+
+
+#        scombo = str(akdf1.iloc[0].combo).replace('NoFor', 'All').replace('For', 'All')
+#        pieces = scombo.rsplit('-', 2)
+#        swcombo = pieces[0]
+#        sijdom = f'{pieces[1]}-{pieces[2]}'
+#        release_base = expmod.root_dir / 'publish' / f'{expmod.name}-{swcombo}' / 'release' / f'{scombo}-F-release.shp'
+#
+#        print('fffffff ', str(release_base))
 
 
 @subcommand(name='loaddb')

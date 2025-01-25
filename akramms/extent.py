@@ -142,7 +142,7 @@ class WriteGpkg:
         swcombo = arcdir.parts[-2]    # Eg: 'ak-ccsm-1981-2010-lapse-For-30'
         sijdom = arcdir.parts[-1][4:]    # Eg: 111-044
         expdir_ext = expmod.dir.parents[0] / 'ext'
-        self.extent_dir = expdir_ext / swcombo / 'extent'
+        self.extent_dir = expdir_ext / swcombo / f'extent_{extent_type}'
 
 
         self.extent_type = extent_type
@@ -217,6 +217,9 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
         akdf1 = akdf0.iloc[[irow]]    # Returns a dataframe of just one row
         akdf1 = resolve.resolve_chunk(akdf1, scenetypes={'arc'})
         akdf1 = resolve.resolve_id(akdf1, realized=True)
+
+        # Read the releasefile polygons so we can analyze land surface types
+        reldf = 
 
         # Iterate through avalanches and polygonize each one
         print(f'Writing extents for {combo} ({len(akdf1)} avalanches): {extent_dir}')

@@ -275,11 +275,11 @@ def query(akdf0, sextent, scenetypes={'x', 'arc'},
             # TODO: Now that extent files are not written during db
             # generation, this status check will need to change.
             if force:
-                akdf1 = akdf1[akdf1.combo_quickstatus == file_info.JobStatus.EXTENT]
-                print('force=True, so only combos with status == EXTENT will be included')
+                akdf1 = akdf1[akdf1.combo_quickstatus >= file_info.JobStatus.MARKED_FINISHED]
+                print('force=True, so only combos with status >= MARKED_FINISHED will be included')
 
-            if not akdf1.combo_quickstatus.eq(file_info.JobStatus.EXTENT).all():
-                raise ValueError('All Combos must have status=EXTENT (9) to proceed')
+            if not akdf1.combo_quickstatus.ge(file_info.JobStatus.MARKED_FINISHED).all():
+                raise ValueError('All Combos must have status >= MARKED_FINISHED to proceed')
 
 
             # --------- Make sure the proper extent files are written

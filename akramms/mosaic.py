@@ -312,6 +312,7 @@ def mosaic_avals_combo(akdf, sextent, tifdir,
 
     # No avalanches, so nothing to write
     if len(akdf) == 0:
+        print('Mosaic: No avalanches, so nothing to write')
         return None
 
     print(f'geom = {geom}')
@@ -548,5 +549,17 @@ class PublishMosaicWriter(MosaicWriter):
 
 
 # ---------------------------------------------------------------------------------
+def fnames(expmod, combo, section_exts = [('release', '.shp')]):
+    scombo = str(combo).replace('NoFor', 'All').replace('For', 'All')
+    pieces = scombo.rsplit('-', 2)
+    swcombo = pieces[0]
+    sijdom = f'{pieces[1]}-{pieces[2]}'
+
+    rets = list()
+#    for section in sections:
+#        for ext in exts:
+    for section,ext in section_exts:
+            yield expmod.root_dir / 'publish' / f'{expmod.name}-{swcombo}' / section / f'{expmod.name}-{scombo}-F-{section}{ext}'
+
 # ---------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------
