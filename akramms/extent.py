@@ -1,6 +1,7 @@
 import os,pathlib,subprocess,sys,typing,contextlib
 import numpy as np
 import pandas as pd
+import pyproj
 import zipfile,netCDF4
 from osgeo import gdal,ogr
 from uafgi.util import gdalutil,ogrutil
@@ -147,7 +148,6 @@ class WriteGpkg:
 
         self.extent_type = extent_type
         self.extent_gpkg = self.extent_dir / f'{swcombo}-{sijdom}-extent_{extent_type}.gpkg'
-
 #        self.tdir = tdir    # This MUST be set manually before entering the context!  HACK!
 
     def __enter__(self):
@@ -164,7 +164,7 @@ class WriteGpkg:
 
         # https://gis.stackexchange.com/questions/392515/create-a-shapefile-from-geometry-with-ogr
         self.extent_Id = self.extent_layer.CreateField(ogr.FieldDefn('Id', ogr.OFTInteger))
-
+        self.relrows = list()
 
         return self
 
@@ -176,16 +176,23 @@ class WriteGpkg:
  
        # Convert to GeoPackage (indented to maintain open temp dir)
         extent_gpkg_tmp = self.extent_gpkg.parents[0] / (self.extent_gpkg.parts[-1][:-5] + '-tmp.gpkg')
-        cmd = ['ogr2ogr', extent_gpkg_tmp, self.extent_shp]
-        subprocess.run(cmd, check=True)
+        edf = geopandas.read_file(self.extent_shp)
+        reldf = pd.DataFrame(self.relrows, columns=['Id', 'Mean_DEM', 'rel_n', 'rel_n41', 'rel_n42', 'rel_n43'])
+        edf = edf.merge(reldf, how='left', on='Id')
+        edf.to_file(str(extent_gpkg_tmp), crs=pyproj.CRS.from_user_input(self.expmod.wkt))
+
+
+#        cmd = ['ogr2ogr', extent_gpkg_tmp, self.extent_shp]
+#        subprocess.run(cmd, check=True)
         os.rename(extent_gpkg_tmp, self.extent_gpkg)
 
 #        return self.extent_gpkg
 
 
 
-    def polygonize(self, combo, aval, id, mask_kwargs={}):
+    def polygonize(self, combo, aval, id, relsizes, mask_kwargs={}):
         polygonize_extent(combo, aval, id, self.extent_layer, self.extent_Id, extent_type=self.extent_type, mask_kwargs=mask_kwargs)
+        self.relrows.append(relsizes)
 
 
 
@@ -202,6 +209,8 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
 
         row = akdf0.iloc[irow]    # Returns a Series
         combo = row['combo']
+
+
         extent_writers = {extent_type: WriteGpkg(expmod, combo, extent_type) for extent_type in extent_types}
         extent_dir = extent_writers['full'].extent_dir    # All extent_dirs are the same
         os.makedirs(extent_dir, exist_ok=True)
@@ -213,13 +222,21 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
         if (not overwrite) and all((os.path.isfile(extent_writer.extent_gpkg) for extent_writer in extent_writers.values())):
             continue
 
+        # Read the releasefile polygons so we can analyze land surface types
+        arcdir = expmod.combo_to_scenedir(combo, 'arc')
+        reldf = archive.read_reldom(arcdir / 'RELEASE.zip', 'rel')
+        reldfi = reldf.set_index('Id')
+
         # Make a dataframe from that one combo, then convert to IDs
         akdf1 = akdf0.iloc[[irow]]    # Returns a dataframe of just one row
         akdf1 = resolve.resolve_chunk(akdf1, scenetypes={'arc'})
         akdf1 = resolve.resolve_id(akdf1, realized=True)
 
-        # Read the releasefile polygons so we can analyze land surface types
-        reldf = 
+
+        # Read the land surface file for this tile
+        fname = expmod.root_dir / 'db' / 'landcover' / f'{expmod.name}_landcover_{combo.idom:03d}_{combo.jdom:03d}.tif'
+        grid_info,landcover,_ = gdalutil.read_raster(fname)
+        landcover_1d = landcover.reshape(-1)
 
         # Iterate through avalanches and polygonize each one
         print(f'Writing extents for {combo} ({len(akdf1)} avalanches): {extent_dir}')
@@ -241,12 +258,18 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
                     continue
                 aval = archive.read_nc(tup.avalfile)
 
-                extent_writers['christen'].polygonize(combo, aval, tup.id)
-                extent_writers['full'].polygonize(combo, aval, tup.id)
+                # Process the PRA
+                relrow = reldfi.loc[tup.id]
+                pra_burn = rasterize.rasterize_polygon_compressed(relrow['geometry'], grid_info)
+                lc1 = landcover_1d[pra_burn]
+
+                relsizes = (tup.id, relrow['Mean_DEM'], len(lc1), np.sum(lc1==41), np.sum(lc1==42), np.sum(lc1==43))
+                extent_writers['christen'].polygonize(combo, aval, tup.id, relsizes)
+                extent_writers['full'].polygonize(combo, aval, tup.id, relsizes)
                 max_pressure = rho * aval.max_vel * aval.max_vel
-                extent_writers['tetra30'].polygonize(combo, aval, tup.id,
+                extent_writers['tetra30'].polygonize(combo, aval, tup.id, relsizes,
                     mask_kwargs=dict(max_pressure=max_pressure))
-                extent_writers['tetra1'].polygonize(combo, aval, tup.id,
+                extent_writers['tetra1'].polygonize(combo, aval, tup.id, relsizes,
                     mask_kwargs=dict(max_pressure=max_pressure))
             print()
 

@@ -657,7 +657,7 @@ class ArchiveContents(typing.NamedTuple):
     max_height: object
     depo: object
 
-    releasefile_attrs: dict
+#    releasefile_attrs: dict
         # int releasefile_attrs ;
         #       releasefile_attrs:description = "Attributes from the RELEASE shapefile used to set up this avalanche" ;
         #       releasefile_attrs:Id = 6740LL ;
@@ -688,9 +688,6 @@ def read_nc(avalfile):
         # --------------- Determine gridL, an x/y oriented grid (subgrid of the tile) containing the avalanche.
         i_diff = nc.variables['i_diff'][:]
         j_diff = nc.variables['j_diff'][:]
-
-        # Release Polygon
-        rel_xy = 
 
         return ArchiveContents(
             gridA_gt=gridA_gt, gridA_wkt=gridA_wkt,
