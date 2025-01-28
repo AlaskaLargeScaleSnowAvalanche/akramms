@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pyproj
 import zipfile,netCDF4
-from osgeo import gdal,ogr
+from osgeo import gdal,ogr,gdalconst
 from uafgi.util import gdalutil,ogrutil
 from uafgi.util import cfutil,ioutil,gisutil,rasterize
 from akramms import experiment,archive,file_info,avalquery,downscale_snow
@@ -12,6 +12,7 @@ from akramms import resolve
 import _mosaic
 import geopandas
 from akramms.plot import p_mosaic
+import shapely.geometry.multipolygon
 
 __all__ = ['write_gpkg']
 
@@ -55,13 +56,24 @@ def _mask_filter_tetra1(nzmask_val, aval, tup_id, max_pressure=None): #
     nzmask_val[max_pressure > 1] = tup_id
 
 # ----------------------------------------------------------------------------
+def extent_fname(expmod, combo, extent_type):
+    arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
+    swcombo = arcdir.parts[-2]    # Eg: 'ak-ccsm-1981-2010-lapse-For-30'
+    sijdom = arcdir.parts[-1][4:]    # Eg: 111-044
+    expdir_ext = expmod.dir.parents[0] / 'ext'
+    extent_dir = expdir_ext / swcombo / f'extent_{extent_type}'
+    extent_gpkg = extent_dir / f'{swcombo}-{sijdom}-extent_{extent_type}.gpkg'
+    return extent_gpkg
+
+
 #extent_types = ('christen', 'full', 'tetra30', 'tetra1')
 def polygonize_extent(combo, aval, tup_id,
-    extent_layer, extent_Id, extent_type='christen', mask_kwargs={}):#full=False):
+    extent_layer, extent_Id, landcover, extent_type='christen', mask_kwargs={}):#full=False):
 #    iA, jA, gridA_gt, crs_wkt, max_vel, max_height, depo,
 
     """Creates a polygon for the extent of an avalanche, and writes it
     into an open OGR datasource.
+    NOTE: This will create multiple polygons in the face of discontinuous extents.
 
     aval: Result of read_nc()
 
@@ -89,7 +101,7 @@ def polygonize_extent(combo, aval, tup_id,
 
     # Create a sub-grid gridL around just the avalanche (fast polygonize)
     iL_min = np.min(aval.iiA) - 2
-    iL_max = np.max(aval.iiA) + 3
+    iL_max = np.max(aval.iiA) + 3    # Max+1
     jL_min = np.min(aval.jjA) - 2
     jL_max = np.max(aval.jjA) + 3
 
@@ -114,6 +126,22 @@ def polygonize_extent(combo, aval, tup_id,
     mask_filter_fn = getattr(this_module, f'_mask_filter_{extent_type}')
     mask_filter_fn(nzmask_val, aval, tup_id, **mask_kwargs)
 
+    # ----------------
+    # Now nzmask_val (on its limited grid) is tup_id where there is
+    # avalanche, and 0 elsewhere.
+    landcoverL = landcover[aval.iiA, aval.jjA]#iL_min:iL_max, jL_min:jL_max]
+#    print('landcover ', landcover.shape)
+#    print('landcoverL ', landcoverL.shape, iL_min, iL_max, jL_min, jL_max)
+#    print('nzmask_val ', nzmask_val.shape)
+    nzmask_in = (nzmask_val != 0)
+    extsizes = (
+        np.sum(nzmask_in),
+        np.sum(landcoverL[nzmask_in] == 41),
+        np.sum(landcoverL[nzmask_in] == 42),
+        np.sum(landcoverL[nzmask_in] == 43))
+    # ----------------
+
+
     # Burn the gridcells that are part of our grid
     # (already pared down)
     nzmaskL = np.zeros((gridL.ny, gridL.nx), dtype=np.int32)
@@ -129,13 +157,23 @@ def polygonize_extent(combo, aval, tup_id,
     gdal.Polygonize(nzmask_band, nzmask_band,
         extent_layer, extent_Id)
 
+    return extsizes
 
 # ----------------------------------------------------------
-
+def merge_multipolygons(df0, idcol):
+    """Merges multiple polygons with the same Id into a single MultiPolygon"""
+    rows = list()
+    for id,df1 in df0.groupby(idcol):
+        mpoly = shapely.geometry.multipolygon.MultiPolygon(list(df1.geometry))
+        rows.append((id,mpoly))
+    df = pd.DataFrame(rows, columns=('Id', 'geometry'))
+    gdf = geopandas.GeoDataFrame(df, geometry='geometry')
+    return gdf
+# ----------------------------------------------------------
 
 class WriteGpkg:
 #    def __init__(self, expmod, combo, swcombo, sijdom, extent_dir, extent_type, tdir, overwrite=False, mask_kwargs={}):
-    def __init__(self, expmod, combo, extent_type):
+    def __init__(self, expmod, combo, extent_type, landcover):
         self.expmod = expmod
 
         # Figure out where we will write extent files
@@ -149,6 +187,8 @@ class WriteGpkg:
         self.extent_type = extent_type
         self.extent_gpkg = self.extent_dir / f'{swcombo}-{sijdom}-extent_{extent_type}.gpkg'
 #        self.tdir = tdir    # This MUST be set manually before entering the context!  HACK!
+        self.landcover = landcover
+        self.complete = False
 
     def __enter__(self):
         os.makedirs(self.extent_dir, exist_ok=True)
@@ -169,6 +209,9 @@ class WriteGpkg:
         return self
 
     def __exit__(self, type, value, traceback):
+        if not self.complete:
+            return
+
         self.extent_Id = None
         self.extent_layer = None
         self.extent_ds = None    # Close the file
@@ -177,13 +220,17 @@ class WriteGpkg:
        # Convert to GeoPackage (indented to maintain open temp dir)
         extent_gpkg_tmp = self.extent_gpkg.parents[0] / (self.extent_gpkg.parts[-1][:-5] + '-tmp.gpkg')
         edf = geopandas.read_file(self.extent_shp)
-        reldf = pd.DataFrame(self.relrows, columns=['Id', 'Mean_DEM', 'rel_n', 'rel_n41', 'rel_n42', 'rel_n43'])
+        edf = merge_multipolygons(edf, 'Id')
+        reldf = pd.DataFrame(self.relrows, columns=['Id', 'Mean_DEM', 'rel_n', 'rel_n41', 'rel_n42', 'rel_n43', 'ext_n', 'ext_n41', 'ext_n42', 'ext_n43'])
         edf = edf.merge(reldf, how='left', on='Id')
         edf.to_file(str(extent_gpkg_tmp), crs=pyproj.CRS.from_user_input(self.expmod.wkt))
 
 
-#        cmd = ['ogr2ogr', extent_gpkg_tmp, self.extent_shp]
+##        cmd = ['ogr2ogr', extent_gpkg_tmp, self.extent_shp]
+#        cmd = ['ogr2ogr', '/home/efischer/tmp/xextent.gpkg', self.extent_shp]
 #        subprocess.run(cmd, check=True)
+
+
         os.rename(extent_gpkg_tmp, self.extent_gpkg)
 
 #        return self.extent_gpkg
@@ -191,8 +238,10 @@ class WriteGpkg:
 
 
     def polygonize(self, combo, aval, id, relsizes, mask_kwargs={}):
-        polygonize_extent(combo, aval, id, self.extent_layer, self.extent_Id, extent_type=self.extent_type, mask_kwargs=mask_kwargs)
-        self.relrows.append(relsizes)
+        extsizes = polygonize_extent(
+            combo, aval, id, self.extent_layer, self.extent_Id, self.landcover,
+            extent_type=self.extent_type, mask_kwargs=mask_kwargs)
+        self.relrows.append(list(relsizes) + list(extsizes))
 
 
 
@@ -211,7 +260,7 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
         combo = row['combo']
 
 
-        extent_writers = {extent_type: WriteGpkg(expmod, combo, extent_type) for extent_type in extent_types}
+        extent_writers = {extent_type: WriteGpkg(expmod, combo, extent_type, None) for extent_type in extent_types}
         extent_dir = extent_writers['full'].extent_dir    # All extent_dirs are the same
         os.makedirs(extent_dir, exist_ok=True)
 
@@ -234,9 +283,23 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
 
 
         # Read the land surface file for this tile
-        fname = expmod.root_dir / 'db' / 'landcover' / f'{expmod.name}_landcover_{combo.idom:03d}_{combo.jdom:03d}.tif'
-        grid_info,landcover,_ = gdalutil.read_raster(fname)
+        dem_fname = expmod.root_dir / 'db' / 'dem' / f'{expmod.name}_dem_{combo.idom:03d}_{combo.jdom:03d}.tif'
+        grid_info = gdalutil.read_grid(dem_fname)
+
+        landcover_fname = expmod.root_dir / 'db' / 'landcover' / f'{expmod.name}_landcover_{combo.idom:03d}_{combo.jdom:03d}.tif'
+        landcover30_grid,landcover30,landcover30_nd = gdalutil.read_raster(landcover_fname)
+
+        # Regrid land mask to same grid as mosaic
+        print('landcover30_nd ', landcover30_nd)
+        landcover = gdalutil.regrid(
+            landcover30, landcover30_grid, landcover30_nd,
+            grid_info, landcover30_nd,
+            resample_algo=gdalconst.GRA_Average)
+
+
         landcover_1d = landcover.reshape(-1)
+        for ew in extent_writers.values():
+            ew.landcover = landcover
 
         # Iterate through avalanches and polygonize each one
         print(f'Writing extents for {combo} ({len(akdf1)} avalanches): {extent_dir}')
@@ -252,6 +315,7 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
                 if count%100 == 0:
                     print('.', end='')
                     sys.stdout.flush()
+#                    break    # DEBUG
 
                 if not os.path.isfile(tup.avalfile):
                     print(f'Missing avalanche file: {tup.avalfile}')
@@ -272,7 +336,8 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
                 extent_writers['tetra1'].polygonize(combo, aval, tup.id, relsizes,
                     mask_kwargs=dict(max_pressure=max_pressure))
             print()
-
+            for ew in extent_writers.values():
+                ew.complete = True
 
 
 
