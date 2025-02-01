@@ -129,16 +129,21 @@ def polygonize_extent(combo, aval, tup_id,
     # ----------------
     # Now nzmask_val (on its limited grid) is tup_id where there is
     # avalanche, and 0 elsewhere.
-    landcoverL = landcover[aval.iiA, aval.jjA]#iL_min:iL_max, jL_min:jL_max]
+#    print('Landcover shape ', landcover.shape)
+#    print('nzmask shape ', nzmask_val.shape)
+#    landcoverL = landcover[aval.iiA, aval.jjA]#iL_min:iL_max, jL_min:jL_max]
+    landcoverL = landcover[aval.jjA, aval.iiA]#iL_min:iL_max, jL_min:jL_max]
 #    print('landcover ', landcover.shape)
 #    print('landcoverL ', landcoverL.shape, iL_min, iL_max, jL_min, jL_max)
 #    print('nzmask_val ', nzmask_val.shape)
     nzmask_in = (nzmask_val != 0)
+#    print(landcoverL[nzmask_in])
     extsizes = (
         np.sum(nzmask_in),
         np.sum(landcoverL[nzmask_in] == 41),
         np.sum(landcoverL[nzmask_in] == 42),
         np.sum(landcoverL[nzmask_in] == 43))
+#    print('extsizes ', extsizes)
     # ----------------
 
 
@@ -316,6 +321,10 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
                     print('.', end='')
                     sys.stdout.flush()
 #                    break    # DEBUG
+
+#                if tup.id != 9288:
+#                    continue        # DEBUG
+#                print('FOUND 9288!!!!')
 
                 if not os.path.isfile(tup.avalfile):
                     print(f'Missing avalanche file: {tup.avalfile}')
