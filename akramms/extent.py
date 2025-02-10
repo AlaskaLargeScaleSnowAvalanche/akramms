@@ -179,6 +179,11 @@ def merge_multipolygons(df0, idcol):
 class WriteGpkg:
 #    def __init__(self, expmod, combo, swcombo, sijdom, extent_dir, extent_type, tdir, overwrite=False, mask_kwargs={}):
     def __init__(self, expmod, combo, extent_type, landcover):
+        """landcover:
+            It is OK to set this to None, then set it by monkey
+            patching later, before polygonize() is used.
+        """
+
         self.expmod = expmod
 
         # Figure out where we will write extent files
@@ -253,6 +258,7 @@ class WriteGpkg:
 
 extent_types = ('christen', 'full', 'tetra30', 'tetra1')
 def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
+
     """Write the extent files for a number of combos.
     akdf:
         Resolved to combo level (in arc dir)
@@ -287,6 +293,7 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
         akdf1 = resolve.resolve_id(akdf1, realized=True)
 
 
+        # ----------------------------------------
         # Read the land surface file for this tile
         dem_fname = expmod.root_dir / 'db' / 'dem' / f'{expmod.name}_dem_{combo.idom:03d}_{combo.jdom:03d}.tif'
         grid_info = gdalutil.read_grid(dem_fname)
@@ -305,6 +312,8 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
         landcover_1d = landcover.reshape(-1)
         for ew in extent_writers.values():
             ew.landcover = landcover
+        # ----------------------------------------
+
 
         # Iterate through avalanches and polygonize each one
         print(f'Writing extents for {combo} ({len(akdf1)} avalanches): {extent_dir}')

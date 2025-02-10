@@ -176,10 +176,10 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
         # -------------- Update the mosaic (in memory)
         extent_types = ('christen', 'full', 'tetra30')
         with contextlib.ExitStack() as stack:
- #           tdir = stack.enter_context(ioutil.TmpDir(extent_dir))
-            extent_writers = {    # Not to write, just use filename
-                extent_type: extent.WriteGpkg(expmod, combo, extent_type)
-#                    expmod, combo, swcombo, sijdom, extent_dir, extent_type)
+
+            # Not to write, just use filename.  Therefore, landcover=None is OK.
+            extent_writers = {
+                extent_type: extent.WriteGpkg(expmod, combo, extent_type, None)
                 for extent_type in extent_types}
 
             count = 0
