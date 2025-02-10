@@ -206,7 +206,7 @@ def main():
     make_plot(googlemaps_dir / 'Cordova_BearCountryLodge.tif', './fig14_Cordova_BearCountryLodge.png')
     make_plot(googlemaps_dir / 'Cordova_BearCountryLodge.tif', './fig14_Cordova_BearCountryLodge_forest.png',
         plot_landcover=True)    # This plot straddles two tiles
-#    make_plot(googlemaps_dir / 'Juneau_SnowslideCreek.tif', './fig14_Juneau_SnowslideCreek.png')
+    make_plot(googlemaps_dir / 'Juneau_SnowslideCreek.tif', './fig14_Juneau_SnowslideCreek.png')
 
 
 

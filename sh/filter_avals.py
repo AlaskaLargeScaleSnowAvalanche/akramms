@@ -1,4 +1,5 @@
 import os,pathlib
+import numpy as np
 import pandas as pd
 import geopandas
 import akramms.experiment.akse as expmod
@@ -40,7 +41,10 @@ def main():
 
         # Separate
         df = df[df['Mean_DEM'] < 300]
-        keep = (((df.rel_n41 + df.rel_n43) / df.rel_n) < 0.3)
+        keep = np.logical_and(
+            (((df.rel_n41 + df.rel_n43) / df.rel_n) < 0.3),
+            (((df.ext_n42 + df.ext_n43) / df.ext_n) < 0.3))
+
         df_include = df[keep]
         df_exclude = df[~keep]
 
