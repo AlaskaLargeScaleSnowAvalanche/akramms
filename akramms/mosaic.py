@@ -142,8 +142,25 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
         expdir_ext = expmod.dir.parents[0] / 'ext'
         extent_dir = expdir_ext / swcombo / 'extent'
 
+        # Initial list of IDs based on query
         akdf1 = akdf1.sort_values('id')
         ids = set(akdf1.id)
+
+        # Read extents, and further filter low-elevation avalanches
+        df = extent.read_annotated_extent(expmod, combo, 'christen')  # >1 polygon per ID
+        df = _subset_poly_df(ids, combo.idom, combo.jdom, df)
+        df,_ = expmod.mosaic_filter(df)    # Filter out bogus low-elevation avalanches
+        dfss['extent_christen'].append(df)
+
+        # Create new master list of IDs based on filtered
+        # extent_christen (created just above)
+        ids = set(dfss['extent_christen'][-1].Id)
+        akdf1 = akdf1[akdf1.id.isin(ids)]
+
+        # Filter the tetra30 avalanches accordig to the same list
+        df = extent.read_annotated_extent(expmod, combo, 'tetra30')  # >1 polygon per ID
+        df = _subset_poly_df(ids, combo.idom, combo.jdom, df)
+        dfss['extent_tetra30'].append(df)
 
         # --------------- Read polygon files: PRAs, domains
         # (All using geopandas, with .Id and .geometry columns)
@@ -161,9 +178,7 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
             # -------------- pra_count: burn area of PRA into the raster
             # TODO: It might be faster to rasterize directly onto the grids.
             # But that's more code to write.
-#            print('ssssssshape ', gridM.nx, gridM.ny, vals['pra_count'].shape, pra_count_1d.shape)
             ixs = rasterize.rasterize_polygon_compressed(pra, gridM)
-#            ixs = ixs[(ixs >= 0) & (ixs < len(pra_count_1d))]    # Elimate out-of-range indices from polygon that extended beyond our domain
             pra_count_1d[ixs] += 1
 
             # -------------- pra_centroid_count: Just one point per PRA
@@ -174,17 +189,12 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
                 pra_centroid_count[j,i] += 1
 
         # -------------- Update the mosaic (in memory)
-        extent_types = ('christen', 'full', 'tetra30')
         with contextlib.ExitStack() as stack:
-
-            # Not to write, just use filename.  Therefore, landcover=None is OK.
-#            extent_namers = {
-#                extent_type: extent.WriteGpkg(expmod, combo, extent_type, None)
-#                for extent_type in extent_types}
 
             count = 0
             print(f'akdf1 = {len(akdf1)}')
             print(akdf1)
+            print('Adding to raster mosaic:')
             for tup in akdf1.itertuples(index=False):    # Iterate through each avalanche (tup.avalfile)
                 count += 1
                 if count%100 == 0:
@@ -212,26 +222,6 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
                     vals['domain_count'],
                     vals['avalanche_count'])
                 _mosaic.mosaic(*args)
-
-#                extent_namers['christen'].polygonize(combo, aval, tup.id)
-#                extent_namers['full'].polygonize(combo, aval, tup.id)
-#                max_pressure = rho * aval.max_vel * aval.max_vel
-#                extent_namers['tetra30'].polygonize(combo, aval, tup.id,
-#                    mask_kwargs=dict(max_pressure=max_pressure))
-
-
-        for etype in ('christen', 'tetra30'):
-            df = extent.read_annotated_extent(expmod, combo, etype)  # >1 polygon per ID
-            df,_ = expmod.mosaic_filter(df)    # Filter out bogus low-elevation avalanches
-            df = _subset_poly_df(ids, combo.idom, combo.jdom, df)
-            dfss[f'extent_{etype}'].append(df)
-
-
-#        dfss['extent_christen'].append(_subset_poly_df(ids, combo.idom, combo.jdom,
-#            geopandas.read_file(str(extent_namers['christen'].extent_gpkg))))    # >1 polygon per ID
-#        dfss['extent_tetra30'].append(_subset_poly_df(ids, combo.idom, combo.jdom,
-#            geopandas.read_file(str(extent_namers['tetra30'].extent_gpkg))))    # >1 polygon per ID
-
 
     # ========== Write output GeoTIFF and Zip it up
     # --------------------- Write shape dataframes to shapefiles
