@@ -358,51 +358,21 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
                 ew.complete = True
 
 
+def read_annotated_extent(expmod, combo, extent_type):
 
+    """Reads an extent GPKG file, annotates it with info from the
+    RELEASE.zip file."""
 
-#
-#
-#
-#def write_gpkg(expmod, combo, extent_type, overwrite=False, mask_kwargs={}):
-#
-#    arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
-#    swcombo = arcdir.parts[-2]    # Eg: 'ak-ccsm-1981-2010-lapse-For-30'
-#    sijdom = arcdir.parts[-1][4:]    # Eg: 111-044
-#    expdir_ext = expmod.dir.parents[0] / 'ext'
-#
-#    odir = expdir_ext / swcombo / 'extent'
-#    extent_gpkg = odir / f'{swcombo}-{sijdom}-extent_{extent_type}.gpkg'
-#
-#    if (not overwrite) and os.path.isfile(extent_gpkg):
-#        return extent_gpkg
-#
-#    os.makedirs(odir, exist_ok=True)
-#
-#    with ioutil.TmpDir(odir) as tdir:
-#
-#            for tup in akdf.sort_values('id').itertuples(index=False):
-#                if n%100 == 0:
-#                    print('.', end='')
-#                    sys.stdout.flush()
-#                if not os.path.isfile(tup.avalfile):
-#                    raise ValueError(f'Missing avalanche file: {tup.avalfile}')
-#
-#                aval = archive.read_nc(tup.avalfile)
-#
-#                polygonize_extent(combo, aval, tup.id, extent_layer, extent_Id, extent_type=extent_type, mask_kwargs=mask_kwargs)
-#                n += 1
-#            print('Done!')
-#        finally:
-#            extent_ds = None
-#
-#
-#        # Convert to GeoPackage (indented to maintain open temp dir)
-#        extent_gpkg_tmp = extent_gpkg.parents[0] / (extent_gpkg.parts[-1][:-5] + '-tmp.gpkg')
-#        cmd = ['ogr2ogr', extent_gpkg_tmp, extent_shp]
-#        subprocess.run(cmd, check=True)
-#        os.rename(extent_gpkg_tmp, extent_gpkg)
-#
-#        return extent_gpkg
-#
-#
-#
+    # One polygon per ID
+    arcdir = expmod.combo_to_scenedir(combo, 'arc')
+    reldf = archive.read_reldom(arcdir / 'RELEASE.zip', 'rel', read_shapes=False)
+
+    # Multiple polygons per ID
+    extent_gpkg = extent_fname(expmod, combo, 'christen')
+    extdf = geopandas.read_file(str(extent_gpkg))
+
+    # Merge the two.  The merging retains the sames tructure as extdf
+    # because reldf has ONLY ONE polygon per ID.
+    _extdf = geopandas.GeoDataFrame(extdf.drop('Mean_DEM', axis=1))
+    _reldf = reldf.drop('geometry',axis=1)
+    return _extdf.merge(_reldf, on='Id')

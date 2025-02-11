@@ -214,6 +214,24 @@ def add_combo(makefile, combo):
 #        add_combo(makefile, combo)
 
 
+def mosaic_filter(df):
+    """Filters low-elevation avalanches based on advanced criteria.
+    df:
+        Result of extent.read_annotated_extent()
+    Returs: df_include, df_exclude
+        Splits df into avalanches to include, and avalanches to exclude.
+    """
+    # Separate
+#    df = df[df['Mean_DEM'] < 300]
+    keep = np.logical_or(
+        df['Mean_DEM'] >= 300,
+        np.logical_and(
+            (((df.rel_n41 + df.rel_n43) / df.rel_n) < 0.3),
+            (((df.ext_n42 + df.ext_n43) / df.ext_n) < 0.3)))
+    df_include = df[keep]
+    df_exclude = df[~keep]
+
+    return df_include, df_exclude
 # -------------------------------------------------------------
 # Degenerate tiles we do NOT want to run (blacklist)
 _exclude_tiles = {
@@ -221,7 +239,8 @@ _exclude_tiles = {
     (123, 56),
     (102,44),
     (96,43),
-    (90,45),}
+    (90,45),
+    (88,42),}
 
 def all_domains():
     domains_margin_shp = os.path.join(dir, f'{name}_domains_margin.shp')

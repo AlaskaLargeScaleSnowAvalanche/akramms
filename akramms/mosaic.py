@@ -178,9 +178,9 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
         with contextlib.ExitStack() as stack:
 
             # Not to write, just use filename.  Therefore, landcover=None is OK.
-            extent_writers = {
-                extent_type: extent.WriteGpkg(expmod, combo, extent_type, None)
-                for extent_type in extent_types}
+#            extent_namers = {
+#                extent_type: extent.WriteGpkg(expmod, combo, extent_type, None)
+#                for extent_type in extent_types}
 
             count = 0
             print(f'akdf1 = {len(akdf1)}')
@@ -213,17 +213,24 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
                     vals['avalanche_count'])
                 _mosaic.mosaic(*args)
 
-#                extent_writers['christen'].polygonize(combo, aval, tup.id)
-#                extent_writers['full'].polygonize(combo, aval, tup.id)
+#                extent_namers['christen'].polygonize(combo, aval, tup.id)
+#                extent_namers['full'].polygonize(combo, aval, tup.id)
 #                max_pressure = rho * aval.max_vel * aval.max_vel
-#                extent_writers['tetra30'].polygonize(combo, aval, tup.id,
+#                extent_namers['tetra30'].polygonize(combo, aval, tup.id,
 #                    mask_kwargs=dict(max_pressure=max_pressure))
 
 
-        dfss['extent_christen'].append(_subset_poly_df(ids, combo.idom, combo.jdom,
-            geopandas.read_file(str(extent_writers['christen'].extent_gpkg))))    # >1 polygon per ID
-        dfss['extent_tetra30'].append(_subset_poly_df(ids, combo.idom, combo.jdom,
-            geopandas.read_file(str(extent_writers['tetra30'].extent_gpkg))))    # >1 polygon per ID
+        for etype in ('christen', 'tetra30'):
+            df = extent.read_annotated_extent(expmod, combo, etype)  # >1 polygon per ID
+            df,_ = expmod.mosaic_filter(df)    # Filter out bogus low-elevation avalanches
+            df = _subset_poly_df(ids, combo.idom, combo.jdom, df)
+            dfss[f'extent_{etype}'].append(df)
+
+
+#        dfss['extent_christen'].append(_subset_poly_df(ids, combo.idom, combo.jdom,
+#            geopandas.read_file(str(extent_namers['christen'].extent_gpkg))))    # >1 polygon per ID
+#        dfss['extent_tetra30'].append(_subset_poly_df(ids, combo.idom, combo.jdom,
+#            geopandas.read_file(str(extent_namers['tetra30'].extent_gpkg))))    # >1 polygon per ID
 
 
     # ========== Write output GeoTIFF and Zip it up
