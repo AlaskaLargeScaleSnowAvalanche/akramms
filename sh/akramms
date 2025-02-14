@@ -981,8 +981,6 @@ def stdmosaic(args):
 #        # akdf1 has two rows.  Sort to get predictable order (the 'For' row forst)
 #        akdf1 = akdf1.sort_values('combo')    # Could sort by 'forest' instead
 
-        print('AA1')
-
         # Determine output Combo name (replace For/NoFor with AllFor)
         forest_ix = expmod.combo_keys.index('forest')
         combo = akdf1.combo.tolist()[0]
@@ -994,22 +992,17 @@ def stdmosaic(args):
 
         # Write the combo
         combo_quickstatus_mtime = akdf1.combo_quickstatus_mtime.max()
-        print('AA2')
         if mwriter.needs_regen(name, combo_quickstatus_mtime):
-            print('AA3')
 
             os.makedirs(publish_dir, exist_ok=True)
             with ioutil.TmpDir(publish_dir) as tdir:
                 tifdir = pathlib.Path(tdir.location)
-                print('AA4')
                 mos = mosaic.mosaic_avals_combo(
                     akdf1, 'tile', tifdir, statuses=args.status,
                     snow=True, dem=True, landcover=True,
                     dry_run=args.dry_run, force=args.force)
                 if mos is not None:    # There were some avalanches to plot...
                     mwriter.write(name, mos, tifdir, ijdom=(ocombo.idom, ocombo.jdom))
-
-        print('AA5')
 
 exts_by_section = {
     'release': ('.shp', '.shx', '.cpg', '.dbf', '.prj'),

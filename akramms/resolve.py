@@ -3,7 +3,7 @@ import netCDF4
 import pandas as pd
 import geopandas
 from uafgi.util import shputil
-from akramms import level,parse,file_info
+from akramms import level,parse,file_info,extent
 
 # Levels:
 #   exp - combo - (pra_size) chunk - (pra_size) - aval
@@ -220,7 +220,7 @@ _avalRE = re.compile(r'^aval-([TSML])-(\d+)-([^-]*).nc$')
 #_out_zipRE = re.compile(r'(.*)_(\d+)\.out\.zip$')
 
 @functools.lru_cache()
-def _realized_ids(scenetype, releasefile, stage, include_overruns=False, filter_geom=None):
+def _realized_ids(expmod, combo, scenetype, releasefile, stage, include_overruns=False, filter_geom=None):
     """Find IDs that exist on disk.
     (Cached separate function)
 
@@ -265,7 +265,8 @@ def _realized_ids(scenetype, releasefile, stage, include_overruns=False, filter_
             avalfiles.append((id, out_zip, None))
     elif scenetype == 'arc':
         arcdir = releasefile
-        extent_full = arcdir / 'extent_full.gpkg'
+        extent_full = extent.extent_fname(expmod, combo, 'full')
+#        extent_full = arcdir / 'extent_full.gpkg'
 
         # Determine subset of IDs (from this combo) we are interestd in, i.e. that match our bounds
         if (filter_geom is not None) and os.path.exists(extent_full):
@@ -314,7 +315,7 @@ def resolve_id(akdf, realized=True, stage='out', status_col=False, filter_geom=F
 
     akdf = akdf.reset_index(drop=True)
     for tup in akdf.itertuples(index=False):
-#        print(tup)
+        expmod = parse.load_expmod(tup.exp)
         if tup.scenetype == 'arc':
             if not realized:
                 raise ValueError('Must have realized=True when resolving IDs for archived scenes')
@@ -347,7 +348,7 @@ def resolve_id(akdf, realized=True, stage='out', status_col=False, filter_geom=F
         # Add those IDs
         if realized:
             # Match releasefile against what's on disk
-            avalfiles = _realized_ids(tup.scenetype, tup.releasefile, stage, filter_geom=filter_geom)
+            avalfiles = _realized_ids(expmod, tup.combo, tup.scenetype, tup.releasefile, stage, filter_geom=filter_geom)
 #            print('avalfiles ', avalfiles)
 
             if ids is None:    # Archive-type directory, no releasefile
