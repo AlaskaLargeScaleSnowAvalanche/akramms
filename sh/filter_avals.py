@@ -25,28 +25,36 @@ comboss = [
 def main():
     for name,combos in comboss:
         print(f'================== {name}')
-        reldfs = list()
-        extdfs = list()
+
+        dfs = list()
         for combo in combos:
-            arcdir = expmod.combo_to_scenedir(combo, 'arc')
-            reldfs.append(archive.read_reldom(arcdir / 'RELEASE.zip', 'rel', read_shapes=False))
-            extent_gpkg = extent.extent_fname(expmod, combo, 'christen')
-            extdfs.append(geopandas.read_file(str(extent_gpkg)))
-        reldf = pd.concat(reldfs)
-        extdf = pd.concat(extdfs)
+            dfs.append(extent.read_annotated_extent(expmod, combo, 'christen'))
+        df = pd.concat(dfs)
 
 
-        # Merge the two
-        df = geopandas.GeoDataFrame(extdf.drop('Mean_DEM', axis=1).merge(reldf.drop('geometry',axis=1), on='Id'))
+#        reldfs = list()
+#        extdfs = list()
+#        for combo in combos:
+#            arcdir = expmod.combo_to_scenedir(combo, 'arc')
+#            reldfs.append(archive.read_reldom(arcdir / 'RELEASE.zip', 'rel', read_shapes=False))
+#            extent_gpkg = extent.extent_fname(expmod, combo, 'christen')
+#            extdfs.append(geopandas.read_file(str(extent_gpkg)))
+#        reldf = pd.concat(reldfs)
+#        extdf = pd.concat(extdfs)
+#
+#
+#        # Merge the two
+#        df = geopandas.GeoDataFrame(extdf.drop('Mean_DEM', axis=1).merge(reldf.drop('geometry',axis=1), on='Id'))
 
         # Separate
         df = df[df['Mean_DEM'] < 300]
-        keep = np.logical_and(
-            (((df.rel_n41 + df.rel_n43) / df.rel_n) < 0.3),
-            (((df.ext_n42 + df.ext_n43) / df.ext_n) < 0.3))
-
-        df_include = df[keep]
-        df_exclude = df[~keep]
+#        keep = np.logical_and(
+#            (((df.rel_n41 + df.rel_n43) / df.rel_n) < 0.3),
+#            (((df.ext_n42 + df.ext_n43) / df.ext_n) < 0.3))
+#
+#        df_include = df[keep]
+#        df_exclude = df[~keep]
+        df_include,df_exclude = expmod.mosaic_filter(df)
 
         # Show it...
         cols = ['Id', 'rel_n', 'rel_n41', 'rel_n43', 'ext_n', 'ext_n41', 'ext_n43']

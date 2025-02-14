@@ -60,6 +60,7 @@ def make_include_exclude():
             arcdir = expmod.combo_to_scenedir(combo, 'arc')
             reldfs.append(archive.read_reldom(arcdir / 'RELEASE.zip', 'rel', read_shapes=False))
             extent_gpkg = extent.extent_fname(expmod, combo, 'christen')
+            extent_gpkg = pathlib.Path(str(extent_gpkg).replace('/ext/', '/ext.v1/'))    # DEBUG
             extdfs.append(geopandas.read_file(str(extent_gpkg)))
         reldf = pd.concat(reldfs)
         extdf = pd.concat(extdfs)
@@ -95,7 +96,7 @@ def make_include_exclude():
 
 # ---------------------------------------------------------------
 
-def make_plot(img_tif, ofname_png, gpkg_kwargs, plot_landcover=False, ijdoms=None):
+def make_plot(img_tif, ofname_png, gpkg_kwargs, plot_landcover=False, ijdoms=None, points_fname=None):
     ofname_png = pathlib.Path(ofname_png)
     if os.path.isfile(ofname_png):
         return
@@ -176,6 +177,20 @@ def make_plot(img_tif, ofname_png, gpkg_kwargs, plot_landcover=False, ijdoms=Non
         ax.add_feature(shape_feature, **feature_kwargs)
 
 
+    # Add numbered points
+    print('points_fname ', points_fname)
+    if points_fname is not None:
+#        df = geopandas.read_file(points_fname)
+        df = geopandas.read_file('/vsizip/juneau_points.zip/juneau_points.shp')
+        print('len ', len(df))
+        for tup in df.itertuples(index=True):
+            x = tup.geometry.x
+            y = tup.geometry.y
+            ax.plot(x,y, marker='.', color='orange', alpha=0.5, markersize=23, transform=map_crs)    # s = marker size
+            ax.annotate(chr(ord('A')+tup.Index), (x,y), xycoords=map_crs, ha='center', va='center', color='black')
+#            ax.annotate(str(tup.Index), (x,y), xytext=(5, 5), textcoords='offset points')
+
+
     with akfigs.TrimmedPng(ofname_png) as tname:
         fig.savefig(tname, dpi=192, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
 
@@ -183,7 +198,6 @@ def make_plot(img_tif, ofname_png, gpkg_kwargs, plot_landcover=False, ijdoms=Non
 
 def main():
     make_include_exclude()
-    return
 
     ih_include = dict(facecolor='gold', alpha=.4, edgecolor='brown', lw=.5)
     ih_high = dict(facecolor='none', alpha=1, edgecolor='blue', lw=.5)
@@ -207,8 +221,18 @@ def main():
     ]
 
     make_plot(
-        googlemaps_dir / 'Juneau1.tif', './fig15_Juneau1.png', gpkg_kwargs,
-        plot_landcover=True, ijdoms=[(113,45)])
+        googlemaps_dir / 'Juneau1.tif', './fig15_Juneau1_IE.png', gpkg_kwargs,
+        plot_landcover=True, ijdoms=[(113,45)], points_fname='juneau_points.gpkg')
+
+    # ---------------- Juneau1 (Downtown): Include & High
+    gpkg_kwargs = [
+        (odir / f'juneau_include.gpkg', ih_include),
+        (odir / f'juneau_high.gpkg', ih_high),
+    ]
+
+    make_plot(
+        googlemaps_dir / 'Juneau1.tif', './fig15_Juneau1_IH.png', gpkg_kwargs,
+        plot_landcover=True, ijdoms=[(113,45)], points_fname='juneau_points.gpkg')
 
     # ----------------- Valdez : Include & Exclude
     gpkg_kwargs = [
