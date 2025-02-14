@@ -956,6 +956,7 @@ def extent(args):
 ])
 def stdmosaic(args):
     from akramms import mosaic,downscale_snow,file_info
+    from uafgi.util import ioutil
 
     run_setup_py()
 
@@ -975,34 +976,41 @@ def stdmosaic(args):
     exp = akdf0.iloc[0].exp
     expmod = akramms.parse.load_expmod(exp)
     publish_dir = expmod.root_dir / 'publish'
-    mwriter = mosaic.PublishMosaicWriter(expmod)
+    os.makedirs(expmod.root_dir / 'tmp', exist_ok=True)
     for akdf1 in avalquery.consolidate_by_forest(expmod, akdf0):
-# No need to sort
-#        # akdf1 has two rows.  Sort to get predictable order (the 'For' row forst)
-#        akdf1 = akdf1.sort_values('combo')    # Could sort by 'forest' instead
 
-        # Determine output Combo name (replace For/NoFor with AllFor)
-        forest_ix = expmod.combo_keys.index('forest')
-        combo = akdf1.combo.tolist()[0]
-        lcombo = list(combo[:forest_ix]) + ['All'] + list(combo[forest_ix+1:])
-        ocombo = expmod.Combo(*lcombo)
-        scombo = str(combo)
-        sstatus = ''.join(file_info.JobStatus._member_names_[x][0] for x in sorted(args.status))
-        name = f'{expmod.name}-{scombo}-{sstatus}'
+        # TODO: Separate out extent generation as separate rules, so
+        # we can gain benefits of parallelism and chunking.
 
-        # Write the combo
-        combo_quickstatus_mtime = akdf1.combo_quickstatus_mtime.max()
-        if mwriter.needs_regen(name, combo_quickstatus_mtime):
+        rule = mosaic.stdmosaic_rule(exp, akdf1, args.status, args.dry_run, args.force)
+        makefile = make.Makefile()
+        makefile.add(rule)
+        makefile.generate(expmod.root_dir / 'init_mk',
+            tdir_fn = lambda: ioutil.TmpDir(expmod.root_dir / 'tmp'),
+            run=True, ncpu=1)
 
-            os.makedirs(publish_dir, exist_ok=True)
-            with ioutil.TmpDir(publish_dir) as tdir:
-                tifdir = pathlib.Path(tdir.location)
-                mos = mosaic.mosaic_avals_combo(
-                    akdf1, 'tile', tifdir, statuses=args.status,
-                    snow=True, dem=True, landcover=True,
-                    dry_run=args.dry_run, force=args.force)
-                if mos is not None:    # There were some avalanches to plot...
-                    mwriter.write(name, mos, tifdir, ijdom=(ocombo.idom, ocombo.jdom))
+
+
+
+#
+## No need to sort
+##        # akdf1 has two rows.  Sort to get predictable order (the 'For' row forst)
+##        akdf1 = akdf1.sort_values('combo')    # Could sort by 'forest' instead
+#
+#
+#        # Write the combo
+#        combo_quickstatus_mtime = akdf1.combo_quickstatus_mtime.max()
+#        if mwriter.needs_regen(combo_quickstatus_mtime):
+#
+#            os.makedirs(publish_dir, exist_ok=True)
+#            with ioutil.TmpDir(publish_dir) as tdir:
+#                tifdir = pathlib.Path(tdir.location)
+#                mos = mosaic.mosaic_avals_combo(
+#                    akdf1, 'tile', tifdir, statuses=args.status,
+#                    snow=True, dem=True, landcover=True,
+#                    dry_run=args.dry_run, force=args.force)
+#                if mos is not None:    # There were some avalanches to plot...
+#                    mwriter.write(mos, tifdir, ijdom=(ocombo.idom, ocombo.jdom))
 
 exts_by_section = {
     'release': ('.shp', '.shx', '.cpg', '.dbf', '.prj'),
@@ -1048,7 +1056,7 @@ def pubextract(args):
         exp = akdf0.iloc[0].exp
         expmod = akramms.parse.load_expmod(exp)
         publish_dir = expmod.root_dir / 'publish'
-        mwriter = mosaic.PublishMosaicWriter(expmod)
+#        mwriter = mosaic.PublishMosaicWriter(expmod)
         for akdf1 in avalquery.consolidate_by_forest(expmod, akdf0):
 
             for fname in mosaic.fnames(expmod, akdf1.iloc[0].combo, section_exts(args.section)):

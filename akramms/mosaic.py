@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import zipfile,netCDF4
 from osgeo import gdal,ogr
-from uafgi.util import gdalutil,ogrutil
+from uafgi.util import gdalutil,ogrutil,make
 from uafgi.util import cfutil,ioutil,gisutil,rasterize
 from akramms import experiment,archive,file_info,avalquery,downscale_snow,extent
 import akramms.parse
@@ -355,17 +355,13 @@ def mosaic_avals_combo(akdf, sextent, tifdir,
 # ---------------------------------------------------------------------------------
 class MosaicWriter:
 
-    def __init__(self, expmod):
-        """statuss: [status, ...]
-            Which stauses of avalanches are bieng plotted
+    def __init__(self, exp, name):
         """
-        self.expmod = expmod
-
-#    def name(self, combo):
-#        """Determines a generic name for a combo"""
-#        scombo = str(combo)
-#        return f'{self.expmod.name}-{scombo}-{self.sstatus}'
-
+        name:
+            Name of output thing to write (typically scombo)
+        """
+        self.exp = exp
+        self.name = name
 
 def _ozip_write(ozip, fname):
     """Writes with truncated arcname"""
@@ -373,25 +369,30 @@ def _ozip_write(ozip, fname):
 
 class ZipMosaicWriter(MosaicWriter):
 
-    def ofnames(self, name):
+    def ofnames(self):
         """Returns a dict of files written for a combo"""
 #        name = self.name(combo)
+        expmod = akramms.parse.load_expmod(self.exp)
         return {
-            'zip': self.expmod.dir / 'mosaic' / f'{name}.zip',
-            'pdf': self.expmod.dir / 'plot' / f'{name}.pdf'}
+            'zip': expmod.dir / 'mosaic' / f'{self.nae}.zip',
+            'pdf': expmod.dir / 'plot' / f'{self.nae}.pdf'}
 
-    def needs_regen(self, name, combo_mtime):
+    def outputs(self):
+        """List of all output names"""
+        return self.ofnames().values()
+
+    def needs_regen(self, combo_mtime):
         """
         combo_mtime:
             Last time the underlying data for this combo(s) was regenerated.
         """
-        ofnames = self.ofnames(name)
+        ofnames = self.ofnames(self.nae)
         for ofname in ofnames.values():
             if (not os.path.isfile(ofname)) or (os.path.getmtime(ofname) < combo_mtime):
                 return True
         return False
 
-    def write(self, name, mos, tifdir, ijdom=None):
+    def write(self, mos, tifdir, ijdom=None):
         """Writes to file(s)
         name:
             Name used to create output file(s)
@@ -401,7 +402,7 @@ class ZipMosaicWriter(MosaicWriter):
             Temporary directory where intermediate outputs are stored
         """
         # ========== Write output GeoTIFF and Zip it up
-        ofnames = self.ofnames(name)
+        ofnames = self.ofnames(self.nae)
         print(f"Writing {ofnames['zip']}")
         os.makedirs(ofnames['zip'].parents[0], exist_ok=True)
         with zipfile.ZipFile(ofnames['zip'], mode='w', compression=zipfile.ZIP_STORED) as ozip:
@@ -474,12 +475,14 @@ _tifdir_names = [
 
 class PublishMosaicWriter(MosaicWriter):
 
-    def ofname(self, scombo, tifdir_name):
+    def ofname(self, tifdir_name):
         """Determines the final filename for a file in the tifdir
         name:
             Name of the overall output (eg combo)
         tifdir_name:
             Filename inside of tifdir"""
+
+        scombo = self.name
 
         # Make sure things are named All; and not NoFor or For.
         # Because mosaics include both For and NoFor elements,
@@ -494,23 +497,26 @@ class PublishMosaicWriter(MosaicWriter):
         #    ak-ccsm-1981-2010-lapse-For-30/   ('-'.join(lcombo[:-3]))
         #    release/ak-ccsm-1981-2010-lapse-For-30-91-42-F-release.dbf
 
+        expmod = akramms.parse.load_expmod(self.exp)
         return \
-            self.expmod.dir.parents[0] / 'publish' / \
+            expmod.dir.parents[0] / 'publish' / \
             ('-'.join(lcombo[:-3])) / base / f'{scombo}-{tifdir_name}'
 
+    def outputs(self):
+        return [self.ofname(tifdir_name) for tifdir_name in _tifdir_names]
 
-    def needs_regen(self, name, combo_mtime):
+    def needs_regen(self, combo_mtime):
         """
         combo_mtime:
             Last time the underlying data for this combo(s) was regenerated.
         """
-        for ofname in (self.ofname(name, tifdir_name) for tifdir_name in _tifdir_names):
+        for ofname in self.outputs():
             print('Checking ', ofname)
             if (not os.path.isfile(ofname)) or (os.path.getmtime(ofname) < combo_mtime):
                 return True
         return False
 
-    def write(self, name, mos, tifdir, ijdom=None):
+    def write(self, mos, tifdir, ijdom=None):
         """Writes to file(s)
         name:
             Name used to create output file(s)
@@ -539,7 +545,7 @@ class PublishMosaicWriter(MosaicWriter):
             if tifdir_name.startswith('domain_count'):
                 continue
 
-            ofname = self.ofname(name, tifdir_name)
+            ofname = self.ofname(tifdir_name)
             print(f'Writing file {tifdir_name}: {ofname}')
             os.makedirs(ofname.parents[0], exist_ok=True)
             os.rename(tifdir / tifdir_name, ofname)
@@ -559,4 +565,41 @@ def fnames(expmod, combo, section_exts = [('release', '.shp')]):
             yield expmod.root_dir / 'publish' / f'{expmod.name}-{swcombo}' / section / f'{expmod.name}-{scombo}-F-{section}{ext}'
 
 # ---------------------------------------------------------------------------------
+class stdmosaic_action:
+    def __init__(self, exp, akdf1, statuses, dry_run, force):
+        """
+        akdf1: (combo level)
+            Dataframe with two rows, a For / NoFor matching pair.
+        """
+        self.akdf1 = akdf1
+        expmod = akramms.parse.load_expmod(exp)
+        self.statuses = statuses
+        self.dry_run = dry_run
+        self.force = force
+
+        # Determine output Combo name (replace For/NoFor with AllFor)
+        forest_ix = expmod.combo_keys.index('forest')
+        combo = akdf1.combo.tolist()[0]
+        lcombo = list(combo[:forest_ix]) + ['All'] + list(combo[forest_ix+1:])
+        self.ocombo = expmod.Combo(*lcombo)
+
+        scombo = str(combo)
+        sstatus = ''.join(file_info.JobStatus._member_names_[x][0] for x in sorted(statuses))
+        name = f'{expmod.name}-{scombo}-{sstatus}'
+        self.mwriter = PublishMosaicWriter(exp, name)
+
+
+    def __call__(self, tdir):
+        tifdir = pathlib.Path(tdir.location)
+        mos = mosaic_avals_combo(
+            self.akdf1, 'tile', tifdir, statuses=self.statuses,
+            snow=True, dem=True, landcover=True,
+            dry_run=self.dry_run, force=self.force)
+        if mos is not None:    # There were some avalanches to plot...
+            self.mwriter.write(mos, tifdir, ijdom=(self.ocombo.idom, self.ocombo.jdom))
+
+
+def stdmosaic_rule(*args, **kwargs):
+    action_fn = stdmosaic_action(*args, **kwargs)
+    return make.Rule(action_fn, [], action_fn.mwriter.outputs())
 # ---------------------------------------------------------------------------------
