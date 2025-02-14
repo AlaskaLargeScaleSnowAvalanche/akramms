@@ -109,8 +109,13 @@ def tile_rtree(expmod):
     """Put all the available tiles into an RTree"""
     domains_margin_shp = os.path.join(expmod.dir, f'{expmod.name}_domains_margin.shp')
 #    domains_df = shputil.read_df(domains_margin_shp)#.df#.set_index(['idom', 'jdom'])
-    domains_df = geopandas.read_file(domains_margin_shp)
-    return rtreeutil.RTree(domains_df, shapecol='geometry')
+    df = geopandas.read_file(domains_margin_shp)
+
+    # Remove excluded tiles
+    df['ijdom'] = list(zip(df.idom, df.jdom))
+    df = df[~df.ijdom.isin(expmod.exclude_tiles)]
+
+    return rtreeutil.RTree(df, shapecol='geometry')
 
 def expand_combos_by_geom(expmod, akdf, geom):
     """
@@ -128,7 +133,6 @@ def expand_combos_by_geom(expmod, akdf, geom):
     #tiles = set()
     for combo in akdf.combo:
         wcombos.add(tuple(combo[:-2]))
-        #tiles.add(combo[-2:])
 
     # Throw out the list of tiles, and instead figure out which tiles
     # (with margins) intersect geom.
@@ -141,18 +145,6 @@ def expand_combos_by_geom(expmod, akdf, geom):
             combos.append(expmod.Combo(*(list(wcombo) + [tup.idom, tup.jdom])))
 
     return resolve.from_combos(expmod.name, combos)
-
-#    # --- A numeric extent is provided: filter (idom,jdom) based on it.
-#    # tiles is the set of (idom,jdom) we are happy to keep
-#    tiles_in_extent = {(idom,jdom)
-#        for idom,jdom,dom_ext in domain_extents(expmod)
-#        if extents_intersect(dom_ext, extent)}
-#
-#    # Filter by tiles_in_extent (i.e. only keep combos on tiles that intersect extent)
-#    ijdom = akdf.combo.map(lambda x: (x[-2],x[-1]) )    # (idom,jdom)
-#    akdf = akdf[ijdom.isin(tiles_in_extent)]
-#
-#    return akdf
 # ---------------------------------------------------------------------
 def geom_by_tiles(expmod, akdf):
     """Produces the extent that is the union of the tiles covered by

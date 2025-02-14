@@ -234,20 +234,21 @@ def mosaic_filter(df):
     return df_include, df_exclude
 # -------------------------------------------------------------
 # Degenerate tiles we do NOT want to run (blacklist)
-_exclude_tiles = {
+exclude_tiles = {
     (112,51),
     (123, 56),
     (102,44),
     (96,43),
     (90,45),
-    (88,42),}
+    # These tiles processed OK but had no avalanches
+    (88,42), (92,43), }
 
 def all_domains():
     domains_margin_shp = os.path.join(dir, f'{name}_domains_margin.shp')
     domains_df = shputil.read_df_noshapes(domains_margin_shp)
     domains_df = domains_df.set_index(['idom', 'jdom'])
     domains_ij = domains_df.index.tolist()
-    domains_ij = [ij for ij in domains_ij if ij not in _exclude_tiles]
+    domains_ij = [ij for ij in domains_ij if ij not in exclude_tiles]
 #    domains_ij = [(row.idom, row.jdom) for row in domains_df.itertuples(index=False)]
     return domains_ij
 

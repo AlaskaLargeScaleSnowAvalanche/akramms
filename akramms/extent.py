@@ -283,9 +283,12 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
             continue
 
         # Read the releasefile polygons so we can analyze land surface types
+        # (reldf only needs to be set if there are avalanches in this combo)
         arcdir = expmod.combo_to_scenedir(combo, 'arc')
-        reldf = archive.read_reldom(arcdir / 'RELEASE.zip', 'rel')
-        reldfi = reldf.set_index('Id')
+        RELEASE_zip = arcdir / 'RELEASE.zip'
+        if os.path.isfile(RELEASE_zip):
+            reldf = archive.read_reldom(RELEASE_zip, 'rel')
+            reldfi = reldf.set_index('Id')
 
         # Make a dataframe from that one combo, then convert to IDs
         akdf1 = akdf0.iloc[[irow]]    # Returns a dataframe of just one row
