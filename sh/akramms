@@ -899,8 +899,8 @@ def xmosaic(args):
 
 @subcommand(name='stats', args=[
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser.'),
-    argument('-r', '--res', type=int,
-        help='Resolution to average to'),
+#    argument('-r', '--res', type=int,
+#        help='Resolution to average to'),
 ])
 def stats(args):
     from akramms import avalstats

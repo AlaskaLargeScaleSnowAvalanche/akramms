@@ -96,7 +96,7 @@ def make_include_exclude():
 
 # ---------------------------------------------------------------
 
-def make_plot(img_tif, ofname_png, gpkg_kwargs, plot_landcover=False, ijdoms=None, points_fname=None):
+def make_plot(img_tif, ofname_png, gpkg_kwargs, plot_landcover=False, ijdoms=None, points_fname=None, ids=None):
     ofname_png = pathlib.Path(ofname_png)
     if os.path.isfile(ofname_png):
         return
@@ -168,9 +168,13 @@ def make_plot(img_tif, ofname_png, gpkg_kwargs, plot_landcover=False, ijdoms=Non
 
     # Add extent outlines
     for extents_gpkg,feature_kwargs in gpkg_kwargs:
+        # https://scitools.org.uk/cartopy/docs/v0.15/tutorials/using_the_shapereader.html
+        geometries = [rec.geometry for rec in cartopy.io.shapereader.Reader(extents_gpkg).records() \
+            if ids is None or rec.attributes['Id'] in ids]
 
         shape_feature = cartopy.feature.ShapelyFeature(
-            cartopy.io.shapereader.Reader(extents_gpkg).geometries(),
+            geometries,
+#            cartopy.io.shapereader.Reader(extents_gpkg).geometries(),
             map_crs)
     #    ax.add_feature(shape_feature, facecolor='pink', alpha=.3, edgecolor='black', lw=0.3)
 #        ax.add_feature(shape_feature, facecolor='none', alpha=1, edgecolor=color, lw=.5)
@@ -181,7 +185,7 @@ def make_plot(img_tif, ofname_png, gpkg_kwargs, plot_landcover=False, ijdoms=Non
     print('points_fname ', points_fname)
     if points_fname is not None:
 #        df = geopandas.read_file(points_fname)
-        df = geopandas.read_file('/vsizip/juneau_points.zip/juneau_points.shp')
+        df = geopandas.read_file(points_fname)
         print('len ', len(df))
         for tup in df.itertuples(index=True):
             x = tup.geometry.x
@@ -205,6 +209,9 @@ def main():
     ie_exclude = dict(facecolor='none', alpha=1, edgecolor='purple', lw=.5)
     ie_include = dict(facecolor='none', alpha=1, edgecolor='pink', lw=.5)
 
+
+    one_style = dict(facecolor='none', alpha=.8, edgecolor='brown')
+
     # ------------- Juneau Rock Dump: Include & High
     gpkg_kwargs = [
         (odir / f'juneau_include.gpkg', ih_include),
@@ -222,7 +229,7 @@ def main():
 
     make_plot(
         googlemaps_dir / 'Juneau1.tif', './fig15_Juneau1_IE.png', gpkg_kwargs,
-        plot_landcover=True, ijdoms=[(113,45)], points_fname='juneau_points.gpkg')
+        plot_landcover=True, ijdoms=[(113,45)], points_fname='/vsizip/juneau_points.zip/juneau_points.shp')
 
     # ---------------- Juneau1 (Downtown): Include & High
     gpkg_kwargs = [
@@ -232,10 +239,22 @@ def main():
 
     make_plot(
         googlemaps_dir / 'Juneau1.tif', './fig15_Juneau1_IH.png', gpkg_kwargs,
-        plot_landcover=True, ijdoms=[(113,45)], points_fname='juneau_points.gpkg')
+        plot_landcover=True, ijdoms=[(113,45)], points_fname='/vsizip/juneau_points.zip/juneau_points.shp')
 
-    # ----------------- Valdez : Include & Exclude
+    # ----------------- Juneau: Snowslide Creek
     gpkg_kwargs = [
+        (odir / f'juneau_include.gpkg', one_style),
+        (odir / f'juneau_high.gpkg', one_style),
+    ]
+
+    make_plot(
+        'Juneau_SnowslideCreek.tif', './fig15_Juneau_SnowslideCreek_IH.png', gpkg_kwargs,
+        plot_landcover=True, ijdoms=[(113,45)],
+        ids={10635, 8871, 8878, 8879, 10626, 10636, 10638, 10644, 10648})
+
+    # ----------------- Valdez : Include & High
+    gpkg_kwargs = [
+        (odir / f'valdez_high.gpkg', ih_high),
         (odir / f'valdez_exclude.gpkg', ie_exclude),
         (odir / f'valdez_include.gpkg', ie_include),
     ]
@@ -264,8 +283,19 @@ def main():
         googlemaps_dir / 'Valdez_HighSchool.tif', './fig15_Valdez_HighSchool_IH.png', gpkg_kwargs,
         plot_landcover=True, ijdoms=[(89,39)])
 
+    # ----------------- Valdez High School: Include & High
+    gpkg_kwargs = [
+        (odir / f'valdez_include.gpkg', ih_include),
+        (odir / f'valdez_high.gpkg', ih_high),
+    ]
+
+    make_plot(
+        'Valdez_PorcupineSt.tif', './fig15_Valdez_PorcupineSt_IH.png', gpkg_kwargs,
+        plot_landcover=True, ijdoms=[(89,39)], points_fname='/vsizip/ValdezPoints.zip/ValdezPoints.shp')
+
     # ----------------- Cordova : Include & Exclude
     gpkg_kwargs = [
+        (odir / f'cordova_high.gpkg', ih_high),
         (odir / f'cordova_exclude.gpkg', ie_exclude),
         (odir / f'cordova_include.gpkg', ie_include),
     ]

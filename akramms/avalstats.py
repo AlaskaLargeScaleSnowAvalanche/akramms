@@ -101,8 +101,8 @@ def _by_1(grid):
 
 stats_vars = {
 ##    'land': (_read_land, _by_1, '1'),#    'avy_extent': (rbind(_read_thresh, 'avalanche_count'), _by_1, '1'),
-#    'count': (rbind(_read_thresh, 'pra_centroid_count'), _by_area, 'km-2'),
-#    'release_extent': (rbind(_read_thresh, 'pra_count'), _by_1, '1'),
+    'count': (rbind(_read_thresh, 'pra_centroid_count'), _by_area, 'km-2'),
+    'release_extent': (rbind(_read_thresh, 'pra_count'), _by_1, '1'),
     'snow': (_read_snow, _by_1, '1'),
 }
 
@@ -112,19 +112,24 @@ def regrid_stdmosaic(expmod, combo, vname, res):
 
     section = _section(expmod, combo)
 
-    stats_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats') / f's{res}'
+    stats_dir = expmod.root_dir / 'stats' / 'tiles' / f's{res}'
+#    stats_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats') / f's{res}'
 
     omosaic_tif = stats_dir / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}-s{res}.tif'
 
     if os.path.isfile(omosaic_tif):
         return
 
+    os.makedirs(stats_dir, exist_ok=True)
     try:
         with ioutil.TmpDir(stats_dir) as tdir:
             imosaic_grid, imosaic_data, imosaic_nd = read_fn(expmod, combo, tdir)
-    except FileNotFoundError:
-        print(f'No input file, skipping: {combo}')
+    except FileNotFoundError as e:
+        print(f'No input file, skipping: {combo}: {read_fn}')
+        print(e)
         return
+#    except:
+#        raise
 
 #    # Construct stats grid (at low resolution), used for averaging
 #    onx = int(round(imosaic_grid.nx * np.abs(imosaic_grid.dx) / res))
@@ -201,8 +206,10 @@ def stats_wcombo(akdf0, ress=[1000]):
         wcombos.add(tuple(combo[:-2]))
 
     for res in ress:
-        istats_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats') / f's{res}'
-        ostats_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats') / 'tif' / f's{res}'
+        istats_dir = expmod.root_dir / 'stats' / 'tiles' / f's{res}'
+        ostats_dir = expmod.root_dir / 'stats' / 'tif' / f's{res}'
+#        istats_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats') / f's{res}'
+#        ostats_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats') / 'tif' / f's{res}'
         os.makedirs(ostats_dir, exist_ok=True)
         for wcombo in wcombos:
             combo = expmod.Combo(*(list(wcombo) + [0,0]))
@@ -231,7 +238,8 @@ def stats_landcover(expmod, ress):
 
         for res in ress:
             # Get filename
-            stats_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats') / f's{res}' / 'land'
+            stats_dir = expmod.root_dir / 'stats' / 'land' / f's{res}'
+#            stats_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats') / f's{res}' / 'land'
             os.makedirs(stats_dir, exist_ok=True)
             ofname = stats_dir / f'land-{idom:03d}-{jdom:03d}.tif'
 #            print('land ', ofname)
