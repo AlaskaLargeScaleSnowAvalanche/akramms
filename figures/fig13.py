@@ -9,7 +9,8 @@ from uafgi.util import wrfutil,cartopyutil,gisutil,gdalutil,cptutil
 import akfigs
 import shapely.geometry
 
-tif_dir = pathlib.Path('/Users/eafischer2/tmp/maps/tif')
+#tif_dir = pathlib.Path('/Users/eafischer2/tmp/maps/tif')
+tif_dir = pathlib.Path('/home/efischer/prj/akse/stats/tif')
 sres = '10000'
 
 
