@@ -913,7 +913,7 @@ def stats(args):
     expmod = akramms.parse.load_expmod(exp)
 
     ress = [100,1000,10000]
-#    avalstats.stats_landcover(expmod, ress=ress)
+    avalstats.stats_landcover(expmod, ress=ress)
     avalstats.stats_wcombo(akdf, ress=ress)
 
 
