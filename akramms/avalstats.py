@@ -240,7 +240,7 @@ def stats_landcover(expmod, ress):
 
         for res in ress:
             # Get filename
-            stats_dir = expmod.root_dir / 'stats' / 'land' / f's{res}'
+            stats_dir = expmod.root_dir / 'stats' / 'tiles' / f's{res}' / 'land'
 #            stats_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats') / f's{res}' / 'land'
             os.makedirs(stats_dir, exist_ok=True)
             ofname = stats_dir / f'land-{idom:03d}-{jdom:03d}.tif'

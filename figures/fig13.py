@@ -10,7 +10,9 @@ import akfigs
 import shapely.geometry
 
 #tif_dir = pathlib.Path('/Users/eafischer2/tmp/maps/tif')
-tif_dir = pathlib.Path('/home/efischer/prj/akse/stats/tif')
+tif_dir = expmod.root_dir / 'stats' / 'tif'
+land_dir = expmod.root_dir / 'stats' / 'land'
+
 sres = '10000'
 
 
@@ -207,7 +209,7 @@ def plot_fig(stat_grid, stat_data, cmap, vmin, vmax, ofname):
 
 
     # Land mask controls transparency
-    land_tif = tif_dir / f's{sres}' / f'land-s{sres}.tif'
+    land_tif = land_dir / f's{sres}' / f'land-s{sres}.tif'
     land_grid, land_data, land_nd = gdalutil.read_raster(land_tif)
     land_data[land_data == land_nd] = 0
 
