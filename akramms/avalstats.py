@@ -260,7 +260,8 @@ def stats_landcover(expmod, ress):
             gdalutil.write_raster(ofname, ogrid, land_data, land_nd)
 
     # Convert to single .tif
-    tif_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats') / 'tif'
+#    tif_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats') / 'tif'
+    tif_dir = expmod.root_dir / 'stats' / 'tif'
     for res,ifnames in ifnamess.items():
 #        print('xxxx ', res, ifnames)
         ofname_vrt = tif_dir / f's{res}' / f'land-s{res}.vrt'
