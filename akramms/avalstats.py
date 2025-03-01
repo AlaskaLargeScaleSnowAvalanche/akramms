@@ -100,11 +100,11 @@ def _by_1(grid):
     return 1
 
 stats_vars = {
-##    'land': (_read_land, _by_1, '1'),
+    'land': (_read_land, _by_1, '1'),
     'avy_extent': (rbind(_read_thresh, 'avalanche_count'), _by_1, '1'),
-#    'count': (rbind(_read_thresh, 'pra_centroid_count'), _by_area, 'km-2'),
-#    'release_extent': (rbind(_read_thresh, 'pra_count'), _by_1, '1'),
-#    'snow': (_read_snow, _by_1, '1'),
+    'count': (rbind(_read_thresh, 'pra_centroid_count'), _by_area, 'km-2'),
+    'release_extent': (rbind(_read_thresh, 'pra_count'), _by_1, '1'),
+    'snow': (_read_snow, _by_1, '1'),
 }
 
 
