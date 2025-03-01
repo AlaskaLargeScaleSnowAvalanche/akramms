@@ -4,7 +4,7 @@ import numpy as np
 import cartopy.io.img_tiles
 from akramms import config
 import matplotlib.pyplot as plt
-import akramms.experiment.ak as exp
+import akramms.experiment.akse as expmod
 from uafgi.util import wrfutil,cartopyutil,gisutil,gdalutil,cptutil
 import akfigs
 import shapely.geometry
@@ -48,7 +48,7 @@ def main():
     for return_period in ('30', '300'):
         for years in ('1981-2010', '2031-2060'):
                 for var in ('avy_extent', 'snow'):
-                    ifname_tif = tif_dir / f's{sres}' / f'ak-ccsm-{years}-lapse-All-{return_period}-{var}-s{sres}.tif'
+                    ifname_tif = tif_dir / f's{sres}' / f'{expmod.name}-ccsm-{years}-lapse-All-{return_period}-{var}-s{sres}.tif'
                     stat_grid, stat_data, stat_nd = gdalutil.read_raster(ifname_tif)
                     stat_data[stat_data == stat_nd] = np.nan
                     if var == 'avy_extent':
