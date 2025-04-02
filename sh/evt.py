@@ -104,40 +104,6 @@ def genx():
             plt.savefig(f'rps/rp_{jj:02d}_{ii:02d}.png')
 
 
-def geny():
-#    data = np.random.normal(loc=5.0, scale=1.0, size=1000000)
-
-    for block_size in (100,1000,10000):
-        # Split into blocks (years)
-        num_blocks = np.floor(len(data) / block_size)
-        blocks = np.split(data, num_blocks)
-        block_maxima = np.max(blocks, axis=1)
-
-#        print('block_maxima size ', block_maxima)
-        params = genextreme.fit(block_maxima)
-        print(f'c, loc, scale = {params}')
-
-#        return_periods = np.linspace(1,300,50)
-        rp_3days = np.linspace(1,300*365./3.,50)
-        rp_years = rp_3days * 3 / 365.
-        ppf = np.array([
-            genextreme.ppf(1-(1/return_period), *params)
-            for return_period in rp_3days])
-
-#        print(ppf)
-        plt.plot(rp_years, ppf)
-
-#    ax = seaborn.histplot(block_maxima)
-    plt.show()
-
-#    print(data)
-#    fit = genextreme.fit(data)
-#   print(fit)
-#    print(np.random.normal.fit(data))
-
-    fit = genextreme.fit(data)
-    print(fit)
-    print(np.random.normal.fit(data))
 
 #subset_acsnow()
 genx()
