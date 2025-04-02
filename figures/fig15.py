@@ -168,9 +168,12 @@ def make_plot(img_tif, ofname_png, gpkg_kwargs, plot_landcover=False, ijdoms=Non
 
     # Add extent outlines
     for extents_gpkg,feature_kwargs in gpkg_kwargs:
-        # https://scitools.org.uk/cartopy/docs/v0.15/tutorials/using_the_shapereader.html
-        geometries = [rec.geometry for rec in cartopy.io.shapereader.Reader(extents_gpkg).records() \
-            if ids is None or rec.attributes['Id'] in ids]
+        if isinstance(extents_gpkg, pathlib.Path):
+            # https://scitools.org.uk/cartopy/docs/v0.15/tutorials/using_the_shapereader.html
+            geometries = [rec.geometry for rec in cartopy.io.shapereader.Reader(extents_gpkg).records() \
+                if ids is None or rec.attributes['Id'] in ids]
+        else:
+            geometries = extents_gpkg
 
         shape_feature = cartopy.feature.ShapelyFeature(
             geometries,
@@ -209,6 +212,9 @@ def main():
     ie_exclude = dict(facecolor='none', alpha=1, edgecolor='purple', lw=.5)
     ie_include = dict(facecolor='none', alpha=1, edgecolor='pink', lw=.5)
 
+    inset_bounds = dict(facecolor='none', alpha=1, edgecolor='fuchsia', lw=1)
+    release_style = dict(facecolor='pink', alpha=.4, edgecolor='brown', lw=.5)
+
 
     one_style = dict(facecolor='none', alpha=.8, edgecolor='brown')
 
@@ -241,6 +247,16 @@ def main():
         googlemaps_dir / 'Juneau1.tif', './fig15_Juneau1_IH.png', gpkg_kwargs,
         plot_landcover=True, ijdoms=[(113,45)], points_fname='/vsizip/juneau_points.zip/juneau_points.shp')
 
+    # ---------------- Juneau1 (Downtown): PRAs
+    stub = 'akse-ccsm-1981-2010-lapse-All-30'
+    gpkg_kwargs = [
+        (pathlib.Path(expmod.root_dir / 'publish' / stub / 'release' / f'{stub}-113-045-F-release.shp'), release_style),
+    ]
+
+    make_plot(
+        googlemaps_dir / 'Juneau1.tif', './fig15_Juneau1_PRA.png', gpkg_kwargs,
+        plot_landcover=True, ijdoms=[(113,45)])
+
     # ----------------- Juneau: Snowslide Creek
     gpkg_kwargs = [
         (odir / f'juneau_include.gpkg', one_style),
@@ -250,7 +266,8 @@ def main():
     make_plot(
         'Juneau_SnowslideCreek.tif', './fig15_Juneau_SnowslideCreek_IH.png', gpkg_kwargs,
         plot_landcover=True, ijdoms=[(113,45)],
-        ids={10635, 8871, 8878, 8879, 10626, 10636, 10638, 10644, 10648})
+        ids={10635, 8871, 8878, 8879, 10626, 10636, 10638, 10644, 10648},
+        points_fname='/vsizip/SnowslideCreek_Points.zip/SnowslideCreek_Points.shp')
 
     # ----------------- Valdez : Include & High
     gpkg_kwargs = [
@@ -275,8 +292,9 @@ def main():
 
     # ----------------- Valdez High School: Include & High
     gpkg_kwargs = [
-        (odir / f'valdez_include.gpkg', ih_include),
+        (odir / f'valdez_include.gpkg', ie_include),
         (odir / f'valdez_high.gpkg', ih_high),
+        ('/vsizip/Valdez_MountainSafety.zip/Valdez_MountainSafety.shp', inset_bounds),
     ]
 
     make_plot(
@@ -294,10 +312,15 @@ def main():
         plot_landcover=True, ijdoms=[(89,39)], points_fname='/vsizip/ValdezPoints.zip/ValdezPoints.shp')
 
     # ----------------- Cordova : Include & Exclude
+    bear_tif = googlemaps_dir / 'Cordova_BearCountryLodge.tif'
+    bear_grid = gdalutil.read_grid(bear_tif)
+    bear_bbox = bear_grid.bounding_box()
+
     gpkg_kwargs = [
         (odir / f'cordova_high.gpkg', ih_high),
         (odir / f'cordova_exclude.gpkg', ie_exclude),
         (odir / f'cordova_include.gpkg', ie_include),
+        ([bear_bbox], inset_bounds),
     ]
 
     make_plot(

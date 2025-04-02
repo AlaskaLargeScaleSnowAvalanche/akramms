@@ -5,7 +5,7 @@ import cartopy.io.img_tiles
 from osgeo import gdal
 from akramms import config
 import matplotlib.pyplot as plt
-import akramms.experiment.ak as exp
+import akramms.experiment.akse as expmod
 from akfigs import *
 from uafgi.util import gdalutil,cptutil,ioutil,cartopyutil
 import shapely.geometry.multipolygon
@@ -33,15 +33,15 @@ def main():
     polys = list()
     for idom in range(idom0,idom1):
         for jdom in range(jdom0,jdom1):
-            polys.append(exp.gridD.poly(idom, jdom, margin=False))
+            polys.append(expmod.gridD.poly(idom, jdom, margin=False))
 
     allpolys = shapely.geometry.multipolygon.MultiPolygon(polys)
     index_box = allpolys.envelope  # Smallest rectangle with sides oriented to axes
     xx,yy = index_box.exterior.coords.xy
     map_extent = (xx[0], xx[1], yy[2], yy[0])
 
-    print('map_extent ', map_extent)
-    return
+#    print('map_extent ', map_extent)
+#    return
 
     fig,ax = plt.subplots(
         nrows=1,ncols=1,
@@ -59,10 +59,10 @@ def main():
 
                 print('ijdom ', idom, jdom)
 
-                subgrid = exp.gridD.sub(idom, jdom, xyres, xyres, margin=True)
+                subgrid = expmod.gridD.sub(idom, jdom, xyres, xyres, margin=True)
 
-                dem_tif = exp.dir / 'dem' / f'ak_dem_{idom:03d}_{jdom:03d}.tif'
-                snow_tif = exp.dir / 'snow' / f'ak_ccsm_1981_2010_lapse_{idom:03d}_{jdom:03d}.tif'
+                dem_tif = expmod.dir / 'dem' / f'{expmod.name}_dem_{idom:03d}_{jdom:03d}.tif'
+                snow_tif = expmod.dir / 'snow' / f'{expmod.name}_ccsm_1981_2010_lapse_{idom:03d}_{jdom:03d}.tif'
 
                 # Avoid tiles that are not part of our domain
                 if not os.path.exists(dem_tif):
@@ -113,7 +113,7 @@ def main():
                     transform=map_crs, cmap=cmap, vmin=0, vmax=700)
 
 
-                pcm_snow.set_clip_path(cartopyutil.poly_clip_path(ax, exp.gridD.poly(idom, jdom, margin=False)))
+                pcm_snow.set_clip_path(cartopyutil.poly_clip_path(ax, expmod.gridD.poly(idom, jdom, margin=False)))
 
         akfigs.plot_cities(ax,
             only={'Haines', 'Juneau'},

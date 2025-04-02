@@ -1,4 +1,4 @@
-import os,subprocess
+import os,subprocess,pathlib
 import cartopy
 from akramms import config
 from uafgi.util import wrfutil,cartopyutil,gisutil
@@ -22,6 +22,7 @@ class TrimmedPng:
 
 class TrimmedPdf:
     def __init__(self, ofname):
+        ofname = pathlib.Path(ofname)
         self.ofname = ofname
         baseleaf,ext = os.path.splitext(ofname.parts[-1])
         self.tname = ofname.parents[0] / f'{baseleaf}_tmp.{ext}'

@@ -11,7 +11,6 @@ import shapely.geometry
 
 #tif_dir = pathlib.Path('/Users/eafischer2/tmp/maps/tif')
 tif_dir = expmod.root_dir / 'stats' / 'tif'
-land_dir = expmod.root_dir / 'stats' / 'land'
 
 sres = '10000'
 
@@ -157,17 +156,21 @@ def main():
 
 
     # Plot the differences
-    plot_fig(stat_grid, data[('300', '1981-2010', 'avy_extent')] - data[('30', '1981-2010', 'avy_extent')], diff_cmap, -20, 20, 'fig13_1981_300-30.png')
-    plot_fig(stat_grid, data[('300', '2031-2060', 'avy_extent')] - data[('30', '2031-2060', 'avy_extent')], diff_cmap, -20, 20, 'fig13_2031_300-30.png')
+    ticks = [-20, 0, 20]
+    ticklabels = ['-20%', '0', '20%']
+    plot_fig(stat_grid, data[('300', '1981-2010', 'avy_extent')] - data[('30', '1981-2010', 'avy_extent')], diff_cmap, -20, 20, 'fig13_1981_300-30.png', ticks, ticklabels)
+    plot_fig(stat_grid, data[('300', '2031-2060', 'avy_extent')] - data[('30', '2031-2060', 'avy_extent')], diff_cmap, -20, 20, 'fig13_2031_300-30.png', ticks, ticklabels)
 
-    plot_fig(stat_grid, data[('30', '2031-2060', 'avy_extent')] - data[('30', '1981-2010', 'avy_extent')], diff_cmap, -10, 10, 'fig13_2031-1981_30.png')
-    plot_fig(stat_grid, data[('300', '2031-2060', 'avy_extent')] - data[('300', '1981-2010', 'avy_extent')], diff_cmap, -10, 10, 'fig13_2031-1981_300.png')
+    ticks = [-10, 0, 10]
+    ticklabels = ['-10%', '0', '10%']
+    plot_fig(stat_grid, data[('30', '2031-2060', 'avy_extent')] - data[('30', '1981-2010', 'avy_extent')], diff_cmap, -10, 10, 'fig13_2031-1981_30.png', ticks, ticklabels)
+    plot_fig(stat_grid, data[('300', '2031-2060', 'avy_extent')] - data[('300', '1981-2010', 'avy_extent')], diff_cmap, -10, 10, 'fig13_2031-1981_300.png', ticks, ticklabels)
 
     # Snow difference
-    plot_fig(stat_grid, data[('30', '2031-2060', 'snow')] - data[('30', '1981-2010', 'snow')], diff_cmap_snow, -100, 100, 'fig13_snowdiff.png')
+    plot_fig(stat_grid, data[('30', '2031-2060', 'snow')] - data[('30', '1981-2010', 'snow')], diff_cmap_snow, -100, 100, 'fig13_snowdiff.png', [-100,0,100], ['-100 kg/m^2', 0, '100 kg/m^2'])
 
     # Baseline
-    plot_fig(stat_grid, data[('30', '1981-2010', 'avy_extent')], abs_cmap, 0., 100, 'fig13_1981_30.png')
+    plot_fig(stat_grid, data[('30', '1981-2010', 'avy_extent')], abs_cmap, 0., 100, 'fig13_1981_30.png', [0,20,40,60,80,100], ['0%', '20', '40', '60', '80', '100%'])
 
 
 
@@ -187,7 +190,7 @@ def main():
 
 
 
-def plot_fig(stat_grid, stat_data, cmap, vmin, vmax, ofname):
+def plot_fig(stat_grid, stat_data, cmap, vmin, vmax, ofname, ticks, ticklabels):
     map_crs = akfigs.map_crs()
 
     map_extent = (320*1000, 1500*1000, 700*1000, 1445*1000)    # xmin, xmax, ymin, ymax; ymin in South
@@ -209,7 +212,7 @@ def plot_fig(stat_grid, stat_data, cmap, vmin, vmax, ofname):
 
 
     # Land mask controls transparency
-    land_tif = land_dir / f's{sres}' / f'land-s{sres}.tif'
+    land_tif = tif_dir / f's{sres}' / f'land-s{sres}.tif'
     land_grid, land_data, land_nd = gdalutil.read_raster(land_tif)
     land_data[land_data == land_nd] = 0
 
@@ -266,8 +269,8 @@ def plot_fig(stat_grid, stat_data, cmap, vmin, vmax, ofname):
 #        subplot_kw={'projection': map_crs},
         figsize=(60/25.4,60/25.4))
     cbar_ax = axs
-    cbar = fig.colorbar(pcm_stat, ax=cbar_ax)#, ticks=[0,100,200,300,400,500,600,700])
-#    labels = cbar.ax.set_yticklabels(['0 mm', '100', '200', '300', '400', '500', '600', '>700 mm'])
+    cbar = fig.colorbar(pcm_stat, ax=cbar_ax, ticks=ticks)
+    labels = cbar.ax.set_yticklabels(ticklabels)
     cbar.ax.tick_params(labelsize=10)
     cbar_ax.remove()   # https://stackoverflow.com/questions/40813148/save-colorbar-for-scatter-plot-separately
 
