@@ -1,107 +1,97 @@
 import datetime,os
 import numpy as np
 import netCDF4
-#from akramms import d_wrf
+from akramms import d_wrf
+from uafgi.util import cfutil
 from scipy.stats import genextreme
 import seaborn
 import matplotlib.pyplot as plt
 import pickle
+import pandas as pd
 
 #jj,ii = 152,282
-ii,jj = 152,282
+#ii,jj = 152,282
 
-def main():
-
-    fnames = [d_wrf.era5_wrf_dscale_agg3(year) for year in range(1940,1957)]
-
-    # Figure out dimensions
-    ntime = 0
-    for fname in fnames:
-        with netCDF4.Dataset(fname) as nc:
-            ntime += len(nc.dimensions['Time'])
-            shape = nc.variables['acsnow'].shape
-
-    # Allocate overall array
-    Time = list()
-    acsnow = np.zeros((ntime, shape[1], shape[2]))
-
-
-    # Read into the array
-    ix = 0
-    for fname in fnames:
-        print(f'Reading {fname}')
-        with netCDF4.Dataset(fname) as nc:
-            nc.set_auto_mask(False)
-            n = len(nc.dimensions['Time'])
-            acs = nc.variables['acsnow'][:]
-            print('val ', acs[:,jj,ii])
-            acsnow[ix:ix+n,:] = acs[:]
-            ix += n
-
-    with open('acsnow.pik', 'wb') as out:
-        pickle.dump(acsnow, out)
-
-def xyz():
-
-#    jj = acsnow.shape[1] // 2
-#    ii = acsnow.shape[2] // 2
-    data = acsnow[:,jj,ii]
-    print(list(data))
-    fit = genextreme.fit(data)
-    print(fit)
-
-def subset_acsnow():
-    with open('acsnow.pik', 'rb') as fin:
-        acsnow = pickle.load(fin)
-
-    acsub = acsnow[:, 270:290, 140:160]
-    with open('acsub.pik', 'wb') as out:
-        pickle.dump(acsub, out)
 
 def genx():
-    with open('acsub.pik', 'rb') as fin:
-        acsub = pickle.load(fin)
+    os.makedirs('plots/hist', exist_ok=True)
+    os.makedirs('plots/rp', exist_ok=True)
 
-    acsub = acsub[:,-3:,-3:]
+    with netCDF4.Dataset(d_wrf.single_acsnow_agg3(1940,2023)) as nc:
+        acsnow_nc = nc.variables['acsnow']
 
-    os.makedirs('plots', exist_ok=True)
-    os.makedirs('rps', exist_ok=True)
-    for jj in range(acsub.shape[1]):
-        for ii in range(acsub.shape[2]):
-#    for jj in (0,):
-#        for ii in (2,):
-            data = acsub[:,jj,ii]
+        # Develop yearly bins for times
+        times = cfutil.read_time(nc, 'Time')
+        times = [datetime.date(dt.year, dt.month, dt.day) for dt in times]
+        year0 = times[0].year - 1
+        yearn = times[-1].year + 1
 
-            if True:    # Histograms
-                for mx in (2,):
-                    datax = data[data >= mx]
-                    ax = seaborn.histplot(datax, stat='density')
-                    ax.set_yscale('log')
-                    ax.set_ylim((1e-4,0.5))
-                    fname = f'plots/plot_{jj:02d}_{ii:02d}.png'
-                    print('--------------- ', fname)
-                    print(datax)
+        bounds = np.array([datetime.date(year,7,1) for year in range(year0,yearn+1)])
+        dt0 = bounds[0]
+        ibounds = [(dt-dt0).days for dt in bounds]
+        itimes = [(dt-dt0).days for dt in times]
+        bins = np.digitize(itimes, ibounds)    # Integer says which bin it is in
+        bin_dt0 = [bounds[bin-1] for bin in bins]
+        bin_dt1 = [bounds[bin] for bin in bins]
 
-            for mx in (2,):
-                datax = data[data >= mx]
-                params = genextreme.fit(datax)
-                print(f'{jj}, {ii}: c, loc, scale = {params}')
-                xx = np.linspace(1,30,200)
-                yy = genextreme.pdf(xx, *params)
-                plt.plot(xx,yy)
+        # Divide time into years
+        df = pd.DataFrame({'time': times, 'bin': bins})
+        df['ix'] = df.index
+        df['year'] = df.time.map(lambda dt: dt.year)
+        df['bin_dt0'] = bin_dt0
+        dfg = list(df.groupby('bin_dt0'))
 
 
-            plt.savefig(fname)
-            plt.clf()
+#        for ii in range(152,153):
+#            for jj in range(282,283):
+        for ii in range(150,155):
+            for jj in range(280,285):
 
-            # Plot return period max. numbers
-            rp_3days = np.linspace(1,300*365./3.,50)
-            rp_years = rp_3days * 3. / 365.
-            ppf = np.array([
-                genextreme.ppf(1-(1/rp), *params)
-                for rp in rp_3days])
-            plt.plot(rp_years, ppf)
-            plt.savefig(f'rps/rp_{jj:02d}_{ii:02d}.png')
+                # Non-blocked data
+                data = acsnow_nc[jj,ii,:]
+
+                # Block it one year at a time
+                bdata = np.zeros(len(dfg))
+                for blockix,(year,df) in enumerate(dfg):
+                    ixs = df.ix
+                    bdata[blockix] = np.max(data[ixs])
+                print('bdata ', bdata)
+                data = bdata
+
+                if True:    # Histograms
+                    for mx in (2,):
+                        datax = data#[data >= mx]
+                        ax = seaborn.histplot(datax, stat='density')
+#                        ax.set_yscale('log')
+#                        ax.set_ylim((1e-4,0.5))
+                        fname = f'plots/hist/hist_{jj:03d}_{ii:03d}.png'
+                        print('--------------- ', fname)
+                        print(datax)
+
+                if True:    # Fit
+                    for mx in (2,):
+                        datax = data#[data >= mx]
+                        params = genextreme.fit(datax)
+                        print(f'{jj}, {ii}: c, loc, scale = {params}')
+                        xx = np.linspace(1,np.max(datax),100)
+                        yy = genextreme.pdf(xx, *params)
+                        plt.plot(xx,yy)
+
+
+                plt.savefig(fname)
+                plt.clf()
+
+                if True:
+                    # Plot return period max. numbers
+#                    rp_3days = np.linspace(1,300*365./3.,50)
+#                    rp_years = rp_3days * 3. / 365.
+                    rp_years = np.linspace(1,300,50)
+                    ppf = np.array([
+                        genextreme.ppf(1-(1/rp), *params)
+                        for rp in rp_years])
+                    plt.plot(rp_years, ppf)
+                    plt.savefig(f'plots/rp/rp_{jj:03d}_{ii:03d}.png')
+                plt.clf()
 
 
 

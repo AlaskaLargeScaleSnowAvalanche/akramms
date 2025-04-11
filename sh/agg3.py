@@ -7,4 +7,9 @@ def main():
     dt1 = datetime.date(2023,7,2)
     d_wrf.agg3(dt0, dt1)
 
-main()
+
+d_wrf.write_single_agg3(1940,2023)
+
+
+
+#main()
