@@ -405,39 +405,6 @@ def to_geotiff():
     wrf_grid,acsnow,acsnow_nd = wrfutil.read(ifname, 'acsnow', geo_fname)
 
 
-    with netCDF4.Dataset(ifname) as nc:
-        # acsnow(fit, south_north, west_east, return_periods)
-#        acsnow = nc.variables['acsnow'][:]
-        xlong = nc.variables['XLONG'][:]
-        xlat = nc.variables['XLAT'][:]
-
-    xx = wrf_grid.centersx
-    yy = wrf_grid.centersy
-
-    xy_x,xy_y = np.meshgrid(xx, yy)
-
-#    wrf_crs = cartopyutil.crs(wrf_grid.wkt)
-#    wrf_crs = pyproj.crs.CRS(wrf_grid.wkt)
-    proj = pyproj.Proj(wrf_grid.wkt)
-#    proj = pyproj.Proj('proj=stere lat_0=90 lat_ts=63.99999237060547 lon_0=-152 x_0=0 y_0=0 R=6370000 nadgrids=@null units=m no_defs')
-    print('proj = ', proj)
-    print('shapes ', xx.shape, yy.shape)
-    xy_long, xy_lat = proj.transform(xy_x, xy_y, direction=pyproj.enums.TransformDirection.INVERSE)
-
-    wrf_x,wrf_y = proj.transform(xlong, xlat)
-    print('--------- LON errors')
-    print(xlong[0,:3] - xy_long[0,:3])
-    print(xlat[0,:3] - xy_lat[0,:3])
-    print('--------- X errros')
-    print(wrf_x[0,:3] - xy_x[0,:3])
-    print(wrf_y[:3,17] - xy_y[:3,17])
-
-
-    max_err_lon = np.max(np.abs(xlong - xy_long))
-    max_err_lat = np.max(np.abs(xlat - xy_lat))
-    print('mmmmmmmmmmmmax ', max_err_lon, max_err_lat)
-
-
 
     for rpix,rp in enumerate(return_periods):
         acsnow_masked = np.ma.masked_array(acsnow[2,:,:,rpix], mask=landmask_out)
