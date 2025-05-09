@@ -12,6 +12,16 @@ from akramms import downscale_snow
 #from akramms import d_ifsar, d_usgs_landcover
 
  # -----------------------------------------------------
+def _ring_to_poly(ring):
+#    print('ring ', ring)
+    npoints = ring.GetPointCount()
+    points = list()
+    for p in range(0,npoints):
+        x,y,z = ring.GetPoint(p)
+        points.append(shapely.geometry.Point(x,y))
+#    print('len points ', len(points))
+    return shapely.geometry.Polygon(points)
+
 @functools.lru_cache()
 def r_active_domains(exp_mod):
     """Writes a shapefile defining the domains for THIS experiment that will be used...
@@ -51,41 +61,36 @@ def r_active_domains(exp_mod):
         print('Opening shapefile ', exp_mod.experiment_region_shp)
         src_ds = driver.Open(exp_mod.experiment_region_shp)
         src_lyr = src_ds.GetLayer()   # Put layer number or name in her
+        polygons = list()
         while True:
             feature = src_lyr.GetNextFeature()
-            if feature is None:    # There should be only ONE feature.
+            # If this is one big MultiPolygon there will be only ONLY feature
+            # If it is many Polygons, there will be MANY features.
+            if feature is None:
                 break
 
             geom = feature.GetGeometryRef()
-            polygons = list()
-            npoly = geom.GetGeometryCount()
-#            print('AA1 npoly = ', npoly)
-            for ix in range(npoly):
-                ring = geom.GetGeometryRef(ix).GetGeometryRef(0)
-                npoints = ring.GetPointCount()
-                points = list()
-                for p in range(0,npoints):
-                    x,y,z = ring.GetPoint(p)
-                    points.append(shapely.geometry.Point(x,y))
-                polygons.append(shapely.geometry.Polygon(points))
+            geom_name = geom.GetGeometryName()  # POLYGON OR MULTIPOLYGON
+            if geom_name == 'POLYGON':
+#                print('geocount ', geom.GetGeometryCount())
+                ring = geom.GetGeometryRef(0)
+                polygons.append(_ring_to_poly(ring))
+            else:    # Multi Polygon
+                npoly = geom.GetGeometryCount()
+                for ix in range(npoly):
+                    ring = geom.GetGeometryRef(ix).GetGeometryRef(0)
+                    polygons.append(_ring_to_poly(ring))
 
-#                if len(polygons) > 1000:    # DEBUG
-#                    break
+        print('len polygons ', len(polygons))
+        experiment_region = shapely.geometry.MultiPolygon(polygons)
+#        print(experiment_region)
 
-            experiment_region = shapely.geometry.MultiPolygon(polygons)
-
-#        for poly in polygons[:5]:
-#            print('exp_region ', poly)
-
-#        print('AA2 ', gridD.index_box.intersects(experiment_region))
-#        print('AA3 ', experiment_region.intersects(gridD.index_box))
-
+        # Compute the gridcells
         rows = list()
         for iy in range(0, gridD.ny):
             print(f'Computing domains iy={iy}')
             for ix in range(0, gridD.nx):
                 domain = gridD.poly(ix, iy)
-#                print('domain ', domain)
                 if domain.intersects(experiment_region):
                     domain_margin = gridD.poly(ix, iy, margin=True)
                     rows.append((ix,iy,domain,domain_margin))
@@ -241,6 +246,40 @@ def r_snow(exp_mod, snow_dataset, downscale_algo, year0, year1, idom, jdom):
                 ofname)
         else:
             raise ValueError(f'Unsupported downscale_algo: {downscale_algo}')
+
+    return make.Rule(action, inputs, [ofname])
+# -----------------------------------------------------------------------
+@functools.lru_cache()
+def r_scsnow(exp_mod, snow_dataset, era, idom, jdom):
+    """Downscales snow from WRF.
+    rules: {Rule, ...}
+        Add sub-rules here!
+    snow_dataset:
+        Which kind of model / reanlysis run to use.
+        Eg: 'cfsr'
+    downscale_algo: {select, lapse}
+        Algorithm to use in downscaling WRF snow.
+    exp_mod:
+        Python module defining the experiment (eg: akramms.e_alaska)
+    Output: {exp_mod.name}_{snow_dataset}_{idom}_{jdom}
+        Snow downscaled and selected for a given region (with margins)
+    """
+
+    # Determine input filenames
+    geo_nc = config.roots.join('DATA', 'lader', 'sx3', 'geo_southeast.nc')
+
+    ifname = config.roots.join('HARNESS', 'outputs', 'wrf_era5_agg3', 'acsnow_agg3_4km_1940_2023_{return_period}.tif')
+
+    domains_margin_shp = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains_margin.shp')
+    dem_tif = r_ifsar(exp_mod, idom, jdom).outputs[0]
+    inputs = [dem_tif, domains_margin_shp, ifname]
+
+    # Determine output filename
+    ofname = downscale_snow.sc_snowfile(exp_mod.dir, exp_mod.name, snow_dataset, era, 'sclapse', idom, jdom)
+
+    def action(tdir):
+        downscale_snow.downscale_acsnow_with_sclapse(
+            ifname, dem_tif, ofname)
 
     return make.Rule(action, inputs, [ofname])
 

@@ -1,11 +1,11 @@
-import subprocess
+simport subprocess
 import os,pathlib,shutil,functools,sys,glob
 import netCDF4
 import numpy as np
 import pandas as pd
 import rtree,math
 from osgeo import gdalconst,gdal
-from uafgi.util import wrfutil,gdalutil
+from uafgi.util import wrfutil,gdalutil,lapseutil
 from akramms import config,process_tree
 from akramms.util import paramutil,harnutil,arcgisutil
 from uafgi.util import make
@@ -23,6 +23,17 @@ def snowfile(exp_dir, exp_name, snow_dataset, year0, year1, downscale_algo, idom
     sjdom = jdom if isinstance(jdom,str) else f'{jdom:03d}'
     ofname = os.path.join(exp_dir, 'snow',
         f'{exp_name}_{snow_dataset}_{year0}_{year1}_{downscale_algo}_{sidom}_{sjdom}.tif')
+    return pathlib.Path(ofname)
+
+def sc_snowfile(exp_dir, exp_name, snow_dataset, era, downscale_algo, idom, jdom):
+    """Creates the name of a snow file.
+    idom,jdom:
+        may be '*' to allow for wildcards and globbing."""
+
+    sidom = idom if isinstance(idom,str) else f'{idom:03d}'
+    sjdom = jdom if isinstance(jdom,str) else f'{jdom:03d}'
+    ofname = os.path.join(exp_dir, 'snow',
+        f'{exp_name}_{snow_dataset}_{era}_{downscale_algo}_{sidom}_{sjdom}.tif')
     return pathlib.Path(ofname)
 
 # --------------------------------------------------------------------------@
@@ -452,4 +463,85 @@ def downscale_sx3_with_lapse(sx3_files, geo_nc, distance_from_coastA_tif, dem_ti
 #    '/home/efischer/av/data/outputs/sx3/ccsm_sx3_1981_2010.nc',
 #    '/home/efischer/av/data/lader/sx3/geo_southeast.nc')
 #rule.action(None)
+
+
+# ------------------------------------------------------------------------
+def downscale_acsnow_with_sclapse(snow_nc, geo_nc, dem_tif, ofname):
+    """
+    snow_tif: Snow for one return period
+        Eg: acsnow_agg3_4km_1940_2023_300.tif
+    dem_tif: (gridI)
+        The hi-res DEM for a particular RAMMS scene
+    ofname:
+        Name of the output file
+    """
+
+    # Read input
+    gridA,acsnowA,acsnowA_nd = gdalutil.read_raster(snow_tif)
+
+    # Construct output grid (and also read the DEM, which might be useful elsewhere)
+    gridI, elevI, elevI_nd = gdalutil.read_raster(dem_tif)
+    print('elevI_nd = ', elevI_nd)
+
+    # Regrid acsnow
+    ofname = pathlib.Path(ofname)
+    acsnowI_tif = ofname.with_name('{}_acsnowI.tif'.format(ofname.with_suffix('').parts[-1]))
+
+    if True:
+        # Compute local gridded lapse rate on A grid
+        wrfdemA,wrfdemA_nd = wrfutil.read_raw(geo_nc, 'HGT_M')
+        wrfdemA = wrfdemA[0,:,:]    # Eliminate zombie dimension
+        lapseA = lapseutil.compute_lapse(wrfdemA, acsnowA, math.fabs(gridA.dx), math.fabs(gridA.dy))
+
+        # Regrid WRF snow field acsnow to the local grid by resampling
+        acsnowI = gdalutil.regrid(
+            acsnowA, gridA, float(acsnowA_nd),
+            gridI, float(acsnowA_nd),
+            resample_algo=gdalconst.GRA_NearestNeighbour)
+
+        # Smooth it!
+        sigma = (math.fabs(gridA.dy / gridI.dy), math.fabs(gridA.dx / gridI.dx))
+        print('sigma ', sigma)
+        acsnowI = scipy.ndimage.gaussian_filter(acsnowI, sigma)
+
+        print('Computing lapseAI...')
+        lapseAI = gdalutil.regrid(
+            lapseA, gridA, float(-1.e30),
+            gridI, float(-1.e30),
+            resample_algo=gdalconst.GRA_NearestNeighbour)
+        # Smooth lapse same as snow
+        lapseAI = scipy.ndimage.gaussian_filter(lapseAI, sigma)
+
+
+    if True:
+        print('Computing elevA...')
+        elevA = gdalutil.regrid(
+            elevI, gridI, float(elevI_nd),
+            gridA, float(elevI_nd),
+            resample_algo=gdalconst.GRA_Average)
+        print('Computing elevAI...')
+        elevAI = gdalutil.regrid(
+            elevA, gridA, float(elevI_nd),
+            gridI, float(elevI_nd),
+            resample_algo=gdalconst.GRA_NearestNeighbour)
+        # Smooth elevation same as snow
+        elevAI = scipy.ndimage.gaussian_filter(elevAI, sigma)
+
+    if True:
+        # TODO: Mysterious corners of elevAI that should be filled actually have NOVAL.
+        # Maybe something funny happening for GRA_Average on small numbers of points?
+        mask_out = np.logical_or(elevI == elevI_nd, elevAI == elevI_nd)
+        elevdiffI = elevI - elevAI
+        elevdiffI[mask_out] = 0
+
+    # Adjust acsnowI base on lapse rate
+    acsnowI += lapseAI * elevdiffI
+    acsnowI[acsnowI < 0] = 0
+
+    # --------------------------------------------------------
+    # Write output
+    print(f'Writing output: {ofname}')
+    os.makedirs(os.path.split(ofname)[0], exist_ok=True)
+    gdalutil.write_raster(ofname, gridI, acsnowI, acsnowA_nd, type=gdal.GDT_Float32)
+
 
