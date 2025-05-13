@@ -250,7 +250,7 @@ def r_snow(exp_mod, snow_dataset, downscale_algo, year0, year1, idom, jdom):
     return make.Rule(action, inputs, [ofname])
 # -----------------------------------------------------------------------
 @functools.lru_cache()
-def r_scsnow(exp_mod, snow_dataset, era, idom, jdom):
+def r_scsnow(exp_mod, snow_dataset, era, idom, jdom, return_period):
     """Downscales snow from WRF.
     rules: {Rule, ...}
         Add sub-rules here!
@@ -268,7 +268,7 @@ def r_scsnow(exp_mod, snow_dataset, era, idom, jdom):
     # Determine input filenames
     geo_nc = config.roots.join('DATA', 'lader', 'sx3', 'geo_southeast.nc')
 
-    ifname = config.roots.join('HARNESS', 'outputs', 'wrf_era5_agg3', 'acsnow_agg3_4km_1940_2023_{return_period}.tif')
+    ifname = config.roots.join('HARNESS', 'outputs', 'wrf_era5_agg3', f'acsnow_agg3_4km_1940_2023_{return_period:03d}.tif')
 
     domains_margin_shp = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains_margin.shp')
     dem_tif = r_ifsar(exp_mod, idom, jdom).outputs[0]
@@ -279,7 +279,7 @@ def r_scsnow(exp_mod, snow_dataset, era, idom, jdom):
 
     def action(tdir):
         downscale_snow.downscale_acsnow_with_sclapse(
-            ifname, dem_tif, ofname)
+            ifname, exp_mod.wrf_geo_nc, dem_tif, ofname)
 
     return make.Rule(action, inputs, [ofname])
 
