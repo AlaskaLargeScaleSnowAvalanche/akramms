@@ -37,7 +37,7 @@ def sc_snowfile(exp_dir, exp_name, snow_dataset, era, downscale_algo, idom, jdom
         f'{exp_name}_{snow_dataset}_{era}_{downscale_algo}_{sidom}_{sjdom}.tif')
     return pathlib.Path(ofname)
 
-# --------------------------------------------------------------------------@
+# --------------------------------------------------------------------------
 def snowfile_vrt(snowfile_argss):
     """Dynamically creates a virtual mosaic .vrt that encompasses AT LEAST the snowfiles given here.
     snowfile_args_vrt:
@@ -467,6 +467,18 @@ def downscale_sx3_with_lapse(sx3_files, geo_nc, distance_from_coastA_tif, dem_ti
 
 
 # ------------------------------------------------------------------------
+#float acsnow(Time, south_north, west_east) ;
+#	acsnow:_FillValue = NaNf ;
+#	acsnow:FieldType = 104 ;
+#	acsnow:MemoryOrder = "XY " ;
+#	acsnow:description = "HOURLY ACCUMULATED SNOW" ;
+#	acsnow:units = "kg m-2" ;
+#	acsnow:stagger = "" ;
+#	acsnow:coordinates = "XLONG XLAT XTIME" ;
+#	acsnow:projection = "PolarStereographic(stand_lon=-152.0, moad_cen_lat=63.99999237060547, truelat1=64.0, truelat2=None, pole_lat=90.0, pole_lon=0.0)" ;
+
+
+
 def downscale_acsnow_with_sclapse(snow_tif, geo_nc, dem_tif, ofname, debug=True):
     """Downscale algo for South Central Alaska run (aksc)
     snow_tif: Snow for one return period
@@ -485,6 +497,9 @@ def downscale_acsnow_with_sclapse(snow_tif, geo_nc, dem_tif, ofname, debug=True)
     # Read input
     gridA,acsnowA,acsnowA_nd = gdalutil.read_raster(snow_tif)
     print('gridA.dx dy ', gridA.dx, gridA.dy)
+    # Extend beyond the (4km) shore so ALL 10m land gridcells are covered
+    acsnowA = filterutil.extend_raster(acsnowA)
+    gdalutil.write_raster(debug_dir / 'acsnowA.tif', gridA, acsnowA, acsnowA_nd, type=gdal.GDT_Float32)
 
     # Construct output grid (and also read the DEM, which might be useful elsewhere)
     gridI, elevI, elevI_nd = gdalutil.read_raster(dem_tif)
@@ -494,38 +509,38 @@ def downscale_acsnow_with_sclapse(snow_tif, geo_nc, dem_tif, ofname, debug=True)
     ofname = pathlib.Path(ofname)
     acsnowI_tif = ofname.with_name('{}_acsnowI.tif'.format(ofname.with_suffix('').parts[-1]))
 
-    if True:
-        # Compute local gridded lapse rate on A grid
-        wrfdemgridA,wrfdemA,wrfdemA_nd = wrfutil.read(geo_nc, 'HGT_M', geo_nc)
-        wrfdemA = wrfdemA[0,:,:]    # Eliminate zombie dimension
+    # ======================== LAPSE RATE
+    # Compute local gridded lapse rate on A grid
+    wrfdemgridA,wrfdemA,wrfdemA_nd = wrfutil.read(geo_nc, 'HGT_M', geo_nc)
+    wrfdemA = wrfdemA[0,:,:]    # Eliminate zombie dimension
 
-        # Standardize no North-Up as with all our other data files and tiff
-        print('wrfdemA shape ', wrfdemA.shape)
-        if wrfdemgridA.dy > 0:
-            wrfdemA = np.flipud(wrfdemA)
-            print('ffffffffffffflipping')
-            wrfdemgridA = wrfdemgridA.flipud()
-
-
-        print('wrfdemgridA dx dy ', wrfdemgridA.dx, wrfdemgridA.dy)
-        slopeA,lapseA = lapseutil.compute_lapse(wrfdemA, acsnowA, gridA.dx, gridA.dy)
-        slope_thresh = 0.004
-        slope_mask_in = (np.abs(slopeA) >= slope_thresh)
-        mask_out = np.logical_or(lapseA < 0, np.logical_not(slope_mask_in))
-        lapseA[mask_out] = np.nan
+    # Standardize no North-Up as with all our other data files and tiff
+    print('wrfdemA shape ', wrfdemA.shape)
+    if wrfdemgridA.dy > 0:
+        wrfdemA = np.flipud(wrfdemA)
+        wrfdemgridA = wrfdemgridA.flipud()
 
 
-        gdalutil.write_raster(debug_dir / 'slopeA.tif', gridA, slopeA, acsnowA_nd, type=gdal.GDT_Float32)
-        gdalutil.write_raster(debug_dir / 'wrfdemA.tif', gridA, wrfdemA, acsnowA_nd, type=gdal.GDT_Float32)
+    print('wrfdemgridA dx dy ', wrfdemgridA.dx, wrfdemgridA.dy)
+    slopeA,lapseA = lapseutil.compute_lapse(wrfdemA, acsnowA, gridA.dx, gridA.dy)
+    slope_thresh = 0.004
+    slope_mask_in = (np.abs(slopeA) >= slope_thresh)
+    mask_out = np.logical_or(lapseA < 0, np.logical_not(slope_mask_in))
+    lapseA[mask_out] = np.nan
 
 
+    gdalutil.write_raster(debug_dir / 'slopeA.tif', gridA, slopeA, acsnowA_nd, type=gdal.GDT_Float32)
+    gdalutil.write_raster(debug_dir / 'wrfdemA.tif', gridA, wrfdemA, acsnowA_nd, type=gdal.GDT_Float32)
 
-#        lapseA_masked = np.ma.masked_array(lapseA, mask_out)
-#        lapseA_filled, converged = gridfill.fill(lapseA_masked, 1, 0, .001)
-#        print('converged ' ,converged)
-#        print('lapseA type ', type(lapseA_filled))
-#        lapseA_final = np.ma.filled(lapseA_filled, np.nan)    # masked --> nan array
 
+#    lapseA_masked = np.ma.masked_array(lapseA, mask_out)
+#    lapseA_filled, converged = gridfill.fill(lapseA_masked, 1, 0, .001)
+#    print('converged ' ,converged)
+#    print('lapseA type ', type(lapseA_filled))
+#    lapseA_final = np.ma.filled(lapseA_filled, np.nan)    # masked --> nan array
+
+     # ------- Expand lapse rate to grid cells it was not able to compute in before.
+    if False:
         lapseA_final = lapseA.copy()
         sigma = .25
         while sigma < 8:
@@ -533,7 +548,6 @@ def downscale_acsnow_with_sclapse(snow_tif, geo_nc, dem_tif, ofname, debug=True)
             lapseAx = filterutil.nanfilter(lapseA, sigma, truncate=2.0)
 
             # Find the gridcells we will update
-            print('xxxxxxxxx ', type(lapseA_final))
             mask_inx = np.logical_and(
                     slope_mask_in,
                     np.logical_and(
@@ -544,33 +558,32 @@ def downscale_acsnow_with_sclapse(snow_tif, geo_nc, dem_tif, ofname, debug=True)
             lapseA_final[mask_inx] = lapseAx[mask_inx]
 
             # Write output
-#            ofname = debug_dir / f'lapseA_{sigma:02.1f}.tif'
-#            gdalutil.write_raster(ofname, gridA, lapseA_final, -1000., type=gdal.GDT_Float32)
-
+            # ofname = debug_dir / f'lapseA_{sigma:02.1f}.tif'
+            # gdalutil.write_raster(ofname, gridA, lapseA_final, -1000., type=gdal.GDT_Float32)
             # Iterate
             sigma *= 2
 
         lapseA = lapseA_final
         lapseA[lapseA<0] = 0
-        gdalutil.write_raster(debug_dir / 'lapseA.tif', gridA, lapseA, acsnowA_nd, type=gdal.GDT_Float32)
+        # gdalutil.write_raster(debug_dir / 'lapseA0.tif', gridA, lapseA, acsnowA_nd, type=gdal.GDT_Float32)
+
+    # -------- Obtain a single overall median scaled lapse rate
+    lapseA_scaled = lapseA / acsnowA
+    gdalutil.write_raster(debug_dir / 'lapseA_scaled.tif', gridA, lapseA_scaled, acsnowA_nd, type=gdal.GDT_Float32)
+#    data = lapseA_scaled[np.logical_not(np.isnan(lapseA_scaled))].reshape(-1)
+#    lapseA_scaled_median = np.median(lapseA_scaled)
+#    print(f'len(data) = {len(data)}, scaled = {lapseA_scaled_median}')
+    lapseA_scaled_median = np.nanmedian(lapseA_scaled)
+
+    # -------- Apply the single scaled lapse rate back to acsnow
+    # to get a per-gridcell lapse rate
+    lapseA = lapseA_scaled_median * acsnowA
+    gdalutil.write_raster(debug_dir / 'lapseA.tif', gridA, lapseA, acsnowA_nd, type=gdal.GDT_Float32)
+
+    # ==================================
 
 
-
-
-
-
-
-# Do successively larger Gaussian filterrs until we've covered all missing gridcells.
-# See here for a VERY clever way to do that with NaNs.
-# https://stackoverflow.com/questions/18697532/gaussian-filtering-a-image-with-nan-in-python
-
-#        mean_lapse = np.nanmean(lapseA)
-#        lapseA[mask_out] = acsnowA_nd
-#        gdalutil.write_raster(debug_dir / 'lapseA.tif', gridA, lapseA_filled, acsnowA_nd, type=gdal.GDT_Float32)
-#        gdalutil.write_raster(debug_dir / 'lapseA.tif', gridA, lapseA_filled, -1., type=gdal.GDT_Float32)
-#        gdalutil.write_raster(debug_dir / 'slopeA.tif', gridA, slopeA, acsnowA_nd, type=gdal.GDT_Float32)
-        sys.exit(0)
-
+    if True:
         # Regrid WRF snow field acsnow to the local grid by resampling
         acsnowI = gdalutil.regrid(
             acsnowA, gridA, float(acsnowA_nd),
@@ -584,6 +597,7 @@ def downscale_acsnow_with_sclapse(snow_tif, geo_nc, dem_tif, ofname, debug=True)
         print('sigma ', sigma)
         acsnowI = scipy.ndimage.gaussian_filter(acsnowI, sigma)
 
+        # Move lapse rate onto I grid
         print('Computing lapseAI...')
         lapseAI = gdalutil.regrid(
             lapseA, gridA, float(-1.e30),
@@ -594,7 +608,6 @@ def downscale_acsnow_with_sclapse(snow_tif, geo_nc, dem_tif, ofname, debug=True)
 
 
         gdalutil.write_raster(debug_dir / 'lapseAI.tif', gridI, lapseAI, acsnowA_nd, type=gdal.GDT_Float32)
-        sys.exit(0)
 
 
     if True:

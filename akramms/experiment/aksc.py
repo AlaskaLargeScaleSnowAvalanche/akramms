@@ -274,3 +274,13 @@ def full():
             for return_period in [30,300]:
                 for forest in ('NoFor','For'):
                     yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
+
+def one():
+    # Generate set of trials
+    snow = 'ccsm'
+    downscale_algo = 'sclapse'
+    idom,jdom = (83,40)
+    era = 'past'
+    return_period = 30
+    forest = 'NoFor'
+    yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
