@@ -271,7 +271,7 @@ def query(akdf0, sextent, scenetypes={'x', 'arc'},
                 print('force=True, so only combos with status >= MARKED_FINISHED will be included')
 
             if not akdf1.combo_quickstatus.ge(file_info.JobStatus.MARKED_FINISHED).all():
-                raise ValueError('All Combos must have status >= MARKED_FINISHED to proceed')
+                raise ValueError("All Combos must have status >= MARKED_FINISHED to proceed.  You might need to use --force if you don't want to include neighboring tiles that are not yet complete.")
 
 
             # --------- Make sure the proper extent files are written

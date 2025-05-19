@@ -159,7 +159,13 @@ def add_pra_size(reldf):
         (or created by another means)
         Must have column: area_m2
     """
-    pra_size = reldf['area_m2'].map(
+    # Find the column containing PRA volume: most begin with 'VOL_'
+    for name in reldf.columns:
+        if name.startswith('VOL_'):
+            vol_col = name
+            break
+
+    pra_size = reldf[vol_col].map(
         lambda x: _pra_sizes[bisect.bisect(_post_cat_bounds, x) - 1])
     reldf['pra_size'] = pra_size.astype('string')
     return reldf
