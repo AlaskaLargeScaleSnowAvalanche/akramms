@@ -1,4 +1,4 @@
-import os,collections,sys,itertools
+import os,collections,sys,itertools,pathlib
 import numpy as np
 import schema
 from uafgi.util import schemautil,shputil,gisutil,ulam
@@ -92,18 +92,31 @@ class Combo(_Combo):
     def __repr__(self):
         return f'{self.base_str()}-{self.idom:03d}-{self.jdom:03d}'
 
+def snowfile(snow_dataset, era, downscale_algo, return_period, idom, jdom):
+    """Creates the name of a snow file.
+    idom,jdom:
+        may be '*' to allow for wildcards and globbing."""
+
+    sidom = idom if isinstance(idom,str) else f'{idom:03d}'
+    sjdom = jdom if isinstance(jdom,str) else f'{jdom:03d}'
+    ofname = os.path.join(dir, 'snow',
+        f'{name}_{snow_dataset}_{era}_{downscale_algo}_{return_period:03d}_{sidom}_{sjdom}.tif')
+    return pathlib.Path(ofname)
+
+def combo_to_snowfile_args(combo):
+    return (
+        combo.snow_dataset,
+        combo.era, combo.downscale_algo,
+        combo.return_period, combo.idom, combo.jdom)
+
+
+
 # -------------------------------------------------------------
 def combo_to_scenedir(combo, scenetype='x'):
     trial_name = f'{name}-{combo.snow_dataset}-{combo.era}-{combo.downscale_algo}-{combo.forest}-{combo.return_period}'
     scene_name = f'{scenetype}-{combo.idom:03d}-{combo.jdom:03d}'    # Underscores would confuse things
 
     return dir / trial_name / scene_name
-
-def combo_to_snowfile_args(combo):
-    return (dir, name,
-        combo.snow_dataset,
-        combo.era, combo.downscale_algo,
-        combo.idom, combo.jdom)
 
 _pra_sizes = {'NoFor': ['L','M'], 'For': ['S','T']}
 def pra_sizes(combo):
@@ -282,5 +295,6 @@ def one():
     idom,jdom = (83,40)
     era = 'past'
     return_period = 30
-    forest = 'NoFor'
-    yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
+#    forest = 'NoFor'
+    for forest in ('NoFor','For'):
+        yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)

@@ -316,12 +316,7 @@ def mosaic_avals_combo(akdf, sextent, tifdir,
 
     # Prepare snow virtual raster for query
     if snow:
-        # Ensure all avalanches use the same snow input
-        snowfile_argss = sorted(set(akdf['combo'].map(expmod.combo_to_snowfile_args)))
-        assert all(x[:-2] == snowfile_argss[0][:-2] for x in snowfile_argss)
-
-        # Create virtual raster to query
-        snowfile_vrt = downscale_snow.snowfile_vrt(snowfile_argss)
+        snowfile_vrt = downscale_snow.snowfile_vrt(expmod, akdf['combo'])
         print('snowfile_vrt = ', snowfile_vrt)
 
 #    if not ofname.parts[-1].endswith('.zip'):

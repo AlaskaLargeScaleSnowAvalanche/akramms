@@ -1,4 +1,4 @@
-import os,collections,sys,itertools
+import os,collections,sys,itertools,pathlib
 import numpy as np
 import schema
 from uafgi.util import schemautil,shputil,gisutil,ulam
@@ -103,9 +103,24 @@ class Combo(_Combo):
     def __repr__(self):
         return f'{self.base_str()}-{self.idom:03d}-{self.jdom:03d}'
 
-#        print('ccccccccccombo ', tuple(self))
-#        return f'{self.snow_dataset}-{self.year0:04d}-{self.year1:04d}-{self.downscale_algo}-{self.forest}-{self.return_period}-{self.idom:03d}-{self.jdom:03d}'
-#        return '-'.join(str(x) for x in self)
+def snowfile(exp_dir, exp_name, snow_dataset, year0, year1, downscale_algo, idom, jdom):
+    """Creates the name of a snow file.
+    idom,jdom:
+        may be '*' to allow for wildcards and globbing."""
+
+    sidom = idom if isinstance(idom,str) else f'{idom:03d}'
+    sjdom = jdom if isinstance(jdom,str) else f'{jdom:03d}'
+    ofname = os.path.join(exp_dir, 'snow',
+        f'{exp_name}_{snow_dataset}_{year0}_{year1}_{downscale_algo}_{sidom}_{sjdom}.tif')
+    return pathlib.Path(ofname)
+
+
+def combo_to_snowfile_args(combo):
+    return (
+        combo.snow_dataset,
+        combo.year0, combo.year1, combo.downscale_algo,
+        combo.idom, combo.jdom)
+
 # -------------------------------------------------------------
 def combo_to_scenedir(combo, scenetype='x'):
     trial_name = f'{name}-{combo.snow_dataset}-{combo.year0}-{combo.year1}-{combo.downscale_algo}-{combo.forest}-{combo.return_period}'

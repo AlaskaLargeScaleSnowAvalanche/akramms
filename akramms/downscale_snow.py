@@ -15,30 +15,9 @@ import gridfill
 
 """Rules to prepare the snow field for direct use in determining snow depth for PRAs."""
 
-def snowfile(exp_dir, exp_name, snow_dataset, year0, year1, downscale_algo, idom, jdom):
-    """Creates the name of a snow file.
-    idom,jdom:
-        may be '*' to allow for wildcards and globbing."""
-
-    sidom = idom if isinstance(idom,str) else f'{idom:03d}'
-    sjdom = jdom if isinstance(jdom,str) else f'{jdom:03d}'
-    ofname = os.path.join(exp_dir, 'snow',
-        f'{exp_name}_{snow_dataset}_{year0}_{year1}_{downscale_algo}_{sidom}_{sjdom}.tif')
-    return pathlib.Path(ofname)
-
-def sc_snowfile(exp_dir, exp_name, snow_dataset, era, downscale_algo, idom, jdom):
-    """Creates the name of a snow file.
-    idom,jdom:
-        may be '*' to allow for wildcards and globbing."""
-
-    sidom = idom if isinstance(idom,str) else f'{idom:03d}'
-    sjdom = jdom if isinstance(jdom,str) else f'{jdom:03d}'
-    ofname = os.path.join(exp_dir, 'snow',
-        f'{exp_name}_{snow_dataset}_{era}_{downscale_algo}_{sidom}_{sjdom}.tif')
-    return pathlib.Path(ofname)
 
 # --------------------------------------------------------------------------
-def snowfile_vrt(snowfile_argss):
+def snowfile_vrt(expmod, combos):
     """Dynamically creates a virtual mosaic .vrt that encompasses AT LEAST the snowfiles given here.
     snowfile_args_vrt:
         Tuple containing args for snowfile() function above (not including idom,jdom)
@@ -47,10 +26,11 @@ def snowfile_vrt(snowfile_argss):
         The VRT file will ONLY be regenerated if one of the snowfiles is newer
     """
 
-    snowfiles = [snowfile(*x) for x in snowfile_argss]
-    snowfile_glob = snowfile(*(snowfile_argss[0][:-2] + ('*','*')))
-#    snowdir_publish = snowfiles[0].parents[0]
-#    snowdir_publish = snowfile_glob.parents[2] / (snowfile_glob.parts[-3]+'_publish') / snowfile_glob.parts[-2]
+    snowfile_argss = sorted(set(expmod.combo_to_snowfile_args(combo) for combo in combos))
+    snowfiles = [expmod.snowfile(*x) for x in snowfile_argss]
+    assert all(x[:-2] == snowfile_argss[0][:-2] for x in snowfile_argss)
+    snowfile_glob = expmod.snowfile(*(snowfile_argss[0][:-2] + ('*','*')))
+
     snowdir_publish = snowfile_glob.parents[2] / 'publish' / snowfile_glob.parts[-2]
 #    ofname = snowfile_glob.parents[0] / (snowfile_glob.parts[-1][:-8] + '.vrt')  # _*_*.tif -> .vrt
     ofname = snowdir_publish / (snowfile_glob.parts[-1][:-8] + '.vrt')  # _*_*.tif -> .vrt
@@ -80,7 +60,9 @@ def snowfile_vrt(snowfile_argss):
         # Include ALL appropriate snowfiles in the VRT, not just the
         # snowfile(s) needed for now.
         cmd.append(ofname)
+        print('snowfile_glob: ', snowfile_glob)
         cmd += [os.path.relpath(x, snowdir_publish) for x in sorted(glob.glob(str(snowfile_glob)))]
+        cmd = [str(x) for x in cmd]
         print(f'** Regenerating {ofname}')
 #        print(cmd)
 #        sys.exit(0)
