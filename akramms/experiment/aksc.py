@@ -298,3 +298,18 @@ def one():
 #    forest = 'NoFor'
     for forest in ('NoFor','For'):
         yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
+
+def anchorage():
+    """Municipality of Anchorage"""
+    snow = 'ccsm'
+    downscale_algo = 'sclapse'
+    era = 'past'
+
+    for idom in (83,84,85):
+        for jdom in (38,39,40,41):
+            for return_period in (10,30,100,300):
+                for forest in ('NoFor','For'):
+                    yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
+
+
+
