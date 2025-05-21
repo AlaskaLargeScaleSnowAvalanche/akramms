@@ -51,15 +51,6 @@ debug = False
 auto_submit = True
 #auto_submit = False
 
-#ramms_version = '230126'
-#ramms_version = '230210'
-#ramms_version = '230321'
-#ramms_version = '230401'
-#ramms_version = '230423'
-#ramms_version = '240111'
-#ramms_version = '240515'
-#docker_container_version = f'${ramms_version}.0'
-
 # Maximum number of PRAs in a RAMMS run
 max_ramms_pras = 100
 #max_ramms_pras = 20
@@ -87,11 +78,7 @@ delete_xdir = True
 
 # ------------------------------
 # DEBUG parameters
-#allowed_pra_sizes = ['L']
 allowed_pra_sizes = ['L', 'M', 'S', 'T']
-#allowed_pra_sizes = {'M', 'S'}
-#allowed_forests = {True}
-#allowed_return_periods = {30}
 
 # Maximum number of chunks in one set
 #max_chunks = 2
