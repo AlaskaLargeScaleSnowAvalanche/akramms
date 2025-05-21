@@ -236,7 +236,7 @@ def r_snow(exp_mod, snow_dataset, downscale_algo, year0, year1, idom, jdom):
     # Determine output filename
 #    ofname = os.path.join(exp_mod.dir, 'snow',
 #        f'{exp_mod.name}_{snow_dataset}_{year0}_{year1}_{downscale_algo}_{idom:03d}_{jdom:03d}.tif')
-    ofname = downscale_snow.snowfile(exp_mod.dir, exp_mod.name, snow_dataset, year0, year1, downscale_algo, idom, jdom)
+    ofname = exp_mod.snowfile(snow_dataset, year0, year1, downscale_algo, idom, jdom)
 
     def action(tdir):
         if downscale_algo == 'lapse':
@@ -275,7 +275,7 @@ def r_scsnow(exp_mod, snow_dataset, era, idom, jdom, return_period):
     inputs = [dem_tif, domains_margin_shp, ifname]
 
     # Determine output filename
-    ofname = downscale_snow.sc_snowfile(exp_mod.dir, exp_mod.name, snow_dataset, era, 'sclapse', idom, jdom)
+    ofname = exp_mod.snowfile(snow_dataset, era, 'sclapse', return_period, idom, jdom)
 
     def action(tdir):
         downscale_snow.downscale_acsnow_with_sclapse(
