@@ -316,7 +316,8 @@ def anchorage():
     era = 'past'
 
     for idom,jdom in anchorage_tiles():
-        for return_period in (10,30,100,300):
+        for return_period in (30,):    # DEBUG
+#        for return_period in (10,30,100,300):
             for forest in ('NoFor','For'):
                 yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
 
