@@ -1,7 +1,7 @@
 import os,collections,sys,itertools,pathlib
 import numpy as np
 import schema
-from uafgi.util import schemautil,shputil,gisutil,ulam
+from uafgi.util import schemautil,shputil,gisutil,ulam,gicollections
 from akramms import downscale_snow
 from akramms import config, r_experiment
 from akramms import r_prepare,r_domain_builder,file_info
@@ -299,17 +299,26 @@ def one():
     for forest in ('NoFor','For'):
         yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
 
+def anchorage_tiles():
+    tiles = [(84,41), (85,41)]    #Priority tiles where we have info
+    for idom in (83,84,85):
+        for jdom in (38,39,40,41):
+            tiles.append((idom,jdom))
+    return gicollections.eliminate_duplicate_inplace(tiles)
+
+
+
+
 def anchorage():
     """Municipality of Anchorage"""
     snow = 'ccsm'
     downscale_algo = 'sclapse'
     era = 'past'
 
-    for idom in (83,84,85):
-        for jdom in (38,39,40,41):
-            for return_period in (10,30,100,300):
-                for forest in ('NoFor','For'):
-                    yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
+    for idom,jdom in anchorage_tiles():
+        for return_period in (10,30,100,300):
+            for forest in ('NoFor','For'):
+                yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
 
 
 
