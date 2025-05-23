@@ -304,7 +304,7 @@ def anchorage_tiles():
     for idom in (83,84,85):
         for jdom in (38,39,40,41):
             tiles.append((idom,jdom))
-    return gicollections.eliminate_duplicate_inplace(tiles)
+    return gicollections.eliminate_duplicates_inplace(tiles)
 
 
 
