@@ -119,7 +119,7 @@ def r_active_domains(exp_mod):
 
 # -----------------------------------------------------------------------
 @functools.lru_cache()
-def r_ifsar(exp_mod, idom, jdom, sanity_check=True):
+def r_ifsar(exp_mod, idom, jdom, sanity_check=True, folder='dem', resolution=None):
     """Select out a portion of the overall IFSAR digital terrain model dataset, for one domain.
 
     exp_mod:
@@ -129,17 +129,21 @@ def r_ifsar(exp_mod, idom, jdom, sanity_check=True):
         (Actually we just use the DTM)
     idom, jdom:
         Index of the domain to select out.
+    folder:
+        Name of folder to put output file in ('dem' or 'pra_dem')
     Output:
         {type}/{exp_mod.name}_{type}_{idom:03d}_{jdom:03d}
     """
+    if resolution is None:
+        resolution = exp_mod.resolution
 
     #ifsar_vrt = d_ifsar.r_vrt(type).outputs[0]
-    ofname = exp_mod.dir / 'dem' / f'{exp_mod.name}_dem_{idom:03d}_{jdom:03d}.tif'
+    ofname = exp_mod.dir / folder / f'{exp_mod.name}_{folder}_{idom:03d}_{jdom:03d}.tif'
 
     def action(tdir):
         poly = exp_mod.gridD.poly(idom, jdom, margin=True)
 #        return d_ifsar.extract(type, poly, ofname, resolution=resolution, sanity_check=True)
-        return exp_mod.extract_dem(poly, ofname, sanity_check=True)
+        return exp_mod.extract_dem(poly, ofname, sanity_check=True, resolution=resolution)
     return make.Rule(action, [exp_mod.dem_img], [ofname])
 # -----------------------------------------------------------------------
 @functools.lru_cache()

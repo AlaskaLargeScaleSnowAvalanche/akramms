@@ -13,6 +13,8 @@ ALL = paramutil.parse([
         """Root name of scene; to use for filenames, plotting, etc"""),
 #    ('basename', None, 'str', False,
 #        """part of name shared with other similar scenes."""),
+    ('pra_dem_file', None, 'input_file', True,
+        """Name of DEM file to use for PRA generation ONLY (GeoTIFF)"""),
     ('dem_file', None, 'input_file', True,
         """Name of DEM file to use (GeoTIFF)"""),
     ('forest_file', None, 'input_file', False,
@@ -35,6 +37,8 @@ ALL = paramutil.parse([
     # Parameters for preprocessing and eCognition
     ('resolution', 'm', 'int', True,
         """Resample DEM and forest files to this resolution for computation"""),
+    ('pra_resolution', 'm', 'int', True,
+        """Resample DEM and forest files to this resolution for computation (used for eCognition)"""),
     ('slope_lowerlimit_frequent', 'angular_degree', 'float', True,
         """Slope angle, frequent scenario"""),
     ('slope_lowerlimit_extreme', 'angular_degree', 'float', True,

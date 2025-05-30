@@ -69,7 +69,7 @@ def prepare_scene_rule(xscene_dir, defaults=dict(), **kwargs):
         with open(os.path.join(scene_dir, 'scene.cdl'), 'w') as out:
             subprocess.run(cmd, stdout=out)
 
-    inputs = [kwargs['dem_file'], kwargs['snow_file'], kwargs['forest_file']]
+    inputs = [kwargs['pra_dem_file'], kwargs['snow_file'], kwargs['forest_file']]
     outputs = [os.path.join(xscene_dir, 'scene.nc')]
 
     return make.Rule(action, inputs, outputs), _make_scene_args(xscene_dir, defaults, kwargs)
@@ -112,8 +112,8 @@ def prepare_data(scene_dir):
     # Assemble script args
     script_args = {'Workspace': str(scene_dir)}
     for script_arg, scene_arg in [
-        ('inDEM', 'dem_file'),
-        ('resampCellSize', 'resolution'),
+        ('inDEM', 'pra_dem_file'),
+        ('resampCellSize', 'pra_resolution'),
         ('Slope_lowerlimit_frequent', 'slope_lowerlimit_frequent'),
         ('Slope_lowerlimit_extreme', 'slope_lowerlimit_extreme'),
         ('Slope_upperlimit', 'slope_upperlimit'),
@@ -539,7 +539,7 @@ def data_prep_PRA2_rule(scene_dir, combo, scene_args, inputs):
         # Copy DEM to eCog folder
         dem_tif = os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name']))
         outputs.append(dem_tif)
-        shutil.copy(scene_args['dem_file'], os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name'])))
+        shutil.copy(scene_args['pra_dem_file'], os.path.join(ecog_dir, '{}_DEM.tif'.format(scene_args['name'])))
 
 
         # ---------------------------------------------------------------------------
