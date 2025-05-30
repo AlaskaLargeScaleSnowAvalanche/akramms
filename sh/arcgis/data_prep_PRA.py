@@ -230,8 +230,8 @@ if inForest != "":
     min_value = int(arcpy.GetRasterProperties_management(inForest, "MINIMUM").getOutput(0))
     max_value = int(arcpy.GetRasterProperties_management(inForest, "MAXIMUM").getOutput(0))
     print('inForest stats: unique_value_count={}, min_value={}, max_value={}'.format(unique_value_count, min_value, max_value))
-    if  (unique_value_count == 1 and (min_value != 0 and min_value != 1)) or \
-        (unique_valuecount == 2 and (min_value != 0 or max_value != 1)) or \
+    if  (unique_value_count == 1 and (min_value != 0 and min_value != 1)) \
+        or (unique_value_count == 2 and (min_value != 0 or max_value != 1)) \
         or (unique_value_count > 2):
 #    if unique_value_count != 2 or min_value != 0 or max_value != 1:
         arcpy.AddError("InputError:Value range of the forest raster not conforming, reclassify raster to 0 (No Forest) and 1 (Forest)")
