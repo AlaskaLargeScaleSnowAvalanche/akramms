@@ -37,10 +37,14 @@ roots = roots_w if os.name=='nt' else roots_l
 
 # Root directory of prj
 #windows_host = 'davos'
-ssh_w = ['sshpass',
-    '-f', os.path.join(os.environ['HOME'], '.ssh', 'davos_password'),
-    'ssh', 'davos']
 
+## Getting into the old Windows machine
+#ssh_w = ['sshpass',
+#    '-f', os.path.join(os.environ['HOME'], '.ssh', 'davos_password'),
+#    'ssh', 'davos']
+
+# Getting into the new Windows machine
+ssh_w = ['ssh', 'mountain@10.10.132.45']
 
 # True if the Linux and Windows harnesses access the same location on a network drive.
 shared_filesystem = True
