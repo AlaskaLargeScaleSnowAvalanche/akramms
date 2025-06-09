@@ -3,10 +3,10 @@
 
 
 LOADENV_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-python "$LOADENV_DIR/loadenv.py" | dos2unix >"$LOADENV_DIR/the_env.sh"
-source "$LOADENV_DIR/the_env.sh"
+#$(python "$LOADENV_DIR/loadenv.py" | dos2unix)
+python $LOADENV_DIR/loadenv.py
 
-conda activate avalanche   # Must be after above loadenv.py
+#conda activate avalanche   # Must be after above loadenv.py
 #mamba active av
 # Currently the mamba env we need is in base (by accident)
 
