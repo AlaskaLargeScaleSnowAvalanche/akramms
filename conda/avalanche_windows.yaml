@@ -1,0 +1,10 @@
+name: avalanche
+channels:
+  - defaults
+dependencies:
+  - six
+  - netcdf4
+  - jupyter
+  - shapely
+  - pandas
+prefix: C:\Users\efischer\opt\conda\m39\envs\avalanche
