@@ -44,7 +44,7 @@ roots = roots_w if os.name=='nt' else roots_l
 #    'ssh', 'davos']
 
 # Getting into the new Windows machine
-ssh_w = ['ssh', 'mountain@10.10.132.45']
+ssh_w = ['ssh', 'mountain2@10.10.132.45']
 
 # True if the Linux and Windows harnesses access the same location on a network drive.
 shared_filesystem = True
