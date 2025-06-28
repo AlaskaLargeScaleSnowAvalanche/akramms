@@ -24,7 +24,7 @@ def default_roots(PureSysPath, harness):
 roots_l = default_roots(
     pathlib.PurePosixPath,
     os.path.abspath(os.path.realpath(os.path.join(os.path.dirname(__file__), '..', '..'))))
-roots_w = default_roots(pathlib.PureWindowsPath, r'C:\Users\Mountain\av') # r'\\nona.dnr.state.ak.us\enggeo_projects\avalanche_sim\av'
+roots_w = default_roots(pathlib.PureWindowsPath, r'C:\Users\mountain2\av') # r'\\nona.dnr.state.ak.us\enggeo_projects\avalanche_sim\av'
 
 # Differences from defaults
 #roots_l['PRJ'] = '/mnt/avalanche_sim/prj'
