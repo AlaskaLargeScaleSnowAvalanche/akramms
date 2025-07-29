@@ -299,12 +299,13 @@ def step1(args):
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'exp', realized=False)
 
-    for exp,_ in akdf0.groupby('exp'):
+    for exp,akdf1 in akdf0.groupby('exp'):
+        expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
         expmod = akramms.parse.load_expmod(exp)
 
         makefile = make.Makefile()
         makefile.add(r_experiment.r_active_domains(expmod))
-        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
+        makefile.generate(os.path.join(expmod.dir, f'{exp}_{expset}_step1.mk'), run=True, ncpu=1)
 
 # -----------------------------------------------------------
 @subcommand([
@@ -318,6 +319,7 @@ def step2(args):
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
 
     for exp,akdf1 in akdf0.groupby('exp'):
+        expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
         expmod = akramms.parse.load_expmod(exp)
         add_experiment_fn = getattr(expmod, 'add_experiment')    # Select out a DEM tile
 
@@ -325,7 +327,7 @@ def step2(args):
         makefile = make.Makefile()
         # This calls through to r_prepare.prepare_scene_rule()
         add_experiment_fn(makefile, akdf1.combo.tolist())
-        makefile.generate(expmod.dir / 'init_mk', run=True, ncpu=config.setup_ncpu)
+        makefile.generate(expmod.dir / f'{exp}_{expset}_step2.mk', run=True, ncpu=config.setup_ncpu)
 
 
 @subcommand([
@@ -352,6 +354,7 @@ def step3(args):
     makefile = make.Makefile()
 
     for exp,akdf1 in akdf0.groupby('exp'):
+        expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
         expmod = akramms.parse.load_expmod(exp)
 
         for combo in akdf1.combo.tolist():
@@ -383,7 +386,7 @@ def step3(args):
                     scenedir, combo.forest, expmod.resolution,
                     combo.return_period, pra_size))
 
-        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
+        makefile.generate(os.path.join(expmod.dir, f'{exp}_{expset}_step3.mk'), run=True, ncpu=1)
 
 # --------------------------------------------------------------------------------------
 @subcommand([
@@ -563,6 +566,7 @@ def run(args):
 
     # --------- Compute the tiles
     parseds = akramms.parse.parse_args(args.spec)
+
     for parsed in parseds:
         expmod = akramms.parse.load_expmod(parsed['exp'])
         # ---------------- Step 1:
@@ -591,9 +595,10 @@ def run(args):
 #    print('aaaaaaaaaaaakdf0 ', akdf0)
 #    print(akdf0.iloc[0])
     for exp,akdf1 in akdf0.groupby('exp'):
+        expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
         # akdf1 = akdf1.sort_values('combo_order')    # Not needed
         expmod = akramms.parse.load_expmod(exp)
-
+        expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
 
         # Run make on chunks a few rows (combos) at a time
         ncpu = config.setup_ncpu if args.j is None else args.j
@@ -610,9 +615,21 @@ def run(args):
                 combo = row1['combo']
 
                 add_run_combo(expmod, makefile, combo, max_step=args.step)
-            makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=ncpu)
+            makefile.generate(os.path.join(expmod.dir, f'{exp}_{expset}_run.mk'), run=True, ncpu=ncpu)
 
 # ------------------------------------------------------------------
+def _get_expset(akdf_row):
+    """Gets the expset (name of the experiment to run) if it exists; or just a moniker if not.
+    akdf_row:
+        A row in an akdf dataframe
+    """
+    parsed = akdf_row.parsed
+    try:
+        return parsed['expset']
+    except KeyError:
+        print('Available keys for expset: ', parsed)
+        return 'expset_{}_{}'.format(*parsed['ijdom'])
+
 @subcommand([
     argument('-j', type=int,
         help='Degree of parallelism to use'),
@@ -640,7 +657,10 @@ def rerun(args):
 
     for ix in range(len(akdf0)):
         combo = akdf0.iloc[ix].combo
-        expmod = akramms.parse.load_expmod(akdf0.iloc[ix].exp)
+        exp = akdf0.iloc[ix].exp
+        expmod = akramms.parse.load_expmod(exp)
+        # expset = akdf0.iloc[ix].parsed['expset']    # Kluge won't always work; for example if rerunning just one combo
+        expset = _get_expset(akdf0.iloc[ix])
         scenedir = expmod.combo_to_scenedir(combo)
 
         # Delete MARKED_FINISHED on combos, which at times is just plain wrong!
@@ -682,7 +702,7 @@ def rerun(args):
         print(f'------------- Rerunning Combo: {combo}')
         makefile = make.Makefile()
         add_run_combo(expmod, makefile, combo)
-        makefile.generate(os.path.join(expmod.dir, 'init_mk'), run=True, ncpu=1)
+        makefile.generate(os.path.join(expmod.dir, f'{exp}_{expset}_rerun.mk'), run=True, ncpu=1)
 
         # See if the chunk status has changed
         akdf1sb = akdf1s.copy().drop(columns=['chunk_status'])
@@ -978,6 +998,7 @@ def stdmosaic(args):
     publish_dir = expmod.root_dir / 'publish'
     os.makedirs(expmod.root_dir / 'tmp', exist_ok=True)
     for akdf1 in avalquery.consolidate_by_forest(expmod, akdf0):
+        expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
 
         # TODO: Separate out extent generation as separate rules, so
         # we can gain benefits of parallelism and chunking.
@@ -985,7 +1006,7 @@ def stdmosaic(args):
         rule = mosaic.stdmosaic_rule(exp, akdf1, args.status, args.dry_run, args.force)
         makefile = make.Makefile()
         makefile.add(rule)
-        makefile.generate(expmod.root_dir / 'init_mk',
+        makefile.generate(expmod.root_dir / f'{exp}_{expset}_mosiac.mk',
             tdir_fn = lambda: ioutil.TmpDir(expmod.root_dir / 'tmp'),
             run=True, ncpu=1)
 

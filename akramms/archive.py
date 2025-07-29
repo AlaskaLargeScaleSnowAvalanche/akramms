@@ -441,6 +441,31 @@ def ramms_to_nc0(out_zip, id_status, ncout):
         raise
 
 # ----------------------------------------------------------
+def _regen_check(arc_fname, out_zip_dtime):
+    """Checks whether to regenerate an archive .nc file
+    Returns:
+        True if it should be regenerated
+        False if the file is OK as-is
+    """
+
+    if not os.path.exists(arc_fname):
+        return True
+
+    try:
+        with netCDF4.Dataset(arc_fname) as nc:
+            ncv = nc.variables['status']
+            ncv_dtime = datetime.datetime.fromisoformat(ncv.avalanche_timestamp)
+
+        return (out_zip_dtime > ncv_dtime)
+
+    except Exception:
+        # Something went wrong reading the archive file, of course we must regenerate
+        return True
+
+#                arc_mtime = os.path.getmtime(arc_fname)
+
+
+
 def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=False):
     """Archives a bunch of work on a single thread
     akdf0:
@@ -476,28 +501,20 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
 #            if tup.id == 6570:
 #                print(f'archive ', tup)
             inout = file_info.inout_name(jb, tup.chunkid, tup.id)
-            out_zip = jb.avalanche_dir / f'{inout}.out.zip'
-            out_zip_mtime = os.path.getmtime(out_zip)
-            out_zip_dtime = datetime.datetime.fromtimestamp(out_zip_mtime)
-            arc_leafbase = f'aval-{jb.pra_size}-{tup.id:05d}'
 
             # Avoid archiving bad files
+            out_zip = jb.avalanche_dir / f'{inout}.out.zip'
             if not file_info.is_file_good(out_zip):
                 continue
+            out_zip_mtime = os.path.getmtime(out_zip)
+            out_zip_dtime = datetime.datetime.fromtimestamp(out_zip_mtime)
 
             # Determine if the avalanche was already archived
             Overrun = 'overrun' if (tup.id_status == file_info.JobStatus.OVERRUN) else ''
+            arc_leafbase = f'aval-{jb.pra_size}-{tup.id:05d}'
             arc_fname = arc_dir / f'{arc_leafbase}-{Overrun}.nc'
-            if os.path.exists(arc_fname):
-                with netCDF4.Dataset(arc_fname) as nc:
-                    ncv = nc.variables['status']
-                    ncv_dtime = datetime.datetime.fromisoformat(ncv.avalanche_timestamp)
-
-                    if out_zip_dtime <= ncv_dtime:
-                        # print(f'Not archiving based on timestamp: {out_zip}')
-                        continue
-
-#                arc_mtime = os.path.getmtime(arc_fname)
+            if not _regen_check(arc_fname, out_zip_dtime):
+                continue
 
 
             out_zips.append(str(out_zip))
@@ -517,6 +534,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
             # Write the full NetCDF file
             tmp_fname = arc_dir / (arc_leafbase + '-tmp.nc')  # Write atomically
             try:
+#                print('xxxxxxxxx Opening to write ', tmp_fname)
                 with netCDF4.Dataset(tmp_fname, 'w') as ncout:
                     # Add info from the RELEASE file
                     ncv = ncout.createVariable('releasefile_attrs', 'i')
@@ -548,6 +566,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
                         schema.create(grp)
                         schema.copy(ncin, grp)
 #                print(f'Archive {out_zip} -> {arc_fname}')
+#                print('xxxxxx renaming ', tmp_fname, arc_fname)
                 os.rename(tmp_fname, arc_fname)
             except Exception:
                 # Remove candidate output file, if it exists
