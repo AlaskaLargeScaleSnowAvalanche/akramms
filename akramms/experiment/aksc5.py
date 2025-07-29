@@ -1,7 +1,8 @@
 import os,collections,sys,itertools,pathlib
 import numpy as np
 import schema
-from uafgi.util import schemautil,shputil,gisutil,ulam,gicollections
+import geopandas
+from uafgi.util import schemautil,shputil,gisutil,ulam,gicollections,ogrutil
 from akramms import downscale_snow
 from akramms import config, r_experiment
 from akramms import r_prepare,r_domain_builder,file_info
@@ -276,19 +277,38 @@ def spiral_domains(x0, y0):
                 return
 
 # Different subsets of combos to try when running the experiment
+# 158 tiles total
 def full():
     """Yields the combos for the FULL experiment.
     REQUIRES: domains.shp and domains_margin.shp
     """
 
+    # Limit to only certain tiles (high priority SC Alaska)
+    limit_shp = config.HARNESS / 'data' / 'fischer' / 'SCAreaHigh.shp'
+    limit_mpoly = ogrutil.read_multi_polygon(limit_shp)
+    df = gridD.intersecting_tiles(limit_mpoly)#.sort_values(['jdom','idom'])
+    limit_set = set(zip(df.idom, df.jdom))
+
+    # Add the Talkeeta Mountains
+    limit_set.update((
+        (83,38), (83,37), (83,36), (83,35),
+        (84,37), (84,36), (84,35),
+        (85,36), (85,35),
+        (86,36), (86,35),
+        (87,36), (87,35),
+        ))
+
     # Generate set of trials
     snow = 'ccsm'
     downscale_algo = 'sclapse'
-    for idom,jdom in spiral_domains(83, 40):    # Spiral around Anchorage
-        for era in ['past']:    # also 'future'
-            for return_period in [30,300]:
-                for forest in ('NoFor','For'):
-                    yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
+    for return_periods in [[30,300], [10,100]]:
+        for idom,jdom in spiral_domains(83, 40):    # Spiral around Anchorage
+            if (idom,jdom) not in limit_set:
+                continue
+            for era in ['past']:    # also 'future'
+                for return_period in return_periods:
+                    for forest in ('NoFor','For'):
+                        yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
 
 def one():
     # Generate set of trials
