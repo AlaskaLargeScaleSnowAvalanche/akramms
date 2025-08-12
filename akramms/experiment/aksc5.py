@@ -289,7 +289,7 @@ def split_domains2(domains, ix):
 
 
 # Different subsets of combos to try when running the experiment
-def full(ix):
+def full(ix=None):
     """Yields the combos for the FULL experiment.
     REQUIRES: domains.shp and domains_margin.shp
     """
@@ -313,7 +313,10 @@ def full(ix):
     snow = 'ccsm'
     downscale_algo = 'sclapse'
     for return_periods in [[30,300], [10,100]]:
-        for idom,jdom in split_domains2(spiral_domains(83, 40), ix):    # Spiral around Anchorage
+        domains = spiral_domains(83, 40)    # generator
+        if ix is not None:
+            domains = split_domains2(domains, ix)
+        for idom,jdom in domains:    # Spiral around Anchorage
             if (idom,jdom) not in limit_set:
                 continue
             for era in ['past']:    # also 'future'
