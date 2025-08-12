@@ -1,4 +1,4 @@
-import os,collections,sys,itertools,pathlib
+import os,collections,sys,itertools,pathlib,hashlib
 import numpy as np
 import schema
 from uafgi.util import schemautil,shputil,gisutil,ulam,gicollections
@@ -272,6 +272,20 @@ def spiral_domains(x0, y0):
             dij.remove(xy)
             if len(dij) == 0:
                 return
+
+def split_domains2(domains, ix):
+    """Splits the domains in 2 parts"""
+    for ij in domains:
+        m = hashlib.sha256()
+        m.update(ij[0].to_bytes(2, 'big'))
+        m.update(ij[1].to_bytes(2, 'big'))
+        x = m.digest()[0]
+        if x%2 == ix:
+            yield ij
+
+
+
+
 
 # Different subsets of combos to try when running the experiment
 def full():

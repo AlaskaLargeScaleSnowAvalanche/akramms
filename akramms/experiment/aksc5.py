@@ -1,4 +1,4 @@
-import os,collections,sys,itertools,pathlib
+import os,collections,sys,itertools,pathlib,hashlib
 import numpy as np
 import schema
 import geopandas
@@ -276,9 +276,20 @@ def spiral_domains(x0, y0):
             if len(dij) == 0:
                 return
 
+
+def split_domains2(domains, ix):
+    """Splits the domains in 2 parts"""
+    for ij in domains:
+        m = hashlib.sha256()
+        m.update(ij[0].to_bytes(2, 'big'))
+        m.update(ij[1].to_bytes(2, 'big'))
+        x = m.digest()[0]
+        if x%2 == ix:
+            yield ij
+
+
 # Different subsets of combos to try when running the experiment
-# 158 tiles total
-def full():
+def full(ix):
     """Yields the combos for the FULL experiment.
     REQUIRES: domains.shp and domains_margin.shp
     """
@@ -302,13 +313,22 @@ def full():
     snow = 'ccsm'
     downscale_algo = 'sclapse'
     for return_periods in [[30,300], [10,100]]:
-        for idom,jdom in spiral_domains(83, 40):    # Spiral around Anchorage
+        for idom,jdom in split_domains2(spiral_domains(83, 40), ix):    # Spiral around Anchorage
             if (idom,jdom) not in limit_set:
                 continue
             for era in ['past']:    # also 'future'
                 for return_period in return_periods:
                     for forest in ('NoFor','For'):
                         yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
+
+
+
+# Two independent runs that can go in parallel
+def full0():
+    return full(0)
+def full1():
+    return full(1)
+
 
 def one():
     # Generate set of trials
@@ -357,3 +377,8 @@ def talkeena():
 #        for return_period in (10,30,100,300):
             for forest in ('NoFor','For'):
                 yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
+
+
+
+
+
