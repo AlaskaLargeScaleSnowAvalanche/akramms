@@ -316,7 +316,7 @@ def parse_file(file):
     """
 
     try:
-        return parse_chunk_releasefile(file)
+        return _parse_chunk_releasefile(file)
     except ValueError as e:
         pass
     return parse_arcfile(file)
