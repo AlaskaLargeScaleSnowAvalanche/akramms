@@ -225,19 +225,27 @@ def run_chunk(release_file, crf, gridI, at_front=False, submit=False, condor_pri
 
 
     print(f'------------- RAMMS Phase 0: {crf.chunk_dir}')
-    harnutil.run_queued('idl',
-        ramms_lshm.run_phase,
-        hconfig, crf.chunk_dir, 0,
-        at_front=False)
+#    harnutil.run_queued('idl',
+#        ramms_lshm.run_phase,
+#        hconfig, crf.chunk_dir, 0,
+#        at_front=False)
+    ramms_lshm.run_phase(
+        hconfig, crf.chunk_dir, 0)
+#        at_front=False)
+
 
     print(f'------------- XY-COORD Files: {crf.chunk_dir}')
     write_xycoords(hconfig, crf.chunk_dir, ncpu=config.ramms_ncpu, check_timestamps=True)
 
     print(f'------------- RAMMS Phase 1: {crf.chunk_dir}')
-    harnutil.run_queued('idl',
-        ramms_lshm.run_phase,
-        hconfig, crf.chunk_dir, 1,
-        at_front=False)
+#    harnutil.run_queued('idl',
+#        ramms_lshm.run_phase,
+#        hconfig, crf.chunk_dir, 1,
+#        at_front=False)
+
+    ramms_lshm.run_phase(
+        hconfig, crf.chunk_dir, 1)
+#        at_front=False)
 
     # Copy .tif files to be reused by later RAMMS Stage 1
     for fname0,fname1 in tmap:
