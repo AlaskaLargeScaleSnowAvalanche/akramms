@@ -611,10 +611,12 @@ def run(args):
 
             # Make a single Makefile for this set of combos
             makefile = make.Makefile()
-            for _,row1 in akdf1b.iterrows():
+            for ix,(_,row1) in enumerate(akdf1b.iterrows()):
+                if ix >= 2:    # Force-quit now and then to prevent "too many file handles open" error in IDL
+                    break
                 combo = row1['combo']
-
                 add_run_combo(expmod, makefile, combo, max_step=args.step)
+
             makefile.generate(os.path.join(expmod.dir, f'{exp}_{expset}_run.mk'), run=True, ncpu=ncpu)
 
 # ------------------------------------------------------------------

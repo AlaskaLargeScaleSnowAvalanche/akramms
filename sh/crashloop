@@ -29,10 +29,10 @@ def main():
 
         # Run the command, do NOT crash on errors
         print('========== crashloop running: {}'.format(' '.join(cmd)))
-        subprocess.run(cmd, check=False)
+        result = subprocess.run(cmd, check=False)
 
         # Wait after running
-        if args.wait > 0:
+        if (args.wait > 0) and (result.returncode != 0):
             time.sleep(args.wait)
 
         # Figure out when we need to run next
