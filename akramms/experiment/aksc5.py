@@ -253,6 +253,9 @@ def all_domains():
     return domains_ij
 
 
+exclude = {
+    (99,43),    # eCognition hung on this coastal tile
+}
 def spiral_domains(x0, y0):
     """Use Ulam Spiral out from a central domain tile"""
 
@@ -271,7 +274,8 @@ def spiral_domains(x0, y0):
         dxy = ulam.n_to_xy(n)
         xy = (x0 + dxy[0], y0 + dxy[1])
         if xy in dij:
-            yield xy
+            if xy not in exclude:
+                yield xy
             dij.remove(xy)
             if len(dij) == 0:
                 return
