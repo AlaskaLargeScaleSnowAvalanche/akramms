@@ -57,7 +57,19 @@ The following should be used to set this up:
    crashloop -p 3600 :: akramms overrun <ak>.full
    ```
 
+## Installing eCognition
 
+MSHM uses the *eCognition Server* from a Docker container.  To get this working, you must install the eCognition license manager (which is just the FlexLM license manager licensed by Trimble) on a Windows machine, and then point the Docker container to it:
+
+1. Follow eCognition instructions, get an entitlement, install the license server on a Windows machine, etc.  We do not believe eCognition Developer needs to be installed, just the license manager.
+
+1. Open incoming ports 27000 -- 27009 on the Windows machine (read up on Windows Defender, how to do this).
+
+1. On the Windows machine, point your browser to *localhost:8090* to administer the license manager.  Username is *admin*, set a password if required.
+
+1. Click on *Vendor Daemon Configuration* and figure out which port the Vendor Daemon uses.  Open that incoming port in the firewall as well.
+
+Now it should work.  **NOTE:** Docker containers can remain in Zombie state.  If you get the message that too many licenses are checked out, use `docker ps` and `docker rm` to remove Zombie Docker runs of eCognition that are taking up licenses.
 
 
 

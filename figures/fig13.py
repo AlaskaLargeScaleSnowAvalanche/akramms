@@ -105,53 +105,53 @@ def main():
 
 
 
-    # ==================================================================
-    # Make the inset map
-    map_crs = akfigs.map_crs()
-    imap_extent = akfigs.allalaska_map_extent
-
-    fig,ax = plt.subplots(
-        nrows=1,ncols=1,
-        subplot_kw={'projection': map_crs},
-        figsize=(1.5,1.0))
-    ax.set_extent(imap_extent, crs=map_crs)
-
-    ax.add_image(cartopy.io.img_tiles.OSM(cache=True), 6, alpha=1)    # Use level 7 (lower # is coarser)
-#    ax.coastlines(resolution='50m', color='grey', linewidth=0.5)
-
-    # The overall bounding box
-#    ax.add_feature(bbox_feature, facecolor='none', edgecolor='brown', lw=1.0, linestyle='--')
-
-
-    # The original map bounds
-    imap_extent_poly = gisutil.xxyy_to_poly(*imap_extent)
+#    # ==================================================================
+#    # Make the inset map
+#    map_crs = akfigs.map_crs()
+#    imap_extent = akfigs.allalaska_map_extent
+#
+#    fig,ax = plt.subplots(
+#        nrows=1,ncols=1,
+#        subplot_kw={'projection': map_crs},
+#        figsize=(1.5,1.0))
+#    ax.set_extent(imap_extent, crs=map_crs)
+#
+#    ax.add_image(cartopy.io.img_tiles.OSM(cache=True), 6, alpha=1)    # Use level 7 (lower # is coarser)
+##    ax.coastlines(resolution='50m', color='grey', linewidth=0.5)
+#
+#    # The overall bounding box
+##    ax.add_feature(bbox_feature, facecolor='none', edgecolor='brown', lw=1.0, linestyle='--')
+#
+#
+#    # The original map bounds
+#    imap_extent_poly = gisutil.xxyy_to_poly(*imap_extent)
+##    x0,x1,y0,y1 = imap_extent
+##    imap_extent_poly = shapely.geometry.Polygon([
+##            (x0,y0),
+##            (x1,y0),
+##            (x1,y1),
+##            (x0,y1),
+##            (x0,y0)])
+#    imap_extent_feature = cartopy.feature.ShapelyFeature(imap_extent_poly, map_crs)
+#    ax.add_feature(imap_extent_feature, facecolor='none', edgecolor='black', lw=1.0)
+#
+#    # Outline this map
 #    x0,x1,y0,y1 = imap_extent
-#    imap_extent_poly = shapely.geometry.Polygon([
+#    iimap_extent_poly = shapely.geometry.Polygon([
 #            (x0,y0),
 #            (x1,y0),
 #            (x1,y1),
 #            (x0,y1),
 #            (x0,y0)])
-    imap_extent_feature = cartopy.feature.ShapelyFeature(imap_extent_poly, map_crs)
-    ax.add_feature(imap_extent_feature, facecolor='none', edgecolor='black', lw=1.0)
-
-    # Outline this map
-    x0,x1,y0,y1 = imap_extent
-    iimap_extent_poly = shapely.geometry.Polygon([
-            (x0,y0),
-            (x1,y0),
-            (x1,y1),
-            (x0,y1),
-            (x0,y0)])
-    imap_extent_feature = cartopy.feature.ShapelyFeature(imap_extent_poly, map_crs)
-    ax.add_feature(imap_extent_feature, facecolor='none', edgecolor='black', lw=2.0)
-
-
-
-    ofname = pathlib.Path('./fig13-inset.png')
-    with akfigs.TrimmedPng(ofname) as tname:
-        fig.savefig(tname, dpi=300, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
-    # ==================================================================
+#    imap_extent_feature = cartopy.feature.ShapelyFeature(imap_extent_poly, map_crs)
+#    ax.add_feature(imap_extent_feature, facecolor='none', edgecolor='black', lw=2.0)
+#
+#
+#
+#    ofname = pathlib.Path('./fig13-inset.png')
+#    with akfigs.TrimmedPng(ofname) as tname:
+#        fig.savefig(tname, dpi=300, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
+#    # ==================================================================
 
 
 
