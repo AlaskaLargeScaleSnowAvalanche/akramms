@@ -227,6 +227,15 @@ def main():
         googlemaps_dir / 'Juneau_RockDump.tif', './fig15_Juneau_RockDump.png', gpkg_kwargs,
         plot_landcover=True, ijdoms=[(113,45)])
 
+    # ------------- Juneau Rock Dump: Include & High
+    gpkg_kwargs = [
+        (odir / f'juneau_include.gpkg', ih_include),
+        (odir / f'juneau_high.gpkg', ih_high),
+    ]
+    make_plot(
+        googlemaps_dir / 'Juneau_BehrendsAve.tif', './fig15_Juneau_BehrendsAve.png', gpkg_kwargs,
+        plot_landcover=True, ijdoms=[(113,45)])
+
     # ---------------- Juneau1 (Downtown): Include & Exclude
     gpkg_kwargs = [
         (odir / f'juneau_exclude.gpkg', ie_exclude),

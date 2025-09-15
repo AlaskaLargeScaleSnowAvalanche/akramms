@@ -87,7 +87,7 @@ def rule(scene_dir, scene_args, inputs, return_period, For):
         cmd += ['-e', 'ECOG_CONFIG_logging=trace level=Detailed']
 
         # eCognition licensing
-        cmd += ['-e', 'LM_LICENSE_FILE=27000@10.10.129.211']
+        cmd += ['-e', 'LM_LICENSE_FILE=27000@10.10.132.45']
 
         # Mount paths inside eCognition container
         cmd += ['-v', f'{scene_dir}:/mnt']
