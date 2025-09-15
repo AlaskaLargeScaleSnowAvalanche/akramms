@@ -185,8 +185,8 @@ def write_xycoords(hconfig, chunkdir, ncpu=1, check_timestamps=True):
     if len(errs) > 0:
         for err in errs:
             print(err, file=sys.stderr)
-        raise exp
-#        raise ValueError('At least one process failed')
+#        raise exp
+        raise ValueError('At least one process failed')
 
 
 
