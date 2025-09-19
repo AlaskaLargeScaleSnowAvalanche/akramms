@@ -300,7 +300,8 @@ def step1(args):
     akdf0 = resolve.resolve_to(parseds, 'exp', realized=False)
 
     for exp,akdf1 in akdf0.groupby('exp'):
-        expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
+        expset = _get_expset(akdf1.iloc[0])
+        #expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
         expmod = akramms.parse.load_expmod(exp)
 
         makefile = make.Makefile()
@@ -319,7 +320,8 @@ def step2(args):
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
 
     for exp,akdf1 in akdf0.groupby('exp'):
-        expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
+        expset = _get_expset(akdf1.iloc[0])
+        #expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
         expmod = akramms.parse.load_expmod(exp)
         add_experiment_fn = getattr(expmod, 'add_experiment')    # Select out a DEM tile
 
@@ -354,7 +356,8 @@ def step3(args):
     makefile = make.Makefile()
 
     for exp,akdf1 in akdf0.groupby('exp'):
-        expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
+        expset = _get_expset(akdf1.iloc[0])
+        #expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
         expmod = akramms.parse.load_expmod(exp)
 
         for combo in akdf1.combo.tolist():
@@ -595,10 +598,12 @@ def run(args):
 #    print('aaaaaaaaaaaakdf0 ', akdf0)
 #    print(akdf0.iloc[0])
     for exp,akdf1 in akdf0.groupby('exp'):
-        expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
+        print(akdf1.iloc[0])
+        #expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
         # akdf1 = akdf1.sort_values('combo_order')    # Not needed
         expmod = akramms.parse.load_expmod(exp)
-        expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
+        expset = _get_expset(akdf1.iloc[0])
+        #expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
 
         # Run make on chunks a few rows (combos) at a time
         ncpu = config.setup_ncpu if args.j is None else args.j
@@ -1000,7 +1005,8 @@ def stdmosaic(args):
     publish_dir = expmod.root_dir / 'publish'
     os.makedirs(expmod.root_dir / 'tmp', exist_ok=True)
     for akdf1 in avalquery.consolidate_by_forest(expmod, akdf0):
-        expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
+        expset = _get_expset(akdf1.iloc[0])
+        # expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
 
         # TODO: Separate out extent generation as separate rules, so
         # we can gain benefits of parallelism and chunking.

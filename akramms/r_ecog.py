@@ -100,7 +100,7 @@ def rule(scene_dir, scene_args, inputs, return_period, For):
 
 
         # Docker container and command to run
-        cmd += ['ecognition/linux_cle:10.2.0', './DIACmdEngine']
+        cmd += ['ecognition/linux_cle:10.3.0', './DIACmdEngine']
 
         # Arguments to DIACmdEnginer (see _dia_cmd_engine_usage above)
         # ----------

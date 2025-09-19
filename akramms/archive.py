@@ -511,7 +511,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
 
             # Determine if the avalanche was already archived
             Overrun = 'overrun' if (tup.id_status == file_info.JobStatus.OVERRUN) else ''
-            arc_leafbase = f'aval-{jb.pra_size}-{tup.id:05d}'
+            arc_leafbase = f'aval-{jb.pra_size}-{tup.id:06d}'
             arc_fname = arc_dir / f'{arc_leafbase}-{Overrun}.nc'
             if not _regen_check(arc_fname, out_zip_dtime):
                 continue

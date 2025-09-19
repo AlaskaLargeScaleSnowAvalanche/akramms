@@ -316,7 +316,8 @@ def full(ix=None):
     # Generate set of trials
     snow = 'ccsm'
     downscale_algo = 'sclapse'
-    for return_periods in [[30,300], [10,100]]:
+#    for return_periods in [[30,300], [10,100]]:
+    for return_periods in [[30,300, 10,100]]:
         domains = spiral_domains(83, 40)    # generator
         if ix is not None:
             domains = split_domains2(domains, ix)

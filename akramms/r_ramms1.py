@@ -149,6 +149,7 @@ def _av2_to_xycoord(hconfig, av2):
     print('.', end='')
     sys.stdout.flush()
 
+_av2RE = re.compile(r'.*_(\d+)\.av2')
 def write_xycoords(hconfig, chunkdir, ncpu=1, check_timestamps=True):
     """
     ncpu:
@@ -164,7 +165,11 @@ def write_xycoords(hconfig, chunkdir, ncpu=1, check_timestamps=True):
     av2s = list()
     for _av2 in glob.glob(str(chunkdir / 'RESULTS/*/*/*.av2')):
         av2 = pathlib.Path(_av2)
-        xycoord = av2.parents[0] / (av2.parts[-1].split('.',1)[0] + '.xy-coord')
+        leaf = av2.parts[-1]
+        # Filter out bogus .av2 file like: c-T-00089For_10m_10T_0.av2
+        if not _av2RE.match(leaf):
+            continue
+        xycoord = av2.parents[0] / (leaf.split('.',1)[0] + '.xy-coord')
 
         if ioutil.needs_regen([xycoord], [av2], check_timestamps=check_timestamps):
             av2s.append(av2)
