@@ -187,8 +187,8 @@ def parse(args):
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
     argument('--quick', '-q', action='store_true',
         help='Only do quick status'),
-    argument('--output', '-o',
-        help='Store pickled dataframe in this file'),
+#    argument('--output', '-o',
+#        help='Store pickled dataframe in this file'),
     argument('--realized', action='store_true',
         help='Only check avalanches with .in.zip / .out.zip files'),
     argument('--update', action='store_true',
@@ -201,15 +201,29 @@ def parse(args):
 def status(args):
     """Test out parsing and resolving to different levels"""
 
+    import geopandas
+    from akramms import file_info
+
     if args.ignore is not None:
         ignore_statuses = {joblib.JobStatus._member_map_[x] for x in args.ignore.split(',')}
     else:
         ignore_statuses = {}
 
     parseds = akramms.parse.parse_args(args.spec)
+    parsed = parseds[0]
+    if ('exp' in parsed) and ('expset' in parsed):
+        sexp = f"{parsed['exp']}-{parsed['expset']}"
+    else:
+        sexp = None
+    expmod = parsed['expmod']
 
     # Special optimizations when working at combo level (large scale)
     akdf = resolve.resolve_to(parseds, args.level, realized=False)
+
+    squick = '-quick' if args.quick else ''
+    odir = expmod.root_dir / 'status'
+    ofname_gpkg = odir / f'{sexp}-status{squick}.gpkg'
+    ofname_pik = odir / f'{sexp}-status{squick}.pik'
 
     if args.quick:
         if args.level != 'combo':
@@ -220,16 +234,39 @@ def status(args):
         akdf = joblib.add_status(
             akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run, ignore_statuses=ignore_statuses)
 
-    print('akdf type ', type(akdf))
-    print(akdf.columns)
-    print(akdf.iloc[0])
+    # Add idom and jdom columns
+    akdf['idom' ] = akdf.combo.map(lambda x: x[-2])
+    akdf['jdom' ] = akdf.combo.map(lambda x: x[-1])
+
+
+    # Write the raw dataframe out to file
     akdf = akdf.drop('parsed', axis=1)
-    if args.output is not None:
-        with open(args.output, 'wb') as out:
+    if sexp is not None:
+        os.makedirs(odir, exist_ok=True)
+        print(f'Writing {ofname_pik}')
+        with open(ofname_pik, 'wb') as out:
             pickle.dump(akdf, out)
 
-#    akdf = pd.concat(dfs).sort_values('combo_order')
-#    print(akdf[['combo_order', 'combo', 'combo_status']])
+    # ----------------------------------------------------
+    if sexp is not None:
+        # Write a graphical tile map to file
+        print(akdf.columns)
+        tilecount = akdf[akdf.combo_status >= file_info.JobStatus.FINISHED].groupby(['idom', 'jdom']).size().to_frame('tilecount')
+        print(tilecount)
+
+        domain_file = expmod.root_dir / 'db' / f'{expmod.name}_domains.shp'
+        ddf = geopandas.read_file(str(domain_file))
+
+        ddf = ddf.merge(tilecount, how='left', left_on=['idom', 'jdom'], right_index=True)
+        ddf = ddf.fillna(0)
+        ddf['tilecount'] = ddf.tilecount.astype(int)
+        print(ddf[ddf.tilecount > 0])
+
+        print(f'Writing {ofname_gpkg}')
+        ddf.to_file(str(ofname_gpkg))
+
+    # -----------------------------------------------------
+    # Print to stdout
     joblib.print_status(akdf, args.level)
 # ---------------------------------------------------------------------
 @subcommand([
