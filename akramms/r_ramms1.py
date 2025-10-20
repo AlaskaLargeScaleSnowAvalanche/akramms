@@ -149,7 +149,7 @@ def _av2_to_xycoord(hconfig, av2):
     print('.', end='')
     sys.stdout.flush()
 
-_av2RE = re.compile(r'.*_(\d+)\.av2')
+_av2RE = re.compile(r'(.*_(\d+))\.av2')
 def write_xycoords(hconfig, chunkdir, ncpu=1, check_timestamps=True):
     """
     ncpu:
@@ -166,9 +166,17 @@ def write_xycoords(hconfig, chunkdir, ncpu=1, check_timestamps=True):
     for _av2 in glob.glob(str(chunkdir / 'RESULTS/*/*/*.av2')):
         av2 = pathlib.Path(_av2)
         leaf = av2.parts[-1]
+
         # Filter out bogus .av2 file like: c-T-00089For_10m_10T_0.av2
-        if not _av2RE.match(leaf):
+        # TODO: It would be more "correct" to read the _rel.shp file instead.
+        match = _av2RE.match(leaf)
+        if not match:
             continue
+        if int(match.group(2)) == 0:
+            file_xyz = av2.parents[0] / (match.group(1) + '.xyz')
+            if not os.path.isfile(file_xyz):
+                continue
+
         xycoord = av2.parents[0] / (leaf.split('.',1)[0] + '.xy-coord')
 
         if ioutil.needs_regen([xycoord], [av2], check_timestamps=check_timestamps):
