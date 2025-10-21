@@ -32,6 +32,8 @@ roots_w = default_roots(pathlib.PureWindowsPath, r'C:\Users\mountain2\av') # r'\
 roots_l['PRJ'] = (pathlib.Path(os.environ['HOME']) / 'prj').resolve()
 roots_w['PRJ'] = r'M:\prj'
 
+roots_l['XPRJ'] = pathlib.Path('/scratch')
+
 # Roots for the system we're running on
 roots = roots_w if os.name=='nt' else roots_l
 
