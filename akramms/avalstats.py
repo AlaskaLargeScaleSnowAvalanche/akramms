@@ -75,6 +75,45 @@ def _read_thresh(expmod, combo, tdir, vname):
 
     return imosaic_grid, imosaic_data, mosaic_nd
 
+
+
+def _read_extent_by_elevation(expmod, combo, tdir, min_elev, max_elev):
+    """Thresholds a "count" variable to 0 or 1"""
+
+    vname = 'avalanche_count'
+    section = _section(expmod, combo)
+    imosaic_tif = expmod.root_dir / 'publish' / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}.tif'
+
+    # Read the variable
+    imosaic_grid, imosaic_data, imosaic_nd = gdalutil.read_raster(imosaic_tif)
+    imosaic_data = np.clip(imosaic_data, None, 1)    # Threshold at count=1'
+    imosaic_data = imosaic_data.astype('d')
+    assert imosaic_nd == 0
+
+    # Use the ocean mask to set nodata values
+    ocean_mask = (_read_land_data(expmod, combo.idom, combo.jdom, imosaic_grid, tdir) == 0)
+    mosaic_nd = -1e10
+    imosaic_data[ocean_mask] = imosaic_nd
+
+    # Mask by elevation
+#    idem_tif = expmod.root_dir / 'publish' / section / 'dem' / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-dem.tif'
+    ijpoly = expmod.gridD.poly(combo.idom, combo.jdom, margin=False)
+    dem_tif = tdir.filename(suffix='.tif')
+    expmod.extract_dem(ijpoly, dem_tif)
+    dem_grid, dem_data, dem_nd = gdalutil.read_raster(dem_tif)
+
+    print('xxxxxxxxxxxxxx ', imosaic_data.shape, dem_data.shape)
+    if min_elev is not None:
+        imosaic_data[dem_data < min_elev] = imosaic_nd
+    if max_elev is not None:
+        imosaic_data[dem_data >= max_elev] = imosaic_nd
+
+    return imosaic_grid, imosaic_data, mosaic_nd
+
+
+
+
+
 def _read_double(expmod, combo, tdir, vname):
     """No Thresholding, variable already double"""
 
@@ -101,10 +140,16 @@ def _by_1(grid):
 
 stats_vars = {
 ##    'land': (_read_land, _by_1, '1'),
-    'avy_extent': (rbind(_read_thresh, 'avalanche_count'), _by_1, '1'),
-    'count': (rbind(_read_thresh, 'pra_centroid_count'), _by_area, 'km-2'),
-    'release_extent': (rbind(_read_thresh, 'pra_count'), _by_1, '1'),
-    'snow': (_read_snow, _by_1, '1'),
+#    'avy_extent': (rbind(_read_thresh, 'avalanche_count'), _by_1, '1'),
+#    'count': (rbind(_read_thresh, 'pra_centroid_count'), _by_area, 'km-2'),
+#    'release_extent': (rbind(_read_thresh, 'pra_count'), _by_1, '1'),
+#    'snow': (_read_snow, _by_1, '1'),
+    'extent020': (rbind(_read_extent_by_elevation, None,20), _by_1, '1'),
+    'extent040': (rbind(_read_extent_by_elevation, 20,40), _by_1, '1'),
+    'extent080': (rbind(_read_extent_by_elevation, 40,80), _by_1, '1'),
+    'extent200': (rbind(_read_extent_by_elevation, 80,200), _by_1, '1'),
+    'extent300': (rbind(_read_extent_by_elevation, 200,300), _by_1, '1'),
+    'extent999': (rbind(_read_extent_by_elevation, 300,None), _by_1, '1'),
 }
 
 
