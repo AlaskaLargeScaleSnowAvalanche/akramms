@@ -967,18 +967,28 @@ def xmosaic(args):
 #        help='Resolution to average to'),
 ])
 def stats(args):
-    from akramms import avalstats
+    from akramms import avalstats2
 
     # Identify archived avalanches for use in the mosaic
     parseds = akramms.parse.parse_args(args.spec)
     akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
 
-    exp = akdf.exp[0]
-    expmod = akramms.parse.load_expmod(exp)
+    avalstats2.stats_by_combos(akdf)
 
-    ress = [100,1000,10000]
-    avalstats.stats_landcover(expmod, ress=ress)
-    avalstats.stats_wcombo(akdf, ress=ress)
+
+#def stats(args):
+#    from akramms import avalstats
+#
+#    # Identify archived avalanches for use in the mosaic
+#    parseds = akramms.parse.parse_args(args.spec)
+#    akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
+#
+#    exp = akdf.exp[0]
+#    expmod = akramms.parse.load_expmod(exp)
+#
+#    ress = [100,1000,10000]
+#    avalstats.stats_landcover(expmod, ress=ress)
+#    avalstats.stats_wcombo(akdf, ress=ress)
 
 
 @subcommand(args=[
