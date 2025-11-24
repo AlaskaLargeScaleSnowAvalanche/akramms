@@ -35,7 +35,7 @@ def colorbar():
             fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res version; add margin so text is not cut off
 
 
-def doplot(section, xdata_tif, ofname, map_extent=None, idom=113, jdom=45, xyres=10, vminmax=None, cpt='palettes/WhiteBlueGreenYellowRed.cpt', ncpt=14, cbar_fname=None):
+def doplot(section, xdata_tif, ofname, map_extent=None, idom=113, jdom=45, xyres=10, vminmax=None, cpt='palettes/WhiteBlueGreenYellowRed.cpt', ncpt=14, cbar_fname=None, delta_extent=None):
     map_crs = cartopy.crs.epsg(3338)    # Alaska Albers
 
 #    idom,jdom = (113,45)    # Juneau tile
@@ -76,6 +76,8 @@ def doplot(section, xdata_tif, ofname, map_extent=None, idom=113, jdom=45, xyres
         if map_extent is None:
             map_extent = tile_extent
 #        map_extent = (x0+dmx+7000, x1-dmx-13000, y0+dmy+10000, y1-dmy-10000)
+        if delta_extent is not None:
+            map_extent = [a+b for a,b in zip(map_extent, delta_extent)]
         print('map_extent ', map_extent)
 
         fig,ax = plt.subplots(
@@ -161,7 +163,7 @@ def doplot(section, xdata_tif, ofname, map_extent=None, idom=113, jdom=45, xyres
 #        ofname = pathlib.Path('./fig12.pdf')
         print(f'Saving main plot to {ofname}')
         with TrimmedPng(pathlib.Path(ofname)) as tname:
-            fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res ver
+            fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=300)   # Hi-res ver
 
         return
 
@@ -171,27 +173,29 @@ def doplot(section, xdata_tif, ofname, map_extent=None, idom=113, jdom=45, xyres
 
 
 def main():
-    for idom,jdom,city in ((110,42,'Haines'), (113,45,'Juneau')):
-        xyres=20
+    for idom,jdom,city, delta_extent in (
+        (110,42,'Haines', (12000, -5000, 0, -17000)),
+        (113,45,'Juneau', (9000, -11000, 8000, -12000))):
+        xyres=10
 
         section = f'{expmod.name}-ccsm-1981-2010-lapse-All-30'
 
         svar = 'max_height'
         xdata_tif = pub_dir / section / 'max_height' / f'{section}-{idom:03d}-{jdom:03d}-F-{svar}.tif'
         doplot(section, xdata_tif, f'fig12_{city}_max_height.png', idom=idom, jdom=jdom, xyres=xyres, vminmax=(0,3),
-            cpt='palettes/ath_2024.cpt', ncpt=10, cbar_fname=f'fig12_{svar}_cbar.pdf')
+            cpt='palettes/ath_2024.cpt', ncpt=10, cbar_fname=f'fig12_{svar}_cbar.pdf', delta_extent=delta_extent)
 
         # 0-300 kPa scale same as used in Buehler paper:
         # https://nhess.copernicus.org/preprints/nhess-2022-11/nhess-2022-11-ATC1.pdf
         svar = 'max_pressure'
         xdata_tif = pub_dir / section / 'max_pressure' / f'{section}-{idom:03d}-{jdom:03d}-F-{svar}.tif'
         doplot(section, xdata_tif, f'fig12_{city}_max_pressure.png', idom=idom, jdom=jdom, xyres=xyres, vminmax=(0,300),
-            cpt='palettes/ath_2024.cpt', ncpt=10, cbar_fname=f'fig12_{svar}_cbar.pdf')
+            cpt='palettes/ath_2024.cpt', ncpt=10, cbar_fname=f'fig12_{svar}_cbar.pdf', delta_extent=delta_extent)
 
         svar = 'max_velocity'
         xdata_tif = pub_dir / section / 'max_velocity' / f'{section}-{idom:03d}-{jdom:03d}-F-{svar}.tif'
         doplot(section, xdata_tif, f'fig12_{city}_max_velocity.png', idom=idom, jdom=jdom, xyres=xyres, vminmax=(0,40),
-            cpt='palettes/ath_2024.cpt', ncpt=10, cbar_fname=f'fig12_{svar}_cbar.pdf')
+            cpt='palettes/ath_2024.cpt', ncpt=10, cbar_fname=f'fig12_{svar}_cbar.pdf', delta_extent=delta_extent)
 
 
 

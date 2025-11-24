@@ -1,9 +1,9 @@
-import os,copy,functools,itertools,subprocess
+import os,copy,functools,itertools,subprocess,sys,itertools
 import numpy as np
 from osgeo import gdalconst
-from uafgi.util import gisutil, gdalutil,ioutil
+from uafgi.util import gisutil, gdalutil,ioutil,make
 import akramms.parse
-from akramms import avalquery
+from akramms import avalquery,config
 
 _last_idom_jdom = None
 _last_ocean_mask = None
@@ -41,6 +41,19 @@ def _read_land_data(expmod, idom, jdom, imosaic_grid, tdir):
 
     return land_data
 # -------------------------------------------------------------------
+def one_stats_outputs(expmod, combo, res, elev_max):
+    section = _section(expmod, combo)
+
+#    ivals = (fhc, ext)
+    vnames = [f'fhc{elev_max:03d}', f'extent{elev_max:03d}']
+
+
+
+    stats_dir = expmod.root_dir / 'stats' / 'tiles' / f's{res}'
+    outputs = [stats_dir / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}-s{res}.tif' for vname in vnames]
+
+    return outputs
+
 def one_stats(expmod, combo, imosaic_grid, imosaic_nd, elev_min, elev_max, fhc, ext, res):
     """Computes stats for one combo / elevation class / resolution
 
@@ -55,19 +68,12 @@ def one_stats(expmod, combo, imosaic_grid, imosaic_nd, elev_min, elev_max, fhc, 
     extent but different resolution from the input grid.
     """
 
-    section = _section(expmod, combo)
-
-#    ivals = (fhc, ext)
-    vnames = [f'fhc{elev_max:03d}', f'extent{elev_max:03d}']
-
-
-
-    stats_dir = expmod.root_dir / 'stats' / 'tiles' / f's{res}'
-    ofnames = [stats_dir / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}-s{res}.tif' for vname in vnames]
+    ofnames = one_stats_outputs(expmod, combo, res, elev_max)
 
 #    if all(os.path.isfile(ofname) for ofname in ofnames):
 #        return
 
+    stats_dir = expmod.root_dir / 'stats' / 'tiles' / f's{res}'
     os.makedirs(stats_dir, exist_ok=True)
 
     # Output grid is same extent as input grid, but lower resolution
@@ -110,66 +116,85 @@ def one_stats(expmod, combo, imosaic_grid, imosaic_nd, elev_min, elev_max, fhc, 
 
 
 
+# ----------------------------------------------------------------------
+elev_ranges = [(-100,40), (40,160), (160,8000)]
 
-def stats_one_combo(expmod, combo, tdir, ress=[1000,10000]):
+def r_stats_one_combo(makefile, expmod, combo, tdir, ress=[100,1000,10000]):
     """Reads the (multiple) variables for a single combo"""
+
 
     section = _section(expmod, combo)
 
-    # ------- Read Data
-    # Read avalanche extent info
     vname = 'avalanche_count'
-    imosaic_tif = expmod.root_dir / 'publish' / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}.tif'
-    imosaic_grid, extent_data, imosaic_nd = gdalutil.read_raster(imosaic_tif)
-    extent_data = np.clip(extent_data, None, 1)
-    extent_data = extent_data.astype('d')
-    assert imosaic_nd == 0
-    imosaic_nd = -1e10    # For the future
+    imosaic_tif = expmod.root_dir / 'publish' / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-avalanche_count.tif'
 
-#    # Read the Land / Ocean Mask
-#    land_mask_in = (_read_land_data(expmod, combo.idom, combo.jdom, imosaic_grid, tdir) == 0)
+    outputss = [one_stats_outputs(expmod, combo, res, elev_max) for res,(_,elev_max) in itertools.product(ress,elev_ranges)]
+    outputs = [item for sublist in outputss for item in sublist]
+#    for x in outputs:
+#        print(x)
+#    sys.exit(0)
+    inputs = [imosaic_tif]
 
-    # Read the DEM
-    ijpoly = expmod.gridD.poly(combo.idom, combo.jdom, margin=False)
-    dem_tif = tdir.filename(suffix='.tif')
-    expmod.extract_dem(ijpoly, dem_tif)
-    dem_grid, dem_data, dem_nd = gdalutil.read_raster(dem_tif)
+    if not os.path.isfile(imosaic_tif):
+#        print('xyz ', imosaic_tif)
+#        sys.exit(0)
+        return None
 
-    # ------------- Process into multiple variables
-    ret = dict()
-#    for elev_min,elev_max in ((-100,20), (20,40), (40,80), (80,200), (200,300), (300,8000)):
-    for elev_min,elev_max in ((-100,40), (40,160), (160,8000)):
-#    for elev_min,elev_max in ((-100,20), (20,8000)):
-#        mask_in = np.logical_and(land_mask_in, np.logical_and(dem_data >= elev_min, dem_data < elev_max))
-        mask_ocean_out = (dem_data <= 0)
-        mask_fhc_out = np.logical_or(dem_data < elev_min, dem_data >= elev_max)
+    def action(tdir):
 
+        # ------- Read Data
+        # Read avalanche extent info
+    #    if not os.path.isfile(imosaic_tif):
+    #        return False    # Avoid degenerate tile
+        imosaic_grid, extent_data, imosaic_nd = gdalutil.read_raster(imosaic_tif)
+        extent_data = np.clip(extent_data, None, 1)
+        extent_data = extent_data.astype('d')
+        assert imosaic_nd == 0
+        imosaic_nd = -1e10    # For the future
 
-#        mask_in = np.logical_and(dem_data > 0, np.logical_and(
-#        mask_out = np.logical_not(mask_in)
+    #    # Read the Land / Ocean Mask
+    #    land_mask_in = (_read_land_data(expmod, combo.idom, combo.jdom, imosaic_grid, tdir) == 0)
 
-        # Compute extent of avalanche
-        #vname = 'ext{elev_max:03d}'
-        elev_ext = extent_data.copy()    # Extent in an elevation class
-        elev_ext[mask_ocean_out] = imosaic_nd
-        elev_ext[mask_fhc_out] = 0
+        # Read the DEM
+        ijpoly = expmod.gridD.poly(combo.idom, combo.jdom, margin=False)
+        dem_tif = tdir.filename(suffix='.tif')
+        expmod.extract_dem(ijpoly, dem_tif)
+        dem_grid, dem_data, dem_nd = gdalutil.read_raster(dem_tif)
 
-        # Compute land cover fraction at this elevation class
-        fhc = np.ones(elev_ext.shape)
-        fhc[mask_fhc_out] = 0        # These two lines MUST be in this order.
-        fhc[mask_ocean_out] = imosaic_nd
-#        fhc = mask_in.astype('d')
-
-
-        for res in ress:
-            one_stats(expmod, combo, imosaic_grid, imosaic_nd, elev_min, elev_max, fhc, elev_ext, res)
+        # ------------- Process into multiple variables
+        ret = dict()
+        for elev_min,elev_max in elev_ranges:
+            mask_ocean_out = (dem_data <= 0)
+            mask_fhc_out = np.logical_or(dem_data < elev_min, dem_data >= elev_max)
 
 
-#        ret.append(((elev_min, elev_max), (fhc, elev_ext)))
-#    return imosaic_grid,ret,imosaic_nd
+    #        mask_in = np.logical_and(dem_data > 0, np.logical_and(
+    #        mask_out = np.logical_not(mask_in)
+
+            # Compute extent of avalanche
+            #vname = 'ext{elev_max:03d}'
+            elev_ext = extent_data.copy()    # Extent in an elevation class
+            elev_ext[mask_ocean_out] = imosaic_nd
+            elev_ext[mask_fhc_out] = 0
+
+            # Compute land cover fraction at this elevation class
+            fhc = np.ones(elev_ext.shape)
+            fhc[mask_fhc_out] = 0        # These two lines MUST be in this order.
+            fhc[mask_ocean_out] = imosaic_nd
+    #        fhc = mask_in.astype('d')
+
+
+            for res in ress:
+                one_stats(expmod, combo, imosaic_grid, imosaic_nd, elev_min, elev_max, fhc, elev_ext, res)
+
+
+    #        ret.append(((elev_min, elev_max), (fhc, elev_ext)))
+    #    return imosaic_grid,ret,imosaic_nd
+
+    makefile.add(make.Rule(action, inputs, outputs))
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
-def stats_by_combos(akdf0, ress=[1000]):
+def stats_by_combos(akdf0, ress=[100,1000,10000]):
 
     """
 
@@ -181,31 +206,34 @@ def stats_by_combos(akdf0, ress=[1000]):
     res: [m]
         Gridcell size to average up to.
         Most be an even divisor of tile size.
-s    """
+    """
 
     print('=== BEGIN stats_combo()')
     print(akdf0)
     exp = akdf0.exp[0]
     expmod = akramms.parse.load_expmod(exp)
 
-    for akdf1 in avalquery.consolidate_by_forest(expmod, akdf0):
-        # Change For/NoFor to All
-        combo = akdf1.combo.iloc[0]
+    makefile = make.Makefile()
+    xdir = expmod.root_dir / 'stats'
+    with ioutil.TmpDir(xdir) as tdir:
+        for akdf1 in avalquery.consolidate_by_forest(expmod, akdf0):
+            # Change For/NoFor to All
+            combo = akdf1.combo.iloc[0]
 
-#        exp = akdf1.exp[0]
-        combo = combo._replace(forest='All')
-        print('combo ', combo)
+    #        exp = akdf1.exp[0]
+            combo = combo._replace(forest='All')
 
-        xdir = expmod.root_dir / 'stats'
-        os.makedirs(xdir, exist_ok=True)
-        with ioutil.TmpDir(xdir) as tdir:
-            stats_one_combo(expmod, combo, tdir, ress=ress)
+            os.makedirs(xdir, exist_ok=True)
+            makefile.add(r_stats_one_combo(makefile, expmod, combo, tdir, ress=ress))
+
+        makefile.generate(expmod.root_dir / '_make', run=True, ncpu=config.stats_ncpu)
+
 
 def combine_tiles(akdf0, ress=[1000]):
     """Combines tiles from stats_by_combo"""
 
     # Compute per-tile stats
-    stats_combo(akdf0, ress=ress)
+#    stats_combo(akdf0, ress=ress)
 
     # Consolidate
     exp = akdf0.exp[0]
@@ -217,7 +245,13 @@ def combine_tiles(akdf0, ress=[1000]):
         combo = combo._replace(forest='All')
         wcombos.add(tuple(combo[:-2]))
 
+
+
+    stats_varss = [[f'fhc{elev_max:03d}', f'extent{elev_max:03d}'] for elev_min,elev_max in elev_ranges]
+    stats_vars = [item for sublist in stats_varss for item in sublist]
+
     for res in ress:
+
         istats_dir = expmod.root_dir / 'stats' / 'tiles' / f's{res}'
         ostats_dir = expmod.root_dir / 'stats' / 'tif' / f's{res}'
 #        istats_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + f'_stats') / f's{res}'
@@ -236,5 +270,16 @@ def combine_tiles(akdf0, ress=[1000]):
                 ofname_tif = ostats_dir / f'{section}-{vname}-s{res}.tif'
 
                 gdalutil.build_vrt(ifnames, ofname_vrt)
-                cmd = ['gdal_translate', ofname_vrt, ofname_tif]
+                cmd = ['gdal_translate', '-co', 'COMPRESS=DEFLATE', ofname_vrt, ofname_tif]
                 subprocess.run(cmd, check=True)
+
+def diff_stats(expmod, res):
+    """Finds the difference climate change will make in the stats"""
+
+    stats_dir = expmod.root_dir / 'stats' / 'tif' / f's{res}'
+    for vname in ('extent040', 'extent160', 'extent8000'):
+        ifname_hist = f'{expmod.name}-ccsm-1981-2010-lapse-All-30-{vname}-s{res}.tif'
+        ifname_fut = f'{expmod.name}-ccsm-2031-2060-lapse-All-30-{vname}-s{res}.tif'
+        
+            
+
