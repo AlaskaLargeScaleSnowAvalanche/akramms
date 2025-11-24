@@ -10,9 +10,8 @@ import akfigs
 import shapely.geometry
 
 #tif_dir = pathlib.Path('/Users/eafischer2/tmp/maps/tif')
-tif_dir = expmod.root_dir / 'stats' / 'tif'
 
-sres = '10000'
+sres = '1000'
 
 
 def corr2(a,b):
@@ -48,7 +47,9 @@ def main():
     data = dict()
     for return_period in ('30', '300'):
         for years in ('1981-2010', '2031-2060'):
-                for var in ('avy_extent', 'snow'):
+                for stdir,var in (('stats', 'extent040'), ('stats.v1', 'snow')):
+                    tif_dir = expmod.root_dir / stdir / 'tif'
+
                     ifname_tif = tif_dir / f's{sres}' / f'{expmod.name}-ccsm-{years}-lapse-All-{return_period}-{var}-s{sres}.tif'
                     stat_grid, stat_data, stat_nd = gdalutil.read_raster(ifname_tif)
                     stat_data[stat_data == stat_nd] = np.nan
