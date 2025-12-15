@@ -215,10 +215,11 @@ def status(args):
         sexp = f"{parsed['exp']}-{parsed['expset']}"
     else:
         sexp = None
-    expmod = parsed['expmod']
+#    expmod = parsed['expmod']    # Does not work in all cases
 
     # Special optimizations when working at combo level (large scale)
     akdf = resolve.resolve_to(parseds, args.level, realized=False)
+    expmod = akramms.parse.load_expmod(akdf.exp[0])    # Always works
 
     squick = '-quick' if args.quick else ''
     odir = expmod.root_dir / 'status'
@@ -531,12 +532,13 @@ def add_run_combo(expmod, makefile, combo, max_step=999):
     print(f'----- Adding Scene: {scene_dir}')
 
     # Run ArcGIS script + companion code to prepare files for eCognition
-    prepare1_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(scene_dir, scene_args)).outputs
+    scene_dir_xs = expmod.combo_to_scenedir(combo, 'xs')
+    prepare1_outputs = makefile.add(r_prepare.data_prep_PRA1_rule(scene_dir, scene_dir_xs, scene_args)).outputs
     if max_step <= 3:
         return
 
     prepare2_outputs = makefile.add(
-        r_prepare.data_prep_PRA2_rule(scene_dir, combo, scene_args, prepare1_outputs)).outputs
+        r_prepare.data_prep_PRA2_rule(scene_dir, scene_dir_xs, combo, scene_args, prepare1_outputs)).outputs
     #print('Number rules ', len(makefile.rule_list))
     if max_step <= 4:
         return
@@ -644,7 +646,8 @@ def run(args):
 
         # Run make on chunks a few rows (combos) at a time
         ncpu = config.setup_ncpu if args.j is None else args.j
-        combo_chunk_size = ncpu * 2 # config.setup_ncpu    # maybe *2
+        combo_chunk_size = 1    # Run only one combo at a time!!!!
+#        combo_chunk_size = ncpu * 2 # config.setup_ncpu    # maybe *2
         nrows = len(akdf1)
         cchunk_bounds = list(range(0, nrows, combo_chunk_size)) + [nrows]
 

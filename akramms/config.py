@@ -1,4 +1,4 @@
-import os,configparser,functools,sys,pathlib
+import os,configparser,functools,sys,pathlib,copy
 from uafgi.util import pathutil,ioutil
 
 
@@ -24,15 +24,17 @@ def default_roots(PureSysPath, harness):
 roots_l = default_roots(
     pathlib.PurePosixPath,
     os.path.abspath(os.path.realpath(os.path.join(os.path.dirname(__file__), '..', '..'))))
+roots_lx = default_roots(
+    pathlib.PurePosixPath,
+    os.path.abspath(os.path.realpath(os.path.join(os.path.dirname(__file__), '..', '..'))))
 roots_w = default_roots(pathlib.PureWindowsPath, r'C:\Users\mountain2\av') # r'\\nona.dnr.state.ak.us\enggeo_projects\avalanche_sim\av'
 
 # Differences from defaults
 #roots_l['PRJ'] = '/mnt/avalanche_sim/prj'
 #roots_w['PRJ'] = r'\\nona.dnr.state.ak.us\enggeo_projects\avalanche_sim\prj'
 roots_l['PRJ'] = (pathlib.Path(os.environ['HOME']) / 'prj').resolve()
+roots_lx['PRJ'] = pathlib.Path('/scratch')
 roots_w['PRJ'] = r'M:\prj'
-
-roots_l['XPRJ'] = pathlib.Path('/scratch')
 
 # Roots for the system we're running on
 roots = roots_w if os.name=='nt' else roots_l

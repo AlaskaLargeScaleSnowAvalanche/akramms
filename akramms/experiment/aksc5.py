@@ -13,7 +13,7 @@ from akramms import d_ifsar, d_usgs_landcover
 # Root directory of studies in this experiment
 name = __name__.rsplit('.', 1)[-1]    # e_alaska
 root_dir = config.roots['PRJ'] / name
-root_xdir = config.roots['XPRJ'] / name
+root_xdir = config.roots_lx['PRJ'] / name
 
 dir = root_dir / 'db'
 publish_dir = root_dir / 'publish'
@@ -116,11 +116,20 @@ def combo_to_snowfile_args(combo):
 
 
 # -------------------------------------------------------------
-def combo_to_scenedir(combo, scenetype='x'):
-    trial_name = f'{name}-{combo.snow_dataset}-{combo.era}-{combo.downscale_algo}-{combo.forest}-{combo.return_period}'
-    scene_name = f'{scenetype}-{combo.idom:03d}-{combo.jdom:03d}'    # Underscores would confuse things
+_root_dir = {
+    'x': (root_xdir, 'x'),
+    'arc': (root_dir, 'arc'),
+    'xs': (root_dir, 'x')}
 
-    return (root_xdir if scenetype == 'x' else root_dir) / 'db' / trial_name / scene_name
+def combo_to_scenedir(combo, scenetype='x'):
+    root_dir, stype = _root_dir[scenetype]
+
+    trial_name = f'{name}-{combo.snow_dataset}-{combo.era}-{combo.downscale_algo}-{combo.forest}-{combo.return_period}'
+    scene_name = f'{stype}-{combo.idom:03d}-{combo.jdom:03d}'    # Underscores would confuse things
+
+    ret = root_dir / 'db' / trial_name / scene_name
+#    print(f'combo_to_scene_dir({scenetype}) = {ret}')
+    return ret
 
 _pra_sizes = {'NoFor': ['L','M'], 'For': ['S','T']}
 def pra_sizes(combo):

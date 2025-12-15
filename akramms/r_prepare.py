@@ -1,4 +1,4 @@
-import subprocess,functools,pickle,re
+import subprocess,functools,pickle,re,shutil
 import os,pathlib,shutil
 import netCDF4
 import numpy as np
@@ -164,8 +164,18 @@ def prepare_data(scene_dir):
     harnutil.print_outputs(outputs)
 
 # ---------------------------------------------------------------------------
+def to_xsdir(scene_dir, scene_dir_xs, fname):
+    if fname.startswith(scene_dir):
+        return scene_dir_xs + fname[len(scene_dir):]
+    return None
 
-def data_prep_PRA1_rule(scene_dir, scene_args):
+def to_xdir(scene_dir, scene_dir_xs, fname):
+    if fname.startswith(scene_dir_xs):
+        return scene_dir + fname[len(scene_dir_xs):]
+    return None
+
+
+def data_prep_PRA1_rule(scene_dir, scene_dir_xs, scene_args):
     """Runs the data_prep_PRA.py script on a scene
     TO RERUN:
         Delete arcgis_stage0.txt
@@ -177,9 +187,12 @@ def data_prep_PRA1_rule(scene_dir, scene_args):
     scene_dir:
         Scene dir on THIS host."""
 
+    print(f'scene_dir = {scene_dir}')
+    print(f'scene_dir_xs = {scene_dir_xs}')
+
 #    scene_args = params.load(scene_dir)
 
-    # Assemble list of files to copy to remote Windows host
+    # Assemble list of files to copy from x-dir on scratch drive to 
     inputs = [os.path.join(scene_dir, 'scene.nc')]
 
     # Input files: dem and forest
@@ -187,13 +200,26 @@ def data_prep_PRA1_rule(scene_dir, scene_args):
         if (param.type == 'input_file') and (param.name in scene_args):
             inputs.append(scene_args[param.name])
 
-    outputs = _prepare_data_outputs(scene_dir, scene_args) + [os.path.join(scene_dir, 'data_prep_PRA1.pik')]
+    outputs = _prepare_data_outputs(scene_dir, scene_args) + [os.path.join(scene_dir, 'data_prep_PRA_args.pik')]
 
     def action(tdir):
         from akramms.util import rqutil
 
+        # Copy inputs off of scratch drive and onto shared drive
+        print('Copying to ', scene_dir_xs)
+        for input in inputs:
+            input_xs = to_xsdir(str(scene_dir), str(scene_dir_xs), str(input))
+            if input_xs is not None:
+                odir = pathlib.Path(input_xs).parents[0]
+                os.makedirs(odir, exist_ok=True)
+                shutil.copy2(input, input_xs)
+
+
+#TODO: Create a temporary x-dir on the shared drive, run the Windows stuff there, and then copy it all back.
+
+
         # Remote command to run
-        scene_dir_rel = config.roots.relpath(scene_dir)
+        scene_dir_rel = config.roots.relpath(scene_dir_xs)
         cmd = ['sh', config.roots_w.syspath('{HARNESS}/akramms/sh/prepare_scene.sh', bash=True, as_str=True),
             scene_dir_rel]
 
@@ -205,11 +231,16 @@ def data_prep_PRA1_rule(scene_dir, scene_args):
 
 
         with rqutil.blocking_lock('arcgis'):
-            harnutil.run_remote(inputs, cmd, tdir)
+           harnutil.run_remote(inputs, cmd, tdir)
 
 #        # Make it clear / obvious we have finished
 #        with open(os.path.join(scene_dir, 'data_prep_PRA1.pik'), 'w') as out:
 #            out.write('Successfully finished running ArcGIS script data_prep_PRA.py')
+
+
+        # -------- Copy everything back from scene_dir_xs to scene_dir
+        cmd = ['rsync', '-av', str(scene_dir_xs)+'/', str(scene_dir)]
+        subprocess.run(cmd, check=True)
         
     return make.Rule(action, inputs, outputs)
 # -----------------------------------------------------------------------------
@@ -288,7 +319,8 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
 
     # Forest may not be the same geometry / resolution as DEM
     # Forest is boolean dataset 1/0
-    iForest_r = gdalutil.read_raster(vv.inForest)
+    inForest_fname = change_root(config.roots_lx, config.roots_l, vv.inForest)
+    iForest_r = gdalutil.read_raster(inForest_fname)
     oForest_data = gdalutil.regrid(
         iForest_r.data, iForest_r.grid, iForest_r.nodata,
         Slope_r.grid, iForest_r.nodata)
@@ -326,12 +358,17 @@ def _data_prep_PRA2(vv, Slope_lowerlimit, name_scenario, mask_out, onodata):
 
 
 # -----------------------------------------------------------------
-def _w2l(val):
+def change_root(iroots, oroots, val):
+    val = iroots.relpath(val)
+    val = oroots.syspath(val)
+    return val
+
+def _w2lx(val):
     if val == '':
         return None
 
     val = config.roots_w.relpath(val)
-    val = config.roots_l.syspath(val)
+    val = config.roots_lx.syspath(val)
     return val
 
 def _float(val):
@@ -349,7 +386,7 @@ for vn in (
     'Curv_profile_eCog', 'Curv_plan_eCog_temp', 'Curv_plan_eCog',
     'Hillshade_eCog', 'Curv_plan', 'Ruggedness_tif', 'inForest',
     ):
-    _arcgis_vars[vn] = _w2l
+    _arcgis_vars[vn] = _w2lx
 
 for vn in (
     'Slope_lowerlimit_frequent', 'Slope_lowerlimit_extreme',
@@ -370,7 +407,7 @@ class LVars:
         return val
 
 # ---------------------------------------------------------------------        
-def prepare_data2(scene_dir):
+def prepare_data2(scene_dir, scene_dir_xs):
     from osgeo import gdal
     from uafgi.util import gdalutil
 
@@ -403,7 +440,7 @@ def prepare_data2(scene_dir):
     # Mask out areas beyond the perimeter
     if vv.inPerimeter is not None:
         # Mask based on the perimeter polygon
-        ds = ogr.GetDriverByName('ESRI Shapefile').Open(vv.Perimeter_Envelope_Buffer)
+        ds = ogr.GetDriverByName('ESRI Shapefile').Open(to_xdir(scene_dir, scene_dir_xs, vv.Perimeter_Envelope_Buffer))
         try:
             # This will be 1 inside perimeter polygon, 0 outside
             in_perimeter = rasterize.rasterize_polygons(ds, DEM_r.grid)
@@ -485,8 +522,7 @@ def import_xml_str(scene_args, freq):
     }
     return import_xml_tpl.format(**args)
 # ---------------------------------------------------------------------------
-
-def data_prep_PRA2_rule(scene_dir, combo, scene_args, inputs):
+def data_prep_PRA2_rule(scene_dir, scene_dir_xs, combo, scene_args, inputs):
     """
     inputs:
         Outputs from data_prep_PRA1_rule
@@ -508,8 +544,10 @@ def data_prep_PRA2_rule(scene_dir, combo, scene_args, inputs):
 
     def action(tdir):
 
+        print('xxxxxxxxxxxxxxxxxxx ', scene_dir, scene_dir_xs)
+
         # Finish the job of the original ArcGIS script
-        prepare_data2(scene_dir)
+        prepare_data2(scene_dir, scene_dir_xs)
 
         # Make sure we have an appropriate  direcotry
         ecog_dir = os.path.join(scene_dir, 'eCog')
