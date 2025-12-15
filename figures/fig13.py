@@ -47,13 +47,13 @@ def main():
     data = dict()
     for return_period in ('30', '300'):
         for years in ('1981-2010', '2031-2060'):
-                for stdir,var in (('stats', 'extent040'), ('stats.v1', 'snow')):
+                for stdir,var in (('stats', 'extentfull'), ('stats', 'extent040'), ('stats', 'extent160'), ('stats', 'snowfull')):
                     tif_dir = expmod.root_dir / stdir / 'tif'
 
                     ifname_tif = tif_dir / f's{sres}' / f'{expmod.name}-ccsm-{years}-lapse-All-{return_period}-{var}-s{sres}.tif'
                     stat_grid, stat_data, stat_nd = gdalutil.read_raster(ifname_tif)
                     stat_data[stat_data == stat_nd] = np.nan
-                    if var == 'avy_extent':
+                    if var.startswith('extent'):
                         stat_data *= 100.    # Convert to percent
                     data[(return_period,years, var)] = stat_data
 
@@ -66,19 +66,20 @@ def main():
     base_cmap,_,_ = cptutil.read_cpt('palettes/WhiteBlueGreenYellowRed.cpt')
     diff_cmap_snow,_,_ = cptutil.read_cpt('palettes/seismic.cpt', reverse=False)
     diff_cmap,_,_ = cptutil.read_cpt('palettes/green-purple.cpt', reverse=False)
-    abs_cmap,_,_ = cptutil.read_cpt('palettes/WhiteBlueGreenYellowRed.cpt')
+#    abs_cmap,_,_ = cptutil.read_cpt('palettes/WhiteBlueGreenYellowRed.cpt')
+    abs_cmap,_,_ = cptutil.read_cpt('palettes/YlOrRd_09.cpt')
 
 
     diffs = [
-        data[('300', '1981-2010', 'avy_extent')] - data[('30', '1981-2010', 'avy_extent')],
-#        data[('300', '2031-2060', 'avy_extent')] - data[('30', '2031-2060', 'avy_extent')],
-        data[('30', '2031-2060', 'avy_extent')] - data[('30', '1981-2010', 'avy_extent')],
-#        data[('300', '2031-2060', 'avy_extent')] - data[('300', '1981-2010', 'avy_extent')],
+        data[('300', '1981-2010', 'extentfull')] - data[('30', '1981-2010', 'extentfull')],
+#        data[('300', '2031-2060', 'extentfull')] - data[('30', '2031-2060', 'extentfull')],
+        data[('30', '2031-2060', 'extentfull')] - data[('30', '1981-2010', 'extentfull')],
+#        data[('300', '2031-2060', 'extentfull')] - data[('300', '1981-2010', 'extentfull')],
 
-#        data[('300', '1981-2010', 'snow')] - data[('30', '1981-2010', 'snow')],
-#        data[('300', '2031-2060', 'snow')] - data[('30', '2031-2060', 'snow')],
-        data[('30', '2031-2060', 'snow')] - data[('30', '1981-2010', 'snow')],
-#        data[('300', '2031-2060', 'snow')] - data[('300', '1981-2010', 'snow')],
+#        data[('300', '1981-2010', 'snowfull')] - data[('30', '1981-2010', 'snowfull')],
+#        data[('300', '2031-2060', 'snowfull')] - data[('30', '2031-2060', 'snowfull')],
+        data[('30', '2031-2060', 'snowfull')] - data[('30', '1981-2010', 'snowfull')],
+#        data[('300', '2031-2060', 'snowfull')] - data[('300', '1981-2010', 'snowfull')],
 
         ]
 
@@ -86,7 +87,7 @@ def main():
     datamat = np.column_stack(diffs)
     ccf = np.corrcoef(datamat.transpose())
 
-    labels = ['Freq', 'Climate', 'Snow']
+    labels = ['Freq', 'Climate', 'snowfull']
     scorr = format_corr(ccf, labels)
     with open('fig13_corr.tex', 'w') as out:
         out.write('\\begin{tabular}{|r|r|r|r|}\n')
@@ -159,28 +160,31 @@ def main():
     # Plot the differences
     ticks = [-20, 0, 20]
     ticklabels = ['-20%', '0', '20%']
-    plot_fig(stat_grid, data[('300', '1981-2010', 'avy_extent')] - data[('30', '1981-2010', 'avy_extent')], diff_cmap, -20, 20, 'fig13_1981_300-30.png', ticks, ticklabels)
-    plot_fig(stat_grid, data[('300', '2031-2060', 'avy_extent')] - data[('30', '2031-2060', 'avy_extent')], diff_cmap, -20, 20, 'fig13_2031_300-30.png', ticks, ticklabels)
+    plot_fig(stat_grid, data[('300', '1981-2010', 'extentfull')] - data[('30', '1981-2010', 'extentfull')], diff_cmap, -20, 20, 'fig13_1981_300-30.png', ticks, ticklabels)
+    plot_fig(stat_grid, data[('300', '2031-2060', 'extentfull')] - data[('30', '2031-2060', 'extentfull')], diff_cmap, -20, 20, 'fig13_2031_300-30.png', ticks, ticklabels)
 
-    ticks = [-10, 0, 10]
-    ticklabels = ['-10%', '0', '10%']
-    plot_fig(stat_grid, data[('30', '2031-2060', 'avy_extent')] - data[('30', '1981-2010', 'avy_extent')], diff_cmap, -10, 10, 'fig13_2031-1981_30.png', ticks, ticklabels)
-    plot_fig(stat_grid, data[('300', '2031-2060', 'avy_extent')] - data[('300', '1981-2010', 'avy_extent')], diff_cmap, -10, 10, 'fig13_2031-1981_300.png', ticks, ticklabels)
+#    ticks = [-10, 0, 10]
+#    ticklabels = ['-10%', '0', '10%']
+    ticks = [0]
+    ticklabels = ['0']
+    plot_fig(stat_grid, data[('30', '2031-2060', 'extentfull')] - data[('30', '1981-2010', 'extentfull')], diff_cmap, -8, 8, 'fig13_2031-1981_30.png', ticks, ticklabels)
+    plot_fig(stat_grid, data[('300', '2031-2060', 'extentfull')] - data[('300', '1981-2010', 'extentfull')], diff_cmap, -8, 8, 'fig13_2031-1981_300.png', ticks, ticklabels)
 
     # Snow difference
-    plot_fig(stat_grid, data[('30', '2031-2060', 'snow')] - data[('30', '1981-2010', 'snow')], diff_cmap_snow, -100, 100, 'fig13_snowdiff.png', [-100,0,100], ['-100 kg/m^2', 0, '100 kg/m^2'])
+    plot_fig(stat_grid, data[('30', '2031-2060', 'snowfull')] - data[('30', '1981-2010', 'snowfull')], diff_cmap_snow, -100, 100, 'fig13_snowdiff.png', [0], ['0'])
 
     # Baseline
-    plot_fig(stat_grid, data[('30', '1981-2010', 'avy_extent')], abs_cmap, 0., 100, 'fig13_1981_30.png', [0,20,40,60,80,100], ['0%', '20', '40', '60', '80', '100%'])
+    plot_fig(stat_grid, data[('30', '1981-2010', 'extent040')], abs_cmap, 0., 100, 'fig13_1981_30_extent040_baseline.png', [0,20,40,60,80,100], ['0%', '20', '40', '60', '80', '100%'])
+    plot_fig(stat_grid, data[('30', '1981-2010', 'extent160')], abs_cmap, 0., 100, 'fig13_1981_30_extent160_baseline.png', [0,20,40,60,80,100], ['0%', '20', '40', '60', '80', '100%'])
 
 
 
 
 #    # The stat to read
-#    stat30_tif = tif_dir / f's{sres}' / f'ak-ccsm-1981-2010-lapse-All-30-avy_extent-s{sres}.tif'
+#    stat30_tif = tif_dir / f's{sres}' / f'ak-ccsm-1981-2010-lapse-All-30-extentfull-s{sres}.tif'
 #    stat30_grid, stat30_data, stat30_nd = gdalutil.read_raster(stat30_tif)
 #
-#    stat300_tif = tif_dir / f's{sres}' / f'ak-ccsm-2031-2060-lapse-All-30-avy_extent-s{sres}.tif'
+#    stat300_tif = tif_dir / f's{sres}' / f'ak-ccsm-2031-2060-lapse-All-30-extentfull-s{sres}.tif'
 #    stat300_grid, stat300_data, stat300_nd = gdalutil.read_raster(stat300_tif)
 #
 #    stat_data = stat300_data - stat30_data
@@ -192,6 +196,9 @@ def main():
 
 
 def plot_fig(stat_grid, stat_data, cmap, vmin, vmax, ofname, ticks, ticklabels):
+    if os.path.isfile(ofname):
+        return
+    tif_dir = expmod.root_dir / 'stats' / 'tif'
     map_crs = akfigs.map_crs()
 
     map_extent = (320*1000, 1500*1000, 700*1000, 1445*1000)    # xmin, xmax, ymin, ymax; ymin in South
@@ -210,10 +217,9 @@ def plot_fig(stat_grid, stat_data, cmap, vmin, vmax, ofname, ticks, ticklabels):
     # --------------------------------------------------------
     # Add a statistic
 
-
-
     # Land mask controls transparency
-    land_tif = tif_dir / f's{sres}' / f'land-s{sres}.tif'
+    land_tif = tif_dir / f's{sres}' / f'{expmod.name}-ccsm-1981-2010-lapse-All-30-fhcfull-s{sres}.tif'
+#f'fhcfull-s{sres}.tif'
     land_grid, land_data, land_nd = gdalutil.read_raster(land_tif)
     land_data[land_data == land_nd] = 0
 
@@ -242,9 +248,9 @@ def plot_fig(stat_grid, stat_data, cmap, vmin, vmax, ofname, ticks, ticklabels):
     # Cities
     akfigs.plot_cities(ax,
         text_kwargs=dict(
-            fontdict = {'size': 8, 'color': 'blue', 'fontweight': 'bold'}),
+            fontdict = {'size': 6, 'color': 'blue', 'fontweight': 'bold'}),
         marker_kwargs=dict(
-            marker='*', markersize=2, color='black', alpha=0.9),
+            marker='*', markersize=.9, color='black', alpha=0.9),
         only={'Juneau', 'Haines', 'Sitka', 'Cordova', 'Valdez', 'Yakutat'})
 
     # Add graticules
@@ -260,8 +266,12 @@ def plot_fig(stat_grid, stat_data, cmap, vmin, vmax, ofname, ticks, ticklabels):
 
     # Write it out
     ofname = pathlib.Path(ofname)
+
+#    with akfigs.TrimmedPdf(ofname) as tname:
+#        fig.savefig(tname, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off'
+
     with akfigs.TrimmedPng(ofname) as tname:
-        fig.savefig(tname, dpi=300, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
+        fig.savefig(tname, dpi=2000, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
 
 
     # ---------- The colorbar

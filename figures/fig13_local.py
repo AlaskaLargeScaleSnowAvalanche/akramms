@@ -85,7 +85,7 @@ def plot_fig(stat_grid, stat_data, fhc_data, cmap, vmin, vmax, ofname, ticks, ti
 
     # Write it out
     ofname = pathlib.Path(ofname)
-    with akfigs.TrimmedPdf(ofname) as tname:
+    with akfigs.TrimmedPng(ofname) as tname:
         fig.savefig(tname, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
 #        fig.savefig(tname, dpi=300, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
 #        fig.savefig(tname, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
@@ -105,7 +105,7 @@ def plot_fig(stat_grid, stat_data, fhc_data, cmap, vmin, vmax, ofname, ticks, ti
 
     bname = ofname.with_suffix('')
     ofname_cbar = bname.parents[0] / (bname.parts[-1] + '-cbar.pdf')
-    with akfigs.TrimmedPdf(ofname_cbar) as tname:
+    with akfigs.TrimmedPng(ofname_cbar) as tname:
             fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res version; add margin so text is not cut off
 
 
@@ -210,7 +210,7 @@ def local_extent(idom, jdom, delta_extent, xyres=1000):
     return map_extent
 
 map_extents = [
-#    ('Juneau', 113, 45, (15000, -5000, 5000, -18000)),
+    ('Juneau', 113, 45, (15000, -5000, 5000, -18000)),
     ('Haines', 110, 42, (12000, -5000, 0, -17000))
 ]
 
@@ -230,12 +230,17 @@ def main2():
             map_extent = tile_grid.extent(order='xxyy')    # INCUDES margin
             map_extent = [a+b for a,b in zip(map_extent, delta_extent)]
 
+
+        # Main Map
+
+
+        # Difference Map
         ticks = [-15, 0, 15]
         ticklabels = ['-15%', '0', '15%']
         fhc_grid, fhc_data, fhc_nd = read_data('stats', '1981-2010', 30, (idom,jdom), 'fhc040')
         stat_grid, stat_data, stat_nd = read_climate_diff('stats', 30, (idom,jdom), 'extent040')
         stat_data[np.abs(stat_data) < 0.01] = np.nan
-        plot_fig(stat_grid, stat_data, fhc_data, diff_cmap, -15, 15, f'fig13b_1981_300-30-{city}.pdf',
+        plot_fig(stat_grid, stat_data, fhc_data, diff_cmap, -15, 15, f'fig13b_1981_300-30-{city}.png',
             ticks, ticklabels, city, map_extent)
 
 

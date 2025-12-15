@@ -1,4 +1,4 @@
-import os,configparser,functools,sys,pathlib,copy
+import os,configparser,functools,sys,pathlib
 from uafgi.util import pathutil,ioutil
 
 

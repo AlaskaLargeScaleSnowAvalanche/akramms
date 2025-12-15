@@ -41,20 +41,18 @@ def _read_land_data(expmod, idom, jdom, imosaic_grid, tdir):
 
     return land_data
 # -------------------------------------------------------------------
-def one_stats_outputs(expmod, combo, res, elev_max):
+def one_stats_outputs(expmod, combo, res, elev_label):
     section = _section(expmod, combo)
 
 #    ivals = (fhc, ext)
-    vnames = [f'fhc{elev_max:03d}', f'extent{elev_max:03d}']
-
-
+    vnames = [f'fhc{elev_label}', f'extent{elev_label}', f'snow{elev_label}']
 
     stats_dir = expmod.root_dir / 'stats' / 'tiles' / f's{res}'
     outputs = [stats_dir / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-{vname}-s{res}.tif' for vname in vnames]
 
     return outputs
 
-def one_stats(expmod, combo, imosaic_grid, imosaic_nd, elev_min, elev_max, fhc, ext, res):
+def one_stats(expmod, combo, imosaic_grid, imosaic_nd, elev_label, elev_min, elev_max, fhc, ext, snow, res):
     """Computes stats for one combo / elevation class / resolution
 
     imosaic_grid, imosaic_nd:
@@ -68,7 +66,7 @@ def one_stats(expmod, combo, imosaic_grid, imosaic_nd, elev_min, elev_max, fhc, 
     extent but different resolution from the input grid.
     """
 
-    ofnames = one_stats_outputs(expmod, combo, res, elev_max)
+    ofnames = one_stats_outputs(expmod, combo, res, elev_label)
 
 #    if all(os.path.isfile(ofname) for ofname in ofnames):
 #        return
@@ -84,6 +82,10 @@ def one_stats(expmod, combo, imosaic_grid, imosaic_nd, elev_min, elev_max, fhc, 
     # Regrid mosaic to the stats grid
     ext_sum = gdalutil.regrid(
         ext, imosaic_grid, imosaic_nd,
+        stats_grid, imosaic_nd,
+        resample_algo=gdalconst.GRA_Sum)
+    snow_sum = gdalutil.regrid(
+        snow, imosaic_grid, imosaic_nd,
         stats_grid, imosaic_nd,
         resample_algo=gdalconst.GRA_Sum)
     fhc_sum = gdalutil.regrid(
@@ -105,8 +107,14 @@ def one_stats(expmod, combo, imosaic_grid, imosaic_nd, elev_min, elev_max, fhc, 
     ext_mean[fhc_sum == 0] = imosaic_nd
     ext_mean[fhc_sum == imosaic_nd] = imosaic_nd
 
+    snow_mean = snow_sum / fhc_sum
+    snow_mean[snow_sum == imosaic_nd] = imosaic_nd
+    snow_mean[fhc_sum == 0] = imosaic_nd
+    snow_mean[fhc_sum == imosaic_nd] = imosaic_nd
+
+
 #    ovals = (fhc_mean, ext_mean)
-    ovals = (fhc_sum, ext_mean)
+    ovals = (fhc_sum, ext_mean, snow_mean)
     for ofname,oval in zip(ofnames, ovals):
         os.makedirs(ofname.parents[0], exist_ok=True)
         print('Writing ', ofname)
@@ -117,7 +125,7 @@ def one_stats(expmod, combo, imosaic_grid, imosaic_nd, elev_min, elev_max, fhc, 
 
 
 # ----------------------------------------------------------------------
-elev_ranges = [(-100,40), (40,160), (160,8000)]
+elev_ranges = [('040', -100,40), ('160', 40,160), ('8000', 160,8000), ('full', -100,9000)]
 
 def r_stats_one_combo(makefile, expmod, combo, tdir, ress=[100,1000,10000]):
     """Reads the (multiple) variables for a single combo"""
@@ -125,10 +133,12 @@ def r_stats_one_combo(makefile, expmod, combo, tdir, ress=[100,1000,10000]):
 
     section = _section(expmod, combo)
 
-    vname = 'avalanche_count'
-    imosaic_tif = expmod.root_dir / 'publish' / section / vname / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-avalanche_count.tif'
+#    vname = 'avalanche_count'
+    imosaic_tif = expmod.root_dir / 'publish' / section / 'avalanche_count' / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-avalanche_count.tif'
+    isnow_tif = expmod.root_dir / 'publish' / section / 'snow' / f'{section}-{combo.idom:03d}-{combo.jdom:03d}-F-snow.tif'
+    
 
-    outputss = [one_stats_outputs(expmod, combo, res, elev_max) for res,(_,elev_max) in itertools.product(ress,elev_ranges)]
+    outputss = [one_stats_outputs(expmod, combo, res, elev_label) for res,(elev_label,_,elev_max) in itertools.product(ress,elev_ranges)]
     outputs = [item for sublist in outputss for item in sublist]
 #    for x in outputs:
 #        print(x)
@@ -152,6 +162,10 @@ def r_stats_one_combo(makefile, expmod, combo, tdir, ress=[100,1000,10000]):
         assert imosaic_nd == 0
         imosaic_nd = -1e10    # For the future
 
+        # Read the snow
+        snow_grid, snow_data, snow_nd = gdalutil.read_raster(isnow_tif)
+        snow_data[snow_data == snow_nd] = imosaic_nd    # Change to new Nodata value
+
     #    # Read the Land / Ocean Mask
     #    land_mask_in = (_read_land_data(expmod, combo.idom, combo.jdom, imosaic_grid, tdir) == 0)
 
@@ -161,9 +175,10 @@ def r_stats_one_combo(makefile, expmod, combo, tdir, ress=[100,1000,10000]):
         expmod.extract_dem(ijpoly, dem_tif)
         dem_grid, dem_data, dem_nd = gdalutil.read_raster(dem_tif)
 
+
         # ------------- Process into multiple variables
         ret = dict()
-        for elev_min,elev_max in elev_ranges:
+        for elev_label,elev_min,elev_max in elev_ranges:
             mask_ocean_out = (dem_data <= 0)
             mask_fhc_out = np.logical_or(dem_data < elev_min, dem_data >= elev_max)
 
@@ -177,6 +192,11 @@ def r_stats_one_combo(makefile, expmod, combo, tdir, ress=[100,1000,10000]):
             elev_ext[mask_ocean_out] = imosaic_nd
             elev_ext[mask_fhc_out] = 0
 
+            # Compute snowfall
+            elev_snow = snow_data.copy()
+            elev_snow[mask_ocean_out] = imosaic_nd
+            elev_snow[mask_fhc_out] = 0
+
             # Compute land cover fraction at this elevation class
             fhc = np.ones(elev_ext.shape)
             fhc[mask_fhc_out] = 0        # These two lines MUST be in this order.
@@ -185,7 +205,7 @@ def r_stats_one_combo(makefile, expmod, combo, tdir, ress=[100,1000,10000]):
 
 
             for res in ress:
-                one_stats(expmod, combo, imosaic_grid, imosaic_nd, elev_min, elev_max, fhc, elev_ext, res)
+                one_stats(expmod, combo, imosaic_grid, imosaic_nd, elev_label, elev_min, elev_max, fhc, elev_ext, elev_snow, res)
 
 
     #        ret.append(((elev_min, elev_max), (fhc, elev_ext)))
@@ -247,7 +267,7 @@ def combine_tiles(akdf0, ress=[1000]):
 
 
 
-    stats_varss = [[f'fhc{elev_max:03d}', f'extent{elev_max:03d}'] for elev_min,elev_max in elev_ranges]
+    stats_varss = [[f'fhc{elev_label}', f'extent{elev_label}', f'snow{elev_label}'] for elev_label,elev_min,elev_max in elev_ranges]
     stats_vars = [item for sublist in stats_varss for item in sublist]
 
     for res in ress:
