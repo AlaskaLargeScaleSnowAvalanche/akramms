@@ -6,7 +6,8 @@ import configparser
 
 Dockerfile_tpl = \
 """# syntax=docker/dockerfile:1
-FROM ubuntu:20.04
+#FROM ubuntu:20.04
+FROM debian
 
 # Update
 RUN apt-get update

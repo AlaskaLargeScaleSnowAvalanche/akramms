@@ -23,7 +23,7 @@ JobStatus = file_info.JobStatus    # Alias
 submit_tpl = \
 """universe                = docker
 docker_image            = {docker_tag}
-executable              = /usr/bin/python
+executable              = /usr/bin/python3
 arguments               = /opt/runaval.py {inout_name}
 Requirements            = (Machine != "10.10.132.212")
 
@@ -72,6 +72,10 @@ def submit_job(run_dir, job_name, inout_name, condor_priority=0):#, local=False)
 
     print('Submitting job: {}'.format(job_name))
     submit_txt = submit_tpl.format(job_name=job_name, inout_name=inout_name, run_dir=run_dir, docker_tag=docker_tag, condor_priority=condor_priority)
+
+    # DEBUG
+    with open('/home/efischer/tmp/avjob.txt', 'w') as out:
+        out.write(submit_txt)
 
     cmd = ['condor_submit', '-batch-name', job_name]
     print(' '.join(cmd) + '<<EOF')
