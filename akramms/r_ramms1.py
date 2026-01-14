@@ -86,6 +86,7 @@ def compress_avalanche_inputs(crf, gridI, ids):
         base = f'{crf.slope_name}_{crf.avalanche_name}_{id}'
 
         zip_file = crf.avalanche_dir / f'{base}.in.zip'
+        zip_file_tmp = crf.avalanche_dir / f'{base}.in.zip.tmp'
 
         files = [crf.avalanche_dir / f'{base}{ext}' for ext in _izip_exts]
         arcnames = [f'{base}{ext}' for ext in _izip_exts]
@@ -98,7 +99,7 @@ def compress_avalanche_inputs(crf, gridI, ids):
 
             # Compress Avalanche intput files into a Zipfile
             with zipfile.ZipFile(
-                zip_file, 'w', compression=zipfile.ZIP_DEFLATED) \
+                zip_file_tmp, 'w', compression=zipfile.ZIP_DEFLATED) \
                 as izip:
 
                 # Write the grid info
@@ -115,6 +116,9 @@ def compress_avalanche_inputs(crf, gridI, ids):
                 with open(av2_file, 'r') as fin:
                     av3_str = av2_to_av3(fin.read())
                 izip.writestr(arcname, av3_str)
+
+            # Atomic create
+            os.rename(zip_file_tmp, zip_file)
 
             # Remove old files
             for file in files:

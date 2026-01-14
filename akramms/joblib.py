@@ -39,10 +39,14 @@ output                  = {inout_name}.job.out
 error                   = {inout_name}.job.err
 log                     = {inout_name}.job.log
 request_cpus            = 1
-request_memory          = 1000M
 priority                = {condor_priority}
+request_memory          = 10000M
 queue 1
 """
+# Only a handful of jobs go over request_memory=1000M
+# request_cpus --> --cpu-shares ==> nice
+
+
 
 def submit_job(run_dir, job_name, inout_name, condor_priority=0):#, local=False):
     """Submits an individual avalanche simulation to HTCondor, after
