@@ -5,7 +5,7 @@ import datetime,time,zipfile
 import contextlib
 import itertools, functools,shutil
 import numpy as np
-import htcondor
+import htcondor2 as htcondor
 from akramms import config,params
 from akramms.util import harnutil,rammsutil
 from uafgi.util import make,ioutil,shputil,gdalutil

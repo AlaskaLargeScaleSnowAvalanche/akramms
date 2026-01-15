@@ -117,7 +117,8 @@ files_for_zip.add(f'{log_base}.out.log')
 
 
 if True:
-    cmd = ['nice', '/opt/ramms/ramms_aval_LHM', av3_file, f'{log_base}.out']
+    # nice -n 19 gives lowest possible priority to these jobs.
+    cmd = ['nice', '-n', '19', '/opt/ramms/ramms_aval_LHM', av3_file, f'{log_base}.out']
     print(' '.join(str(x) for x in cmd))
     sys.stdout.flush()
     sys.stderr.flush()

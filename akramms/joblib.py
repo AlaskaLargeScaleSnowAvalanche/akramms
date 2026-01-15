@@ -1,5 +1,5 @@
 import os,subprocess,functools,re,typing,zipfile,sys,contextlib,pathlib,glob,io,time
-import htcondor
+import htcondor2 as htcondor
 import numpy as np
 import pandas as pd
 from uafgi.util import gdalutil
@@ -20,13 +20,16 @@ JobStatus = file_info.JobStatus    # Alias
 #docker_tag = config.docker_tag()
 
 #requirements = opsys == 'WINDOWS'
+#Requirements            = (Machine != "10.10.132.83")
+#Requirements = (Name == "slot1@htcondor02.dnr.state.ak.us")
+#Requirements = (Name != "slot1@khione.dnr.state.ak.us")
+#Requirements            = (Machine != "10.10.132.212")
+
 submit_tpl = \
 """universe                = docker
 docker_image            = {docker_tag}
 executable              = /usr/bin/python3
 arguments               = /opt/runaval.py {inout_name}
-Requirements            = (Machine != "10.10.132.212")
-
 initialdir              = {run_dir}
 transfer_input_files    = {inout_name}.in.zip
 transfer_output_files   = {inout_name}.out.zip
@@ -34,15 +37,16 @@ should_transfer_files   = YES
 when_to_transfer_output = ON_EXIT
 on_exit_hold            = False
 on_exit_remove          = True
-
+request_memory          = 3000M
 output                  = {inout_name}.job.out
 error                   = {inout_name}.job.err
 log                     = {inout_name}.job.log
 request_cpus            = 1
 priority                = {condor_priority}
-request_memory          = 10000M
 queue 1
 """
+#Requirements            = (Machine == "khione.dnr.state.ak.us")
+#request_memory          = 10000M
 # Only a handful of jobs go over request_memory=1000M
 # request_cpus --> --cpu-shares ==> nice
 

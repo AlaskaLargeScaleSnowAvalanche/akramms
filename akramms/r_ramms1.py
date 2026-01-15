@@ -142,14 +142,22 @@ def combo_control_file(scene_dir):
 #    if not os.path.exists(control_file):
 #        harnutil.run_remote(*args, **kwargs)
 
-def _av2_to_xycoord(hconfig, av2):
+def _av2_to_xycoord(hconfig, av2, xycoord):
     """Job to run in parallel, to generate an xycoord file"""
     cmd = [str(hconfig.rammscore_exe), str(av2), '/', 'write_xy']
 #    print(' '.join(str(x) for x in cmd))
     if False:
         time.sleep(3)    # DEBUG
     else:
-        subprocess.run(cmd, check=True)
+        try:
+            subprocess.run(cmd, check=True)
+        except Exception:
+            # Remove the output file if something went wrong, for example user pressed Ctrl-C
+            try:
+                os.remove(xycoord)
+            except FileNotFoundError:
+                pass
+
     print('.', end='')
     sys.stdout.flush()
 
@@ -184,14 +192,14 @@ def write_xycoords(hconfig, chunkdir, ncpu=1, check_timestamps=True):
         xycoord = av2.parents[0] / (leaf.split('.',1)[0] + '.xy-coord')
 
         if ioutil.needs_regen([xycoord], [av2], check_timestamps=check_timestamps):
-            av2s.append(av2)
+            av2s.append((av2,xycoord))
 
     # Run the jobs in parallel, and collect errors
     pool = multiprocessing.pool.ThreadPool(processes=ncpu)
 
     errs = list()
-    jobs=[pool.apply_async(_av2_to_xycoord, args=(hconfig, av2)) for av2 in av2s]
-    for av2,job in zip(av2s,jobs):
+    jobs=[pool.apply_async(_av2_to_xycoord, args=(hconfig, av2, xycoord)) for av2,xycoords in av2s]
+    for (av2,xycoord),job in zip(av2s,jobs):
         try:
             job.get()    # Get return value, we throw it away
         except Exception as exp:

@@ -1,5 +1,5 @@
 import os,subprocess,functools,re,typing,zipfile,enum,sys
-import htcondor
+import htcondor2 as htcondor
 import pandas as pd
 from akramms import config,file_info,parse,level,complete,resolve
 

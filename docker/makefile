@@ -8,6 +8,6 @@ DOCKER_HOST=git.akdggs.com
 DOCKER_TAG=${DOCKER_HOST}/efischer/ramms
 
 build:
-	docker build.py
+	python build.py
 #	docker build -t ramms:${VERSION} .
 #	docker tag ramms:${VERSION} ${DOCKER_TAG}:${VERSION}; docker push ${DOCKER_TAG}:${VERSION}

@@ -1,5 +1,5 @@
 import sys,re,subprocess,os
-import htcondor
+import htcondor2 as htcondor
 import shapely
 from akramms import ramms
 
