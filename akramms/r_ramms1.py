@@ -162,11 +162,13 @@ def _av2_to_xycoord(hconfig, av2, xycoord):
     sys.stdout.flush()
 
 _av2RE = re.compile(r'(.*_(\d+))\.av2')
-def write_xycoords(hconfig, chunkdir, ncpu=1, check_timestamps=True):
+def write_xycoords(all_ids, hconfig, chunkdir, ncpu=1, check_timestamps=True):
     """
     ncpu:
         Degree of (threaded) parallelism to use
     """
+
+    all_ids = set(all_ids)
 
     # Generate xy-coord files
     t0 = time.time()
@@ -179,15 +181,18 @@ def write_xycoords(hconfig, chunkdir, ncpu=1, check_timestamps=True):
         av2 = pathlib.Path(_av2)
         leaf = av2.parts[-1]
 
-        # Filter out bogus .av2 file like: c-T-00089For_10m_10T_0.av2
-        # TODO: It would be more "correct" to read the _rel.shp file instead.
+        # Delete bogus .av2 files
+        # (For some reason, RAMMS Phase 0 creates them.  Sometimes
+        # with id=0, other times with random IDs that do not
+        # correspond to what is in the shapefile)
         match = _av2RE.match(leaf)
         if not match:
             continue
-        if int(match.group(2)) == 0:
-            file_xyz = av2.parents[0] / (match.group(1) + '.xyz')
-            if not os.path.isfile(file_xyz):
-                continue
+        id = int(match.group(2))
+
+        if id not in all_ids:
+            os.remove(av2)
+            continue
 
         xycoord = av2.parents[0] / (leaf.split('.',1)[0] + '.xy-coord')
 
@@ -258,9 +263,13 @@ def run_chunk(release_file, crf, gridI, at_front=False, submit=False, condor_pri
         hconfig, crf.chunk_dir, 0)
 #        at_front=False)
 
+    # Read the list of avalanches we are SUPPOSED to do
+    release_df = shputil.read_df_noshapes(release_file)
+    #df = shputil.read_df(release_file, read_shapes=False)
+    all_ids = list(release_df['Id'])
 
     print(f'------------- XY-COORD Files: {crf.chunk_dir}')
-    write_xycoords(hconfig, crf.chunk_dir, ncpu=config.ramms_ncpu, check_timestamps=True)
+    write_xycoords(all_ids, hconfig, crf.chunk_dir, ncpu=config.ramms_ncpu, check_timestamps=True)
 
     print(f'------------- RAMMS Phase 1: {crf.chunk_dir}')
 #    harnutil.run_queued('idl',
@@ -286,9 +295,6 @@ def run_chunk(release_file, crf, gridI, at_front=False, submit=False, condor_pri
 #    gridI = gdalutil.read_grid(dem_file)
 
     # Compress Avalanche inputs, ready for Docker container
-    df = shputil.read_df_noshapes(release_file)
-    #df = shputil.read_df(release_file, read_shapes=False)
-    all_ids = list(df['Id'])
     procs = list()
     for ids in striped_chunks(all_ids, config.ncpu_compress):
         proc = multiprocessing.Process(
