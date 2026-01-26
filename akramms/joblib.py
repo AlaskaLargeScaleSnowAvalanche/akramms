@@ -562,9 +562,13 @@ def _ignore_ids(expmod):
 #    xdir = expmod.combo_to_scenedir(row['combo'], scenetype='x')
 #    glob.glob(xdir / 
 
-def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_statuses={}):
+def add_combo_status(akdf0, realized=True, update=True, dry_run=False, delete_xdir=True, ignore_statuses={}):
     """akdf:
         Resolved to combo level (theoretical, i.e. realized=False)
+    update:
+        Archive xdir if possible?
+    delete_xdir:
+        Delete xdir after archiving?
     """
 
 
@@ -588,7 +592,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, ignore_st
             expmod = parse.load_expmod(exp)
             for tup in akdf1.itertuples(index=False):
                 print('Finishing combo (c): {}'.format(tup.combo))
-                archive.finish_combo(expmod, tup.combo, dry_run=dry_run)
+                archive.finish_combo(expmod, tup.combo, dry_run=dry_run, delete_xdir=delete_xdir)
 
     # -----
     mask = (~akdf0.combo_quickstatus.isin([JobStatus.MARKED_FINISHED, JobStatus.FINISHED, JobStatus.EXTENT]))

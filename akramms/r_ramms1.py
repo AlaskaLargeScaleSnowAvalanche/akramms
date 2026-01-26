@@ -144,19 +144,14 @@ def combo_control_file(scene_dir):
 
 def _av2_to_xycoord(hconfig, av2, xycoord):
     """Job to run in parallel, to generate an xycoord file"""
+    # The C program creates a .xy-coord.tmp file
     cmd = [str(hconfig.rammscore_exe), str(av2), '/', 'write_xy']
 #    print(' '.join(str(x) for x in cmd))
     if False:
         time.sleep(3)    # DEBUG
     else:
-        try:
-            subprocess.run(cmd, check=True)
-        except Exception:
-            # Remove the output file if something went wrong, for example user pressed Ctrl-C
-            try:
-                os.remove(xycoord)
-            except FileNotFoundError:
-                pass
+        subprocess.run(cmd, check=True)
+#        os.rename(str(xycoord) + '.tmp', xycoord)
 
     print('.', end='')
     sys.stdout.flush()

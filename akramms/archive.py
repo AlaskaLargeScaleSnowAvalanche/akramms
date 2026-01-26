@@ -717,10 +717,26 @@ def read_nc(avalfile):
             depo=nc.variables['depo'][:].astype('f4'))
 
 
+def _rmtree(xdir):
+    # --------------- (Very conservatively)
+    # Delete the xdir by moving it to a todel directory.
+    if os.path.exists(xdir):
+        todel = xdir.parents[0] / 'todel'
+        os.makedirs(todel, exist_ok=True)
+        odir = todel / xdir.parts[-1]
+        if os.path.exists(odir):
+            shutil.rmtree(odir)
+        shutil.move(xdir, odir)
 
-def finish_combo(expmod, combo, dry_run=False):
+        # Now delete it for good
+        if config.delete_xdir:
+            shutil.rmtree(odir, ignore_errors=True)
+
+
+def finish_combo(expmod, combo, dry_run=False, delete_xdir=True):
 
     xdir = expmod.combo_to_scenedir(combo, scenetype='x')
+    xsdir = expmod.combo_to_scenedir(combo, scenetype='xs')
     arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
 
     control_fname = arcdir / 'archived.txt'
@@ -740,20 +756,10 @@ def finish_combo(expmod, combo, dry_run=False):
 #    with ioutil.TmpDir(dir=arcdir) as tdir:
 #        write_extent_gpkg(expmod, combo, arcdir, tdir)
 
-    # --------------- (Very conservatively)
-    # Delete the xdir by moving it to a todel directory.
-    if os.path.exists(xdir):
-        todel = xdir.parents[0] / 'todel'
-        os.makedirs(todel, exist_ok=True)
-        odir = todel / xdir.parts[-1]
-        if os.path.exists(odir):
-            shutil.rmtree(odir)
-        shutil.move(xdir, odir)
-
-        # Now delete it for good
-        if config.delete_xdir:
-            shutil.rmtree(odir, ignore_errors=True)
-
+# DEBUG
+#    if delete_xdir:
+#        _rmtree(xdir)
+#        _rmtree(xsdir)
 
 # ----------------------------------------------------------
 def read_reldom(arcdir_zip, ext, **kwargs):
