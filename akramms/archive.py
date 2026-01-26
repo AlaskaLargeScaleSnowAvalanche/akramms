@@ -756,10 +756,9 @@ def finish_combo(expmod, combo, dry_run=False, delete_xdir=True):
 #    with ioutil.TmpDir(dir=arcdir) as tdir:
 #        write_extent_gpkg(expmod, combo, arcdir, tdir)
 
-# DEBUG
-#    if delete_xdir:
-#        _rmtree(xdir)
-#        _rmtree(xsdir)
+    if delete_xdir:
+        _rmtree(xdir)
+        _rmtree(xsdir)
 
 # ----------------------------------------------------------
 def read_reldom(arcdir_zip, ext, **kwargs):
