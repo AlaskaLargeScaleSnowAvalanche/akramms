@@ -131,7 +131,7 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
             mos.rasters[vname] = val
 
     # Collect extent polygons
-    dfss = {'release': list(), 'domain': list(), 'extent_christen': list(), 'extent_tetra30': list()}
+    dfss = {'release': list(), 'domain': list(), 'extent_christen': list(), 'extent_tetra30': list(), 'extent_full': list()}
     shapedfs = list()
     for (combo,arcdir),akdf1 in akdf0.groupby(['combo', 'releasefile']):
 
@@ -161,6 +161,11 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
         df = extent.read_annotated_extent(expmod, combo, 'tetra30')  # >1 polygon per ID
         df = _subset_poly_df(ids, combo.idom, combo.jdom, df)
         dfss['extent_tetra30'].append(df)
+
+        # Filter the full avalanches accordig to the same list
+        df = extent.read_annotated_extent(expmod, combo, 'full')  # >1 polygon per ID
+        df = _subset_poly_df(ids, combo.idom, combo.jdom, df)
+        dfss['extent_full'].append(df)
 
         # --------------- Read polygon files: PRAs, domains
         # (All using geopandas, with .Id and .geometry columns)
@@ -450,6 +455,11 @@ _tifdir_names = [
     'extent_tetra30.prj',
     'extent_tetra30.shp',
     'extent_tetra30.shx',
+    'extent_full.cpg',
+    'extent_full.dbf',
+    'extent_full.prj',
+    'extent_full.shp',
+    'extent_full.shx',
     'landcover.tfw',
     'landcover.tif',
     'landcover.tif.aux.xml',
