@@ -5,7 +5,7 @@ import cartopy.io.img_tiles
 from osgeo import gdal
 from akramms import config
 import matplotlib.pyplot as plt
-import akramms.experiment.ak as exp
+import akramms.experiment.aksc5 as exp
 from akfigs import *
 from uafgi.util import gdalutil,cptutil,ioutil,cartopyutil
 import matplotlib.colors
@@ -14,28 +14,15 @@ import akfigs
 
 # Line2D Properties: https://matplotlib.org/stable/api/_as_gen/matplotlib.lines.Line2D.html#matplotlib.lines.Line2D
 
-def _discrete_cmap(N, base_cmap, nkeep):
-    """Create an N-bin discrete colormap from the specified input map"""
-
-    # Note that if base_cmap is a string or None, you can simply do
-    #    return plt.cm.get_cmap(base_cmap, N)
-    # The following works for string, None, or a colormap instance:
-
-    base = matplotlib.pyplot.cm.get_cmap(base_cmap)
-    color_list = base(np.linspace(0, 1, N))[:nkeep]
-    cmap_name = base.name + str(N)
-#    print('cccccccccccccccccccccccccccc ', color_list)
-    return base.from_list(cmap_name, color_list, nkeep)
-
 
 def main():
     map_crs = akfigs.map_crs()
 
-    idom,jdom = (113,45)    # Juneau tile
+    idom,jdom = (84,39)    # Eagle River tile
 
     # Resample DEM to 100m resolution
-    landcover_tif = exp.dir / 'landcover' / f'ak_landcover_{idom:03d}_{jdom:03d}.tif'
-    dem_tif = exp.dir / 'dem' / f'ak_dem_{idom:03d}_{jdom:03d}.tif'
+    landcover_tif = exp.dir / 'landcover' / f'aksc5_landcover_{idom:03d}_{jdom:03d}.tif'
+    dem_tif = exp.dir / 'dem' / f'aksc5_dem_{idom:03d}_{jdom:03d}.tif'
     print('dem_tif ', dem_tif)
     with ioutil.TmpDir() as tdir:
         xyres = 60    # Resample to 100m
@@ -71,7 +58,7 @@ def main():
 
         # ------- Plot bed elevations EVERYWHERE
         cmap,_,_ = cptutil.read_cpt('palettes/geo_0_2000.cpt', scale=4000)    # Convert to m
-        cmap = _discrete_cmap(10, cmap,6)
+        cmap = cptutil.discrete_cmap(10, base_cmap=cmap, nkeep=6)
         print('dem_data shape ', dem_data.shape)
 #        dem_data[0:300, 0:300] = 0
 #        dem_data[300:600, 0:300] = 20
@@ -137,7 +124,7 @@ def main():
     # Make the inset map
 #    imap_extent = (-820*1000, 1900*1000, 0*1000, 2400*1000)
     # Same as fig01 map_extent, 
-    imap_extent = akfigs.sealaska_map_extent
+    imap_extent = akfigs.anchorage_map_extent
 
     fig,ax = plt.subplots(
         nrows=1,ncols=1,
