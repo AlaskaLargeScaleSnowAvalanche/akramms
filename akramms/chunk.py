@@ -499,7 +499,7 @@ def write_rel(rdf, wkt, return_period, ofname, **kwargs):
 #    shputil.write_df(df, 'pra', 'Polygon', ofname, wkt=wkt, **kwargs)
     crs = pyproj.CRS.from_user_input(wkt)
     df = geopandas.GeoDataFrame(df, geometry='pra')
-    df.to_file(ofname, crs=crs, **kwargs)
+    df.to_file(ofname, engine='fiona', crs=crs, **kwargs)
 
 def write_dom(rdf, wkt, ofname, **kwargs):
     """
@@ -514,7 +514,7 @@ def write_dom(rdf, wkt, ofname, **kwargs):
 #    shputil.write_df(df, 'dom', 'Polygon', ofname, wkt=wkt, **kwargs)
     df = geopandas.GeoDataFrame(df, geometry='dom')
     crs = pyproj.CRS.from_user_input(wkt)
-    df.to_file(ofname, crs=crs, **kwargs)
+    df.to_file(ofname, engine='fiona', crs=crs, **kwargs)
 
 def write_chull(rdf, wkt, ofname, **kwargs):
     """
@@ -529,7 +529,7 @@ def write_chull(rdf, wkt, ofname, **kwargs):
     df = geopandas.GeoDataFrame(df, geometry='chull')
 #    shputil.write_df(df, 'chull', 'Polygon', ofname, wkt=wkt, **kwargs)
     crs = pyproj.CRS.from_user_input(wkt)
-    df.to_file(ofname, crs=crs, **kwargs)
+    df.to_file(ofname, engine='fiona', crs=crs, **kwargs)
 
 # -----------------------------------------------------------
 def dem_forest_links(scene_args, chunk_dir, oslope_name, For):
@@ -679,7 +679,7 @@ def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
     _dfx = dfc.reset_index()[['area_m2', 'Mean_DEM', 'Mean_Slope', 'Scene_reso', 'Id', 'i', 'j', 'sx3', 'd0star', 'slopecorr', 'Wind', f'd0_{ci.return_period}', f'VOL_{ci.return_period}', 'pra']]
 #    shputil.write_df(_dfx, 'pra', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
     _dfx = geopandas.GeoDataFrame(_dfx, geometry='pra')
-    _dfx.to_file(ofname, crs=pyproj.CRS.from_user_input(scene_args['coordinate_system']))
+    _dfx.to_file(ofname, engine='fiona', crs=pyproj.CRS.from_user_input(scene_args['coordinate_system']))
 
     # Write the _dom.shp file 
     os.makedirs(chunk_dir / 'DOMAIN', exist_ok=True)
@@ -687,7 +687,7 @@ def write_chunk(scene_args, chunk_info, dfc, scenario_kwargs):
     _dfx = dfc.reset_index()[['Id', 'dom']]
 #    shputil.write_df(_dfx, 'dom', 'Polygon', ofname, wkt=scene_args['coordinate_system'])
     _dfx = geopandas.GeoDataFrame(_dfx, geometry='dom')
-    _dfx.to_file(ofname, crs=pyproj.CRS.from_user_input(scene_args['coordinate_system']))
+    _dfx.to_file(ofname, engine='fiona', crs=pyproj.CRS.from_user_input(scene_args['coordinate_system']))
 
 #    os.rename(chunk_dir, chunk_dir_final)
     return chunk_dir_final

@@ -264,14 +264,14 @@ def domain_rule(dem_filled_file, release_file, chull_file, domain_file, min_alph
         chulls_df['shape'] = chulls
         # shputil.write_df(chulls_df, 'shape', 'Polygon', chull_file, wkt=grid_info.wkt)
         chulls_df = geopandas.GeoDataFrame(chulls_df, geometry='shape')
-        chulls.to_file(chull_file, crs=pyproj.CRS.from_user_input(grid_info.wkt))
+        chulls.to_file(chull_file, engine='fiona', crs=pyproj.CRS.from_user_input(grid_info.wkt))
 
         # Store domains as a Shapefile
         domains_df = pras_df[['Id']]
         domains_df['shape'] = domains
         # shputil.write_df(domains_df, 'shape', 'Polygon', domain_file, wkt=grid_info.wkt)
         domains_df = geopandas.GeoDataFrame(domains_df, geometry='shape')
-        domains.to_file(domain_file, crs=pyproj.CRS.from_user_input(grid_info.wkt))
+        domains.to_file(domain_file, engine='fiona', crs=pyproj.CRS.from_user_input(grid_info.wkt))
 
 
     return make.Rule(action, [dem_filled_file, release_file], outputs)

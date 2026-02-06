@@ -233,7 +233,7 @@ class WriteGpkg:
         edf = merge_multipolygons(edf, 'Id')
         reldf = pd.DataFrame(self.relrows, columns=['Id', 'Mean_DEM', 'rel_n', 'rel_n41', 'rel_n42', 'rel_n43', 'ext_n', 'ext_n41', 'ext_n42', 'ext_n43'])
         edf = edf.merge(reldf, how='left', on='Id')
-        edf.to_file(str(extent_gpkg_tmp), crs=pyproj.CRS.from_user_input(self.expmod.wkt))
+        edf.to_file(str(extent_gpkg_tmp), engine='fiona', crs=pyproj.CRS.from_user_input(self.expmod.wkt))
 
 
 ##        cmd = ['ogr2ogr', extent_gpkg_tmp, self.extent_shp]
