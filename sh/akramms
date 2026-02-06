@@ -250,13 +250,18 @@ def status(args):
 
     # ----------------------------------------------------
     if sexp is not None:
+
+        domain_tiles = [ijdom for ijdom,_ in akdf.groupby(['idom', 'jdom'])]
+        domain_tiles = pd.DataFrame(domain_tiles, columns=['idom', 'jdom'])
+
         # Write a graphical tile map to file
         print(akdf.columns)
         tilecount = akdf[akdf.combo_status >= file_info.JobStatus.FINISHED].groupby(['idom', 'jdom']).size().to_frame('tilecount')
-        print(tilecount)
+        print('tilecount ', tilecount)
 
         domain_file = expmod.root_dir / 'db' / f'{expmod.name}_domains.shp'
-        ddf = geopandas.read_file(str(domain_file))
+        ddf = geopandas.read_file(str(domain_file))    # Includes ALL of Alaska
+        ddf = ddf.merge(domain_tiles, how='inner', on=['idom', 'jdom'])    # Cut down to our compute domain
 
         ddf = ddf.merge(tilecount, how='left', left_on=['idom', 'jdom'], right_index=True)
         ddf = ddf.fillna(0)

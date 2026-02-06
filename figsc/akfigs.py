@@ -1,5 +1,6 @@
 import os,subprocess,pathlib
 import cartopy
+from osgeo import gdal
 from akramms import config
 from uafgi.util import wrfutil,cartopyutil,gisutil
 from akramms import config
@@ -16,7 +17,7 @@ class TrimmedPng:
         return self.tname
 
     def __exit__(self ,type, value, traceback):
-        cmd = ['convert', self.tname, '-trim', self.ofname]
+        cmd = ['magick', 'convert', self.tname, '-trim', self.ofname]
         subprocess.run(cmd, check=True)
         os.remove(self.tname)
 
@@ -47,6 +48,20 @@ anchorage_cities = [
     (-149.1146, 61.5994, 'Palmer'),
 ]
 
+scalaska_cities = [
+    # Lon, Lat, Name
+    (-149.8977, 61.2176, 'Anchorage'),
+    (-149.4411, 61.5809, 'Wasilla'),
+#    (-150.0622, 61.7584, 'Willow'),
+    (-145.751944, 60.543611, 'Cordova'),
+    (-146.3499, 61.1309, 'Valdez'),
+    (-144.4411, 61.5156, 'Chitina'),
+#    (-142.9229, 61.4331, 'McCarthy'),    # out of bounds
+#    (-145.5340, 62.1081, 'Glenallen'),    # out of bounds
+    (-151.2418, 60.5577, 'Kenai'),
+    (-151.5299, 59.6481, 'Homer'),
+]
+
 _cities_marker_kwargs = dict(marker='o', markersize=2, color='blue', alpha=0.5)
 _cities_text_kwargs = dict(
             fontdict = {'size': 4, 'color': 'black'})
@@ -75,6 +90,9 @@ allalaska_map_extent = (-820*1000, 1900*1000, 0*1000, 2400*1000)
 #sealaska_map_extent = ((320-180)*1000, 1670*1000, 300*1000, (1425+230)*1000)    # xmin, xmax, ymin, ymax; ymin in South
 anchorage_map_extent = (210000-5000, 300000+5000, 1200000-5000, 1320000+5000)    # xmin, xmax, ymin, ymax; ymin in South
 
+scalaska_map_extent = (-820*1000, 1900*1000, 0*1000, 2400*1000)
+
+
 #(214750-15000, 300200+5000, 1199835-5000, 1320230+5000,)
 
 
@@ -90,3 +108,40 @@ def wrf_bbox_feature():
     bbox = snow_grid.bounding_box()
     return cartopy.feature.ShapelyFeature(bbox, snow_crs)
     
+
+def resample_lr(exp, tiles, tdir, vars=['dem', 'landcover'], xyres=60):
+    """Read DM and Landcover rasters
+    tiles: collection / iterator
+        (idom, jdom) of tiles to include in ther aster
+    """
+
+    # Build a sinlge mosaic from the individual tiles
+    tifss = [list() for vname in vars]
+    for idom,jdom in sorted(tiles):
+        for vname,tifs in zip(vars, tifss):
+            if vname == 'snow':
+#                root = f'{exp.name}_ccsm_past_sclapse_030'
+                fname = exp.root_dir / 'publish' / f'{exp.name}-ccsm-past-sclapse-All-30' / 'snow' / f'{exp.name}-ccsm-past-sclapse-All-30-{idom:03d}-{jdom:03d}-F-snow.tif'
+            else:
+#                root = f'{vname}'
+                root = f'{exp.name}_{vname}'
+                fname = exp.dir / vname / f'{root}_{idom:03d}_{jdom:03d}.tif'
+            print('vrt ', fname)
+            tifs.append(fname)
+
+    # Resample DEM to 100m resolution
+    xyres = 60    # Resample to 100m
+
+    tif_lrs = []
+    for vname,tifs in zip(vars, tifss):
+        fname_vrt = gisutil.build_vrt(tifs, tdir.location / f'{vname}.vrt')
+        fname_lr = tdir.location / f'{vname}_lr.tif'
+
+        ds = gdal.Warp(fname_lr, fname_vrt,
+            xRes=xyres, yRes=xyres, resampleAlg='average')
+        ds = None
+
+        tif_lrs.append(fname_lr)
+
+
+    return tif_lrs

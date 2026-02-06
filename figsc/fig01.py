@@ -6,15 +6,37 @@ import matplotlib.pyplot as plt
 import akramms.experiment.aksc5 as exp
 from uafgi.util import wrfutil,cartopyutil,gisutil
 import akfigs
-
+import shapely.geometry
 
 # Line2D Properties: https://matplotlib.org/stable/api/_as_gen/matplotlib.lines.Line2D.html#matplotlib.lines.Line2D
 
+
+def combos_extent(gridD, combos, margin=(0,0,0,0)):
+    """Infer extent from a number of combos
+    margin: [west, south, east, north]
+    """
+
+    tiles = sorted({(combo.idom, combo.jdom) for combo in combos})
+    polys = [gridD.poly(idom, jdom) for idom,jdom in tiles]
+
+    gc = shapely.geometry.GeometryCollection(polys)
+    bbox = gc.bounds    # minx, miny, maxx, maxy
+    ext = [bbox[0], bbox[2], bbox[1], bbox[3]]    # minx, maxx, miny, maxy
+    return [ext[0] - margin[0], ext[1] + margin[1], ext[2] - margin[2], ext[3] + margin[3]]
+
+jdom_for_idom = {79:35, 80:35, 81:35, 82:35}
+
+
 def main():
     map_crs = akfigs.map_crs()
-    map_extent = list(akfigs.anchorage_map_extent)
-    map_extent[0] -= 5000
-    map_extent[-1] += 5000
+
+    combos = list(exp.full())
+    map_extent = combos_extent(exp.gridD, combos, margin=(30000, 30000, 30000, 30000))
+
+##    map_extent = list(akfigs.anchorage_map_extent)
+#    map_extent = list(akfigs.scalaska_map_extent)
+#    map_extent[0] -= 5000
+#    map_extent[-1] += 5000
 
     fig,ax = plt.subplots(
         nrows=1,ncols=1,
@@ -22,11 +44,13 @@ def main():
         figsize=(7.2,5.5))
     ax.set_extent(map_extent, map_crs)
 
-    ax.add_image(cartopy.io.img_tiles.OSM(cache=True), 9, alpha=1)    # Use level 7 (lower # is coarser)
+    ax.add_image(cartopy.io.img_tiles.OSM(cache=True), 7, alpha=1)    # Use level 7 (lower # is coarser)
+#    ax.add_image(cartopy.io.img_tiles.OSM(cache=True), 9, alpha=1)    # Use level 7 (lower # is coarser)
 #    ax.coastlines(resolution='50m', color='grey', linewidth=0.5)
 
     # Read the tile squares for our own analysis
-    ijdom = {(combo.idom, combo.jdom) for combo in exp.anchorage()}
+#    combos = exp.anchorage()
+    ijdom = {(combo.idom, combo.jdom) for combo in combos}
     tile_df = geopandas.read_file(str(exp.dir / 'aksc5_domains.shp'))
     ijdom_col = tile_df.apply(lambda row: (row.idom,row.jdom), axis=1)
     tile_df = tile_df[ijdom_col.isin(ijdom)]
@@ -48,15 +72,7 @@ def main():
     # Plot jdom numbers
     for jdom,col_df in tile_df.groupby('jdom'):
 
-#        if jdom <= 43:
-#            idom = 87
-#        elif jdom in (44,45):
-#            idom = col_df.idom.nsmallest(2).iloc[-1]    # Second smallest
-#        else:
-        if True:
-            idom = col_df.idom.min()
-
-
+        idom = col_df.idom.min()
         tile_grid = exp.gridD.sub(idom,jdom, 10,10, margin=False)
 
         GT = exp.gridD.geotransform
@@ -73,14 +89,12 @@ def main():
             fontdict={'size':8})
 
 
-    # Plot idom numbers
+    # Plot idom (column) numbers
     for idom,col_df in tile_df.groupby('idom'):
+        jdom = jdom_for_idom.get(idom, col_df.jdom.min())
 
-#        if idom <= 98:
-#            jdom = 35
-#        else:
-        if True:
-            jdom = col_df.jdom.min()
+        print('ijdom2 ', idom, jdom)
+
 
         tile_grid = exp.gridD.sub(idom,jdom, 10,10, margin=False)
         
@@ -97,7 +111,7 @@ def main():
             horizontalalignment='center', verticalalignment='bottom',
             fontdict={'size':8})
 
-    akfigs.plot_cities(ax, 'anchorage',
+    akfigs.plot_cities(ax, 'scalaska',
         text_kwargs=dict(
             fontdict = {'size': 7, 'color': 'blue', 'fontweight': 'bold'}),
         marker_kwargs=dict(

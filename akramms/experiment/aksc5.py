@@ -2,6 +2,7 @@ import os,collections,sys,itertools,pathlib,hashlib
 import numpy as np
 import schema
 import geopandas
+import shapely
 from uafgi.util import schemautil,shputil,gisutil,ulam,gicollections,ogrutil
 from akramms import downscale_snow
 from akramms import config, r_experiment
@@ -303,6 +304,10 @@ def split_domains2(domains, ix):
             yield ij
 
 
+def myfn():
+    print('mmmmyfn')
+    return
+
 # Different subsets of combos to try when running the experiment
 def full(ix=None):
     """Yields the combos for the FULL experiment.
@@ -322,7 +327,29 @@ def full(ix=None):
         (85,36), (85,35),
         (86,36), (86,35),
         (87,36), (87,35),
+        (82,35), (82,36), (82,37), (82, 38),     # Parks Highway west of SC
+        (82,34), (83,34), (83,33), (83,32), (84,32), (84,31),    # Parks Highway north through Denali
         ))
+
+    # Add Kodiak Island
+    limit_zip = str(config.HARNESS / 'data' / 'fischer' / 'KodiakOutline.zip')
+    limit_shp = f'/vsizip/{limit_zip}/KodiakOutline.shp'
+    limit_mpoly = ogrutil.read_multi_polygon(limit_shp)
+    df = gridD.intersecting_tiles(limit_mpoly)
+    limit_set.update(zip(df.idom, df.jdom))
+
+    # Add the road / rail belt
+    roads_zip = config.HARNESS / 'data' / 'fischer' / 'AlaskaRoad_Albers2.zip'
+    df = geopandas.read_file(f'zip://{roads_zip}')
+    roads_mlines = shapely.MultiLineString(list(df.geometry))
+    df = gridD.intersecting_tiles(roads_mlines)
+    road_tiles = list(zip(df.idom, df.jdom))
+    road_tiles = list((idom,jdom) for idom,jdom in road_tiles if idom >= 74 and idom <= 100)    # Cut out extra roads in Southeast and Aleutians
+#    road_tiles = list((idom,jdom) for idom,jdom in road_tiles if jdom >= 26)    # Cut out everything north of Fairbanks
+    
+    limit_set.update(road_tiles)
+
+
 
     # Generate set of trials
     snow = 'ccsm'
