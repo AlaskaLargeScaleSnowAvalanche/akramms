@@ -3,6 +3,7 @@ import numpy as np
 import schema
 import geopandas
 import shapely
+import shapely.ops
 from uafgi.util import schemautil,shputil,gisutil,ulam,gicollections,ogrutil
 from akramms import downscale_snow
 from akramms import config, r_experiment
@@ -268,28 +269,20 @@ def all_domains():
 exclude = {
     (99,43),    # eCognition hung on this coastal tile
 }
-def spiral_domains(x0, y0):
+def sort_spiral(tiles, x0, y0):
     """Use Ulam Spiral out from a central domain tile"""
 
-    dij = set(all_domains())
+    tiles = set(tiles)
 
     # High prioirty domains
     # (Code usese x/y and i/j interchangibly here)
-    high_priority = [
-    ]
-    for xy in high_priority:
-        if xy in dij:
-            yield xy
-            dij.remove(xy)
-
     for n in itertools.count(start=0, step=1):
         dxy = ulam.n_to_xy(n)
-        xy = (x0 + dxy[0], y0 + dxy[1])
-        if xy in dij:
-            if xy not in exclude:
-                yield xy
-            dij.remove(xy)
-            if len(dij) == 0:
+        ij = (x0 + dxy[0], y0 + dxy[1])
+        if ij in tiles:
+            yield ij
+            tiles.remove(ij)
+            if len(tiles) == 0:
                 return
 
 
@@ -330,38 +323,44 @@ def full(ix=None):
         (82,35), (82,36), (82,37), (82, 38),     # Parks Highway west of SC
         (82,34), (83,34), (83,33), (83,32), (84,32), (84,31),    # Parks Highway north through Denali
         ))
+    avoid = {(75,52), (75,51), (76,50), (77,49)}
+    tiles = {ijdom:None for ijdom in sort_spiral(limit_set, 83, 40) if ijdom not in avoid}
 
     # Add Kodiak Island
     limit_zip = str(config.HARNESS / 'data' / 'fischer' / 'KodiakOutline.zip')
     limit_shp = f'/vsizip/{limit_zip}/KodiakOutline.shp'
     limit_mpoly = ogrutil.read_multi_polygon(limit_shp)
     df = gridD.intersecting_tiles(limit_mpoly)
-    limit_set.update(zip(df.idom, df.jdom))
+    new_tiles = list(zip(df.idom, df.jdom))
+    avoid = {(75,52), (75,51), (76,50), (77,49),}    # Extraneous tiles to remove
+    tiles.update((ijdom,None) for ijdom in new_tiles if (ijdom not in avoid) and (ijdom not in tiles))
 
     # Add the road / rail belt
     roads_zip = config.HARNESS / 'data' / 'fischer' / 'AlaskaRoad_Albers2.zip'
     df = geopandas.read_file(f'zip://{roads_zip}')
-    roads_mlines = shapely.MultiLineString(list(df.geometry))
+    df['geometry'] = df.geometry.map(lambda shp: shp.buffer(7000))    # Add 7km margin around road
+
+#    geom = df.iloc[0].geometry
+#    print(geom)
+#    for geom in df.geometry:
+#        print(type(geom))
+
+#    roads_mlines = shapely.MultiLineString(list(df.geometry))
+#    roads_mlines = shapely.MultiPolygon(list(df.geometry))
+    roads_mlines = shapely.ops.unary_union(list(df.geometry))
     df = gridD.intersecting_tiles(roads_mlines)
     road_tiles = list(zip(df.idom, df.jdom))
     road_tiles = list((idom,jdom) for idom,jdom in road_tiles if idom >= 74 and idom <= 100)    # Cut out extra roads in Southeast and Aleutians
 #    road_tiles = list((idom,jdom) for idom,jdom in road_tiles if jdom >= 26)    # Cut out everything north of Fairbanks
     
-    limit_set.update(road_tiles)
-
-
+    tiles.update((ijdom,None) for ijdom in road_tiles if ijdom not in tiles)
 
     # Generate set of trials
     snow = 'ccsm'
     downscale_algo = 'sclapse'
 #    for return_periods in [[30,300], [10,100]]:
     for return_periods in [[30,300, 10,100]]:
-        domains = spiral_domains(83, 40)    # generator
-        if ix is not None:
-            domains = split_domains2(domains, ix)
-        for idom,jdom in domains:    # Spiral around Anchorage
-            if (idom,jdom) not in limit_set:
-                continue
+        for idom,jdom in tiles:    # Spiral around Anchorage
             for era in ['past']:    # also 'future'
                 for return_period in return_periods:
                     for forest in ('NoFor','For'):
