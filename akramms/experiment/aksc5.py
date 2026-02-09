@@ -321,7 +321,7 @@ def full(ix=None):
         (86,36), (86,35),
         (87,36), (87,35),
         (82,35), (82,36), (82,37), (82, 38),     # Parks Highway west of SC
-        (82,34), (83,34), (83,33), (83,32), (84,32), (84,31),    # Parks Highway north through Denali
+#        (82,34), (83,34), (83,33), (83,32), (84,32), (84,31),    # Parks Highway north through Denali
         ))
     avoid = {(75,52), (75,51), (76,50), (77,49)}
     tiles = {ijdom:None for ijdom in sort_spiral(limit_set, 83, 40) if ijdom not in avoid}
