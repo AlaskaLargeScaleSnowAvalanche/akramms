@@ -22,6 +22,38 @@ def _ring_to_poly(ring):
 #    print('len points ', len(points))
     return shapely.geometry.Polygon(points)
 
+def load_experiment_region(experiment_region_shp):
+    """Loads expmod.experiment_region (coastal outlines) as a Shapely Multi-Polygon"""
+    # Load the experiment region and convert to Shapely Polygon
+    driver = ogr.GetDriverByName('ESRI Shapefile')
+    print('Opening shapefile ', experiment_region_shp)
+    src_ds = driver.Open(experiment_region_shp)
+    src_lyr = src_ds.GetLayer()   # Put layer number or name in her
+    polygons = list()
+    while True:
+        feature = src_lyr.GetNextFeature()
+        # If this is one big MultiPolygon there will be only ONLY feature
+        # If it is many Polygons, there will be MANY features.
+        if feature is None:
+            break
+
+        geom = feature.GetGeometryRef()
+        geom_name = geom.GetGeometryName()  # POLYGON OR MULTIPOLYGON
+        if geom_name == 'POLYGON':
+#                print('geocount ', geom.GetGeometryCount())
+            ring = geom.GetGeometryRef(0)
+            polygons.append(_ring_to_poly(ring))
+        else:    # Multi Polygon
+            npoly = geom.GetGeometryCount()
+            for ix in range(npoly):
+                ring = geom.GetGeometryRef(ix).GetGeometryRef(0)
+                polygons.append(_ring_to_poly(ring))
+
+    print('len polygons ', len(polygons))
+    experiment_region = shapely.geometry.MultiPolygon(polygons)
+#        print(experiment_region)
+    return experiment_region
+
 @functools.lru_cache()
 def r_active_domains(exp_mod):
     """Writes a shapefile defining the domains for THIS experiment that will be used...
@@ -56,34 +88,7 @@ def r_active_domains(exp_mod):
     domains_margin_zip = exp_mod.dir / f'{exp_mod.name}_domains_margin.zip'
 
     def action(tdir):
-        # Load the experiment region and convert to Shapely Polygon
-        driver = ogr.GetDriverByName('ESRI Shapefile')
-        print('Opening shapefile ', exp_mod.experiment_region_shp)
-        src_ds = driver.Open(exp_mod.experiment_region_shp)
-        src_lyr = src_ds.GetLayer()   # Put layer number or name in her
-        polygons = list()
-        while True:
-            feature = src_lyr.GetNextFeature()
-            # If this is one big MultiPolygon there will be only ONLY feature
-            # If it is many Polygons, there will be MANY features.
-            if feature is None:
-                break
-
-            geom = feature.GetGeometryRef()
-            geom_name = geom.GetGeometryName()  # POLYGON OR MULTIPOLYGON
-            if geom_name == 'POLYGON':
-#                print('geocount ', geom.GetGeometryCount())
-                ring = geom.GetGeometryRef(0)
-                polygons.append(_ring_to_poly(ring))
-            else:    # Multi Polygon
-                npoly = geom.GetGeometryCount()
-                for ix in range(npoly):
-                    ring = geom.GetGeometryRef(ix).GetGeometryRef(0)
-                    polygons.append(_ring_to_poly(ring))
-
-        print('len polygons ', len(polygons))
-        experiment_region = shapely.geometry.MultiPolygon(polygons)
-#        print(experiment_region)
+        experiment_region = load_experiment_region(exp_mod)
 
         # Compute the gridcells
         rows = list()

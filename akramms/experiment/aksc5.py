@@ -326,6 +326,7 @@ def full(ix=None):
     avoid = {(75,52), (75,51), (76,50), (77,49)}
     tiles = {ijdom:None for ijdom in sort_spiral(limit_set, 83, 40) if ijdom not in avoid}
 
+
     # Add Kodiak Island
     limit_zip = str(config.HARNESS / 'data' / 'fischer' / 'KodiakOutline.zip')
     limit_shp = f'/vsizip/{limit_zip}/KodiakOutline.shp'
@@ -339,21 +340,19 @@ def full(ix=None):
     roads_zip = config.HARNESS / 'data' / 'fischer' / 'AlaskaRoad_Albers2.zip'
     df = geopandas.read_file(f'zip://{roads_zip}')
     df['geometry'] = df.geometry.map(lambda shp: shp.buffer(7000))    # Add 7km margin around road
-
-#    geom = df.iloc[0].geometry
-#    print(geom)
-#    for geom in df.geometry:
-#        print(type(geom))
-
-#    roads_mlines = shapely.MultiLineString(list(df.geometry))
-#    roads_mlines = shapely.MultiPolygon(list(df.geometry))
     roads_mlines = shapely.ops.unary_union(list(df.geometry))
     df = gridD.intersecting_tiles(roads_mlines)
     road_tiles = list(zip(df.idom, df.jdom))
     road_tiles = list((idom,jdom) for idom,jdom in road_tiles if idom >= 74 and idom <= 100)    # Cut out extra roads in Southeast and Aleutians
-#    road_tiles = list((idom,jdom) for idom,jdom in road_tiles if jdom >= 26)    # Cut out everything north of Fairbanks
-    
+#    road_tiles = list((idom,jdom) for idom,jdom in road_tiles if jdom >= 26)    # Cut out everything north of Fairbanks    
     tiles.update((ijdom,None) for ijdom in road_tiles if ijdom not in tiles)
+
+    # Remove tiles that do not intersect with land!
+    # (And covert to a list)
+    df = geopandas.read_file(dir / f'{name}_domains.shp')    # All Alaska tiles, no ocean tiles
+    land_tiles = set(zip(df.idom, df.jdom))
+    tiles = [ijdom for ijdom in tiles.keys() if ijdom in land_tiles]
+
 
     # Generate set of trials
     snow = 'ccsm'
