@@ -328,24 +328,26 @@ def full(ix=None):
 
 
     # Add Kodiak Island
-    limit_zip = str(config.HARNESS / 'data' / 'fischer' / 'KodiakOutline.zip')
-    limit_shp = f'/vsizip/{limit_zip}/KodiakOutline.shp'
-    limit_mpoly = ogrutil.read_multi_polygon(limit_shp)
-    df = gridD.intersecting_tiles(limit_mpoly)
-    new_tiles = list(zip(df.idom, df.jdom))
-    avoid = {(75,52), (75,51), (76,50), (77,49),}    # Extraneous tiles to remove
-    tiles.update((ijdom,None) for ijdom in new_tiles if (ijdom not in avoid) and (ijdom not in tiles))
+    if False:
+        limit_zip = str(config.HARNESS / 'data' / 'fischer' / 'KodiakOutline.zip')
+        limit_shp = f'/vsizip/{limit_zip}/KodiakOutline.shp'
+        limit_mpoly = ogrutil.read_multi_polygon(limit_shp)
+        df = gridD.intersecting_tiles(limit_mpoly)
+        new_tiles = list(zip(df.idom, df.jdom))
+        avoid = {(75,52), (75,51), (76,50), (77,49),}    # Extraneous tiles to remove
+        tiles.update((ijdom,None) for ijdom in new_tiles if (ijdom not in avoid) and (ijdom not in tiles))
 
     # Add the road / rail belt
-    roads_zip = config.HARNESS / 'data' / 'fischer' / 'AlaskaRoad_Albers2.zip'
-    df = geopandas.read_file(f'zip://{roads_zip}')
-    df['geometry'] = df.geometry.map(lambda shp: shp.buffer(7000))    # Add 7km margin around road
-    roads_mlines = shapely.ops.unary_union(list(df.geometry))
-    df = gridD.intersecting_tiles(roads_mlines)
-    road_tiles = list(zip(df.idom, df.jdom))
-    road_tiles = list((idom,jdom) for idom,jdom in road_tiles if idom >= 74 and idom <= 100)    # Cut out extra roads in Southeast and Aleutians
-#    road_tiles = list((idom,jdom) for idom,jdom in road_tiles if jdom >= 26)    # Cut out everything north of Fairbanks    
-    tiles.update((ijdom,None) for ijdom in road_tiles if ijdom not in tiles)
+    if False:
+        roads_zip = config.HARNESS / 'data' / 'fischer' / 'AlaskaRoad_Albers2.zip'
+        df = geopandas.read_file(f'zip://{roads_zip}')
+        df['geometry'] = df.geometry.map(lambda shp: shp.buffer(7000))    # Add 7km margin around road
+        roads_mlines = shapely.ops.unary_union(list(df.geometry))
+        df = gridD.intersecting_tiles(roads_mlines)
+        road_tiles = list(zip(df.idom, df.jdom))
+        road_tiles = list((idom,jdom) for idom,jdom in road_tiles if idom >= 74 and idom <= 100)    # Cut out extra roads in Southeast and Aleutians
+    #    road_tiles = list((idom,jdom) for idom,jdom in road_tiles if jdom >= 26)    # Cut out everything north of Fairbanks    
+        tiles.update((ijdom,None) for ijdom in road_tiles if ijdom not in tiles)
 
     # Remove tiles that do not intersect with land!
     # (And covert to a list)

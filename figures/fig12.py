@@ -85,7 +85,8 @@ def doplot(section, xdata_tif, ofname, map_extent=None, idom=113, jdom=45, xyres
             subplot_kw={'projection': map_crs},
             figsize=(3.0,3.0))
         ax.set_extent(map_extent, map_crs)
-        ax.set_facecolor((82./255,117./255,168./255))    # LANDSAT color for open water
+#        ax.set_facecolor((82./255,117./255,168./255))    # LANDSAT color for open water
+        ax.set_facecolor((126./255,143./255,168./255))    # LANDSAT color for open water
 
 
         landcover_grid, landcover_data, landcover_nd = gdalutil.read_raster(landcover_tif_lr)
