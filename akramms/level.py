@@ -179,8 +179,12 @@ def chunkdir_to_releasefile(chunkdir):
             releasefiles.append(RELEASEdir / file)
 
     # There should only be one release file per chunk!
-    assert len(releasefiles) == 1
-    return releasefiles[0]
+    if len(releasefiles) == 0:
+        raise ValueError(f'No Release files found for {chunkdir}')
+    elif len(releasefiles) != 1:
+        raise ValueError(f'Wrong numbe of release files for {chunkdir}: {len(releasefiles)}')
+    else:
+        return releasefiles[0]
 
 # -----------------------------------------------------------
 def arcdir_to_releasefiles(arcdir):
