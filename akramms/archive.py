@@ -790,13 +790,14 @@ def read_reldom(arcdir_zip, ext, **kwargs):
             match = fileRE.match(info.filename)
             if match is not None:
                 fnames.append(f'/vsizip//{arcdir_zip}/{info.filename}')
+#                fnames.append(f'{arcdir_zip}!{info.filename}')
 
     dfs = list()
     for fname in fnames:
         print(f'------- archive.read_reldom() Reading shapefile: {fname}')
 #        dfs.append(ogrutil.read_df(fname, **kwargs).df)
         try:
-            dfs.append(geopandas.read_file(fname))
+            dfs.append(geopandas.read_file(fname, engine='fiona'))
         except fiona.errors.DriverError:
             # Eg fiona.errors.DriverError: '/vsizip///mnt/avalanche_sim/prj/ak/ak-ccsm-1981-2010-lapse-For-30/arc-088-042/RELEASE.zip/x-088-042For_10m_30L_rel.shp' not recognized as a supported file format.
             # This happens with zero-length shapefiles inside a .zip file
