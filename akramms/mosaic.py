@@ -137,10 +137,10 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
 
         # Figure out where we will write extent files
         arcdir = expmod.combo_to_scenedir(combo, scenetype='arc')
-        swcombo = arcdir.parts[-2]    # Eg: 'ak-ccsm-1981-2010-lapse-For-30'
-        sijdom = arcdir.parts[-1][4:]    # Eg: 111-044
-        expdir_ext = expmod.dir.parents[0] / 'ext'
-        extent_dir = expdir_ext / swcombo / 'extent'
+#        swcombo = arcdir.parts[-2]    # Eg: 'ak-ccsm-1981-2010-lapse-For-30'
+#        sijdom = arcdir.parts[-1][4:]    # Eg: 111-044
+#        expdir_ext = expmod.dir.parents[0] / 'ext'
+#        extent_dir = expdir_ext / swcombo / 'extent'
 
         # Initial list of IDs based on query
         akdf1 = akdf1.sort_values('id')
@@ -593,7 +593,6 @@ class stdmosaic_action:
         name = f'{expmod.name}-{scombo}-{sstatus}'
         self.mwriter = PublishMosaicWriter(exp, name)
 
-
     def __call__(self, tdir):
         tifdir = pathlib.Path(tdir.location)
         mos = mosaic_avals_combo(
@@ -608,3 +607,40 @@ def stdmosaic_rule(*args, **kwargs):
     action_fn = stdmosaic_action(*args, **kwargs)
     return make.Rule(action_fn, [], action_fn.mwriter.outputs())
 # ---------------------------------------------------------------------------------
+
+def stdmosaic_rules(akdf0, akdf_all):
+
+    # Identify tiles we are doing
+    ijdoms = akdf0.set_index(['idom','jdom']).set()
+    print('stdmosaic_rules ijdoms = ', ijdoms)
+    return    # DEBUG
+
+    # Determine input tiles where we need extents
+    domains_margin_shp = expmod.dir / f'{expmod.name}_domains_margin.shp'
+    df = geopandas.read_file(domains_margin_shp).set_index(['idom','jdom'])
+
+
+
+    plan = list()
+    exp = akdf0.iloc[0].exp
+    expmod = akramms.parse.load_expmod(exp)
+    publish_dir = expmod.root_dir / 'publish'
+    os.makedirs(expmod.root_dir / 'tmp', exist_ok=True)
+    for akdf1 in avalquery.consolidate_by_forest(expmod, akdf0):
+        expset = _get_expset(akdf1.iloc[0])
+        # expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
+
+        # TODO: Separate out extent generation as separate rules, so
+        # we can gain benefits of parallelism and chunking.
+
+        rule = mosaic.stdmosaic_rule(exp, akdf1, args.status, args.dry_run, args.force)
+        makefile = make.Makefile()
+        makefile.add(rule)
+        makefile.generate(expmod.root_dir / f'{exp}_{expset}_mosiac.mk',
+            tdir_fn = lambda: ioutil.TmpDir(expmod.root_dir / 'tmp'),
+            run=True, ncpu=16)
+
+
+
+        df = 
+

@@ -104,26 +104,48 @@ def check_extent_sign(extent):
     assert x1>=x0
     assert y1>=y0
 # =====================================================================
-@functools.lru_cache()
-def tile_rtree(expmod):
-    """Put all the available tiles into an RTree"""
+#@functools.lru_cache()
+#def tile_rtree(expmod):
+#    """Put all the available tiles into an RTree"""
+#    domains_margin_shp = os.path.join(expmod.dir, f'{expmod.name}_domains_margin.shp')
+##    domains_df = shputil.read_df(domains_margin_shp)#.df#.set_index(['idom', 'jdom'])
+#    df = geopandas.read_file(domains_margin_shp)
+#
+#    # Remove excluded tiles
+#    df['ijdom'] = list(zip(df.idom, df.jdom))
+#    df = df[~df.ijdom.isin(expmod.exclude_tiles)]
+#
+#    return rtreeutil.RTree(df, shapecol='geometry')
+
+def tile_rtree(expmod, akdf_all):
+    """
+    akdf0:
+        A combo-level stuff
+    """
+    df0 = akdf_all[['idom','jdom']].drop_duplicates()    # One row per tile used in our sub-experiment
+
+    # Domain of all tiles
     domains_margin_shp = os.path.join(expmod.dir, f'{expmod.name}_domains_margin.shp')
-#    domains_df = shputil.read_df(domains_margin_shp)#.df#.set_index(['idom', 'jdom'])
-    df = geopandas.read_file(domains_margin_shp)
+    df1 = geopandas.read_file(domains_margin_shp)
 
-    # Remove excluded tiles
-    df['ijdom'] = list(zip(df.idom, df.jdom))
-    df = df[~df.ijdom.isin(expmod.exclude_tiles)]
+    # Domain of tiles used in our experiment
+    df = df1.merge(df0, on=['idom','jdom'], how='left')
+    print('tile_rtree ', df)
 
-    return rtreeutil.RTree(df, shapecol='geometry')
+    return rtreeutil.RTree(df, shapecol='geomoetry')
 
-def expand_combos_by_geom(expmod, akdf, geom):
+#    df['ijdom'] = list(zip(df.idom, df.jdom))
+
+
+def expand_combos_by_geom(expmod, akdf, akdf_all, geom):
     """
     expmod:
         Overall experiment
     akdf:
         Resolved to combo level
-        All combos in expmod
+        All combos in our query
+    akdf_all:
+        All combos in our sub-experiment (eg result of aksc5.full())
     geom:
         Shapely geometry combos must intersect with
     """
@@ -136,7 +158,8 @@ def expand_combos_by_geom(expmod, akdf, geom):
 
     # Throw out the list of tiles, and instead figure out which tiles
     # (with margins) intersect geom.
-    qdf = tile_rtree(expmod).intersection(geom)
+#    qdf = tile_rtree(expmod).intersection(geom)
+    qdf = tile_rtree(expmod, akdf_all)
 
     # Compute Cartesian product of the two
     combos = list()
@@ -190,10 +213,13 @@ def geom_by_avalanches(expmod, akdf):
     return geom
 
 # ---------------------------------------------------------------------
-def query(akdf0, sextent, scenetypes={'x', 'arc'},
+def query(akdf0, akdf_all, sextent, scenetypes={'x', 'arc'},
     statuses=[file_info.JobStatus.OVERRUN, file_info.JobStatus.FINISHED], force=False):
 
-    """akdf:
+    """
+    NOTE: Before running, extents MUST have already been written.  See extent.r_combo_extent()
+
+    akdf:
         Resolved to the combo level (or should work at id level too)
         (If it contains specific IDs, that will be in the `parsed`
         column, and will come out later in this function as we resolve
@@ -256,11 +282,11 @@ def query(akdf0, sextent, scenetypes={'x', 'arc'},
 
             # Filter/expand combos to account for all tiles (with margins) that
             # intersect the geom
-            akdf1 = expand_combos_by_geom(expmod, akdf1, geom)   # This finds avalanches in neighboring tiles!!!
+            akdf1 = expand_combos_by_geom(expmod, akdf1, akdf_all, geom)   # This finds avalanches in neighboring tiles!!!
             akdf1 = joblib.add_combo_quickstatus(akdf1)
 
             # Make sure all combos have status EXTENT, and are fully ready to query!
-            print('Query searching the following combos:')
+            print('Query searching the following combos, all most have status EXTENT:')
             #print(akdf1.columns)
             print(akdf1[['combo', 'combo_quickstatus']])
 
@@ -275,7 +301,7 @@ def query(akdf0, sextent, scenetypes={'x', 'arc'},
 
 
             # --------- Make sure the proper extent files are written
-            akramms.extent.write_combos_extents(expmod, akdf1)
+#            akramms.extent.write_combos_extents(expmod, akdf1)
 
             # --------- Move to the avalanche (id) level
             # Resolve to individual avalanches

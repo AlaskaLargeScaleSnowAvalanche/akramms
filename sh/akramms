@@ -1053,26 +1053,7 @@ def stdmosaic(args):
     if len(akdf0) == 0:
         raise ValueError('None of the select combos are MARKED_FINISHED.  Run akramms status --update')
 
-    # Process mosaics one combo at a time
-    plan = list()
-    exp = akdf0.iloc[0].exp
-    expmod = akramms.parse.load_expmod(exp)
-    publish_dir = expmod.root_dir / 'publish'
-    os.makedirs(expmod.root_dir / 'tmp', exist_ok=True)
-    for akdf1 in avalquery.consolidate_by_forest(expmod, akdf0):
-        expset = _get_expset(akdf1.iloc[0])
-        # expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
-
-        # TODO: Separate out extent generation as separate rules, so
-        # we can gain benefits of parallelism and chunking.
-
-        rule = mosaic.stdmosaic_rule(exp, akdf1, args.status, args.dry_run, args.force)
-        makefile = make.Makefile()
-        makefile.add(rule)
-        makefile.generate(expmod.root_dir / f'{exp}_{expset}_mosiac.mk',
-            tdir_fn = lambda: ioutil.TmpDir(expmod.root_dir / 'tmp'),
-            run=True, ncpu=1)
-
+    rules = mosaic.stdmosaic_rules(akdf0)
 
 
 
