@@ -259,34 +259,30 @@ class WriteGpkg:
             extent_type=self.extent_type, mask_kwargs=mask_kwargs)
         self.relrows.append(list(relsizes) + list(extsizes))
 
-
-
-
+# ----------------------------------------------------------------
 extent_types = ('christen', 'full', 'tetra30', 'tetra1')
-def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
 
-    """Write the extent files for a number of combos.
-    akdf:
-        Resolved to combo level (in arc dir)
-    """
-    
-    # Iterate through one combo at a time
-    for irow in range(len(akdf0)):
+class combo_extent_action:
 
-        row = akdf0.iloc[irow]    # Returns a Series
+    def __init__(self, exp, row):
+
+        self.exp = exp
+        self.row = row
+
         combo = row['combo']
-
+        expmod = akramms.parse.load_expmod(exp)
 
         extent_writers = {extent_type: WriteGpkg(expmod, combo, extent_type, None) for extent_type in extent_types}
         extent_dir = extent_writers['full'].extent_dir    # All extent_dirs are the same
-        os.makedirs(extent_dir, exist_ok=True)
 
-        # Don't need to re-do extents if ALL output files are there
-        print('Writing extent files:')
-        for ew in extent_writers.values():
-            print('    ', ew.extent_gpkg)
-        if (not overwrite) and all((os.path.isfile(extent_writer.extent_gpkg) for extent_writer in extent_writers.values())):
-            continue
+        self.outputs = [ew.extent_gpkg for ew in extent_writers.values()]
+
+
+    def __call_(self, tdir):
+        combo = self.row['combo']
+        expmod = akramms.parse.load_expmod(self.exp)
+        extent_writers = {extent_type: WriteGpkg(expmod, combo, extent_type, None) for extent_type in extent_types}
+
 
         # Read the releasefile polygons so we can analyze land surface types
         # (reldf only needs to be set if there are avalanches in this combo)
@@ -297,7 +293,8 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
             reldfi = reldf.set_index('Id')
 
         # Make a dataframe from that one combo, then convert to IDs
-        akdf1 = akdf0.iloc[[irow]]    # Returns a dataframe of just one row
+#        akdf1 = akdf0.iloc[[irow]]    # Returns a dataframe of just one row
+        akdf1 = pd.DataFrame([self.row])
         akdf1 = resolve.resolve_chunk(akdf1, scenetypes={'arc'})
         akdf1 = resolve.resolve_id(akdf1, realized=True)
 
@@ -366,6 +363,9 @@ def write_combos_extents(expmod, akdf0, overwrite=False, rho=300):
             for ew in extent_writers.values():
                 ew.complete = True
 
+def r_combo_extent(self, *args, **kwargs):
+    action_fn = combo_extent_action*args, **kwargs)
+    return make.Rule(action_fn, [], action_fn.outputs)
 
 def read_annotated_extent(expmod, combo, extent_type):
 
