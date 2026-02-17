@@ -1017,17 +1017,12 @@ def extent(args):
     akdf = joblib.add_combo_quickstatus(expmod, akdf, mtime=False)
     akdf = akdf[akdf.combo_quickstatus == JobStatus.MARKED_FINISHED]
 
-#    ijdom = akdf.combo.map(lambda combo: (combo.idom, combo.jdom))
-#    akdf = akdf.loc[ijdom.isin([(83,40)])]
-#    akdf = akdf.loc[ijdom.isin([(89,40)])]    # DEBUG
-
-    rule = extent.r_combo_extent(expmod.name, akdf.iloc[0])
-#    print(rule)
-#    rule.action(None)
-
     expset = _get_expset(akdf.iloc[0])
     makefile = make.Makefile()
-    makefile.add(rule)
+    for row in akdf.iterrows():
+        rule = extent.r_combo_extent(expmod.name, row)
+        makefile.add(rule)
+
     makefile.generate(expmod.root_dir / f'{exp}_{expset}_extent.mk',
         tdir_fn = lambda: ioutil.TmpDir(expmod.root_dir / 'tmp'),
         run=True, ncpu=config.ncpu_archive)
