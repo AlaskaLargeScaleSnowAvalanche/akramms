@@ -1005,25 +1005,46 @@ def stats(args):
 ])
 def extent(args):
     """Write the extent files related to some combos"""
+    from uafgi.util import ioutil
     from akramms import extent
     from akramms.file_info import JobStatus
 
     # Identify combos
     parseds = akramms.parse.parse_args(args.spec)
     akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
-    expmod = akramms.parse.load_expmod(akdf.exp[0])    # Always works
+    exp = akdf.exp[0]
+    expmod = akramms.parse.load_expmod(exp)    # Always works
     akdf = joblib.add_combo_quickstatus(expmod, akdf, mtime=False)
-    akdf = akdf[akdf.combo_quickstatus >= JobStatus.MARKED_FINISHED]
-#    akdf = joblib.add_combo_status(expmod, akdf, update=False, delete_xdir=False)
-    print('akdf ', akdf)
-    print(akdf.combo_quickstatus.value_counts())
-    return
+    akdf = akdf[akdf.combo_quickstatus == JobStatus.MARKED_FINISHED]
 
-    for exp,akdf1 in akdf0.groupby('exp'):
-        # akdf1 = akdf1.sort_values('combo_order')    # Not needed
-        expmod = akramms.parse.load_expmod(exp)
+#    ijdom = akdf.combo.map(lambda combo: (combo.idom, combo.jdom))
+#    akdf = akdf.loc[ijdom.isin([(83,40)])]
+#    akdf = akdf.loc[ijdom.isin([(89,40)])]    # DEBUG
 
-        extent.write_combos_extents(expmod, akdf1)
+    rule = extent.r_combo_extent(expmod.name, akdf.iloc[0])
+#    print(rule)
+#    rule.action(None)
+
+    expset = _get_expset(akdf.iloc[0])
+    makefile = make.Makefile()
+    makefile.add(rule)
+    makefile.generate(expmod.root_dir / f'{exp}_{expset}_extent.mk',
+        tdir_fn = lambda: ioutil.TmpDir(expmod.root_dir / 'tmp'),
+        run=True, ncpu=config.ncpu_archive)
+
+
+#    return
+#
+##    akdf = joblib.add_combo_status(expmod, akdf, update=False, delete_xdir=False)
+#    print('akdf ', akdf)
+#    print(akdf.combo_quickstatus.value_counts())
+#    return
+#
+#    for exp,akdf1 in akdf0.groupby('exp'):
+#        # akdf1 = akdf1.sort_values('combo_order')    # Not needed
+#        expmod = akramms.parse.load_expmod(exp)
+#
+#        extent.write_combos_extents(expmod, akdf1)
 
 
 @subcommand(args=[

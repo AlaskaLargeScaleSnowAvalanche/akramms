@@ -4,7 +4,7 @@ import pandas as pd
 import pyproj
 import zipfile,netCDF4
 from osgeo import gdal,ogr,gdalconst
-from uafgi.util import gdalutil,ogrutil
+from uafgi.util import gdalutil,ogrutil,make
 from uafgi.util import cfutil,ioutil,gisutil,rasterize
 from akramms import experiment,archive,file_info,avalquery,downscale_snow
 import akramms.parse
@@ -264,24 +264,29 @@ extent_types = ('christen', 'full', 'tetra30', 'tetra1')
 
 class combo_extent_action:
 
-    def __init__(self, exp, row):
-
+    def __init__(self, exp, row, rho=300):
+        """
+        rho: [kg m-2]
+            Assumed snow density
+        """
         self.exp = exp
         self.row = row
+        self.rho = rho
 
         combo = row['combo']
         expmod = akramms.parse.load_expmod(exp)
 
-        extent_writers = {extent_type: WriteGpkg(expmod, combo, extent_type, None) for extent_type in extent_types}
-        extent_dir = extent_writers['full'].extent_dir    # All extent_dirs are the same
+#        extent_writers = {extent_type: WriteGpkg(expmod, combo, extent_type, None) for extent_type in extent_types}
 
-        self.outputs = [ew.extent_gpkg for ew in extent_writers.values()]
+#        self.outputs = [ew.extent_gpkg for ew in extent_writers.values()]
+        self.outputs = extent_files(expmod, combo)
 
 
-    def __call_(self, tdir):
+    def __call__(self, tdir):
         combo = self.row['combo']
         expmod = akramms.parse.load_expmod(self.exp)
         extent_writers = {extent_type: WriteGpkg(expmod, combo, extent_type, None) for extent_type in extent_types}
+        extent_dir = extent_writers[extent_types[0]].extent_dir
 
 
         # Read the releasefile polygons so we can analyze land surface types
@@ -354,7 +359,7 @@ class combo_extent_action:
                 relsizes = (tup.id, relrow['Mean_DEM'], len(lc1), np.sum(lc1==41), np.sum(lc1==42), np.sum(lc1==43))
                 extent_writers['christen'].polygonize(combo, aval, tup.id, relsizes)
                 extent_writers['full'].polygonize(combo, aval, tup.id, relsizes)
-                max_pressure = rho * aval.max_vel * aval.max_vel
+                max_pressure = self.rho * aval.max_vel * aval.max_vel
                 extent_writers['tetra30'].polygonize(combo, aval, tup.id, relsizes,
                     mask_kwargs=dict(max_pressure=max_pressure))
                 extent_writers['tetra1'].polygonize(combo, aval, tup.id, relsizes,
@@ -363,8 +368,8 @@ class combo_extent_action:
             for ew in extent_writers.values():
                 ew.complete = True
 
-def r_combo_extent(self, *args, **kwargs):
-    action_fn = combo_extent_action*args, **kwargs)
+def r_combo_extent( exp, row):
+    action_fn = combo_extent_action(exp, row)
     return make.Rule(action_fn, [], action_fn.outputs)
 
 def read_annotated_extent(expmod, combo, extent_type):

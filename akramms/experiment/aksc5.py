@@ -355,7 +355,6 @@ def full(ix=None):
     land_tiles = set(zip(df.idom, df.jdom))
     tiles = [ijdom for ijdom in tiles.keys() if ijdom in land_tiles]
 
-
     # Generate set of trials
     snow = 'ccsm'
     downscale_algo = 'sclapse'
