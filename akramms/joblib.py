@@ -3,7 +3,7 @@ import htcondor2 as htcondor
 import numpy as np
 import pandas as pd
 from uafgi.util import gdalutil
-from akramms import config,file_info,parse,level,complete,resolve,archive,overrun,params
+from akramms import config,file_info,parse,level,complete,resolve,archive,overrun,params,extent
 
 # Categorize each job int one of four sets
 #job_status_labels = ('noinput', 'incomplete', 'todo', 'inprocess', 'finished', 'overrun', 'failed')
@@ -483,7 +483,7 @@ def is_combo_zero_size(expmod, combo, xdir):
     return True
 
 
-def add_combo_quickstatus(akdf0, mtime=False):
+def add_combo_quickstatus(expmod, akdf0, mtime=False):
 
     """Adds a quick per-combo status field based on just whether the
     combo has been marked finished.  Allows for easy exclusion of
@@ -516,7 +516,8 @@ def add_combo_quickstatus(akdf0, mtime=False):
             arcdir = expmod.combo_to_scenedir(tup.combo, scenetype='arc')
 #            print('quickstatus ', tup.combo, arcdir)
             if os.path.exists(arcdir / 'archived.txt'):
-                if os.path.exists(arcdir / 'extent.gpkg') and os.path.exists(arcdir / 'extent_full.gpkg'):
+                if all(os.path.isfile(gpkg) for gpkg in extent.extent_files(expmod, tup.combo)):
+#                if os.path.exists(arcdir / 'extent.gpkg') and os.path.exists(arcdir / 'extent_full.gpkg'):
                     status = JobStatus.EXTENT
                 else:
                     status = JobStatus.MARKED_FINISHED
@@ -562,7 +563,7 @@ def _ignore_ids(expmod):
 #    xdir = expmod.combo_to_scenedir(row['combo'], scenetype='x')
 #    glob.glob(xdir / 
 
-def add_combo_status(akdf0, realized=True, update=True, dry_run=False, delete_xdir=True, ignore_statuses={}):
+def add_combo_status(expmod, akdf0, realized=True, update=True, dry_run=False, delete_xdir=True, ignore_statuses={}):
     """akdf:
         Resolved to combo level (theoretical, i.e. realized=False)
     update:
@@ -583,11 +584,12 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, delete_xd
         return akdf0
 
     # Cull combos that have finished or not yet started
-    akdf0 = add_combo_quickstatus(akdf0)#, mtime=mtime)
+    akdf0 = add_combo_quickstatus(expmod, akdf0)#, mtime=mtime)
 
-    # Write extent.gpkg
+    # Write extent.gpkg (Actually this does NOT write extents, it just moves it to MARKED_FINISHED
     if update:
-        mask = (akdf0.combo_quickstatus.isin([JobStatus.MARKED_FINISHED, JobStatus.FINISHED]))
+#        mask = (akdf0.combo_quickstatus.isin([JobStatus.MARKED_FINISHED, JobStatus.FINISHED]))
+        mask = (akdf0.combo_quickstatus.isin([JobStatus.FINISHED]))
         for exp,akdf1 in akdf0[mask].reset_index(drop=True).groupby('exp'):
             expmod = parse.load_expmod(exp)
             for tup in akdf1.itertuples(index=False):
@@ -682,7 +684,7 @@ def add_combo_status(akdf0, realized=True, update=True, dry_run=False, delete_xd
 
     return pd.concat(dfs).sort_values('combo_order')
 # ------------------------------------------------------------
-def add_status(akdf, level, realized=True, update=True, dry_run=False, ignore_statuses={}):
+def add_status(expmod, akdf, level, realized=True, update=True, dry_run=False, ignore_statuses={}):
     if level == 'id':
         akdf = add_id_status(akdf, update=update, dry_run=dry_run)
 
@@ -690,7 +692,7 @@ def add_status(akdf, level, realized=True, update=True, dry_run=False, ignore_st
         akdf = add_chunk_status(akdf, realized=realized, update=update, ignore_statuses=ignore_statuses, dry_run=dry_run)
 
     elif level == 'combo':
-        akdf = add_combo_status(akdf, realized=realized, update=update, dry_run=dry_run, ignore_statuses=ignore_statuses)
+        akdf = add_combo_status(expmod, akdf, realized=realized, update=update, dry_run=dry_run, ignore_statuses=ignore_statuses)
 
     return akdf
 

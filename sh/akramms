@@ -233,7 +233,7 @@ def status(args):
         akdf = akdf.rename(columns={'combo_quickstatus': 'combo_status'})
     else:
         akdf = joblib.add_status(
-            akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run, ignore_statuses=ignore_statuses)
+            expmod, akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run, ignore_statuses=ignore_statuses)
 
     # Add idom and jdom columns
     akdf['idom' ] = akdf.combo.map(lambda x: x[-2])
@@ -467,8 +467,9 @@ def xreset(args):
         ignore_statuses = {}
 
     parseds = akramms.parse.parse_args(args.spec)
+    expmod = akramms.parse.load_expmod(akdf.exp[0])    # Always works
     akdf = resolve.resolve_to(parseds, args.level, realized=False)
-    akdf = joblib.add_status(akdf, args.level,
+    akdf = joblib.add_status(expmod, akdf, args.level,
         realized=False, update=False, ignore_statuses=ignore_statuses)
 
     # Refuse to reset things that are still running
@@ -723,7 +724,7 @@ def rerun(args):
         akdf1 = resolve.resolve_chunk(akdf0.iloc[ix:ix+1])
 
         # relized=False needed, or else sometimes chunk_stats is NaN
-        akdf1 = joblib.add_status(akdf1, 'chunk', realized=False, update=False)
+        akdf1 = joblib.add_status(expmod, akdf1, 'chunk', realized=False, update=False)
 
         # OVERRUN will be taken  care of by `akramms overrun`
         akdf1s = akdf1[~akdf1.chunk_status.isin([joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.FINISHED, joblib.JobStatus.OVERRUN, joblib.JobStatus.INPROCESS])]
@@ -759,7 +760,7 @@ def rerun(args):
         # See if the chunk status has changed
         akdf1sb = akdf1s.copy().drop(columns=['chunk_status'])
         time.sleep(5)    # Wait for statues to be updated in system before you re-check
-        akdf1sb = joblib.add_status(akdf1sb, 'chunk', realized=False, update=False)
+        akdf1sb = joblib.add_status(expmod, akdf1sb, 'chunk', realized=False, update=False)
 
         df = akdf1s[['chunkname', 'chunk_status']].merge(
             akdf1sb[['chunkname', 'chunk_status']],
@@ -1005,11 +1006,19 @@ def stats(args):
 def extent(args):
     """Write the extent files related to some combos"""
     from akramms import extent
+    from akramms.file_info import JobStatus
 
     # Identify combos
     parseds = akramms.parse.parse_args(args.spec)
-    akdf0 = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
-    print('akdf0 ', akdf0)
+    akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
+    expmod = akramms.parse.load_expmod(akdf.exp[0])    # Always works
+    akdf = joblib.add_combo_quickstatus(expmod, akdf, mtime=False)
+    akdf = akdf[akdf.combo_quickstatus >= JobStatus.MARKED_FINISHED]
+#    akdf = joblib.add_combo_status(expmod, akdf, update=False, delete_xdir=False)
+    print('akdf ', akdf)
+    print(akdf.combo_quickstatus.value_counts())
+    return
+
     for exp,akdf1 in akdf0.groupby('exp'):
         # akdf1 = akdf1.sort_values('combo_order')    # Not needed
         expmod = akramms.parse.load_expmod(exp)

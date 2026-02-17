@@ -176,6 +176,12 @@ def merge_multipolygons(df0, idcol):
     return gdf
 # ----------------------------------------------------------
 
+def extent_files(expmod, combo):
+    """Extent files required for a given combo"""
+    return [
+        WriteGpkg(expmod, combo, extent_type, None).extent_gpkg \
+        for extent_type in extent_types]
+
 class WriteGpkg:
 #    def __init__(self, expmod, combo, swcombo, sijdom, extent_dir, extent_type, tdir, overwrite=False, mask_kwargs={}):
     def __init__(self, expmod, combo, extent_type, landcover):
