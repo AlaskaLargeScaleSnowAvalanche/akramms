@@ -635,7 +635,8 @@ def run(args):
 
     # Exclude combos that have already been completely finished and archived
     # (and the x-dir might have been deleted)
-    akdf0 = joblib.add_combo_quickstatus(akdf0)
+    expmod = akramms.parse.load_expmod(akdf0.exp[0])    # Always works
+    akdf0 = joblib.add_combo_quickstatus(expmod, akdf0)
     akdf0 = akdf0[~akdf0.combo_quickstatus.isin(
         [joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.EXTENT])]
 

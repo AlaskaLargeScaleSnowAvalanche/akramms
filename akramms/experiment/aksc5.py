@@ -302,7 +302,7 @@ def myfn():
     return
 
 # Different subsets of combos to try when running the experiment
-def full(ix=None):
+def _full(segments):
     """Yields the combos for the FULL experiment.
     REQUIRES: domains.shp and domains_margin.shp
     """
@@ -313,32 +313,35 @@ def full(ix=None):
     df = gridD.intersecting_tiles(limit_mpoly)#.sort_values(['jdom','idom'])
     limit_set = set(zip(df.idom, df.jdom))
 
-    # Add the Talkeeta Mountains
-    limit_set.update((
-        (83,38), (83,37), (83,36), (83,35),
-        (84,37), (84,36), (84,35),
-        (85,36), (85,35),
-        (86,36), (86,35),
-        (87,36), (87,35),
-        (82,35), (82,36), (82,37), (82, 38),     # Parks Highway west of SC
-#        (82,34), (83,34), (83,33), (83,32), (84,32), (84,31),    # Parks Highway north through Denali
-        ))
-    avoid = {(75,52), (75,51), (76,50), (77,49)}
-    tiles = {ijdom:None for ijdom in sort_spiral(limit_set, 83, 40) if ijdom not in avoid}
+    tiles = dict()
+
+    if 'central' in segments:
+        # Add the Talkeeta Mountains
+        limit_set.update((
+            (83,38), (83,37), (83,36), (83,35),
+            (84,37), (84,36), (84,35),
+            (85,36), (85,35),
+            (86,36), (86,35),
+            (87,36), (87,35),
+            (82,35), (82,36), (82,37), (82, 38),     # Parks Highway west of SC
+    #        (82,34), (83,34), (83,33), (83,32), (84,32), (84,31),    # Parks Highway north through Denali
+            ))
+        avoid = {(75,52), (75,51), (76,50), (77,49)}
+        tiles.update((ijdom,None) for ijdom in sort_spiral(limit_set, 83, 40) if ijdom not in avoid)
 
 
     # Add Kodiak Island
-    if False:
+    if 'kodiak' in segments:
         limit_zip = str(config.HARNESS / 'data' / 'fischer' / 'KodiakOutline.zip')
         limit_shp = f'/vsizip/{limit_zip}/KodiakOutline.shp'
         limit_mpoly = ogrutil.read_multi_polygon(limit_shp)
         df = gridD.intersecting_tiles(limit_mpoly)
         new_tiles = list(zip(df.idom, df.jdom))
-        avoid = {(75,52), (75,51), (76,50), (77,49),}    # Extraneous tiles to remove
+        avoid = {(74,53), (75,52), (75,51), (76,50), (77,49),}    # Extraneous tiles to remove
         tiles.update((ijdom,None) for ijdom in new_tiles if (ijdom not in avoid) and (ijdom not in tiles))
 
     # Add the road / rail belt
-    if False:
+    if 'road' in segments:
         roads_zip = config.HARNESS / 'data' / 'fischer' / 'AlaskaRoad_Albers2.zip'
         df = geopandas.read_file(f'zip://{roads_zip}')
         df['geometry'] = df.geometry.map(lambda shp: shp.buffer(7000))    # Add 7km margin around road
@@ -365,6 +368,19 @@ def full(ix=None):
                 for return_period in return_periods:
                     for forest in ('NoFor','For'):
                         yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
+
+
+def full():
+    for combo in _full({'central', 'kodiak', 'road'}):
+        yield combo
+
+def central():
+    for combo in _full({'central'}):
+        yield combo
+
+def kodiak():
+    for combo in _full({'kodiak'}):
+        yield combo
 
 
 
