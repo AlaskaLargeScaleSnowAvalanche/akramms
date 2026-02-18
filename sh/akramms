@@ -1020,7 +1020,7 @@ def extent(args):
 
     expset = _get_expset(akdf.iloc[0])
     makefile = make.Makefile()
-    for row in akdf.iterrows():
+    for index,row in akdf.iterrows():
         rule = extent.r_combo_extent(expmod.name, row)
         makefile.add(rule)
 
