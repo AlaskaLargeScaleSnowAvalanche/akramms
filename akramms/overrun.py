@@ -68,7 +68,9 @@ def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run
 
     # Poll until RAMMS Stage 2 is done running for these combos
     while True:
-        akdf0 = joblib.add_combo_status(akdf0, realized=False, update=update, dry_run=dry_run, ignore_statuses=ignore_statuses)
+        print('akdf0 len ', len(akdf0))
+        expmod = parse.load_expmod(akdf0.exp.iloc[0])    # Always works
+        akdf0 = joblib.add_combo_status(expmod, akdf0, realized=False, update=update, dry_run=dry_run, ignore_statuses=ignore_statuses)
 
         if block:
             mask = (akdf0.combo_status == joblib.JobStatus.INPROCESS)

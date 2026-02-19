@@ -2,7 +2,6 @@ import os,pathlib,subprocess,sys,typing,contextlib
 import numpy as np
 import pandas as pd
 import pyproj
-import zipfile,netCDF4
 from osgeo import gdal,ogr,gdalconst
 from uafgi.util import gdalutil,ogrutil,make
 from uafgi.util import cfutil,ioutil,gisutil,rasterize
@@ -348,6 +347,8 @@ class combo_extent_action:
 
                 if not os.path.isfile(tup.avalfile):
                     print(f'Missing avalanche file: {tup.avalfile}')
+                    continue
+                if os.path.getlength(tup.avalfile) == 0:    # Avoid dummy placeholder avalanches
                     continue
                 aval = archive.read_nc(tup.avalfile)
 

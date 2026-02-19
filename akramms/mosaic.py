@@ -209,6 +209,8 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
                 if not os.path.isfile(tup.avalfile):
                     print(f'Missing avalanche file: {tup.avalfile}')
                     continue
+                if os.path.getlength(tup.avalfile) == 0:    # Avoid dummy placeholder avalanches
+                    continue
                 aval = archive.read_nc(tup.avalfile)
 
                 # ---------- Copy raster into the overall mosaic

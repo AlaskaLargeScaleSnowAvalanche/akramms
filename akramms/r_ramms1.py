@@ -84,6 +84,17 @@ def compress_avalanche_inputs(crf, gridI, ids):
     for id in ids:
 #        base = os.path.join(crf.avalanche_dir, f'{crf.ramms_name}')
         base = f'{crf.slope_name}_{crf.avalanche_name}_{id}'
+        av2_file = crf.avalanche_dir / f'{base}.av2'
+
+        # Bail on zero-length .av2 files: write placeholder .in.zip and .out.zip files
+        if os.path.getsize(av2_file) == 0:
+            izip_file = crf.avalanche_dir / f'{base}.in.zip'
+            with open(izip_file, 'w') as out:
+                pass
+            ozip_file = crf.avalanche_dir / f'{base}.out.zip'
+            with open(ozip_file, 'w') as out:
+                pass
+            continue
 
         zip_file = crf.avalanche_dir / f'{base}.in.zip'
         zip_file_tmp = crf.avalanche_dir / f'{base}.in.zip.tmp'
@@ -111,7 +122,6 @@ def compress_avalanche_inputs(crf, gridI, ids):
 
                 # Write the .av3 files based on the .av2 file
                 arcname = f'{base}.av3'
-                av2_file = crf.avalanche_dir / f'{base}.av2'
                 files.append(av2_file)
                 with open(av2_file, 'r') as fin:
                     av3_str = av2_to_av3(fin.read())
@@ -191,6 +201,10 @@ def write_xycoords(all_ids, hconfig, chunkdir, ncpu=1, check_timestamps=True):
 
         xycoord = av2.parents[0] / (leaf.split('.',1)[0] + '.xy-coord')
 
+        # Bail on zero-length .av2 files
+        if os.path.getsize(av2) == 0:
+            continue
+
         if ioutil.needs_regen([xycoord], [av2], check_timestamps=check_timestamps):
             av2s.append((av2,xycoord))
 
@@ -249,6 +263,7 @@ def run_chunk(release_file, crf, gridI, at_front=False, submit=False, condor_pri
         rammscore_exe = config.roots['HARNESS'] / 'rammscore' / f'build/ramms_aval_LHM{EXE_EXT}')
 
 
+    # ------------ RAMMS Phase 0 generates .av2 files / etc.
     print(f'------------- RAMMS Phase 0: {crf.chunk_dir}')
 #    harnutil.run_queued('idl',
 #        ramms_lshm.run_phase,
@@ -263,9 +278,11 @@ def run_chunk(release_file, crf, gridI, at_front=False, submit=False, condor_pri
     #df = shputil.read_df(release_file, read_shapes=False)
     all_ids = list(release_df['Id'])
 
+    # --------------- We generate .xy-coord files
     print(f'------------- XY-COORD Files: {crf.chunk_dir}')
     write_xycoords(all_ids, hconfig, crf.chunk_dir, ncpu=config.ramms_ncpu, check_timestamps=True)
 
+    # RAMMS Phase 1 generates xyz files
     print(f'------------- RAMMS Phase 1: {crf.chunk_dir}')
 #    harnutil.run_queued('idl',
 #        ramms_lshm.run_phase,
@@ -304,8 +321,9 @@ def run_chunk(release_file, crf, gridI, at_front=False, submit=False, condor_pri
     avalanche_dir = crf.avalanche_dir
     for id in all_ids:    # Avalanche ID
         in_zip = crf.avalanche_dir / f'{crf.slope_name}_{crf.avalanche_name}_{id}.in.zip'
+        in_zip = crf.avalanche_dir / f'{crf.slope_name}_{crf.avalanche_name}_{id}.av2'
 
-        if not os.path.exists(in_zip):
+        if (not os.path.exists(in_zip)) and (os.path.getsize(av2_files) != 0):
             missing.append(in_zip)
 
     if len(missing) > 0:

@@ -504,6 +504,7 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
 
             # Avoid archiving bad files
             out_zip = jb.avalanche_dir / f'{inout}.out.zip'
+            in_zip = jb.avalanche_dir / f'{inout}.in.zip'
             if not file_info.is_file_good(out_zip):
                 continue
             out_zip_mtime = os.path.getmtime(out_zip)
@@ -515,7 +516,6 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
             arc_fname = arc_dir / f'{arc_leafbase}-{Overrun}.nc'
             if not _regen_check(arc_fname, out_zip_dtime):
                 continue
-
 
             out_zips.append(str(out_zip))
             if dry_run:
@@ -530,6 +530,13 @@ def _archive_single_threaded(akdf0, status_attrs, print_output=False, dry_run=Fa
                 sys.stdout.flush()
 
             os.makedirs(arc_dir, exist_ok=True)
+
+
+            # Promote blank .av2 --> blank .in.zip/.out.zip --> blank .nc
+            if os.path.getlength(f'{base}.in.zip') == 0 and os.path.getlength(f'{base}.out.zip') == 0:
+                with open(arc_fname, 'w'):
+                    pass
+                continue
 
             # Write the full NetCDF file
             tmp_fname = arc_dir / (arc_leafbase + '-tmp.nc')  # Write atomically
