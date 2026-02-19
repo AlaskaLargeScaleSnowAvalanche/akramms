@@ -264,6 +264,7 @@ def _realized_ids(expmod, combo, scenetype, releasefile, stage, include_overruns
             # Do not provide info on whether the avalanche finished or overran
             avalfiles.append((id, out_zip, None))
     elif scenetype == 'arc':
+        print('scenetype == arc')
         arcdir = releasefile
         extent_full = extent.extent_fname(expmod, combo, 'full')
 #        extent_full = arcdir / 'extent_full.gpkg'
@@ -272,7 +273,8 @@ def _realized_ids(expmod, combo, scenetype, releasefile, stage, include_overruns
         if (filter_geom is not None) and os.path.exists(extent_full):
             # Directory is fully archived.  Use spatial index to
             # filter avalanches by extent
-            dfi = geopandas.read_file(str(extent_full), mask=filter_geom)
+#            dfi = geopandas.read_file(str(extent_full), mask=filter_geom, engine='fiona')
+            dfi = geopandas.read_file(str(extent_full), engine='fiona')
             include_ids = set(dfi.Id)
             print(f'Filtering avalanches from {extent_full}: {len(include_ids)}')
 

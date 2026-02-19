@@ -1,4 +1,4 @@
-import os,collections,re,itertools,functools
+import os,collections,re,itertools,functools,sys
 import netCDF4
 import pandas as pd
 import geopandas
@@ -144,7 +144,8 @@ def expand_combos_by_geom(expmod, akdf, geom):
         for tup in qdf.itertuples(index=False):
             combos.append(expmod.Combo(*(list(wcombo) + [tup.idom, tup.jdom])))
 
-    return resolve.from_combos(expmod.name, combos)
+    ret = resolve.from_combos(expmod.name, combos)
+    return ret
 # ---------------------------------------------------------------------
 def geom_by_tiles(expmod, akdf):
     """Produces the extent that is the union of the tiles covered by
@@ -249,7 +250,7 @@ def query(akdf0, sextent, scenetypes={'x', 'arc'},
 
             elif (not isinstance(extent, str)):
                 # Numeric extent: (x0,y0, x1,y1)
-                geom = shapely.geometry.box(2, 30, 5, 33)
+                geom = shapely.geometry.box(2, 30, 5, 33)    # HUH????
 
             else:
                 raise ValueError(f'Unknown extent: {extent}')
@@ -257,7 +258,7 @@ def query(akdf0, sextent, scenetypes={'x', 'arc'},
             # Filter/expand combos to account for all tiles (with margins) that
             # intersect the geom
             akdf1 = expand_combos_by_geom(expmod, akdf1, geom)   # This finds avalanches in neighboring tiles!!!
-            akdf1 = joblib.add_combo_quickstatus(akdf1)
+            akdf1 = joblib.add_combo_quickstatus(expmod, akdf1)
 
             # Make sure all combos have status EXTENT, and are fully ready to query!
             print('Query searching the following combos:')
@@ -275,13 +276,19 @@ def query(akdf0, sextent, scenetypes={'x', 'arc'},
 
 
             # --------- Make sure the proper extent files are written
-            akramms.extent.write_combos_extents(expmod, akdf1)
+# This is now done beforehand with rules
+#            akramms.extent.write_combos_extents(expmod, akdf1)
 
             # --------- Move to the avalanche (id) level
             # Resolve to individual avalanches
             akdf1 = resolve.resolve_chunk(akdf1, scenetypes=scenetypes)
+            print('len(akdf1) ', len(akdf1))
+            print('Filtering by geom ', geom)
             akdf1 = resolve.resolve_id(akdf1, realized=True, status_col=True, filter_geom=geom)
+            print('len(akdf1) ', len(akdf1))
             akdf1 = akdf1[akdf1.id_status.isin(statuses)]
+            print('len(akdf1) ', len(akdf1))
+            raise ValueError(17)
 
 
         # Now akdf1 is resolved to the ID level, and it contains a
