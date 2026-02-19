@@ -250,6 +250,13 @@ def add_id_status(akdf0, update=True, dry_run=False):
                     # (User can reset jobs by removing *.out.zip)
                     if os.path.exists(out_zip):
 
+                        # Check for RAMMS having bailed on this avalanche
+                        print('in_zip out_zip ', os.path.getsize(in_zip), os.path.getsize(out_zip))
+                        if os.path.getsize(in_zip) == 0 and os.path.getsize(out_zip) == 0:
+                            xstat = (combo, chunkid, tup.id, JobStatus.FINISHED)
+                            statuses.append(xstat)
+                            continue
+
                         # Check for abandoned job
                         # TODO: Use is_file_good() instead!
                         statinfo = os.stat(out_zip)
