@@ -251,7 +251,7 @@ def add_id_status(akdf0, update=True, dry_run=False):
                     if os.path.exists(out_zip):
 
                         # Check for RAMMS having bailed on this avalanche
-                        print('in_zip out_zip ', os.path.getsize(in_zip), os.path.getsize(out_zip))
+#                        print('in_zip out_zip ', os.path.getsize(in_zip), os.path.getsize(out_zip))
                         if os.path.getsize(in_zip) == 0 and os.path.getsize(out_zip) == 0:
                             xstat = (combo, chunkid, tup.id, JobStatus.FINISHED)
                             statuses.append(xstat)
