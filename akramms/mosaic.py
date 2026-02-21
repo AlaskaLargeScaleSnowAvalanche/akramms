@@ -598,6 +598,7 @@ class stdmosaic_action:
 
 
     def __call__(self, tdir):
+        expmod = akramms.parse.load_expmod(self.exp)
         tifdir = pathlib.Path(tdir.location)
         mos = mosaic_avals_combo(
             self.akdf1, 'tile', tifdir, statuses=self.statuses,
@@ -605,7 +606,7 @@ class stdmosaic_action:
             dry_run=self.dry_run, force=self.force)
         if mos is None:    # There were no avalanches found
             ofname = expmod.root_dir / 'publish' / f'{self.exp}-{self.scombo}' / 'blank' / f'{self.exp}-{self.scombo}-F-blank.txt'
-            os.makedirs(ofname.parents[0])
+            os.makedirs(ofname.parents[0], exist_ok=True)
             with open(ofname, 'w') as out:
                 pass
             print('Nothing to mosaic, wrote ', ofname)

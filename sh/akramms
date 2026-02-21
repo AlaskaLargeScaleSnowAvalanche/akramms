@@ -1107,7 +1107,7 @@ def stdmosaic(args):
         makefile.add(rule)
         makefile.generate(expmod.root_dir / f'{exp}_{expset}_mosiac.mk',
             tdir_fn = lambda: ioutil.TmpDir(expmod.root_dir / 'tmp'),
-            run=True, ncpu=1)
+            run=True, ncpu=8)
 
 
 
