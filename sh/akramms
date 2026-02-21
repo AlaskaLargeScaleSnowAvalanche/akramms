@@ -46,6 +46,11 @@ def run_setup_py():
     cmd = ['install', '--prefix', prefix]
     print('setup.py ', cmd)
     setuptools.sandbox.run_setup(setup_py, cmd)
+
+@subcommand([])
+def compile(args):
+    run_setup_py()
+
 # ------------------------------------------------------------------------
 # Files and folders to copy from one scene to jumpstart the next.
 # TODO: Make this work for general scenes
@@ -962,7 +967,7 @@ def _parse_statuses(sstat):
 def xmosaic(args):
     from akramms import mosaic,downscale_snow
 
-    run_setup_py()
+#    run_setup_py()
 
     # Identify archived avalanches for use in the mosaic
     parseds = akramms.parse.parse_args(args.spec)
@@ -1070,7 +1075,7 @@ def stdmosaic(args):
     from akramms import mosaic,downscale_snow,file_info
     from uafgi.util import ioutil
 
-    run_setup_py()
+#    run_setup_py()
 
     # Identify combos
     parseds = akramms.parse.parse_args(args.spec)
