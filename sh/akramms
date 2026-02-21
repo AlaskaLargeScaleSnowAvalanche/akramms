@@ -1095,6 +1095,9 @@ def stdmosaic(args):
     expmod = akramms.parse.load_expmod(exp)
     publish_dir = expmod.root_dir / 'publish'
     os.makedirs(expmod.root_dir / 'tmp', exist_ok=True)
+
+
+    makefile = make.Makefile()
     for akdf1 in avalquery.consolidate_by_forest(expmod, akdf0):
         expset = _get_expset(akdf1.iloc[0])
         # expset = akdf1.iloc[0].parsed['expset']    # Kluge won't always work
@@ -1103,11 +1106,10 @@ def stdmosaic(args):
         # we can gain benefits of parallelism and chunking.
 
         rule = mosaic.stdmosaic_rule(exp, akdf1, args.status, args.dry_run, args.force)
-        makefile = make.Makefile()
         makefile.add(rule)
-        makefile.generate(expmod.root_dir / f'{exp}_{expset}_mosiac.mk',
-            tdir_fn = lambda: ioutil.TmpDir(expmod.root_dir / 'tmp'),
-            run=True, ncpu=8)
+    makefile.generate(expmod.root_dir / f'{exp}_{expset}_mosiac.mk',
+        tdir_fn = lambda: ioutil.TmpDir(expmod.root_dir / 'tmp'),
+        run=True, ncpu=8)
 
 
 
