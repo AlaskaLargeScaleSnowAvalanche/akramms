@@ -282,13 +282,13 @@ def query(akdf0, sextent, scenetypes={'x', 'arc'},
             # --------- Move to the avalanche (id) level
             # Resolve to individual avalanches
             akdf1 = resolve.resolve_chunk(akdf1, scenetypes=scenetypes)
-            print('len(akdf1) ', len(akdf1))
-            print('Filtering by geom ', geom)
+#            print('len(akdf1) ', len(akdf1))
+#            print('Filtering by geom ', geom)
             akdf1 = resolve.resolve_id(akdf1, realized=True, status_col=True, filter_geom=geom)
-            print('len(akdf1) ', len(akdf1))
+#            print('len(akdf1) ', len(akdf1))
             akdf1 = akdf1[akdf1.id_status.isin(statuses)]
-            print('len(akdf1) ', len(akdf1))
-            raise ValueError(17)
+#            print('len(akdf1) ', len(akdf1))
+#            raise ValueError(17)
 
 
         # Now akdf1 is resolved to the ID level, and it contains a

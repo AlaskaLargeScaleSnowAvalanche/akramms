@@ -209,7 +209,7 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
                 if not os.path.isfile(tup.avalfile):
                     print(f'Missing avalanche file: {tup.avalfile}')
                     continue
-                if os.path.getlength(tup.avalfile) == 0:    # Avoid dummy placeholder avalanches
+                if os.path.getsize(tup.avalfile) == 0:    # Avoid dummy placeholder avalanches
                     continue
                 aval = archive.read_nc(tup.avalfile)
 
@@ -317,7 +317,7 @@ def mosaic_avals_combo(akdf, sextent, tifdir,
     # No avalanches, so nothing to write
     if len(akdf) == 0:
         print('Mosaic: No avalanches, so nothing to write')
-        return None
+        return None    # A dummy file will be written based on this.
 
     print(f'geom = {geom}')
 
@@ -579,6 +579,7 @@ class stdmosaic_action:
             Dataframe with two rows, a For / NoFor matching pair.
         """
         self.akdf1 = akdf1
+        self.exp = exp
         expmod = akramms.parse.load_expmod(exp)
         self.statuses = statuses
         self.dry_run = dry_run
@@ -590,9 +591,9 @@ class stdmosaic_action:
         lcombo = list(combo[:forest_ix]) + ['All'] + list(combo[forest_ix+1:])
         self.ocombo = expmod.Combo(*lcombo)
 
-        scombo = str(combo)
+        self.scombo = str(combo)
         sstatus = ''.join(file_info.JobStatus._member_names_[x][0] for x in sorted(statuses))
-        name = f'{expmod.name}-{scombo}-{sstatus}'
+        name = f'{expmod.name}-{self.scombo}-{sstatus}'
         self.mwriter = PublishMosaicWriter(exp, name)
 
 
@@ -602,7 +603,14 @@ class stdmosaic_action:
             self.akdf1, 'tile', tifdir, statuses=self.statuses,
             snow=True, dem=True, landcover=True,
             dry_run=self.dry_run, force=self.force)
-        if mos is not None:    # There were some avalanches to plot...
+        if mos is None:    # There were no avalanches found
+            ofname = expmod.root_dir / 'publish' / f'{self.exp}-{self.scombo}' / 'blank' / f'{self.exp}-{self.scombo}-F-blank.txt'
+            os.makedirs(ofname.parents[0])
+            with open(ofname, 'w') as out:
+                pass
+            print('Nothing to mosaic, wrote ', ofname)
+
+        else:   # There were some avalanches to plot...
             self.mwriter.write(mos, tifdir, ijdom=(self.ocombo.idom, self.ocombo.jdom))
 
 
