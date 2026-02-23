@@ -321,9 +321,9 @@ def run_chunk(release_file, crf, gridI, at_front=False, submit=False, condor_pri
     avalanche_dir = crf.avalanche_dir
     for id in all_ids:    # Avalanche ID
         in_zip = crf.avalanche_dir / f'{crf.slope_name}_{crf.avalanche_name}_{id}.in.zip'
-        in_zip = crf.avalanche_dir / f'{crf.slope_name}_{crf.avalanche_name}_{id}.av2'
+        av2_file = crf.avalanche_dir / f'{crf.slope_name}_{crf.avalanche_name}_{id}.av2'
 
-        if (not os.path.exists(in_zip)) and (os.path.getsize(av2_files) != 0):
+        if (not os.path.exists(in_zip)) and (os.path.getsize(av2_file) != 0):
             missing.append(in_zip)
 
     if len(missing) > 0:
