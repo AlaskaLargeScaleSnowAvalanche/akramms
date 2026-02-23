@@ -66,7 +66,10 @@ def difference_encode(ivec):
     """Encode a 1D Numpy vector by computing for compression by computing successive differences.
        Eg: [1, 5, 2] -> [1, 4, -3]
     """
-    ret = np.full_like(ivec, ivec[0])
+    if len(ivec) < 2:
+        return ivec
+
+    ret = np.full_like(ivec, ivec[0])    # Return a full array with the same shape and type as a given array
     ret[1:] = ivec[1:] - ivec[:-1]
     return ret
 
