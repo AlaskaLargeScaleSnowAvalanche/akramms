@@ -348,7 +348,7 @@ class combo_extent_action:
                 if not os.path.isfile(tup.avalfile):
                     print(f'Missing avalanche file: {tup.avalfile}')
                     continue
-                if os.path.getlength(tup.avalfile) == 0:    # Avoid dummy placeholder avalanches
+                if os.path.getsize(tup.avalfile) == 0:    # Avoid dummy placeholder avalanches
                     continue
                 aval = archive.read_nc(tup.avalfile)
 
