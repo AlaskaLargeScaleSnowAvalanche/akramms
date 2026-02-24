@@ -710,7 +710,7 @@ def rerun(args):
     # Zero in on combos that are not done
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
     expmod = akramms.parse.load_expmod(akdf0.exp.iloc[0])    # Always works
-    akdf0 = joblib.add_combo_quickstatus(akdf0, mtime=True)
+    akdf0 = joblib.add_combo_quickstatus(expmod, akdf0, mtime=True)
 #    akdf0 = akdf0[~akdf0.combo_quickstatus.isin(
 #        [joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.EXTENT])]
 
@@ -1022,10 +1022,19 @@ def extent(args):
     # Identify combos
     parseds = akramms.parse.parse_args(args.spec)
     akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
+
+    if len(akdf) == 0:
+        print('No combos at all!')
+        return
+
     exp = akdf.exp.iloc[0]
     expmod = akramms.parse.load_expmod(exp)    # Always works
     akdf = joblib.add_combo_quickstatus(expmod, akdf, mtime=False)
     akdf = akdf[akdf.combo_quickstatus == JobStatus.MARKED_FINISHED]
+
+    if len(akdf) == 0:
+        print('No remaining combos to calculate extent on!')
+        return
 
     expset = _get_expset(akdf.iloc[0])
     makefile = make.Makefile()
