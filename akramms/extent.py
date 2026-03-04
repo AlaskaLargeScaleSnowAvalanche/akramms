@@ -384,7 +384,9 @@ def read_annotated_extent(expmod, combo, extent_type):
 
     # Multiple polygons per ID
     extent_gpkg = extent_fname(expmod, combo, 'christen')
-    extdf = geopandas.read_file(str(extent_gpkg))
+    if not os.path.isfile(extent_gpkg):
+        raise FileNotFoundError(extent_gpkg)    # Raise a recognizable exception
+    extdf = geopandas.read_file(str(extent_gpkg), engine='fiona')
 
     # Merge the two.  The merging retains the sames tructure as extdf
     # because reldf has ONLY ONE polygon per ID.

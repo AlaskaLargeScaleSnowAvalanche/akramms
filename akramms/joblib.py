@@ -3,7 +3,7 @@ import htcondor2 as htcondor
 import numpy as np
 import pandas as pd
 from uafgi.util import gdalutil
-from akramms import config,file_info,parse,level,complete,resolve,archive,overrun,params,extent
+from akramms import config,file_info,parse,level,complete,resolve,archive,params,extent
 
 # Categorize each job int one of four sets
 #job_status_labels = ('noinput', 'incomplete', 'todo', 'inprocess', 'finished', 'overrun', 'failed')
@@ -217,6 +217,7 @@ def add_id_status(akdf0, update=True, dry_run=False):
                     #job_name = f'{jb.slope_name}_{jb.avalanche_name}_{id}'
                     inout = file_info.inout_name(jb, tup.chunkid, tup.id)
                     in_zip = jb.avalanche_dir / f'{inout}.in.zip'
+                    job_out = jb.avalanche_dir / f'{inout}.job.out'
 
                     # Mark as NOINPUT if the .in.zip file is not there.
                     if not os.path.exists(in_zip):
@@ -273,7 +274,7 @@ def add_id_status(akdf0, update=True, dry_run=False):
                         # wasn't overrun.
                         xstat = \
                             (combo, chunkid, tup.id,
-                            JobStatus.OVERRUN if check_overruns.is_overrun(in_zip, out_zip) else JobStatus.FINISHED)
+                            JobStatus.OVERRUN if check_overruns.is_overrun(in_zip, out_zip, job_out) else JobStatus.FINISHED)
 #                        print('xstat ', xstat)
                         statuses.append(xstat)
                         continue
@@ -292,6 +293,9 @@ def add_id_status(akdf0, update=True, dry_run=False):
 
 #    print('xxxxxxxxxxxxxxx 6570')
 #    print(akdf0[akdf0.id==6570])
+
+    akdf0 = fix_overruns(akdf0)
+
     
     if update:
         archive.archive_ids(akdf0, dry_run=dry_run)
@@ -570,6 +574,49 @@ def _ignore_ids(expmod):
 #    xdir = expmod.combo_to_scenedir(row['combo'], scenetype='x')
 #    glob.glob(xdir / 
 
+def drop_duplicates(akdf):
+
+    """Removes duplicate avalanches after resolving, keeping only the
+    avalanche in the most recent chunk
+
+    akdf:
+        Resolved to id
+
+    """
+    # Keep only the avalanche from the most recent chunk
+    akdf = akdf.sort_values(['combo', 'id', 'chunkid'])    # Not needed
+    akdf.drop_duplicates(['combo', 'id'], keep='last', inplace=True)
+    return akdf
+
+def fix_overruns(akdf):
+    # If an avalanche has been run more than once, consider the second run as FINISHED.
+    # Sometimes RAMMS thinks it overran anyway, leading to runaway avalanche bounds.
+    # Adding 5km to the bounds always finishes the avalanches, espcially Tiny-size avalanches.
+
+    print('ffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
+
+    # Look at only avalanches that have finished running
+    completed = akdf.id_status.isin([JobStatus.OVERRUN, JobStatus.FINISHED])
+    akdf1 = akdf[completed].sort_values(['combo', 'id', 'chunkid'])
+
+    # Keep only the avalanche from the most recent chunk
+    is_dup = akdf1.duplicated(subset=['combo', 'id'], keep=False)
+    last_dup_neg = akdf1.duplicated(subset=['combo', 'id'], keep='last')
+    to_finished = is_dup & ~last_dup_neg & (akdf1.id_status == JobStatus.OVERRUN)   # Avalanches we should mark as finished
+    akdf1.id_status[to_finished] = JobStatus.FINISHED
+#    akdf1['to_finished'] = to_finished
+
+#    print(akdf1.last_dup.sum())
+#    print(akdf1[is_dup][['chunkid','id','id_status', 'to_finished']])
+#    print(akdf1.columns)
+#    akdf1.id_status[akdf1.last_dup & akdf1.id_status == JobStatus.OVERRUN] = JobStatus.FINISHED
+#    print(akdf1[['chunkid','id','id_status', 'last_dup']][akdf1.last_dup])
+
+    akdf = pd.concat([akdf[~completed], akdf1])
+    return akdf1
+
+
+
 def add_combo_status(expmod, akdf0, realized=True, update=True, dry_run=False, delete_xdir=True, ignore_statuses={}):
     """akdf:
         Resolved to combo level (theoretical, i.e. realized=False)
@@ -644,13 +691,7 @@ def add_combo_status(expmod, akdf0, realized=True, update=True, dry_run=False, d
 
         # Replace older avalanches runs with newer runs of the same ID
         # (which presumably have fixed overrun problems)
-        iddf1 = overrun.drop_duplicates(iddf1)
-#        print('add_combo_status() rows')
-#        xdf = iddf1[['combo', 'pra_size', 'chunkid', 'id', 'id_status']]
-#        print('All rows ID')
-#        print(xdf)
-#        print('combo_status ID NOINPUT rows')
-#        print(xdf[xdf.id_status == JobStatus.NOINPUT])
+        iddf1 = drop_duplicates(iddf1)
 
         # Aggregate id status back to combo level and add to akdf1
         # (Now we know whether the combo has fully finished)
@@ -658,19 +699,8 @@ def add_combo_status(expmod, akdf0, realized=True, update=True, dry_run=False, d
             iddf1[['combo','id_status']].groupby('combo').agg(lambda x: agg_status(x,ignore_statuses)) \
             .rename(columns={'id_status': 'combo_status'})
         akdf1 = akdf1.merge(combo_status, how='left', left_on='combo', right_index=True)
-#        print('combo_status ', akdf1[['combo', 'combo_status']])
 
         akdf1['combo_status'] = akdf1.combo_status.fillna(JobStatus.NOINPUT).astype(int)
-
-#        # 
-#        for i,row in akdf1.iterrows():
-#            if np.isnan(row['combo_status']):
-#
-#                # No avalanches available for this combo.  That is OK
-#                # if the combo had no avalanches to begin wtih.
-#                print(row)
-#
-#            print(i,row['combo_status'])
 
 
         # --------------------------------------------

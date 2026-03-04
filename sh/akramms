@@ -241,6 +241,7 @@ def status(args):
         akdf = joblib.add_status(
             expmod, akdf, args.level, realized=args.realized, update=args.update, dry_run=args.dry_run, ignore_statuses=ignore_statuses)
 
+
     # Add idom and jdom columns
     akdf['idom' ] = akdf.combo.map(lambda x: x[-2])
     akdf['jdom' ] = akdf.combo.map(lambda x: x[-1])
@@ -992,7 +993,7 @@ def stats(args):
     parseds = akramms.parse.parse_args(args.spec)
     akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
 
-#    avalstats2.stats_by_combos(akdf)
+    avalstats2.stats_by_combos(akdf)
     avalstats2.combine_tiles(akdf, ress=[100,1000,10000])
 
 #def stats(args):
@@ -1014,6 +1015,9 @@ def stats(args):
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser.'),
 ])
 def extent(args):
+    _extent(args)
+
+def _extent(args):
     """Write the extent files related to some combos"""
     from uafgi.util import ioutil
     from akramms import extent
@@ -1077,12 +1081,16 @@ def extent(args):
 #        help="Include original snowcover in the output?"),
     argument('--dry-run', action='store_true',
         help="Don't actually do the work"),
-    argument('--force', action='store_true',
-        help="Proceed even if not all required combos are finished")
+#    argument('--force', action='store_true',
+#        help="Proceed even if not all required combos are finished")
 ])
 def stdmosaic(args):
+
     from akramms import mosaic,downscale_snow,file_info
     from uafgi.util import ioutil
+
+    # Make sure that ALL extents are successfuly complete first
+    _extent(args)
 
 #    run_setup_py()
 
@@ -1114,11 +1122,11 @@ def stdmosaic(args):
         # TODO: Separate out extent generation as separate rules, so
         # we can gain benefits of parallelism and chunking.
 
-        rule = mosaic.stdmosaic_rule(exp, akdf1, args.status, args.dry_run, args.force)
+        rule = mosaic.stdmosaic_rule(exp, akdf1, args.status, args.dry_run, True)    # force=True
         makefile.add(rule)
     makefile.generate(expmod.root_dir / f'{exp}_{expset}_mosiac.mk',
         tdir_fn = lambda: ioutil.TmpDir(expmod.root_dir / 'tmp'),
-        run=True, ncpu=8)
+        run=True, ncpu=config.stats_ncpu)
 
 
 

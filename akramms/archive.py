@@ -234,7 +234,7 @@ class OverrunChecker:
             self.gridI,dem_mask,_ = gdalutil.read_raster(dem_mask_tif)
             self.dem_mask = dem_mask.astype(np.byte)
 
-    def is_overrun(self, in_zip, out_zip):
+    def is_overrun(self, in_zip, out_zip, job_out):
         """Determines whether a RAMMS result is overrun
 
         in_zip, out_zip:
@@ -283,10 +283,25 @@ class OverrunChecker:
                 namevals = parse_out(fin, zipname=out_zip.filename, check=True)
                 vals = {name:val for name,val,_ in namevals}
 
-            return \
+            is_overrun = \
                    np.any(np.logical_and(oedge != 0, vals['max_height'] > 0)) \
                 or np.any(np.logical_and(oedge != 0, vals['max_vel'] > 0)) \
                 or np.any(np.logical_and(oedge != 0, vals['depo'] > 0))
+
+
+            if not is_overrun:
+                return False
+
+            # We still think we are overrun.  But if we have "LOW MASS
+            # FLUX" in the RAMMS stdout, we will decide it's not
+            # overrun.
+            with open(job_out, 'r') as fin:
+                job_out_str = fin.read()
+            if 'LOW MASS FLUX...FINISHING CALCULATION!!!!' in job_out_str:
+                is_overrun = False
+
+            return is_overrun
+
 # -------------------------------------------------------------
 def ramms_to_nc0(out_zip, id_status, ncout):
     """

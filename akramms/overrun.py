@@ -119,7 +119,7 @@ def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run
     # ----------------- Move to id level
     akdf0 = resolve.resolve_chunk(akdf0, scenetypes={'x'}, realized=True)
     akdf0 = resolve.resolve_id(akdf0, realized=True)
-    akdf0 = drop_duplicates(akdf0)    # Account for past successful overrun resubmissions
+    akdf0 = joblib.drop_duplicates(akdf0)    # Account for past successful overrun resubmissions
     akdf0 = joblib.add_id_status(akdf0)
     akdf0 = akdf0[akdf0.id_status == joblib.JobStatus.OVERRUN]
 
@@ -188,16 +188,3 @@ def resubmit(akdf0, check_running=True, ignore_statuses={}, update=True, dry_run
 
     return len(akdf1)
 
-def drop_duplicates(akdf):
-
-    """Removes duplicate avalanches after resolving, keeping only the
-    avalanche in the most recent chunk
-
-    akdf:
-        Resolved to id
-
-    """
-    # Keep only the avalanche from the most recent chunk
-    akdf = akdf.sort_values(['combo', 'id', 'chunkid'])    # Not needed
-    akdf.drop_duplicates(['combo', 'id'], keep='last', inplace=True)
-    return akdf

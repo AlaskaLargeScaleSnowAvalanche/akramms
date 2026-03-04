@@ -147,7 +147,14 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
         ids = set(akdf1.id)
 
         # Read extents, and further filter low-elevation avalanches
-        df = extent.read_annotated_extent(expmod, combo, 'christen')  # >1 polygon per ID
+        try:
+            df = extent.read_annotated_extent(expmod, combo, 'christen')  # >1 polygon per ID
+        except FileNotFoundError as err:
+            # Assume that if the extent file is not found, it does not exist.
+            # `akramms extent` should have been run first!
+            print('mosaic_avals_id(): ', err)
+            continue
+
         df = _subset_poly_df(ids, combo.idom, combo.jdom, df)
         df,_ = expmod.mosaic_filter(df)    # Filter out bogus low-elevation avalanches
         dfss['extent_christen'].append(df)
@@ -233,7 +240,8 @@ def mosaic_avals_id(expmod, gridM, akdf0, tifdir,
     # ========== Write output GeoTIFF and Zip it up
     # --------------------- Write shape dataframes to shapefiles
     for vname, dfs in dfss.items():
-        mos.vectors[vname] = pd.concat(dfs)
+        if len(dfs) > 0:
+            mos.vectors[vname] = pd.concat(dfs)
 
     # ------------------- Other TIFF variables (written  directly into tifdir)
     for vname in vars:
@@ -311,6 +319,8 @@ def mosaic_avals_combo(akdf, sextent, tifdir,
     assert all(x == row0.exp for x in akdf.exp)
 
     # Query down to the id level (expands to neigbhoring tiles as well)
+    # NOTE: This could add some tiles that are outside of a domain like aksc5.central
+    #       Further down, we will pass if things are not found.
     expmod = akramms.parse.load_expmod(row0.exp)
     geom,akdf = avalquery.query(akdf, sextent, statuses=statuses, scenetypes='arc', force=force)
 
