@@ -341,7 +341,7 @@ def _full(segments):
         tiles.update((ijdom,None) for ijdom in new_tiles if (ijdom not in avoid) and (ijdom not in tiles))
 
     # Add the road / rail belt
-    if 'road' in segments:
+    if 'roads' in segments:
         roads_zip = config.HARNESS / 'data' / 'fischer' / 'AlaskaRoad_Albers2.zip'
         df = geopandas.read_file(f'zip://{roads_zip}')
         df['geometry'] = df.geometry.map(lambda shp: shp.buffer(7000))    # Add 7km margin around road
@@ -384,7 +384,7 @@ def _full(segments):
 
 
 def full():
-    for combo in _full({'central', 'kodiak', 'road'}):
+    for combo in _full({'central', 'kodiak', 'roads'}):
         yield combo
 
 def central():
@@ -393,6 +393,10 @@ def central():
 
 def kodiak():
     for combo in _full({'kodiak'}):
+        yield combo
+
+def roads():
+    for combo in _full({'roads'}):
         yield combo
 
 
