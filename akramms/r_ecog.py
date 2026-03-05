@@ -53,7 +53,7 @@ Usage:
     --pause                - pause application after done
 """
 
-def rule(scene_dir, scene_args, inputs, return_period, For):
+def rule(scene_dir, scene_args, inputs, idom, jdom, return_period, For):
     """inputs:
         Outputs of r_prepare.rule()
     """
@@ -133,6 +133,16 @@ def rule(scene_dir, scene_args, inputs, return_period, For):
             _subprocess_run, msg, cmd, check=True)
 #        with rqutil.blocking_lock('ecognition'):
 #            subprocess.run(cmd, check=True)
+
+        # ---------------------------------------
+        # Check for completely degenerate tile with no avalanches.  Zero, nada.
+        # In that case we need to exclude it from our domain.
+        all_exist = all(os.path.isfile(x) for x in outputs)
+        if not all_exist:
+            print('eCognition produced nothing, removing this tile from the domain')
+            with open(expmod.dir / 'exclude_tiles.csv', 'a') as out:
+                print(f'{idom},{jdom}', file=out)
+            raise ValueError(f'Tile ({idom},{jdom}) found to be blank, restarting with crashloop')
 
         # ---------------------------------------
         # eCognition writes out shapefiles with wrong projection.  Fix that

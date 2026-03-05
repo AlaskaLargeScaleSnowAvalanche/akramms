@@ -627,5 +627,6 @@ class stdmosaic_action:
 
 def stdmosaic_rule(*args, **kwargs):
     action_fn = stdmosaic_action(*args, **kwargs)
-    return make.Rule(action_fn, [], action_fn.mwriter.outputs())
+    rule = make.Rule(action_fn, [], action_fn.mwriter.outputs())
+    return rule
 # ---------------------------------------------------------------------------------

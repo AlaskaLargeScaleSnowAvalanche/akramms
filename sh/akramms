@@ -426,7 +426,7 @@ def step3(args):
             dem_filled_file = f'{dem_file[:-4]}_filled.tif'
 
             # Run eCognition
-            makefile.add(r_ecog.rule(scenedir, prepare_outputs, combo.return_period, combo.forest))
+            makefile.add(r_ecog.rule(scenedir, prepare_outputs, combo.idom, combo.jdom, combo.return_period, combo.forest))
 
             # Post-Process eCognition Output (the pra_file)
             # [f'{scene_name}{For}_{resolution}m_{return_period}{cat_letter}_rel.shp', ...]
@@ -564,7 +564,7 @@ def add_run_combo(expmod, makefile, combo, max_step=999):
     dem_filled_file = dem_file.parents[0] / (dem_file.parts[-1][:-4] + '_filled.tif')
 
     # Run eCognition
-    makefile.add(r_ecog.rule(scene_dir, scene_args, prepare2_outputs, combo.return_period, combo.forest))
+    makefile.add(r_ecog.rule(scene_dir, scene_args, prepare2_outputs, combo.idom, combo.jdom, combo.return_period, combo.forest))
     if max_step <= 5:
         return
 
@@ -1123,7 +1123,11 @@ def stdmosaic(args):
         # we can gain benefits of parallelism and chunking.
 
         rule = mosaic.stdmosaic_rule(exp, akdf1, args.status, args.dry_run, True)    # force=True
+#        print(rule)
         makefile.add(rule)
+
+#    return
+
     makefile.generate(expmod.root_dir / f'{exp}_{expset}_mosiac.mk',
         tdir_fn = lambda: ioutil.TmpDir(expmod.root_dir / 'tmp'),
         run=True, ncpu=config.stats_ncpu)

@@ -146,7 +146,7 @@ def r_stats_one_combo(makefile, expmod, combo, tdir, ress=[100,1000,10000]):
     inputs = [imosaic_tif]
 
     if not os.path.isfile(imosaic_tif):
-#        print('xyz ', imosaic_tif)
+        print('xyz ', imosaic_tif)
 #        sys.exit(0)
         return None
 
@@ -173,7 +173,13 @@ def r_stats_one_combo(makefile, expmod, combo, tdir, ress=[100,1000,10000]):
         ijpoly = expmod.gridD.poly(combo.idom, combo.jdom, margin=False)
         dem_tif = tdir.filename(suffix='.tif')
         expmod.extract_dem(ijpoly, dem_tif)
-        dem_grid, dem_data, dem_nd = gdalutil.read_raster(dem_tif)
+        dem5_grid, dem5_data, dem5_nd = gdalutil.read_raster(dem_tif)
+
+        # Regrid DEM to same grid as mosaic
+        dem_data = gdalutil.regrid(
+            dem5_data, dem5_grid, dem5_nd,
+            imosaic_grid, dem5_nd,
+            resample_algo=gdalconst.GRA_Average)
 
 
         # ------------- Process into multiple variables
@@ -189,6 +195,8 @@ def r_stats_one_combo(makefile, expmod, combo, tdir, ress=[100,1000,10000]):
             # Compute extent of avalanche
             #vname = 'ext{elev_max:03d}'
             elev_ext = extent_data.copy()    # Extent in an elevation class
+#            print('AA1 ', len(elev_ext), elev_ext.shape)
+#            print('AA2 ', len(mask_ocean_out), mask_ocean_out.shape)
             elev_ext[mask_ocean_out] = imosaic_nd
             elev_ext[mask_fhc_out] = 0
 
@@ -244,7 +252,9 @@ def stats_by_combos(akdf0, ress=[100,1000,10000]):
             combo = combo._replace(forest='All')
 
             os.makedirs(xdir, exist_ok=True)
-            makefile.add(r_stats_one_combo(makefile, expmod, combo, tdir, ress=ress))
+            rule = r_stats_one_combo(makefile, expmod, combo, tdir, ress=ress)
+            makefile.add(rule)
+#            print('avalstast2 rule ', rule)
 
         makefile.generate(expmod.root_dir / '_make', run=True, ncpu=config.stats_ncpu)
 

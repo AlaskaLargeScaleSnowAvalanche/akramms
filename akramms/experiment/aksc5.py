@@ -326,7 +326,7 @@ def _full(segments):
             (82,35), (82,36), (82,37), (82, 38),     # Parks Highway west of SC
     #        (82,34), (83,34), (83,33), (83,32), (84,32), (84,31),    # Parks Highway north through Denali
             ))
-        avoid = {(75,52), (75,51), (76,50), (77,49)}
+        avoid = {(75,52), (75,51), (76,50), (77,49), (90,45)}
         tiles.update((ijdom,None) for ijdom in sort_spiral(limit_set, 83, 40) if ijdom not in avoid)
 
 
@@ -357,6 +357,19 @@ def _full(segments):
     df = geopandas.read_file(dir / f'{name}_domains.shp')    # All Alaska tiles, no ocean tiles
     land_tiles = set(zip(df.idom, df.jdom))
     tiles = [ijdom for ijdom in tiles.keys() if ijdom in land_tiles]
+
+    # Remove dynamically excluded tiles
+    exclude_tiles_csv = expmod.dir / 'exclude_tiles.csv'
+    if os.path.isfile(exclude_tiles_csv):
+        with open(exclude_tiles_csv) as fin:
+            reader = csv.reader(fin)
+            for row in reader:
+                idom,jdom = int(row[0]), int(row[1])
+                try:
+                    del tiles[(idom,jdom)]
+                except KeyError:
+                    pass
+
 
     # Generate set of trials
     snow = 'ccsm'

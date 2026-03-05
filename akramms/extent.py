@@ -96,6 +96,10 @@ def polygonize_extent(combo, aval, tup_id,
 
     """
 
+    # Watch out for null polygons
+    if len(aval.iiA) == 0:
+        return None
+
 #    print(f'polygonize_extent({tup_id})')
 
     # Create a sub-grid gridL around just the avalanche (fast polygonize)
@@ -256,7 +260,8 @@ class WriteGpkg:
         extsizes = polygonize_extent(
             combo, aval, id, self.extent_layer, self.extent_Id, self.landcover,
             extent_type=self.extent_type, mask_kwargs=mask_kwargs)
-        self.relrows.append(list(relsizes) + list(extsizes))
+        if extsizes is not None:
+            self.relrows.append(list(relsizes) + list(extsizes))
 
 # ----------------------------------------------------------------
 extent_types = ('christen', 'full', 'tetra30', 'tetra1')
@@ -371,7 +376,7 @@ class combo_extent_action:
 
 def r_combo_extent( exp, row):
     action_fn = combo_extent_action(exp, row)
-    return make.Rule(action_fn, [], action_fn.outputs)
+    rule = make.Rule(action_fn, [], action_fn.outputs)
 
 def read_annotated_extent(expmod, combo, extent_type):
 
