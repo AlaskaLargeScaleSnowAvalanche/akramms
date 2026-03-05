@@ -53,7 +53,7 @@ Usage:
     --pause                - pause application after done
 """
 
-def rule(scene_dir, scene_args, inputs, idom, jdom, return_period, For):
+def rule(scene_dir, scene_args, inputs, expmod, idom, jdom, return_period, For):
     """inputs:
         Outputs of r_prepare.rule()
     """
