@@ -564,7 +564,7 @@ def add_run_combo(expmod, makefile, combo, max_step=999):
     dem_filled_file = dem_file.parents[0] / (dem_file.parts[-1][:-4] + '_filled.tif')
 
     # Run eCognition
-    makefile.add(r_ecog.rule(scene_dir, scene_args, prepare2_outputs, combo.idom, combo.jdom, combo.return_period, combo.forest))
+    makefile.add(r_ecog.rule(scene_dir, scene_args, prepare2_outputs, expmod, combo.idom, combo.jdom, combo.return_period, combo.forest))
     if max_step <= 5:
         return
 

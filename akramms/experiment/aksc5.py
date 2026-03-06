@@ -1,4 +1,4 @@
-import os,collections,sys,itertools,pathlib,hashlib
+import os,collections,sys,itertools,pathlib,hashlib,csv
 import numpy as np
 import schema
 import geopandas
@@ -359,16 +359,14 @@ def _full(segments):
     tiles = [ijdom for ijdom in tiles.keys() if ijdom in land_tiles]
 
     # Remove dynamically excluded tiles
-    exclude_tiles_csv = expmod.dir / 'exclude_tiles.csv'
+    exclude_tiles_csv = dir / 'exclude_tiles.csv'
     if os.path.isfile(exclude_tiles_csv):
+        excludes = set()
         with open(exclude_tiles_csv) as fin:
             reader = csv.reader(fin)
             for row in reader:
-                idom,jdom = int(row[0]), int(row[1])
-                try:
-                    del tiles[(idom,jdom)]
-                except KeyError:
-                    pass
+                excludes.add(tuple(int(x) for x in row))
+        tiles = [ijdom for ijdom in tiles if ijdom not in excludes]
 
 
     # Generate set of trials
