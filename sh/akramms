@@ -12,7 +12,8 @@ import argparse,itertools,os,subprocess,sys,io,codecs,re,pickle
 from akramms import r_experiment
 from akramms.util import rammsutil,exputil
 from uafgi.util import ioutil,make
-from akramms import r_domain_builder, r_ramms1, resolve,joblib, avalquery, overrun, domain_mask
+from akramms import file_info
+from akramms import overrun, domain_mask
 # ------------------------------------------------------------------------
 # https://mike.depalatis.net/blog/simplifying-argparse.html
 # https://gist.github.com/mivade/384c2c41c3a29c637cb6c603d4197f9f
@@ -178,6 +179,7 @@ def export(args):
 ])
 def parse(args):
     """Test out parsing and resolving to different levels"""
+    from akramms import resolve
 
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, args.level, realized=False)
@@ -206,11 +208,13 @@ def parse(args):
 def status(args):
     """Test out parsing and resolving to different levels"""
 
+    from akramms import joblib
+    from akramms import resolve
     import geopandas
     from akramms import file_info
 
     if args.ignore is not None:
-        ignore_statuses = {joblib.JobStatus._member_map_[x] for x in args.ignore.split(',')}
+        ignore_statuses = {file_info.JobStatus._member_map_[x] for x in args.ignore.split(',')}
     else:
         ignore_statuses = {}
 
@@ -289,6 +293,8 @@ def report(args):
     """Quick status report at the Combo level"""
 
     import datetime,time
+    from akramms import resolve
+    from akramms import joblib
 
     now = time.time()
 
@@ -301,8 +307,8 @@ def report(args):
     expmod = akramms.parse.load_expmod(akdf0.exp.iloc[0])    # Always works
     akdf0 = joblib.add_combo_quickstatus(expmod, akdf0, mtime=True)
 
-#    mask = (akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED)
-    mask = (akdf0.combo_quickstatus == joblib.JobStatus.EXTENT)
+#    mask = (akdf0.combo_quickstatus == file_info.JobStatus.MARKED_FINISHED)
+    mask = (akdf0.combo_quickstatus == file_info.JobStatus.EXTENT)
     todo = akdf0[~mask]
     done = akdf0[mask]
 
@@ -347,6 +353,8 @@ def step1(args):
     """Generate grid defining active domains.  The extent of future
     steps likely depends on this."""
 
+    from akramms import resolve
+
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'exp', realized=False)
 
@@ -366,6 +374,8 @@ def step1(args):
 def step2(args):
     """Create required DEMs, Forest files, scene definitions, etc.
     NO Proprietary Software in this step, it can run with high levels of parallelism."""
+
+    from akramms import resolve
 
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=False)
@@ -391,6 +401,7 @@ def step3(args):
     import setuptools
     from akramms.util import harnutil
     from akramms import r_prepare,r_ecog,r_pra_post
+    from akramms import resolve
 
     # ------------
     # Make sure the domain finder C++ code is compiled. (needed for RAMMS Stage 1)
@@ -447,6 +458,7 @@ def step3(args):
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
 def step4(args):
+    from akramms import resolve
     parseds = akramms.parse.parse_args(args.spec)
 
     # This will resolve to the CHUNK releasefiles
@@ -460,17 +472,19 @@ def step4(args):
     argument('step', help='Which step of computation to reset'),
     argument('--ignore',
         help="Disregard these status codes when aggregating (comma-separated status codes)"),
-    argument('--status', type=lambda x: joblib.JobStatus[x],
-        default=joblib.JobStatus.FAILED,
+    argument('--status', type=lambda x: file_info.JobStatus[x],
+        default=file_info.JobStatus.FAILED,
         help='Reset only items with this status (or below)'),
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser'),
 ])
 def xreset(args):
     """Reset parts of the computation"""
     from akramms import reset
+    from akramms import resolve
+    from akramms import joblib
 
     if args.ignore is not None:
-        ignore_statuses = {joblib.JobStatus._member_map_[x] for x in args.ignore.split(',')}
+        ignore_statuses = {file_info.JobStatus._member_map_[x] for x in args.ignore.split(',')}
     else:
         ignore_statuses = {}
 
@@ -483,8 +497,8 @@ def xreset(args):
     # Refuse to reset things that are still running
     status_col = f'{args.level}_status'
 #    print(akdf.columns)
-    mask = akdf[status_col] == joblib.JobStatus.INPROCESS
-    if len(mask) > 0:   #joblib.JobStatus.INPROCESS in set(akdf[status_col]):
+    mask = akdf[status_col] == file_info.JobStatus.INPROCESS
+    if len(mask) > 0:   #file_info.JobStatus.INPROCESS in set(akdf[status_col]):
         df = akdf[mask]
         print('The following items are still running, cannot reset for now')
         print(df)
@@ -515,7 +529,7 @@ def locks(args):
 def add_run_combo(expmod, makefile, combo, max_step=999):
     """Adds running one full combo to the makefile"""
 
-    from akramms import r_pra_post, r_prepare, r_ecog
+    from akramms import r_pra_post, r_prepare, r_ecog, r_domain_builder, r_ramms1
 
     # -------------------- Step 2:
     # (a) Prepare DEM files, forest files
@@ -607,6 +621,8 @@ def add_run_combo(expmod, makefile, combo, max_step=999):
 def run(args):
     """Steps 1-4"""
 
+    from akramms import joblib
+    from akramms import resolve
     import setuptools
     from akramms.util import harnutil
 
@@ -646,7 +662,7 @@ def run(args):
     expmod = akramms.parse.load_expmod(akdf0.exp.iloc[0])    # Always works
     akdf0 = joblib.add_combo_quickstatus(expmod, akdf0)
     akdf0 = akdf0[~akdf0.combo_quickstatus.isin(
-        [joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.EXTENT])]
+        [file_info.JobStatus.MARKED_FINISHED, file_info.JobStatus.EXTENT])]
 
     # Keep combo_order
 #    print('aaaaaaaaaaaakdf0 ', akdf0)
@@ -702,6 +718,8 @@ def _get_expset(akdf_row):
 def rerun(args):
     """Steps 1-4"""
 
+    from akramms import joblib
+    from akramms import resolve
     import setuptools,shutil
     from akramms.util import harnutil
 
@@ -713,10 +731,10 @@ def rerun(args):
     expmod = akramms.parse.load_expmod(akdf0.exp.iloc[0])    # Always works
     akdf0 = joblib.add_combo_quickstatus(expmod, akdf0, mtime=True)
 #    akdf0 = akdf0[~akdf0.combo_quickstatus.isin(
-#        [joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.EXTENT])]
+#        [file_info.JobStatus.MARKED_FINISHED, file_info.JobStatus.EXTENT])]
 
     # Don't re-run true NOINPUT combos, which haven't run the first time yet
-    akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.UNKNOWN]
+    akdf0 = akdf0[akdf0.combo_quickstatus == file_info.JobStatus.UNKNOWN]
 
     for ix in range(len(akdf0)):
         combo = akdf0.iloc[ix].combo
@@ -737,7 +755,7 @@ def rerun(args):
         akdf1 = joblib.add_status(expmod, akdf1, 'chunk', realized=False, update=False)
 
         # OVERRUN will be taken  care of by `akramms overrun`
-        akdf1s = akdf1[~akdf1.chunk_status.isin([joblib.JobStatus.MARKED_FINISHED, joblib.JobStatus.FINISHED, joblib.JobStatus.OVERRUN, joblib.JobStatus.INPROCESS])]
+        akdf1s = akdf1[~akdf1.chunk_status.isin([file_info.JobStatus.MARKED_FINISHED, file_info.JobStatus.FINISHED, file_info.JobStatus.OVERRUN, file_info.JobStatus.INPROCESS])]
 
         # Reset chunks that didn't finish properly
         for tup in akdf1s.itertuples(index=False):
@@ -797,6 +815,8 @@ def submit(args):
     """Standalone submission of avalanches.
     (Run if jobs submitted by akramms run failed somehow)"""
 
+    from akramms import joblib
+    from akramms import resolve
     parseds = akramms.parse.parse_args(args.spec)
 
     akdf = resolve.resolve_to(parseds, 'id', realized=True, stage='in')
@@ -810,6 +830,8 @@ def submit(args):
 def ps(args):
     """Provides status of RAMMS avalanches"""
 
+    from akramms import joblib
+    from akramms import resolve
     parseds = akramms.parse.parse_args(args.spec)
     akdf = resolve.resolve_to(parseds, 'id', realized=True, stage='in', scenetypes={'x'})
     akdf = overrun.drop_duplicates(akdf)    # Keep only newest attempt at each avalanche
@@ -830,6 +852,9 @@ def ps(args):
 def xoverrun(args):
     """Resubmits overruns"""
 
+    from akramms import resolve
+    from akramms import joblib
+
     # Find the combos to check
     parseds = akramms.parse.parse_args(args.spec)
     akdf0 = resolve.resolve_to(parseds, 'combo', realized=False, scenetypes={'x', 'arc'})
@@ -840,12 +865,12 @@ def xoverrun(args):
     expmod = akramms.parse.load_expmod(akdf0.exp.iloc[0])    # Always works
     akdf0 = joblib.add_combo_quickstatus(expmod, akdf0)
     akdf0 = akdf0[~akdf0.combo_quickstatus.isin([
-        joblib.JobStatus.NOINPUT,
-        joblib.JobStatus.MARKED_FINISHED,
-        joblib.JobStatus.EXTENT])]
+        file_info.JobStatus.NOINPUT,
+        file_info.JobStatus.MARKED_FINISHED,
+        file_info.JobStatus.EXTENT])]
 
     if args.ignore is not None:
-        ignore_statuses = {joblib.JobStatus._member_map_[x] for x in args.ignore.split(',')}
+        ignore_statuses = {file_info.JobStatus._member_map_[x] for x in args.ignore.split(',')}
         update = False    # Don't permanently updates status based on ignoring certain status codes
     else:
         ignore_statuses = {}
@@ -916,6 +941,7 @@ def redo_extent(args):
     originals were wrong."""
 
     from akramms import archive
+    from akramms import resolve
 
     # Identify archived avalanches for use in the mosaic
     parseds = akramms.parse.parse_args(args.spec)
@@ -939,7 +965,7 @@ def all_equal(iterable):
     return next(g, True) and not next(g, False)
 
 def _parse_statuses(sstat):
-    return [joblib.JobStatus[x] for x in sstat.split(',')]
+    return [file_info.JobStatus[x] for x in sstat.split(',')]
 
 @subcommand(name='mosaic', args=[
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser.'),
@@ -950,7 +976,7 @@ def _parse_statuses(sstat):
     argument('--limit', type=int,
         help='Limit number of avalanches processed (for DEBUGGING)'),
     argument('--status', type=_parse_statuses,
-        default = [joblib.JobStatus.FINISHED],
+        default = [file_info.JobStatus.FINISHED],
         help="Comma-separated statuses to plot: OVERRUN,FINISHED"),
     argument('--extent', '-e', default='tile',
         help="Designation of extent of final mosiac: tile, aval, <listed in experiment>, or coordinates"),
@@ -967,6 +993,7 @@ def _parse_statuses(sstat):
 ])
 def xmosaic(args):
     from akramms import mosaic,downscale_snow
+    from akramms import resolve
 
 #    run_setup_py()
 
@@ -988,6 +1015,7 @@ def xmosaic(args):
 ])
 def stats(args):
     from akramms import avalstats2
+    from akramms import resolve
 
     # Identify archived avalanches for use in the mosaic
     parseds = akramms.parse.parse_args(args.spec)
@@ -1022,6 +1050,8 @@ def _extent(args):
     from uafgi.util import ioutil
     from akramms import extent
     from akramms.file_info import JobStatus
+    from akramms import resolve
+    from akramms import joblib
 
     # Identify combos
     parseds = akramms.parse.parse_args(args.spec)
@@ -1071,7 +1101,7 @@ def _extent(args):
 #    argument('-q', '--query', help='Name of query file to read from.  If set, then spec is ignored'),
 #    argument('-o', '--output', help='Name of Mosaic output file to write'),
     argument('--status', type=_parse_statuses,
-        default = [joblib.JobStatus.FINISHED],
+        default = [file_info.JobStatus.FINISHED],
         help="Comma-separated statuses to plot: OVERRUN,FINISHED"),
 #    argument('--dem', action='store_true',
 #        help="Include original DEM in the output?"),
@@ -1088,6 +1118,8 @@ def stdmosaic(args):
 
     from akramms import mosaic,downscale_snow,file_info
     from uafgi.util import ioutil
+    from akramms import resolve
+    from akramms import joblib,avalquery
 
     # Make sure that ALL extents are successfuly complete first
     _extent(args)
@@ -1101,7 +1133,7 @@ def stdmosaic(args):
     # Only run for combos that are completely finished
     expmod = akramms.parse.load_expmod(akdf0.exp.iloc[0])    # Always works
     akdf0 = joblib.add_combo_quickstatus(expmod, akdf0, mtime=True)
-    akdf0 = akdf0[akdf0.combo_quickstatus >= joblib.JobStatus.MARKED_FINISHED]
+    akdf0 = akdf0[akdf0.combo_quickstatus >= file_info.JobStatus.MARKED_FINISHED]
 
     if len(akdf0) == 0:
         raise ValueError('None of the select combos are MARKED_FINISHED.  Run akramms status --update')
@@ -1183,6 +1215,7 @@ def pubextract(args):
 
     import zipfile
     from akramms import mosaic
+    from akramms import resolve,avalquery
 
 #    odir = pathlib.Path(args.output)
 
@@ -1223,6 +1256,8 @@ def pubextract(args):
 
 @subcommand(name='loaddb')
 def loaddb(args):
+    from akramms import resolve
+    from akramms import joblib
 
     # Identify combos
     parseds = akramms.parse.parse_args(args.spec)
@@ -1231,7 +1266,7 @@ def loaddb(args):
     # Only load DB for combos that are completely finished
     expmod = akramms.parse.load_expmod(akdf.exp.iloc[0])    # Always works
     akdf0 = joblib.add_combo_quickstatus(expmod, akdf0, mtime=True)
-    akdf0 = akdf0[akdf0.combo_quickstatus == joblib.JobStatus.MARKED_FINISHED]
+    akdf0 = akdf0[akdf0.combo_quickstatus == file_info.JobStatus.MARKED_FINISHED]
 
     # Remove combos already in the database
 #    TODO: Remove combos already in the database
