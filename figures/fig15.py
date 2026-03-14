@@ -98,8 +98,8 @@ def make_include_exclude():
 
 def make_plot(img_tif, ofname_png, gpkg_kwargs, plot_landcover=False, ijdoms=None, points_fname=None, ids=None):
     ofname_png = pathlib.Path(ofname_png)
-    if os.path.isfile(ofname_png):
-        return
+#    if os.path.isfile(ofname_png):
+#        return
     print(f'--------------- Plotting {ofname_png}')
 
 #    img_tif = googlemaps_dir / 'Cordova_BearCountryLodge.tif'
@@ -199,7 +199,7 @@ def make_plot(img_tif, ofname_png, gpkg_kwargs, plot_landcover=False, ijdoms=Non
 
 
     with akfigs.TrimmedPng(ofname_png) as tname:
-        fig.savefig(tname, dpi=192, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
+        fig.savefig(tname, dpi=600, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
 
 
 
@@ -216,7 +216,7 @@ def main():
     release_style = dict(facecolor='pink', alpha=.4, edgecolor='brown', lw=.5)
 
 
-    one_style = dict(facecolor='none', alpha=.8, edgecolor='brown')
+    one_style = dict(facecolor='none', alpha=.8, edgecolor='violet')
 
     # ------------- Juneau Rock Dump: Include & High
     gpkg_kwargs = [

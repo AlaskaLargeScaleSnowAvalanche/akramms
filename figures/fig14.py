@@ -107,7 +107,7 @@ def make_dissolveds():
 #        img, origin='upper', transform=map_crs, extent=map_extent, alpha=0.8)
 #
 #    # Add extent outlines
-#    for extents_gpkg,color in ((extents300_gpkg, 'red'), (extents30_gpkg, 'yellow')):
+#    for extents_gpkg,color in ((extents300_gpkg, 'purple'), (extents30_gpkg, 'yellow')):
 #        shape_feature = cartopy.feature.ShapelyFeature(
 #            cartopy.io.shapereader.Reader(extents_gpkg).geometries(),
 #            map_crs)
@@ -189,7 +189,7 @@ def make_plot(img_tif, ofname_png, plot_landcover=False):
 
 
     # Add extent outlines
-    for extents_gpkg,color in ((extents300_gpkg, 'red'), (extents30_gpkg, 'yellow')):
+    for extents_gpkg,color in ((extents300_gpkg, 'violet'), (extents30_gpkg, 'yellow')):
         shape_feature = cartopy.feature.ShapelyFeature(
             cartopy.io.shapereader.Reader(extents_gpkg).geometries(),
             map_crs)
@@ -198,7 +198,7 @@ def make_plot(img_tif, ofname_png, plot_landcover=False):
 
 
     with akfigs.TrimmedPng(ofname_png) as tname:
-        fig.savefig(tname, dpi=96, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
+        fig.savefig(tname, dpi=600, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
 
 
 
