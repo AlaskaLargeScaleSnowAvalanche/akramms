@@ -13,7 +13,7 @@ from akramms import r_experiment
 from akramms.util import rammsutil,exputil
 from uafgi.util import ioutil,make
 from akramms import file_info
-from akramms import overrun, domain_mask
+from akramms import domain_mask
 # ------------------------------------------------------------------------
 # https://mike.depalatis.net/blog/simplifying-argparse.html
 # https://gist.github.com/mivade/384c2c41c3a29c637cb6c603d4197f9f
@@ -831,7 +831,8 @@ def ps(args):
     """Provides status of RAMMS avalanches"""
 
     from akramms import joblib
-    from akramms import resolve
+    from akramms import resolve,overrun
+
     parseds = akramms.parse.parse_args(args.spec)
     akdf = resolve.resolve_to(parseds, 'id', realized=True, stage='in', scenetypes={'x'})
     akdf = overrun.drop_duplicates(akdf)    # Keep only newest attempt at each avalanche
@@ -853,7 +854,7 @@ def xoverrun(args):
     """Resubmits overruns"""
 
     from akramms import resolve
-    from akramms import joblib
+    from akramms import joblib,overrun
 
     # Find the combos to check
     parseds = akramms.parse.parse_args(args.spec)

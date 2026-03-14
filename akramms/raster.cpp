@@ -1,5 +1,5 @@
+#include <stdexcept>
 #include <akramms/raster.hpp>
-
 #include <cmath>
 
 namespace akramms {

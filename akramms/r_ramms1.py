@@ -337,9 +337,12 @@ def run_chunk(release_file, crf, gridI, at_front=False, submit=False, condor_pri
     # Submit the individual avalanche runs immediately so we can
     # get going while preparing more RAMMS directories.
     if submit:
+        print('release_file ', release_file)
 
         parseds = [parse._parse_chunk_releasefile(release_file)]
         akdf = resolve.resolve_to(parseds, 'id', stage='in', realized=True)
+        print('release_file resolved to:')
+        print(akdf)
         joblib.submit_jobs(akdf, condor_priority=condor_priority)
 
     # Write output files
