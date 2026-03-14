@@ -186,7 +186,7 @@ def add_id_status(akdf0, update=True, dry_run=False):
         Must all have the same combo (scenedir)
     """
 
-    print('add_id_status called with len(akdf0) = ', len(akdf0))
+#    print('add_id_status called with len(akdf0) = ', len(akdf0))
 
     # Make it idempotent
     if 'id_status' in akdf0.columns:
@@ -215,7 +215,6 @@ def add_id_status(akdf0, update=True, dry_run=False):
 
                 for tup in akdf3.itertuples():
                     job_info = JobInfo(combo, tup.chunkid, tup.id)
-                    print('akdf3 tup: ', job_info)
 
                     #job_name = f'{jb.slope_name}_{jb.avalanche_name}_{id}'
                     inout = file_info.inout_name(jb, tup.chunkid, tup.id)
@@ -241,23 +240,18 @@ def add_id_status(akdf0, update=True, dry_run=False):
 
                     # If an archive NetCDF file exists, then this avalanche is FINISHED.
                     if arcdir is not None:
-                        print('AA2')
                         aval_nc = os.path.join(arcdir, f'aval-{id}.nc')
                         if os.path.exists(aval_nc):
-                            print('AA3')
                             aval_nc_tm = os.path.getmtime(aval_nc)
                             if (aval_nc_tm > out_zip_tm) and (out_zip_tm > in_zip_tm):
                                 # .nc files only "count" if they are newer than raw files
                                 # (or those raw files don't exist)
                                 statuses.append((tup.combo, chunkid, tup.id, JobStatus.FINISHED))
                                 continue
-                    print('AA4')
 
                     # Identify avalanches that have finished: .out.zip exists and has non-zero size
                     # (User can reset jobs by removing *.out.zip)
                     if os.path.exists(out_zip):
-
-                        print('AA5')
 
                         # Check for RAMMS having bailed on this avalanche
 #                        print('in_zip out_zip ', os.path.getsize(in_zip), os.path.getsize(out_zip))
@@ -287,14 +281,12 @@ def add_id_status(akdf0, update=True, dry_run=False):
                         statuses.append(xstat)
                         continue
 
-                    print('AA6')
                     # Default to TODO
                     statuses.append((tup.combo, chunkid, tup.id, JobStatus.TODO))
 
 
     df = pd.DataFrame(statuses, columns=('combo', 'chunkid', 'id', 'id_status'))
-    print('AA7')
-    print(df)
+#    print(df)
 
 
     # Keep only the avalanche from the most recent chunk
@@ -303,16 +295,7 @@ def add_id_status(akdf0, update=True, dry_run=False):
 
     akdf0 = akdf0.merge(df.reset_index(drop=True), how='left', left_on=['combo', 'chunkid', 'id'], right_on=['combo', 'chunkid', 'id'])
 
-    print('AA8')
-    print(akdf0)
-
-#    print('xxxxxxxxxxxxxxx 6570')
-#    print(akdf0[akdf0.id==6570])
-
     akdf0 = fix_overruns(akdf0)
-
-    print('AA9')
-    print(akdf0)
     
     if update:
         archive.archive_ids(akdf0, dry_run=dry_run)
@@ -390,7 +373,7 @@ def _condorq_njobs():
     return None
 
 def submit_jobs(akdf, **kwargs):
-    print('submit_jobs len(akdf) = ', len(akdf))
+#    print('submit_jobs len(akdf) = ', len(akdf))
 
     akdf = add_id_status(akdf)
 
@@ -619,9 +602,7 @@ def fix_overruns(akdf):
     # Sometimes RAMMS thinks it overran anyway, leading to runaway avalanche bounds.
     # Adding 5km to the bounds always finishes the avalanches, espcially Tiny-size avalanches.
 
-TODO: I introduced a bug in here somewhere.  FIX IT!!!!
-
-    print('ffffffffffffffffffffffffffffffffffffffffffffffffffffffff')
+#TODO: I introduced a bug in here somewhere.  FIX IT!!!!
 
     # Look at only avalanches that have finished running
     completed = akdf.id_status.isin([JobStatus.OVERRUN, JobStatus.FINISHED])
@@ -641,7 +622,7 @@ TODO: I introduced a bug in here somewhere.  FIX IT!!!!
 #    print(akdf1[['chunkid','id','id_status', 'last_dup']][akdf1.last_dup])
 
     akdf = pd.concat([akdf[~completed], akdf1])
-    return akdf1
+    return akdf
 
 
 
