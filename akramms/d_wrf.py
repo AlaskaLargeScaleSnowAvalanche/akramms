@@ -5,7 +5,11 @@ import netCDF4
 from uafgi.util import ncutil,cfutil
 from akramms import config
 
-def era5_wrf_dscale(date, res=4):
+# Datasets:
+# wrf_era5: Downscaled ERA5 (past) from Chris Waigl
+# wrf_fut: Downscaled future GCM predictions from Tricia Hutton
+
+def era5_wrf_dscale(date, res=4, dataset='wrf_era5'):
     """Produces filename from Chris Waigl input dataset"""
     if date is None:
         date = datetime.date(1940,3,12)    # Sample date
