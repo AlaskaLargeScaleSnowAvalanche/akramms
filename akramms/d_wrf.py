@@ -1,4 +1,4 @@
-import datetime,os,sys
+import datetime,os,sys,typing,pathlib
 import numpy as np
 import pandas as pd
 import netCDF4
@@ -6,30 +6,59 @@ from uafgi.util import ncutil,cfutil
 from akramms import config
 
 # Datasets:
-# wrf_era5: Downscaled ERA5 (past) from Chris Waigl
-# wrf_fut: Downscaled future GCM predictions from Tricia Hutton
+# era5: Downscaled ERA5 (past) from Chris Waigl
+# fut: Downscaled future GCM predictions from Tricia Hutton
 
-def era5_wrf_dscale(date, res=4, dataset='wrf_era5'):
+class DatasetInfo(typing.NamedTuple):
+    root: pathlib.Path
+    
+# ------------------------------------------------------------
+# Dataset: wrf_era5
+_fut_skm = {12: '12', 4: '4', 1.33: '1_33'}
+def wrf_fname(date, res=4, dataset='era5'):
     """Produces filename from Chris Waigl input dataset"""
-    if date is None:
-        date = datetime.date(1940,3,12)    # Sample date
-    return config.HARNESS / 'data' / 'waigl' / 'wrf_era5' / f'{res:02d}km' / f'{date.year:04d}' / f'era5_wrf_dscale_{res}km_{date:%Y-%m-%d}.nc'
+    if dataset == 'era5':
+        if date is None:
+            date = datetime.date(1940,3,12)    # Sample date
+        return config.HARNESS / 'data' / 'waigl' / 'wrf_era5' / f'{res:02d}km' / f'{date.year:04d}' / f'era5_wrf_dscale_{res}km_{date:%Y-%m-%d}.nc'
+    else:
+        if date is None:
+            date = datetime.date(1979,7,1)    # Sample date
+        skm = _fut_skm[res]
+        return config.HARNESS / 'data' / 'hutton' / 'wrf_fut' / f'{skm}km' / f'{date.year:04d}' / f'wrf_dscale_{res}km_{date:%Y-%m-%d}.nc'
 
-def era5_wrf_dscale_agg3(olabel, res=4):
+
+def wrf_fname_agg3(olabel, res=4, dataset='era5'):
     olabel = str(olabel)    # year
-    return config.HARNESS / 'outputs' / 'wrf_era5_agg3' / f'{res:02d}km' / f'acsnow_agg3_{res}km_{olabel}.nc'
+    if dataset == 'era5':
+        return config.HARNESS / 'outputs' / 'wrf_era5_agg3' / f'{res:02d}km' / f'acsnow_agg3_{res}km_{olabel}.nc'
+    else:
+        skm = _fut_skm[res]
+        return config.HARNESS / 'outputs' / 'wrf_fut_agg3' / f'{res:02d}km' / f'acsnow_agg3_{res}km_{olabel}.nc'
+# ------------------------------------------------------------
 
-def single_acsnow_agg3(year_first, year_last, res=4):
+
+
+
+
+
+
+def single_acsnow_agg3(year_first, year_last, res=4, dataset='era5'):
     olabel = f'{year_first}_{year_last}'
-    return config.HARNESS / 'outputs' / 'wrf_era5_agg3' / f'acsnow_agg3_{res}km_{olabel}.nc'
+    if dataset == 'era5':
+        return config.HARNESS / 'outputs' / 'wrf_era5_agg3' / f'acsnow_agg3_{res}km_{olabel}.nc'
+    else:
+        skm = _fut_skm[res]
+        return config.HARNESS / 'outputs' / 'wrf_fut_agg3' / f'acsnow_agg3_{skm}km_{olabel}.nc'
 
 
-def agg3_one(dt0, dt1, olabel, res=4):
+
+def agg3_one(dt0, dt1, olabel, res=4, dataset='era5'):
     """Create new timeseries of 3-day snowfall and write to a SINGLE output file"""
-    print(f'======= agg3_one: {dt0}, {dt1}, {olabel}')
+    print(f'======= agg3_one: {dt0}, {dt1}, {olabel}, {dataset}')
 
     now = datetime.datetime.now()
-    with netCDF4.Dataset(era5_wrf_dscale(None, res=res)) as nc:
+    with netCDF4.Dataset(wrf_fname(None, res=res, dataset=dataset)) as nc:
         schema = ncutil.Schema(nc)
         XLONG = nc.variables['XLONG'][:]
         XLAT = nc.variables['XLAT'][:]
@@ -67,7 +96,7 @@ def agg3_one(dt0, dt1, olabel, res=4):
 
         for daydelta1 in range(0,3):
             dtt = dtt0 + datetime.timedelta(days=daydelta1)
-            ifname = era5_wrf_dscale(dtt, res=res)
+            ifname = wrf_fname(dtt, res=res, dataset=dataset)
             if not os.path.exists(ifname):
                 raise ValueError(f'Path not exists: {ifname}')
 #                acsnow[ix,:] = np.nan    # Blank out 3-day agg this belongs to
@@ -79,7 +108,7 @@ def agg3_one(dt0, dt1, olabel, res=4):
                     acsnow[ix,:] += np.sum(nc.variables['acsnow'][:],0)
 
     # Write out to agg3 file
-    ofname = era5_wrf_dscale_agg3(olabel, res=res)
+    ofname = wrf_fname_agg3(olabel, res=res, dataset=dataset)
     print(f'Writing {ofname}')
     os.makedirs(ofname.parents[0], exist_ok=True)
     with netCDF4.Dataset(ofname, 'w') as nc:
@@ -89,7 +118,7 @@ def agg3_one(dt0, dt1, olabel, res=4):
         nc.variables['XLONG'][:] = XLONG
         nc.variables['XLAT'][:] = XLAT
 
-def agg3(dt0, dt1, res=4):
+def agg3(dt0, dt1, res=4, dataset='era5'):
 
     # Split up range into 1-year segments
     year = dt0.year
@@ -101,11 +130,11 @@ def agg3(dt0, dt1, res=4):
     ranges = [(b0[0], b0[1], b1[1]) for b0,b1 in zip(bounds[:-1], bounds[1:])]
 
     for year,dt0,dt1 in ranges:
-        agg3_one(dt0, dt1, str(year))
+        agg3_one(dt0, dt1, str(year), dataset=dataset)
 
 
-def read_agg3(year0, year1, res=4):
-    fnames = [era5_wrf_dscale_agg3(year) for year in range(year0, year1)]
+def read_agg3(year0, year1, res=4, dataset='ear5'):
+    fnames = [wrf_fname_agg3(year, dataset=dataset) for year in range(year0, year1)]
 
     # Figure out dimensions
     ntime = 0
@@ -131,9 +160,9 @@ def read_agg3(year0, year1, res=4):
             ix += n
     return acsnow,times,fnames
 
-def write_single_agg3(year_first, year_last, res=4):
+def write_single_agg3(year_first, year_last, res=4, dataset='era5'):
     # Read original (and transpose while reading)
-    acsnow,times,fnames = read_agg3(year_first, year_last+1, res=res)
+    acsnow,times,fnames = read_agg3(year_first, year_last+1, res=res, dataset=dataset)
 
     # Get the schema
     with netCDF4.Dataset(fnames[0]) as nc:
@@ -156,7 +185,7 @@ def write_single_agg3(year_first, year_last, res=4):
     schema.vars['acsnow'].dims = (ddims[1], ddims[2], ddims[0])
 
     # Write out to agg3 file
-    ofname = single_acsnow_agg3(year_first, year_last, res=res)
+    ofname = single_acsnow_agg3(year_first, year_last, res=res, dataset=dataset)
     print(f'Writing {ofname}')
     os.makedirs(ofname.parents[0], exist_ok=True)
     with netCDF4.Dataset(ofname, 'w') as nc:
