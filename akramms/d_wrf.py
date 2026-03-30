@@ -11,10 +11,12 @@ from akramms import config
 
 class DatasetInfo(typing.NamedTuple):
     root: pathlib.Path
-    
+
 # ------------------------------------------------------------
 # Dataset: wrf_era5
-_fut_skm = {12: '12', 4: '4', 1.33: '1_33'}
+fut_sres = {12: '12', 4: '4', 1.33: '1_33'}
+
+
 def wrf_fname(date, res=4, dataset='era5'):
     """Produces filename from Chris Waigl input dataset"""
     if dataset == 'era5':
@@ -24,8 +26,8 @@ def wrf_fname(date, res=4, dataset='era5'):
     else:
         if date is None:
             date = datetime.date(1979,7,1)    # Sample date
-        skm = _fut_skm[res]
-        return config.HARNESS / 'data' / 'hutton' / 'wrf_fut' / f'{skm}km' / f'{date.year:04d}' / f'wrf_dscale_{res}km_{date:%Y-%m-%d}.nc'
+        skm = fut_sres[res]
+        return config.HARNESS / 'data' / 'hutton' / 'wrf_fut' / f'{skm}km' / f'{date.year:04d}' / f'wrf_dscale_{skm}km_{date:%Y-%m-%d}.nc'
 
 
 def wrf_fname_agg3(olabel, res=4, dataset='era5'):
@@ -33,8 +35,8 @@ def wrf_fname_agg3(olabel, res=4, dataset='era5'):
     if dataset == 'era5':
         return config.HARNESS / 'outputs' / 'wrf_era5_agg3' / f'{res:02d}km' / f'acsnow_agg3_{res}km_{olabel}.nc'
     else:
-        skm = _fut_skm[res]
-        return config.HARNESS / 'outputs' / 'wrf_fut_agg3' / f'{res:02d}km' / f'acsnow_agg3_{res}km_{olabel}.nc'
+        skm = fut_sres[res]
+        return config.HARNESS / 'outputs' / 'wrf_fut_agg3' / f'{skm}km' / f'acsnow_agg3_{skm}km_{olabel}.nc'
 # ------------------------------------------------------------
 
 
@@ -48,7 +50,7 @@ def single_acsnow_agg3(year_first, year_last, res=4, dataset='era5'):
     if dataset == 'era5':
         return config.HARNESS / 'outputs' / 'wrf_era5_agg3' / f'acsnow_agg3_{res}km_{olabel}.nc'
     else:
-        skm = _fut_skm[res]
+        skm = fut_sres[res]
         return config.HARNESS / 'outputs' / 'wrf_fut_agg3' / f'acsnow_agg3_{skm}km_{olabel}.nc'
 
 
@@ -58,6 +60,9 @@ def agg3_one(dt0, dt1, olabel, res=4, dataset='era5'):
     print(f'======= agg3_one: {dt0}, {dt1}, {olabel}, {dataset}')
 
     now = datetime.datetime.now()
+    dt0 = datetime.date(1979,7,1)
+#    dt0 = datetime.date(1957,1,1)
+    dt1 = datetime.date(2099,1,1)
     with netCDF4.Dataset(wrf_fname(None, res=res, dataset=dataset)) as nc:
         schema = ncutil.Schema(nc)
         XLONG = nc.variables['XLONG'][:]
