@@ -6,6 +6,8 @@ from uafgi.util import rasterize
 import d8graph
 from akramms.util import rammsutil
 from akramms import snow,config,file_info,level,params,domain_mask
+import shapely.geometry.multipolygon as multipolygon
+import shapely.ops
 
 """Everything to do with reading, rearranging and writing release files and chunks.
 
@@ -354,8 +356,24 @@ def add_dom(rdf, dem_filled, dem_nodata, grid_info, margins, **kwargs):
         if ix%1000 == 0:
             print('   Calculated {} of {} domains'.format(ix, len(rdf)))
 
-        # Get list of gridcells covered by the PRA polygon (the "PRA Burn")
-        pra_burn = rasterize.rasterize_polygon_compressed(row['pra'], grid_info)
+        # --------- Get list of gridcells covered by the PRA polygon (the "PRA Burn")
+        pra = row['pra']
+
+        # Sometimes we get a MultiPolygon.  If the two overlap, we can
+        # turn this back into a single Polygon and everyone will be
+        # MUCH happier.  If not, then unary_union() will return a
+        # MultiPolygon again.
+        if type(pra) == multipolygon.MultiPolygon:
+            # Choose the constituent polygon of maximum area
+            polys = list(iter(pra.geoms))
+            areas = [poly.area for poly in polys]
+            max_area, max_poly = max(zip(areas,polys))
+            pra = max_poly
+#            print('aaaaaaaaa ', max_area, max_poly)
+#            pra = shapely.ops.unary_union(pra)
+
+
+        pra_burn = rasterize.rasterize_polygon_compressed(pra, grid_info)
 #        if row['Id'] == 21:
 #            print('BEGIN HHHHHHH')
 #            print(pra_burn.shape, grid_info.nx, grid_info.ny, np.sum(pra_burn))

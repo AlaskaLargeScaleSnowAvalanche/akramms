@@ -85,9 +85,10 @@ def compress_avalanche_inputs(crf, gridI, ids):
 #        base = os.path.join(crf.avalanche_dir, f'{crf.ramms_name}')
         base = f'{crf.slope_name}_{crf.avalanche_name}_{id}'
         av2_file = crf.avalanche_dir / f'{base}.av2'
+        var_file = crf.avalanche_dir / f'{base}.var'
 
         # Bail on zero-length .av2 files: write placeholder .in.zip and .out.zip files
-        if os.path.getsize(av2_file) == 0:
+        if (os.path.getsize(av2_file) == 0) or (os.path.getsize(var_file) == 0):
             izip_file = crf.avalanche_dir / f'{base}.in.zip'
             with open(izip_file, 'w') as out:
                 pass
