@@ -342,7 +342,10 @@ def _full(segments):
 
     # Add the road / rail belt
     if 'roads' in segments:
-        roads_zip = config.HARNESS / 'data' / 'fischer' / 'AlaskaRoad_Albers2.zip'
+#        roads_zip = config.HARNESS / 'data' / 'fischer' / 'AlaskaRoad_Albers2.zip'
+        roads_zip = config.HARNESS / 'data' / 'fischer' / 'AKDOTRoads_Albers_Clipped.zip'
+
+
         df = geopandas.read_file(f'zip://{roads_zip}')
         df['geometry'] = df.geometry.map(lambda shp: shp.buffer(7000))    # Add 7km margin around road
         roads_mlines = shapely.ops.unary_union(list(df.geometry))
@@ -351,6 +354,51 @@ def _full(segments):
         road_tiles = list((idom,jdom) for idom,jdom in road_tiles if idom >= 74 and idom <= 100)    # Cut out extra roads in Southeast and Aleutians
     #    road_tiles = list((idom,jdom) for idom,jdom in road_tiles if jdom >= 26)    # Cut out everything north of Fairbanks    
         tiles.update((ijdom,None) for ijdom in road_tiles if ijdom not in tiles)
+
+    # Add Alsaka and St. Elias ranges by hand
+    if 'mountains' in segments:
+        new_tiles = [
+            # West of Parks Highway
+            (81,33), (80,33), (79,33),
+            (81,34), (80,34), (79,34), (78,34),
+            (79,35), (78,35),
+
+            # East of Parks Highway
+#            (85,28), (86,28),
+#            (86,29), (87,29), 
+            (85,30), (86,30), (87,30),
+            (86,31), (87,31), (88,31),
+
+            # East of Richardson Highway
+            (91,31), (91,32),
+
+            # St. Elias Mountains
+            (92,35), (93,35), (94,35), (95,35), (96,35),
+            (92,36), (93,36), (94,36), (95,36), (96,36), (97,36), (98,36),
+
+            # East of St. Elias Mountains to Canadian Borer
+            (97,37), (98,37),
+            (97,38), (98,38), (99,38),
+
+            # Carl Glacier
+            (97,35), (97,34),
+
+            # Mount Hayes
+            (78,38), (79,38),
+            (78,39), (79,39),
+            (77,40), (78,40), (79,40),
+            (77,41), (78,41), (79,41),
+            (77,42), (78,42), (79,42),
+            (76,43), (77,43), (78,43),
+            (76,44), (77,44), (78,44),
+
+            # Katmai Wilderness
+            (75,50), (74,50),
+            (75,51), (74,51), (73,51),
+
+        ]
+        tiles.update((ijdom,None) for ijdom in new_tiles if ijdom not in tiles)
+
 
     # Remove tiles that do not intersect with land!
     # (And covert to a list)
@@ -382,7 +430,7 @@ def _full(segments):
 
 
 def full():
-    for combo in _full({'central', 'kodiak', 'roads'}):
+    for combo in _full({'central', 'kodiak', 'roads', 'mountains'}):
         yield combo
 
 def central():
