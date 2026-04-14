@@ -10,9 +10,9 @@ def main():
 
 #main()
 
-d_wrf.write_single_agg3(1979, 1981, res=4, dataset='fut')
-#d_wrf.write_single_agg3(1979, 2100, res=4, dataset='fut')
-#d_wrf.write_single_agg3(1979, 2100, res=1.33, dataset='fut')
+#d_wrf.write_single_agg3(1979, 1981, res=4, dataset='fut')
+d_wrf.write_single_agg3(1979, 2100, res=4, dataset='fut')
+d_wrf.write_single_agg3(1979, 2100, res=1.33, dataset='fut')
 
 # ----------------------------------------------------
 

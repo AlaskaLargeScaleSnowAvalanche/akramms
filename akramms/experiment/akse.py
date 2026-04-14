@@ -34,7 +34,8 @@ extents = {
 # Function extracts a DEM and writes it to a file
 dem_img = d_ifsar.r_vrt('DTM').outputs[0]    # Master DEM image file
 def extract_dem(poly, ofname, **kwargs):
-    return d_ifsar.extract('DTM', poly, ofname, resolution=resolution, **kwargs)
+    # Hard-code to resolution for akse
+    return d_ifsar.extract('DTM', poly, ofname, resolution=resolution, resample_algo='bilinear', **kwargs)
 
 landcover_img = d_usgs_landcover.landcover_img # Master landcover image file
 extract_landcover = d_usgs_landcover.extract    # Function to extract from master landcover

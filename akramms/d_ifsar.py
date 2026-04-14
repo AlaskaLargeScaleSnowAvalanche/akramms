@@ -62,17 +62,20 @@ def r_vrt(type):
 
     return make.Rule(action, [], [ofname])
 # ------------------------------------------------------------------
-def extract(type, poly, ofname, resolution=None, sanity_check=True):
+def extract(type, poly, ofname, resolution=None, sanity_check=True, resample_algo='nearest'):
     """
     poly:
         A rectangle
     ofname:
         Output raster filename
+    resample_algo: str
+        nearest|bilinear|cubic|cubicspline|lanczos|average|rms|mode
     """
     xx,yy = poly.exterior.coords.xy
 
     x0,x1,y0,y1 = gdalutil.positive_rectangle(xx[0], xx[2], yy[0], yy[2])
 
+    # https://gdal.org/en/stable/programs/gdal_translate.html
     cmd = ['gdal_translate']
     # https://gis.stackexchange.com/questions/1104/should-gdal-be-set-to-produce-geotiff-files-with-compression-which-algorithm-sh
     cmd += ['-co', 'COMPRESS=DEFLATE']
@@ -81,6 +84,12 @@ def extract(type, poly, ofname, resolution=None, sanity_check=True):
 #        cmd += ['-eco']    # Error when completely outside (SANITY CHECK)
     if resolution is not None:
         cmd += ['-tr', str(resolution), str(resolution)]
+        cmd += ['-r', resample_algo]
+
+    # No -r flag, so this command defaults to nearest neighbor
+    # -r {nearest|bilinear|cubic|cubicspline|lanczos|average|rms|mode}
+    # Select a resampling algorithm.
+    # nearest (default) applies a nearest neighbour (simple sampling) resampler
 
     cmd.append('-projwin')
     # -projwin <ulx> <uly> <lrx> <lry>

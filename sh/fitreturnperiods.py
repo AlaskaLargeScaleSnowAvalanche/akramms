@@ -12,6 +12,16 @@ import skextremes
 from akramms import config
 import gridfill
 
+# aksc5
+#def _single_acsnow_agg3():
+#    return d_wrf.single_acsnow_agg3(1940,2023)
+
+# aksc5fut4
+RES = 4
+def _single_acsnow_agg3():
+    return d_wrf.single_acsnow_agg3(1979,2100,res=4,dataset='fut')
+
+
 #jj,ii = 152,282
 #ii,jj = 152,282
 
@@ -32,7 +42,7 @@ def gen_fits():
     fit_names = ('sp', 'en', 'cl')    # SciPy, Engineering, Classical
 
     return_periods = (30, 300)
-    ifname = d_wrf.single_acsnow_agg3(1940,2023)
+    ifname = _single_acsnow_agg3()
 
     with netCDF4.Dataset(ifname) as nc:
         iacsnow = nc.variables['acsnow']
@@ -130,8 +140,7 @@ def gen_fits():
     print(f'Done writing {ofname}')
 
 def read_landmask_in():
-    res = 4
-    ifname = config.HARNESS / 'data' / 'waigl' / 'wrf_era5' / f'{res:02d}km' / 'invar' / 'geo_em.d02.nc'
+    ifname = config.HARNESS / 'data' / 'waigl' / 'wrf_era5' / f'{RES:02d}km' / 'invar' / 'geo_em.d02.nc'
     with netCDF4.Dataset(ifname) as nc:
         landmask_v = nc.variables['LANDMASK']
         landmask = np.zeros(landmask_v.shape[1:], dtype='int8')
@@ -146,7 +155,7 @@ def gen_evt():
 
     rpinvs = [1. - (1./rp) for rp in return_periods]
 
-    name0 = d_wrf.single_acsnow_agg3(1940,2023)
+    name0 = _single_acsnow_agg3()
     ifname = name0.parents[0] / f"{name0.stem}_fit.nc"
     ofname = name0.parents[0] / f"{name0.stem}_evt.nc"
 
@@ -196,7 +205,7 @@ def gen_30_300():
     fit_names = ('sp', 'en', 'cl')    # SciPy, Engineering, Classical
 
     return_periods = (30, 300)
-    ifname = d_wrf.single_acsnow_agg3(1940,2023)
+    ifname = _single_acsnow_agg3()
     with netCDF4.Dataset(ifname) as nc:
         acsnow_nc = nc.variables['acsnow']
         shape = [len(return_periods)] + list(acsnow_nc.shape[:2])
@@ -380,7 +389,7 @@ def eval_large():
     print(f'acsnow_evt[{jj}, {ii}] = {acsnow_evt[:,jj,ii]}')
 
 
-    ifname = d_wrf.single_acsnow_agg3(1940,2023)
+    ifname = _single_acsnow_agg3()
     with EVTFit(ifname, (30,300)) as evt_fit:
         fit = evt_fit.fit(jj,ii)
         print(fit)
@@ -400,7 +409,7 @@ def to_geotiff():
     geo_fname = config.HARNESS / 'data' / 'waigl' / 'wrf_era5' / '04km' / 'invar' / 'geo_em.d02.nc'
 #    grid = wrfutil.wrf_info(geo_fname)
 
-    name0 = d_wrf.single_acsnow_agg3(1940,2023)
+    name0 = _single_acsnow_agg3()
     ifname = name0.parents[0] / f"{name0.stem}_evt.nc"
     wrf_grid,acsnow,acsnow_nd = wrfutil.read(ifname, 'acsnow', geo_fname)
 
