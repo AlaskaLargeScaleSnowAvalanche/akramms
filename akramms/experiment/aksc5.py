@@ -43,7 +43,7 @@ extents = {
 # Function extracts a DEM and writes it to a file
 dem_img = d_ifsar.r_vrt('DTM').outputs[0]    # Master DEM image file
 def extract_dem(poly, ofname, **kwargs):
-    resample_algo='nearest        # How we ran
+    resample_algo='nearest'        # How we ran
     # resample_algo='bilin'        # How we should have run
     return d_ifsar.extract('DTM', poly, ofname, resample_algo=resample_algo, **kwargs) #resolution=resolution, **kwargs)
 
