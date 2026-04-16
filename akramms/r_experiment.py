@@ -147,7 +147,6 @@ def r_ifsar(exp_mod, idom, jdom, sanity_check=True, folder='dem', resolution=Non
 
     def action(tdir):
         poly = exp_mod.gridD.poly(idom, jdom, margin=True)
-#        return d_ifsar.extract(type, poly, ofname, resolution=resolution, sanity_check=True)
         return exp_mod.extract_dem(poly, ofname, sanity_check=True, resolution=resolution)
     return make.Rule(action, [exp_mod.dem_img], [ofname])
 # -----------------------------------------------------------------------

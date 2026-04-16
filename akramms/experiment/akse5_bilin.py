@@ -20,7 +20,7 @@ publish_dir = root_dir / 'publish'
 epsg = 3338    # Same as WKT; see https://espg.io
 wkt = 'PROJCS["NAD83 / Alaska Albers",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["Degree",0.017453292519943295]],PROJECTION["Albers"],PARAMETER["standard_parallel_1",55],PARAMETER["standard_parallel_2",65],PARAMETER["latitude_of_origin",50],PARAMETER["central_meridian",-154],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["Meter",1]]'
 resolution = 10    # 10m resolution for our DEM
-pra_resolution = 10    # Use 5m DEM when computing PRAs
+pra_resolution = 5    # Use 5m DEM when computing PRAs
 snow_density = 300    # [kg m-3], used for mosaic
 
 #forest_landcover_types = [42,43]    # NCLD Land Cover Classifications *Evergreen* and *Mixed Deciduous*
@@ -174,8 +174,8 @@ def add_combo(makefile, combo):
 #    makefile.add(r_experiment.r_active_domains(exp_mod))
 
     # DTM and Forest (landcover==42)
-    dem_tif = add_dem(makefile, combo.idom, combo.jdom, resolution=resolution)  #makefile.add(r_experiment.r_ifsar(exp_mod, combo.idom, combo.jdom, resolution=resolution)).outputs[0]
     pra_dem_tif = add_dem(makefile, combo.idom, combo.jdom, folder='pra_dem', resolution=pra_resolution)
+    dem_tif = add_dem(makefile, combo.idom, combo.jdom, resolution=resolution)  #makefile.add(r_experiment.r_ifsar(exp_mod, combo.idom, combo.jdom, resolution=resolution)).outputs[0]
 #    pra_dem_tif = dem_tif
 #    assert pra_resolution == resolution    # This must be true for our shortcut here to work
 

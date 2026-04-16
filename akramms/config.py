@@ -33,7 +33,7 @@ roots_w = default_roots(pathlib.PureWindowsPath, r'C:\Users\mountain2\av') # r'\
 #roots_l['PRJ'] = '/mnt/avalanche_sim/prj'
 #roots_w['PRJ'] = r'\\nona.dnr.state.ak.us\enggeo_projects\avalanche_sim\prj'
 roots_l['PRJ'] = (pathlib.Path(os.environ['HOME']) / 'prj').resolve()
-roots_lx['PRJ'] = pathlib.Path('/home/efischer/av/akramms/scratch')
+roots_lx['PRJ'] = pathlib.Path('/home/efischer/scratch')
 roots_w['PRJ'] = r'M:\prj'
 
 # Roots for the system we're running on
@@ -60,9 +60,9 @@ auto_submit = True
 #auto_submit = False
 
 # Maximum number of PRAs in a RAMMS run
-max_ramms_pras = 100
+#max_ramms_pras = 100
 #max_ramms_pras = 20
-#max_ramms_pras = 500
+max_ramms_pras = 500
 
 enlarge_increment = 5000.    # Enlarge domains by 5km each time.
 

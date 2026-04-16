@@ -27,6 +27,11 @@ def snowfile_vrt(expmod, combos):
     """
 
     snowfile_argss = sorted(set(expmod.combo_to_snowfile_args(combo) for combo in combos))
+    print('expmod ', expmod)
+    print('expmod.snowfile ', expmod.snowfile)
+    print('xxxargs ', snowfile_argss[0])
+    print('xxxargs2 ', expmod.combo_to_snowfile_args(combos[0]))
+
     snowfiles = [expmod.snowfile(*x) for x in snowfile_argss]
     assert all(x[:-2] == snowfile_argss[0][:-2] for x in snowfile_argss)
     snowfile_glob = expmod.snowfile(*(snowfile_argss[0][:-2] + ('*','*')))

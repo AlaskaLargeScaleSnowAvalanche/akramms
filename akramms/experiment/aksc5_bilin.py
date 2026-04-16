@@ -1,7 +1,10 @@
-import os,collections,sys,itertools,pathlib
+import os,collections,sys,itertools,pathlib,hashlib,csv
 import numpy as np
 import schema
-from uafgi.util import schemautil,shputil,gisutil,ulam
+import geopandas
+import shapely
+import shapely.ops
+from uafgi.util import schemautil,shputil,gisutil,ulam,gicollections,ogrutil
 from akramms import downscale_snow
 from akramms import config, r_experiment
 from akramms import r_prepare,r_domain_builder,file_info
@@ -13,6 +16,7 @@ from akramms import d_ifsar, d_usgs_landcover
 name = __name__.rsplit('.', 1)[-1]    # e_alaska
 root_dir = config.roots['PRJ'] / name
 root_xdir = config.roots_lx['PRJ'] / name
+
 dir = root_dir / 'db'
 publish_dir = root_dir / 'publish'
 
@@ -20,8 +24,11 @@ publish_dir = root_dir / 'publish'
 epsg = 3338    # Same as WKT; see https://espg.io
 wkt = 'PROJCS["NAD83 / Alaska Albers",GEOGCS["GCS_North_American_1983",DATUM["D_North_American_1983",SPHEROID["GRS_1980",6378137,298.257222101]],PRIMEM["Greenwich",0],UNIT["Degree",0.017453292519943295]],PROJECTION["Albers"],PARAMETER["standard_parallel_1",55],PARAMETER["standard_parallel_2",65],PARAMETER["latitude_of_origin",50],PARAMETER["central_meridian",-154],PARAMETER["false_easting",0],PARAMETER["false_northing",0],UNIT["Meter",1]]'
 resolution = 10    # 10m resolution for our DEM
-pra_resolution = 10    # Use 5m DEM when computing PRAs
+pra_resolution = 5    # Use 5m DEM when computing PRAs
 snow_density = 300    # [kg m-3], used for mosaic
+
+# File describing WRF geometry, grid, etc.
+wrf_geo_nc = config.HARNESS / 'data' / 'waigl' / 'wrf_era5' / '04km' / 'invar' / 'geo_em.d02.nc'
 
 #forest_landcover_types = [42,43]    # NCLD Land Cover Classifications *Evergreen* and *Mixed Deciduous*
 forest_landcover_types = [42]    # NCLD Land Cover Classifications *Evergreen* only
@@ -30,14 +37,13 @@ forest_landcover_types = [42]    # NCLD Land Cover Classifications *Evergreen* o
 # ----------------------------------------------
 # Named regions we typically query: (x0, y0, x1, y1)
 extents = {
-    'southeast': [0,0,1,1],    # Dummy for now
+    'southcentral': [0,0,1,1],    # Dummy for now
 }
 # ----------------------------------------------
 # Function extracts a DEM and writes it to a file
 dem_img = d_ifsar.r_vrt('DTM').outputs[0]    # Master DEM image file
 def extract_dem(poly, ofname, **kwargs):
-    # Hard-code to resolution for akse
-    return d_ifsar.extract('DTM', poly, ofname, resample_algo='bilinear', **kwargs)
+    return d_ifsar.extract('DTM', poly, ofname, resample_algo='bilin', **kwargs) #resolution=resolution, **kwargs)
 
 landcover_img = d_usgs_landcover.landcover_img # Master landcover image file
 extract_landcover = d_usgs_landcover.extract    # Function to extract from master landcover
@@ -57,20 +63,18 @@ gridD = gisutil.DomainGrid(
 
 # /vzip/ is a GDAL thing for shapefiles contained in .zip
 
-experiment_region_zip = config.roots.syspath('{DATA}/wolken/SE_AK_Domain_Land.zip')
-experiment_region_shp = f'/vsizip/{experiment_region_zip}/SE_AK_Domain_Land.shp'
+experiment_region_zip = config.roots.syspath('{DATA}/dggs/Alaska_1%3A250%2C000.zip')
+experiment_region_shp = f'/vsizip/{experiment_region_zip}/Alaska_1%3A250%2C000.shp'
 
 # Schema of top-level tuple describing a single trial.
 combo_schema = schema.Schema({
     'snow_dataset': schemautil.EnumField(
         {'ccsm', 'cfsr', 'gfdl'},
         "Available WRF Dataset to use in obtaining snow data"),
-    'year0': schemautil.Int(
+    'era': schemautil.EnumField({'past','future'},
         "First year of snow dataset to accumulate over"),
-    'year1': schemautil.Int(
-        "Last year of snow dataset to accumulate over"),
     'downscale_algo': schemautil.EnumField(
-        {'select', 'lapse'},
+        {'select', 'lapse', 'sclapse'},    # lapse=SE Alaska; sclapse=SC Alaska.  Input & procedures are different.
         "Algorithm to use downscaling snow from WRF to RAMMS grid"),
     'forest': schemautil.EnumField(    # REQUIRED key for stdmosaic; see mosaic.py
         {'', 'For', 'NoFor'},    # Blank string in EnumField allows for wildcard forest in mosaic plotting
@@ -85,28 +89,16 @@ combo_schema = schema.Schema({
         "y index of the Alaska sub-domain to run"),
 })
 
-# SQL types for the files in the combo
-combo_sql_types = {
-    'snow_dataset': 'varchar(10)',
-    'year0': 'int4',
-    'year1': 'int4',
-    'downscale_algo': 'varchar(10)',
-    'forest': 'varchar(5)',
-    'return_period': 'int4',
-    'idom': 'int4',
-    'jdom': 'int4',
-}
-
 
 combo_keys = list(combo_schema.schema.keys())
 _Combo = collections.namedtuple('Combo', combo_keys)
 class Combo(_Combo):
     def base_str(self):
-        return f'{self.snow_dataset}-{self.year0:04d}-{self.year1:04d}-{self.downscale_algo}-{self.forest}-{self.return_period}'
+        return f'{self.snow_dataset}-{self.era}-{self.downscale_algo}-{self.forest}-{self.return_period}'
     def __repr__(self):
         return f'{self.base_str()}-{self.idom:03d}-{self.jdom:03d}'
 
-def snowfile(snow_dataset, year0, year1, downscale_algo, idom, jdom):
+def snowfile(snow_dataset, era, downscale_algo, return_period, idom, jdom):
     """Creates the name of a snow file.
     idom,jdom:
         may be '*' to allow for wildcards and globbing."""
@@ -114,15 +106,16 @@ def snowfile(snow_dataset, year0, year1, downscale_algo, idom, jdom):
     sidom = idom if isinstance(idom,str) else f'{idom:03d}'
     sjdom = jdom if isinstance(jdom,str) else f'{jdom:03d}'
     ofname = os.path.join(dir, 'snow',
-        f'{name}_{snow_dataset}_{year0}_{year1}_{downscale_algo}_{sidom}_{sjdom}.tif')
+        f'{name}_{snow_dataset}_{era}_{downscale_algo}_{return_period:03d}_{sidom}_{sjdom}.tif')
     return pathlib.Path(ofname)
-
 
 def combo_to_snowfile_args(combo):
     return (
         combo.snow_dataset,
-        combo.year0, combo.year1, combo.downscale_algo,
-        combo.idom, combo.jdom)
+        combo.era, combo.downscale_algo,
+        combo.return_period, combo.idom, combo.jdom)
+
+
 
 # -------------------------------------------------------------
 _root_dir = {
@@ -133,18 +126,12 @@ _root_dir = {
 def combo_to_scenedir(combo, scenetype='x'):
     root_dir, stype = _root_dir[scenetype]
 
-    trial_name = f'{name}-{combo.snow_dataset}-{combo.year0}-{combo.year1}-{combo.downscale_algo}-{combo.forest}-{combo.return_period}'
+    trial_name = f'{name}-{combo.snow_dataset}-{combo.era}-{combo.downscale_algo}-{combo.forest}-{combo.return_period}'
     scene_name = f'{stype}-{combo.idom:03d}-{combo.jdom:03d}'    # Underscores would confuse things
 
     ret = root_dir / 'db' / trial_name / scene_name
 #    print(f'combo_to_scene_dir({scenetype}) = {ret}')
     return ret
-
-#def combo_to_snowfile_args(combo):
-#    return (dir, name,
-#        combo.snow_dataset,
-#        combo.year0, combo.year1, combo.downscale_algo,
-#        combo.idom, combo.jdom)
 
 _pra_sizes = {'NoFor': ['L','M'], 'For': ['S','T']}
 def pra_sizes(combo):
@@ -154,7 +141,7 @@ def pra_sizes(combo):
 # Avalanches that just wouldn't compute; so we ignore them when looking at job status
 def ignore_ids():
     return [
-        ( Combo('ccsm', 1981, 2010, 'lapse', 'NoFor', 300, 123, 50), 203 ),
+#        ( Combo('ccsm', 1981, 2010, 'lapse', 'NoFor', 300, 123, 50), 203 ),
     ]
 
 
@@ -174,13 +161,8 @@ def add_combo(makefile, combo):
 #    makefile.add(r_experiment.r_active_domains(exp_mod))
 
     # DTM and Forest (landcover==42)
-    dem_tif = add_dem(makefile, combo.idom, combo.jdom, resolution=resolution)  #makefile.add(r_experiment.r_ifsar(exp_mod, combo.idom, combo.jdom, resolution=resolution)).outputs[0]
     pra_dem_tif = add_dem(makefile, combo.idom, combo.jdom, folder='pra_dem', resolution=pra_resolution)
-#    pra_dem_tif = dem_tif
-#    assert pra_resolution == resolution    # This must be true for our shortcut here to work
-
-#    dem_filled_file,sinks_file,neighbor1_file = makefile.add(r_domain_builder.neighbor1_rule(
-#        dem_tif, os.path.split(dem_tif)[0], fill_sinks=True)).outputs
+    dem_tif = add_dem(makefile, combo.idom, combo.jdom, folder='dem', resolution=resolution)
 
     # Forest File
     landcover_tif = makefile.add(r_experiment.r_landcover(
@@ -189,11 +171,16 @@ def add_combo(makefile, combo):
         exp_mod, combo.idom, combo.jdom)).outputs[0]
 
     # Snow downscaling
-    if combo.downscale_algo == 'lapse':
-        makefile.add(r_experiment.r_dfcA(exp_mod))
-    sx3I_tif = makefile.add(r_experiment.r_snow(
-        exp_mod, combo.snow_dataset, combo.downscale_algo,
-        combo.year0, combo.year1, combo.idom, combo.jdom)).outputs[0]
+    if combo.downscale_algo == 'sclapse':
+        sx3I_tif = makefile.add(r_experiment.r_scsnow(
+            exp_mod, combo.snow_dataset,
+            combo.era, combo.idom, combo.jdom, combo.return_period)).outputs[0]
+    else:
+        if combo.downscale_algo == 'lapse':
+            makefile.add(r_experiment.r_dfcA(exp_mod))
+        sx3I_tif = makefile.add(r_experiment.r_snow(
+            exp_mod, combo.snow_dataset, combo.downscale_algo,
+            combo.era, combo.idom, combo.jdom)).outputs[0]
 
     # Convert Combo to a scene_dir / scen_args
     scene_dir = os.path.join(exp_mod.dir, combo_to_scenedir(combo))
@@ -267,14 +254,7 @@ def mosaic_filter(df):
     return df_include, df_exclude
 # -------------------------------------------------------------
 # Degenerate tiles we do NOT want to run (blacklist)
-exclude_tiles = {
-    (112,51),
-    (123, 56),
-    (102,44),
-    (96,43),
-    (90,45),
-    # These tiles processed OK but had no avalanches
-    (88,42), (92,43), }
+exclude_tiles = {}
 
 def all_domains():
     domains_margin_shp = os.path.join(dir, f'{name}_domains_margin.shp')
@@ -286,96 +266,243 @@ def all_domains():
     return domains_ij
 
 
-def spiral_domains(x0, y0):
+exclude = {
+    (99,43),    # eCognition hung on this coastal tile
+}
+def sort_spiral(tiles, x0, y0):
     """Use Ulam Spiral out from a central domain tile"""
 
-#    yield (110,43)
-#    return
-
-
-    dij = set(all_domains())
+    tiles = set(tiles)
 
     # High prioirty domains
     # (Code usese x/y and i/j interchangibly here)
-    high_priority = [
-        (110, 42), (109,42),    # Haines and West: Avalanche of 2024-2-2
-
-        (91,42), (91,41), (91, 40),  # Cordova
-        (90, 42), (90, 41), (90,40),
-        (89, 39),        # Valdez
-#        (90, 40), (91, 40),     # Cordova
-#        (90, 41), (91, 41), 
-#        (90, 42), (91, 42), 
-    ]
-    for xy in high_priority:
-        if xy in dij:
-            yield xy
-            dij.remove(xy)
-
     for n in itertools.count(start=0, step=1):
         dxy = ulam.n_to_xy(n)
-        xy = (x0 + dxy[0], y0 + dxy[1])
-        if xy in dij:
-            yield xy
-            dij.remove(xy)
-            if len(dij) == 0:
+        ij = (x0 + dxy[0], y0 + dxy[1])
+        if ij in tiles:
+            yield ij
+            tiles.remove(ij)
+            if len(tiles) == 0:
                 return
 
+
+def split_domains2(domains, ix):
+    """Splits the domains in 2 parts"""
+    for ij in domains:
+        m = hashlib.sha256()
+        m.update(ij[0].to_bytes(2, 'big'))
+        m.update(ij[1].to_bytes(2, 'big'))
+        x = m.digest()[0]
+        if x%2 == ix:
+            yield ij
+
+
+def myfn():
+    print('mmmmyfn')
+    return
+
 # Different subsets of combos to try when running the experiment
-def full():
+def _full(segments):
     """Yields the combos for the FULL experiment.
     REQUIRES: domains.shp and domains_margin.shp
     """
 
+    # Limit to only certain tiles (high priority SC Alaska)
+    limit_shp = config.HARNESS / 'data' / 'fischer' / 'SCAreaHigh.shp'
+    limit_mpoly = ogrutil.read_multi_polygon(limit_shp)
+    df = gridD.intersecting_tiles(limit_mpoly)#.sort_values(['jdom','idom'])
+    limit_set = set(zip(df.idom, df.jdom))
+
+    tiles = dict()
+
+    if 'central' in segments:
+        # Add the Talkeeta Mountains
+        limit_set.update((
+            (83,38), (83,37), (83,36), (83,35),
+            (84,37), (84,36), (84,35),
+            (85,36), (85,35),
+            (86,36), (86,35),
+            (87,36), (87,35),
+            (82,35), (82,36), (82,37), (82, 38),     # Parks Highway west of SC
+    #        (82,34), (83,34), (83,33), (83,32), (84,32), (84,31),    # Parks Highway north through Denali
+            ))
+        avoid = {(75,52), (75,51), (76,50), (77,49), (90,45)}
+        tiles.update((ijdom,None) for ijdom in sort_spiral(limit_set, 83, 40) if ijdom not in avoid)
+
+
+    # Add Kodiak Island
+    if 'kodiak' in segments:
+        limit_zip = str(config.HARNESS / 'data' / 'fischer' / 'KodiakOutline.zip')
+        limit_shp = f'/vsizip/{limit_zip}/KodiakOutline.shp'
+        limit_mpoly = ogrutil.read_multi_polygon(limit_shp)
+        df = gridD.intersecting_tiles(limit_mpoly)
+        new_tiles = list(zip(df.idom, df.jdom))
+        avoid = {(74,53), (75,52), (75,51), (76,50), (77,49),}    # Extraneous tiles to remove
+        tiles.update((ijdom,None) for ijdom in new_tiles if (ijdom not in avoid) and (ijdom not in tiles))
+
+    # Add the road / rail belt
+    if 'roads' in segments:
+#        roads_zip = config.HARNESS / 'data' / 'fischer' / 'AlaskaRoad_Albers2.zip'
+        roads_zip = config.HARNESS / 'data' / 'fischer' / 'AKDOTRoads_Albers_Clipped.zip'
+
+
+        df = geopandas.read_file(f'zip://{roads_zip}')
+        df['geometry'] = df.geometry.map(lambda shp: shp.buffer(7000))    # Add 7km margin around road
+        roads_mlines = shapely.ops.unary_union(list(df.geometry))
+        df = gridD.intersecting_tiles(roads_mlines)
+        road_tiles = list(zip(df.idom, df.jdom))
+        road_tiles = list((idom,jdom) for idom,jdom in road_tiles if idom >= 74 and idom <= 100)    # Cut out extra roads in Southeast and Aleutians
+    #    road_tiles = list((idom,jdom) for idom,jdom in road_tiles if jdom >= 26)    # Cut out everything north of Fairbanks    
+        tiles.update((ijdom,None) for ijdom in road_tiles if ijdom not in tiles)
+
+    # Add Alsaka and St. Elias ranges by hand
+    if 'mountains' in segments:
+        new_tiles = [
+            # West of Parks Highway
+            (81,33), (80,33), (79,33),
+            (81,34), (80,34), (79,34), (78,34),
+            (79,35), (78,35),
+
+            # East of Parks Highway
+#            (85,28), (86,28),
+#            (86,29), (87,29), 
+            (85,30), (86,30), (87,30),
+            (86,31), (87,31), (88,31),
+
+            # East of Richardson Highway
+            (91,31), (91,32),
+
+            # St. Elias Mountains
+            (92,35), (93,35), (94,35), (95,35), (96,35),
+            (92,36), (93,36), (94,36), (95,36), (96,36), (97,36), (98,36),
+
+            # East of St. Elias Mountains to Canadian Borer
+            (97,37), (98,37),
+            (97,38), (98,38), (99,38),
+
+            # Carl Glacier
+            (97,35), (97,34),
+
+            # Mount Hayes
+            (78,38), (79,38),
+            (78,39), (79,39),
+            (77,40), (78,40), (79,40),
+            (77,41), (78,41), (79,41),
+            (77,42), (78,42), (79,42),
+            (76,43), (77,43), (78,43),
+            (76,44), (77,44), (78,44),
+
+            # Katmai Wilderness
+            (75,50), (74,50),
+            (75,51), (74,51), (73,51),
+
+        ]
+        tiles.update((ijdom,None) for ijdom in new_tiles if ijdom not in tiles)
+
+
+    # Remove tiles that do not intersect with land!
+    # (And covert to a list)
+    df = geopandas.read_file(dir / f'{name}_domains.shp')    # All Alaska tiles, no ocean tiles
+    land_tiles = set(zip(df.idom, df.jdom))
+    tiles = [ijdom for ijdom in tiles.keys() if ijdom in land_tiles]
+
+    # Remove dynamically excluded tiles
+    exclude_tiles_csv = dir / 'exclude_tiles.csv'
+    if os.path.isfile(exclude_tiles_csv):
+        excludes = set()
+        with open(exclude_tiles_csv) as fin:
+            reader = csv.reader(fin)
+            for row in reader:
+                excludes.add(tuple(int(x) for x in row))
+        tiles = [ijdom for ijdom in tiles if ijdom not in excludes]
 
 
     # Generate set of trials
     snow = 'ccsm'
-    downscale_algo = 'lapse'
-    for idom,jdom in spiral_domains(113, 45):    # Spiral around Juneau
-        for year0,year1 in [(1981, 2010),(2031,2060)]:        # 30-year climatologies
-#            for return_period in [10,30,100,300]:
-            for return_period in [30,300]:
-                for forest in ('NoFor','For'):
-                    yield Combo(snow, year0, year1, downscale_algo, forest, return_period, idom, jdom)
-
-def urban():
-    for year0,year1 in [(1981,2010), (2031,2060)]:
-        for return_period in [30,300]:
-            for idom,jdom in [        (90, 41), (91, 41), (90, 42), (91, 42),    # Cordova
-                (89, 39),        # Valdez
-                (110, 42), (109,42),    # Haines and West: Avalanche of 2024-2-2
-                (113, 45)]:    # Juneau
-                for forest in ('NoFor','For'):
-                    yield Combo('ccsm', year0, year1, 'lapse', forest, return_period, idom, jdom)
-# -----------------------------------------------------------------
-def juneau():
-    for year0,year1 in [(1981,2010)]:
-        for return_period in [30,300]:
-            for idom,jdom in [(113,45), (113,44)]:
-                for forest in ('NoFor','For'):
-                    yield Combo('ccsm', year0, year1, 'lapse', forest, return_period, idom, jdom)
+    downscale_algo = 'sclapse'
+#    for return_periods in [[30,300], [10,100]]:
+    for return_periods in [[30,300, 10,100]]:
+        for idom,jdom in tiles:    # Spiral around Anchorage
+            for era in ['past']:    # also 'future'
+                for return_period in return_periods:
+                    for forest in ('NoFor','For'):
+                        yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
 
 
+def full():
+    for combo in _full({'central', 'kodiak', 'roads', 'mountains'}):
+        yield combo
+
+def central():
+    for combo in _full({'central'}):
+        yield combo
+
+def kodiak():
+    for combo in _full({'kodiak'}):
+        yield combo
+
+def roads():
+    for combo in _full({'roads'}):
+        yield combo
 
 
 
-#    for year0,year1 in [(1981,1990), (2051,2060)]:
-#    for year0,year1 in [(2051,2060)]:
+# Two independent runs that can go in parallel
+def full0():
+    return full(0)
+def full1():
+    return full(1)
 
-#        # Just one combo for now
-#        yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 113, 45)    # A Juneau-close box
-#        yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 113, 44)    # North of Juneau
-#        yield Combo('ccsm', year0, year1, 'lapse', 'For', 30, 111, 42)    # Tile borders with Canada
 
-def simple():
-    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 45)    # A Juneau-close box
+def one():
+    # Generate set of trials
+    snow = 'ccsm'
+    downscale_algo = 'sclapse'
+    idom,jdom = (83,40)
+    era = 'past'
+    return_period = 30
+#    forest = 'NoFor'
+    for forest in ('NoFor','For'):
+        yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
 
-def elizabeth():
-    yield Combo('ccsm', 1981, 1990, 'lapse', 'For', 30, 113, 47)    # A Juneau-close box
+def anchorage_tiles():
+    tiles = [(84,41), (85,41)]    #Priority tiles where we have info
+    for idom in (83,84,85):
+        for jdom in (38,39,40,41):
+            tiles.append((idom,jdom))
+    return gicollections.eliminate_duplicates_inplace(tiles)
 
-def edge():
-    # A single edge cell
-    for return_period in [30,300]:
-        for forest in ('NoFor','For'):
-            yield Combo('ccsm', 1981, 2010, 'lapse', forest, return_period, 111, 42)   # Tile borders  Canada
+
+
+
+def anchorage():
+    """Municipality of Anchorage"""
+    snow = 'ccsm'
+    downscale_algo = 'sclapse'
+    era = 'past'
+
+    for idom,jdom in anchorage_tiles():
+#        for return_period in (30,):    # DEBUG
+        for return_period in (10,30,100,300):
+            for forest in ('NoFor','For'):
+                yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
+
+
+
+
+
+def talkeena():
+    snow = 'ccsm'
+    downscale_algo = 'sclapse'
+    era = 'past'
+
+    for idom,jdom in [(84,36)]:
+        for return_period in (30,):    # DEBUG
+#        for return_period in (10,30,100,300):
+            for forest in ('NoFor','For'):
+                yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
+
+
+
+
+

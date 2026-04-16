@@ -62,7 +62,7 @@ def r_vrt(type):
 
     return make.Rule(action, [], [ofname])
 # ------------------------------------------------------------------
-def extract(type, poly, ofname, resolution=None, sanity_check=True, resample_algo='nearest'):
+def extract(type, poly, ofname, resolution=None, sanity_check=True, resample_algo='bilinear'):
     """
     poly:
         A rectangle
@@ -86,7 +86,6 @@ def extract(type, poly, ofname, resolution=None, sanity_check=True, resample_alg
         cmd += ['-tr', str(resolution), str(resolution)]
         cmd += ['-r', resample_algo]
 
-    # No -r flag, so this command defaults to nearest neighbor
     # -r {nearest|bilinear|cubic|cubicspline|lanczos|average|rms|mode}
     # Select a resampling algorithm.
     # nearest (default) applies a nearest neighbour (simple sampling) resampler

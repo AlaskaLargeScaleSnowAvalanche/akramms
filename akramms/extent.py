@@ -333,6 +333,7 @@ class combo_extent_action:
         # Iterate through avalanches and polygonize each one
         print(f'Writing extents for {combo} ({len(akdf1)} avalanches): {extent_dir}')
         with contextlib.ExitStack() as stack:
+            os.makedirs(extent_dir, exist_ok=True)
             tdir = stack.enter_context(ioutil.TmpDir(extent_dir))
             for extent_writer in extent_writers.values():
                 extent_writer.tdir = tdir    # Hack
@@ -377,6 +378,7 @@ class combo_extent_action:
 def r_combo_extent( exp, row):
     action_fn = combo_extent_action(exp, row)
     rule = make.Rule(action_fn, [], action_fn.outputs)
+    return rule
 
 def read_annotated_extent(expmod, combo, extent_type):
 

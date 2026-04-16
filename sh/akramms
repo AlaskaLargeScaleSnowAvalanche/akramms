@@ -1077,8 +1077,10 @@ def _extent(args):
         rule = extent.r_combo_extent(expmod.name, row)
         makefile.add(rule)
 
+    _tmp = expmod.root_dir / 'tmp'
+    os.makedirs(_tmp, exist_ok=True)
     makefile.generate(expmod.root_dir / f'{exp}_{expset}_extent.mk',
-        tdir_fn = lambda: ioutil.TmpDir(expmod.root_dir / 'tmp'),
+        tdir_fn = lambda: ioutil.TmpDir(_tmp),
         run=True, ncpu=config.ncpu_archive)
 
 
