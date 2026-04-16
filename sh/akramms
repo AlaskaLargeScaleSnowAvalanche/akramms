@@ -1084,20 +1084,6 @@ def _extent(args):
         run=True, ncpu=config.ncpu_archive)
 
 
-#    return
-#
-##    akdf = joblib.add_combo_status(expmod, akdf, update=False, delete_xdir=False)
-#    print('akdf ', akdf)
-#    print(akdf.combo_quickstatus.value_counts())
-#    return
-#
-#    for exp,akdf1 in akdf0.groupby('exp'):
-#        # akdf1 = akdf1.sort_values('combo_order')    # Not needed
-#        expmod = akramms.parse.load_expmod(exp)
-#
-#        extent.write_combos_extents(expmod, akdf1)
-
-
 @subcommand(args=[
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser.'),
 #    argument('-s', '--save', help='Name of query file to write to'),
