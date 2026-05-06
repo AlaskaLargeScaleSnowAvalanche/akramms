@@ -78,6 +78,7 @@ poll_period = 60*5    # Seconds between polling attempts
 condor_maxjobs = 90000    # Max. number of jobs to have on HTCondor queue
 stats_ncpu = 8
 #stats_ncpu = 1
+mosaic_ncpu = 3
 
 # Should we use the Redis Queue for running remote IDL commands?
 queue = {'arcgis': True, 'ecognition': True, 'idl': True}

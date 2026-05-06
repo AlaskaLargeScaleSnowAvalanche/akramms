@@ -274,9 +274,12 @@ def r_scsnow(exp_mod, snow_dataset, era, idom, jdom, return_period):
     """
 
     # Determine input filenames
-    geo_nc = config.roots.join('DATA', 'lader', 'sx3', 'geo_southeast.nc')
+#    geo_nc = config.roots.join('DATA', 'lader', 'sx3', 'geo_southeast.nc')
 
-    ifname = config.roots.join('HARNESS', 'outputs', 'wrf_era5_agg3', f'acsnow_agg3_4km_1940_2023_{return_period:03d}.tif')
+    if snow_dataset == 'ccsm':
+        ifname = config.roots.join('HARNESS', 'outputs', 'wrf_era5_agg3', f'acsnow_agg3_4km_1940_2023_{return_period:03d}.tif')
+    else:
+        ifname = config.roots.join('HARNESS', 'outputs', 'wrf_fut_agg3', f'acsnow_fut_4km_1979_2100_{return_period:03d}.tif')
 
     domains_margin_shp = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains_margin.shp')
     dem_tif = r_ifsar(exp_mod, idom, jdom).outputs[0]

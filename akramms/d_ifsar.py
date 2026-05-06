@@ -84,7 +84,8 @@ def extract(type, poly, ofname, resolution=None, sanity_check=True, resample_alg
 #        cmd += ['-eco']    # Error when completely outside (SANITY CHECK)
     if resolution is not None:
         cmd += ['-tr', str(resolution), str(resolution)]
-        cmd += ['-r', resample_algo]
+        if resample_algo is not None:
+            cmd += ['-r', resample_algo]
 
     # -r {nearest|bilinear|cubic|cubicspline|lanczos|average|rms|mode}
     # Select a resampling algorithm.
