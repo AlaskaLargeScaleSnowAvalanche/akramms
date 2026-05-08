@@ -1304,7 +1304,38 @@ def upload_mosaic(args):
 #4. If no other extent info, union all the extents
 
 
+@subcommand()
+def throughput(args):
+    import glob,datetime
 
+    experiments = (('akse5c', 'South-East', 1./4), ('aksc5c', 'South-Central', 1./8))
+    rows = list()
+    for experiment, nickname, tiles_per_combo in experiments:
+        expmod = akramms.parse.load_expmod(experiment)
+        sglob = str(expmod.dir / f'{experiment}*/arc-*/archived.txt')
+        print(sglob)
+        for spath in glob.glob(sglob):
+            stats_info = os.stat(spath)
+            dt = datetime.datetime.fromtimestamp(stats_info.st_ctime)
+            date = dt.date()
+            file = pathlib.Path(spath)
+            sijdom = file.parts[-2]
+            subexp = file.parts[-3]
+            rows.append((nickname, tiles_per_combo, subexp, sijdom, date, stats_info.st_ctime))
+
+    df = pd.DataFrame(rows, columns=('exp', 'tiles_per_combo', 'subexp', 'sijdom', 'date', 'ctime'))
+    df = df.sort_values(by='date')
+    print(df)
+
+    dfg = df[['date','exp','tiles_per_combo']].groupby(['date', 'exp'])
+
+    sdf = dfg.sum().rename(columns={'tiles_per_combo':'ntile'})
+    sdf['ncombo'] = dfg.size()
+    print(sdf)
+
+#    size_df = .size().to_frame(name='ncombo')
+#    size_df['ntile'] = size_df['ncombo'] / 8.0
+#    print(size_df)
 
 
 def main():

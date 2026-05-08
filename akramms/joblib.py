@@ -373,7 +373,7 @@ def _condorq_njobs():
     return None
 
 def submit_jobs(akdf, **kwargs):
-#    print('submit_jobs len(akdf) = ', len(akdf))
+    print('submit_jobs len(akdf) = ', len(akdf))
 
     akdf = add_id_status(akdf)
 
