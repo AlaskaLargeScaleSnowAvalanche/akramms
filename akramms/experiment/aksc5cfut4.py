@@ -69,7 +69,7 @@ experiment_region_shp = f'/vsizip/{experiment_region_zip}/Alaska_1%3A250%2C000.s
 # Schema of top-level tuple describing a single trial.
 combo_schema = schema.Schema({
     'snow_dataset': schemautil.EnumField(
-        {'ccsm', 'cfsr', 'gfdl'},
+        {'fut', 'ccsm', 'cfsr', 'gfdl'},
         "Available WRF Dataset to use in obtaining snow data"),
     'era': schemautil.EnumField({'past','future'},
         "First year of snow dataset to accumulate over"),
@@ -418,7 +418,7 @@ def _full(segments):
 
 
     # Generate set of trials
-    snow = 'ccsm'
+    snow = 'fut'
     downscale_algo = 'sclapse'
 #    for return_periods in [[30,300], [10,100]]:
     for return_periods in [[30,300, 10,100]]:
@@ -456,7 +456,7 @@ def full1():
 
 def one():
     # Generate set of trials
-    snow = 'ccsm'
+    snow = 'fut'
     downscale_algo = 'sclapse'
     idom,jdom = (83,40)
     era = 'past'
@@ -477,7 +477,7 @@ def anchorage_tiles():
 
 def anchorage():
     """Municipality of Anchorage"""
-    snow = 'ccsm'
+    snow = 'fut'
     downscale_algo = 'sclapse'
     era = 'past'
 
@@ -492,7 +492,7 @@ def anchorage():
 
 
 def talkeena():
-    snow = 'ccsm'
+    snow = 'fut'
     downscale_algo = 'sclapse'
     era = 'past'
 

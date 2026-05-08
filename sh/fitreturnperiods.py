@@ -36,6 +36,7 @@ def _classic_GEV(data):
     return (params.c, params.loc, params.scale)
 
 
+# Step 1
 def gen_fits():
 
     fit_fns = (genextreme.fit, _lieblein, _classic_GEV)
@@ -140,13 +141,15 @@ def gen_fits():
     print(f'Done writing {ofname}')
 
 def read_landmask_in():
-    ifname = config.HARNESS / 'data' / 'waigl' / 'wrf_era5' / f'{RES:02d}km' / 'invar' / 'geo_em.d02.nc'
+#    ifname = config.HARNESS / 'data' / 'waigl' / 'wrf_era5' / f'{RES:02d}km' / 'invar' / 'geo_em.d02.nc'
+    ifname = config.HARNESS / 'data' / 'hutton' / 'wrf_fut' / 'geo_em_files' / 'geo_em_4km.nc'
     with netCDF4.Dataset(ifname) as nc:
         landmask_v = nc.variables['LANDMASK']
         landmask = np.zeros(landmask_v.shape[1:], dtype='int8')
         landmask[:] = landmask_v[0,:,:]
     return landmask != 0
 
+# Step 2
 def gen_evt():
     """Once the fits have been created, use them to produce a value
     for each return period"""
@@ -406,7 +409,8 @@ def eval_large():
 def to_geotiff():
     landmask_out = np.logical_not(read_landmask_in())
 
-    geo_fname = config.HARNESS / 'data' / 'waigl' / 'wrf_era5' / '04km' / 'invar' / 'geo_em.d02.nc'
+#    geo_fname = config.HARNESS / 'data' / 'waigl' / 'wrf_era5' / '04km' / 'invar' / 'geo_em.d02.nc'
+    geo_fname = config.HARNESS / 'data' / 'hutton' / 'wrf_fut' / 'geo_em_files' / 'geo_em_4km.nc'
 #    grid = wrfutil.wrf_info(geo_fname)
 
     name0 = _single_acsnow_agg3()
@@ -429,9 +433,13 @@ def to_geotiff():
 
 
 #eval_large()
-#gen_fits()
-#gen_evt()
 
-to_geotiff()
+
+def main():
+#    gen_fits()
+#    gen_evt()
+    to_geotiff()
+
+main()
 
 
