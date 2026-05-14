@@ -251,20 +251,24 @@ def _realized_ids(expmod, combo, scenetype, releasefile, stage, include_overruns
     stage_zipRE = re.compile(r'(.*)_(\d+)\.' + stage + r'\.zip$')
 
     avalfiles = list()
+    ndiscard = 0        # Number of files we found but discarded
 
     # Find the IDs that exist on disk
     if scenetype == 'x':
 #TODO: Apply proper comparisons to avoid race conditions
         resultsdir = releasefile.parents[1] / 'RESULTS'
-        for out_zip in glob.iglob(str(resultsdir / '*' / '*' / f'*.{stage}.zip')):
+        glob_str = str(resultsdir / '*' / '*' / f'*.{stage}.zip')
+#        print('Glob ', glob_str)
+        for out_zip in glob.iglob(glob_str):
+#            print('** out_zip ', out_zip, file_info.is_file_good(out_zip))
             if not file_info.is_file_good(out_zip):
-                continue
+                ndiscard += 1
             match = stage_zipRE.match(os.path.split(out_zip)[1])
             id = int(match.group(2))
             # Do not provide info on whether the avalanche finished or overran
             avalfiles.append((id, out_zip, None))
     elif scenetype == 'arc':
-        print('scenetype == arc')
+#        print('scenetype == arc')
         arcdir = releasefile
         extent_full = extent.extent_fname(expmod, combo, 'full')
 #        extent_full = arcdir / 'extent_full.gpkg'
@@ -276,7 +280,7 @@ def _realized_ids(expmod, combo, scenetype, releasefile, stage, include_overruns
 #            dfi = geopandas.read_file(str(extent_full), mask=filter_geom, engine='fiona')
             dfi = geopandas.read_file(str(extent_full), engine='fiona')
             include_ids = set(dfi.Id)
-            print(f'Filtering avalanches from {extent_full}: {len(include_ids)}')
+#            print(f'Filtering avalanches from {extent_full}: {len(include_ids)}')
 
 
             
@@ -298,7 +302,7 @@ def _realized_ids(expmod, combo, scenetype, releasefile, stage, include_overruns
     else:
         assert False
 
-    return avalfiles
+    return avalfiles,ndiscard
 
 def resolve_id(akdf, realized=True, stage='out', status_col=False, filter_geom=False):
     """
@@ -343,21 +347,21 @@ def resolve_id(akdf, realized=True, stage='out', status_col=False, filter_geom=F
             if tup.scenetype == 'x':
                 df = shputil.read_df_noshapes(tup.releasefile, read_shapes=False)
                 ids = df['Id'].tolist()
-                #print(f'Reading releasefile {tup.releasefile}: {ids}')
+                print(f'Reading releasefile {tup.releasefile}: {ids}')
             else:
                 ids = None    # No releasefile for archive
 
         # Add those IDs
         if realized:
             # Match releasefile against what's on disk
-            avalfiles = _realized_ids(expmod, tup.combo, tup.scenetype, tup.releasefile, stage, filter_geom=filter_geom)
+            avalfiles,ndiscard = _realized_ids(expmod, tup.combo, tup.scenetype, tup.releasefile, stage, filter_geom=filter_geom)
 #            print('avalfiles ', avalfiles)
 
             if ids is None:    # Archive-type directory, no releasefile
                 for x in avalfiles:    # (id, fname, id_status)
                     orows.append(itertools.chain(tup, x))
             else:
-                #print('avalfiles ', tup.combo, len(avalfiles), len(ids))
+                print('avalfiles ', tup.combo, len(avalfiles), len(ids))
                 avalfile_set = {id: (fname, id_status) for id,fname,id_status in avalfiles}
                 for id in ids:
                     try:
@@ -376,7 +380,8 @@ def resolve_id(akdf, realized=True, stage='out', status_col=False, filter_geom=F
 
     df = pd.DataFrame(orows, columns=tuple(
         itertools.chain(akdf.columns, ['id', 'avalfile', 'id_status'])))
-#        itertools.chain(type(tup)._fields, ['id', 'avalfile'])))
+#      bj  itertools.chain(type(tup)._fields, ['id', 'avalfile'])))
+    df.attrs['ndiscard'] = ndiscard    # IDs that were found but discarded
 
     if not status_col:
         df = df.drop('id_status', axis=1)
@@ -401,17 +406,18 @@ def resolve_to(parseds, level, realized=True, scenetypes={'x'}, stage='out', sta
         return akdf
 
     akdf = resolve_combo(akdf, realized=realized, scenetypes=scenetypes)
-#    print('resolve_combo ', akdf)
+    print('resolve_combo ', akdf)
     if level == 'combo':
         return akdf
 
     akdf = resolve_chunk(akdf, scenetypes=scenetypes)
-#    print('resolve_chunk ', akdf)
+    print('resolve_chunk ', akdf)
     if level == 'chunk':
         return akdf
 
     akdf = resolve_id(akdf, realized=realized, stage=stage, status_col=status_col, filter_geom=filter_geom)
-#    print('resolve_id ', akdf)
+    print('resolve_id ', akdf)
+    print('ndiscard1 ', akdf.attrs['ndiscard'])
     if level == 'id':
         return akdf
 

@@ -28,7 +28,7 @@ pra_resolution = 5    # Use 5m DEM when computing PRAs
 snow_density = 300    # [kg m-3], used for mosaic
 
 # File describing WRF geometry, grid, etc.
-wrf_geo_nc = config.HARNESS / 'data' / 'waigl' / 'wrf_era5' / '04km' / 'invar' / 'geo_em.d02.nc'
+wrf_geo_nc = config.HARNESS / 'data' / 'hutton' / 'wrf_fut' / 'geo_em_files' / 'geo_em_4km.nc'
 
 #forest_landcover_types = [42,43]    # NCLD Land Cover Classifications *Evergreen* and *Mixed Deciduous*
 forest_landcover_types = [42]    # NCLD Land Cover Classifications *Evergreen* only

@@ -508,7 +508,11 @@ def downscale_acsnow_with_sclapse(snow_tif, geo_nc, dem_tif, ofname, debug=True)
         wrfdemgridA = wrfdemgridA.flipud()
 
 
-    print('wrfdemgridA dx dy ', wrfdemgridA.dx, wrfdemgridA.dy)
+#    print('wrfdemgridA dx dy ', wrfdemgridA.dx, wrfdemgridA.dy)
+#    print('wrfdemA ', wrfdemA.shape)
+#    print('acsnowA ', acsnowA.shape)
+#    print('gridA ', gridA.dy, gridA.dx)
+#    print('geo_nc ', geo_nc)
     slopeA,lapseA = lapseutil.compute_lapse(wrfdemA, acsnowA, gridA.dx, gridA.dy)
     slope_thresh = 0.004
     slope_mask_in = (np.abs(slopeA) >= slope_thresh)

@@ -342,8 +342,8 @@ def run_chunk(release_file, crf, gridI, at_front=False, submit=False, condor_pri
 
         parseds = [parse._parse_chunk_releasefile(release_file)]
         akdf = resolve.resolve_to(parseds, 'id', stage='in', realized=True)
-        print('release_file resolved to:')
-        print(akdf)
+        if len(akdf) + akdf.attrs['ndiscard'] == 0:
+            raise ValueError('Suspicious resolution of release_file to nothing (r_ramms1.py)!')
         joblib.submit_jobs(akdf, condor_priority=condor_priority)
 
     # Write output files
