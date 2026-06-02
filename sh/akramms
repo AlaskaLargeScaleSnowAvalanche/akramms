@@ -1308,7 +1308,7 @@ def upload_mosaic(args):
 def throughput(args):
     import glob,datetime
 
-    experiments = (('akse5c', 'South-East', 1./4), ('aksc5c', 'South-Central', 1./8))
+    experiments = (('akse5c', 'South-East', 1./4), ('aksc5c', 'South-Central', 1./8), ('aksc5cfut4', 'South-Central Future', 1./8))
     rows = list()
     for experiment, nickname, tiles_per_combo in experiments:
         expmod = akramms.parse.load_expmod(experiment)
