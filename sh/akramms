@@ -1337,6 +1337,33 @@ def throughput(args):
 #    size_df['ntile'] = size_df['ncombo'] / 8.0
 #    print(size_df)
 
+@subcommand()
+def fitreturnperiods(args):
+    ifname = pathlib.Path('/home/efischer/av/outputs/wrf_fut_agg3/acsnow_agg3_4km_1979_2100.nc')
+    #geo_fname = config.HARNESS / 'data' / 'waigl' / 'wrf_era5' / '04km' / 'invar' / 'geo_em.d02.nc'
+    geo_fname = config.HARNESS / 'data' / 'hutton' / 'wrf_fut' / 'geo_em_files' / 'geo_em_4km.nc'
+    return_periods = [10,30,100,300]
+
+    makefile = make.Makefile()
+
+    rule = r_fitreturnperiods.r_fits(ifname, 'acsnow_agg3_4km', 1979, 2100)
+    fname_fit = rule.outputs[0]
+    makefile.add(rule)
+
+    rule = r_fitreturnperiods.r_evt(fname_fit, return_periods)
+    fname_evt = rule.outputs[0]
+    makefile.add(rule)
+
+    rule = r_fitreturnperiods.r_geotiff(fname_evt, geo_fname, return_periods)
+    makefile.add(rule)
+
+    dir = ifname.parts[-1]
+    makefile.generate(dir / 'fitreturnperiods.mk',
+        tdir_fn = lambda: ioutil.TmpDir(dir),
+        run=True, ncpu=config.mosaic_ncpu)
+
+
+
 
 def main():
     args = cli.parse_args()
