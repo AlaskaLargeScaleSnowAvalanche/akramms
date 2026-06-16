@@ -132,21 +132,13 @@ def polygonize_extent(combo, aval, tup_id,
     # ----------------
     # Now nzmask_val (on its limited grid) is tup_id where there is
     # avalanche, and 0 elsewhere.
-#    print('Landcover shape ', landcover.shape)
-#    print('nzmask shape ', nzmask_val.shape)
-#    landcoverL = landcover[aval.iiA, aval.jjA]#iL_min:iL_max, jL_min:jL_max]
     landcoverL = landcover[aval.jjA, aval.iiA]#iL_min:iL_max, jL_min:jL_max]
-#    print('landcover ', landcover.shape)
-#    print('landcoverL ', landcoverL.shape, iL_min, iL_max, jL_min, jL_max)
-#    print('nzmask_val ', nzmask_val.shape)
     nzmask_in = (nzmask_val != 0)
-#    print(landcoverL[nzmask_in])
     extsizes = (
         np.sum(nzmask_in),
         np.sum(landcoverL[nzmask_in] == 41),
         np.sum(landcoverL[nzmask_in] == 42),
         np.sum(landcoverL[nzmask_in] == 43))
-#    print('extsizes ', extsizes)
     # ----------------
 
 
@@ -264,6 +256,22 @@ class WriteGpkg:
             self.relrows.append(list(relsizes) + list(extsizes))
 
 # ----------------------------------------------------------------
+def fix_aval(aval, shape):
+    """Remove gridcells that are out of bounds of our full tile grid"""
+
+    mask_in_jj = np.logical_and(aval.jjA >= 0, aval.jjA < shape[0])
+    mask_in_ii = np.logical_and(aval.iiA >= 0, aval.iiA < shape[1])
+    mask_in = np.logical_and(mask_in_jj, mask_in_ii)
+
+    aval1 = aval._replace(
+        jjA=aval.jjA[mask_in],
+        iiA=aval.iiA[mask_in],
+        max_vel=aval.max_vel[mask_in],
+        max_height=aval.max_height[mask_in],
+        depo=aval.depo[mask_in])
+
+    return not np.all(mask_in),aval1    # True if anything was removed
+# ----------------------------------------------------------------
 extent_types = ('christen', 'full', 'tetra30', 'tetra1')
 
 class combo_extent_action:
@@ -329,7 +337,6 @@ class combo_extent_action:
             ew.landcover = landcover
         # ----------------------------------------
 
-
         # Iterate through avalanches and polygonize each one
         print(f'Writing extents for {combo} ({len(akdf1)} avalanches): {extent_dir}')
         with contextlib.ExitStack() as stack:
@@ -358,6 +365,9 @@ class combo_extent_action:
                     continue
                 aval = archive.read_nc(tup.avalfile)
 
+                # Ensure all gridcells in the avalanche are in bounds
+                removed,aval = fix_aval(aval, landcover.shape)
+
                 # Process the PRA
                 relrow = reldfi.loc[tup.id]
                 pra_burn = rasterize.rasterize_polygon_compressed(relrow['geometry'], grid_info)
@@ -371,6 +381,10 @@ class combo_extent_action:
                     mask_kwargs=dict(max_pressure=max_pressure))
                 extent_writers['tetra1'].polygonize(combo, aval, tup.id, relsizes,
                     mask_kwargs=dict(max_pressure=max_pressure))
+
+
+#                if removed:
+#                    raise ValueError('Removed 17')
             print()
             for ew in extent_writers.values():
                 ew.complete = True
