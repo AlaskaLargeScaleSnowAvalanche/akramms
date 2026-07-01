@@ -719,7 +719,23 @@ class ArchiveContents(typing.NamedTuple):
         #       releasefile_attrs:VOL_30 = 38637.5522545201 ;
         #       releasefile_attrs:fid = 83. ;
 
-def read_nc(avalfile):
+def fix_aval(aval, shape):
+    """Remove gridcells that are out of bounds of our full tile grid"""
+
+    mask_in_jj = np.logical_and(aval.jjA >= 0, aval.jjA < shape[0])
+    mask_in_ii = np.logical_and(aval.iiA >= 0, aval.iiA < shape[1])
+    mask_in = np.logical_and(mask_in_jj, mask_in_ii)
+
+    aval1 = aval._replace(
+        jjA=aval.jjA[mask_in],
+        iiA=aval.iiA[mask_in],
+        max_vel=aval.max_vel[mask_in],
+        max_height=aval.max_height[mask_in],
+        depo=aval.depo[mask_in])
+
+    return not np.all(mask_in),aval1    # True if anything was removed
+
+def read_nc(avalfile, fix_shape=None):
     with netCDF4.Dataset(avalfile) as nc:
         nc.set_always_mask(False)
 
@@ -733,7 +749,7 @@ def read_nc(avalfile):
         i_diff = nc.variables['i_diff'][:]
         j_diff = nc.variables['j_diff'][:]
 
-        return ArchiveContents(
+        aval = ArchiveContents(
             gridA_gt=gridA_gt, gridA_wkt=gridA_wkt,
             iiA=np.cumsum(i_diff, dtype=i_diff.dtype),
             jjA=np.cumsum(j_diff, dtype=j_diff.dtype),
@@ -741,6 +757,10 @@ def read_nc(avalfile):
             max_height=nc.variables['max_height'][:].astype('f4'),
             depo=nc.variables['depo'][:].astype('f4'))
 
+    if fix_shape is not None:    # fix is the shape of our tile
+        removed,aval = fix_aval(aval, fix_shape)
+
+    return aval
 
 def _rmtree(xdir):
     # --------------- (Very conservatively)

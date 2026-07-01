@@ -256,22 +256,6 @@ class WriteGpkg:
             self.relrows.append(list(relsizes) + list(extsizes))
 
 # ----------------------------------------------------------------
-def fix_aval(aval, shape):
-    """Remove gridcells that are out of bounds of our full tile grid"""
-
-    mask_in_jj = np.logical_and(aval.jjA >= 0, aval.jjA < shape[0])
-    mask_in_ii = np.logical_and(aval.iiA >= 0, aval.iiA < shape[1])
-    mask_in = np.logical_and(mask_in_jj, mask_in_ii)
-
-    aval1 = aval._replace(
-        jjA=aval.jjA[mask_in],
-        iiA=aval.iiA[mask_in],
-        max_vel=aval.max_vel[mask_in],
-        max_height=aval.max_height[mask_in],
-        depo=aval.depo[mask_in])
-
-    return not np.all(mask_in),aval1    # True if anything was removed
-# ----------------------------------------------------------------
 extent_types = ('christen', 'full', 'tetra30', 'tetra1')
 
 class combo_extent_action:
@@ -363,10 +347,10 @@ class combo_extent_action:
                     continue
                 if os.path.getsize(tup.avalfile) == 0:    # Avoid dummy placeholder avalanches
                     continue
-                aval = archive.read_nc(tup.avalfile)
+                aval = archive.read_nc(tup.avalfile, fix_shape=landcover.shape)
 
-                # Ensure all gridcells in the avalanche are in bounds
-                removed,aval = fix_aval(aval, landcover.shape)
+#                # Ensure all gridcells in the avalanche are in bounds
+#                removed,aval = fix_aval(aval, landcover.shape)
 
                 # Process the PRA
                 relrow = reldfi.loc[tup.id]

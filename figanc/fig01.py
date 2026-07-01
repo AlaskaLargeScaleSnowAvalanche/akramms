@@ -3,7 +3,7 @@ import cartopy,geopandas
 import cartopy.io.img_tiles
 from akramms import config
 import matplotlib.pyplot as plt
-import akramms.experiment.aksc5 as exp
+import akramms.experiment.aksc5c as exp
 from uafgi.util import wrfutil,cartopyutil,gisutil
 import akfigs
 import shapely.geometry
@@ -30,7 +30,8 @@ jdom_for_idom = {79:35, 80:35, 81:35, 82:35}
 def main():
     map_crs = akfigs.map_crs()
 
-    combos = list(exp.full())
+#    combos = list(exp.full())
+    combos = list(exp.anchorage())
     map_extent = combos_extent(exp.gridD, combos, margin=(30000, 30000, 30000, 30000))
 
 ##    map_extent = list(akfigs.anchorage_map_extent)
@@ -51,7 +52,7 @@ def main():
     # Read the tile squares for our own analysis
 #    combos = exp.anchorage()
     ijdom = {(combo.idom, combo.jdom) for combo in combos}
-    tile_df = geopandas.read_file(str(exp.dir / 'aksc5_domains.shp'))
+    tile_df = geopandas.read_file(str(exp.dir / 'aksc5c_domains.shp'))
     ijdom_col = tile_df.apply(lambda row: (row.idom,row.jdom), axis=1)
     tile_df = tile_df[ijdom_col.isin(ijdom)]
 
@@ -62,7 +63,7 @@ def main():
     # The tile squares (plot for map)
     shape_feature = cartopy.feature.ShapelyFeature(
         list(tile_df.geometry),
-#        cartopy.io.shapereader.Reader(str(exp.dir / 'aksc5_domains.shp')).geometries(),
+#        cartopy.io.shapereader.Reader(str(exp.dir / 'aksc5c_domains.shp')).geometries(),
         map_crs)
     ax.add_feature(shape_feature, facecolor='pink', alpha=.3, edgecolor='black', lw=0.3)
 
@@ -111,11 +112,11 @@ def main():
             horizontalalignment='center', verticalalignment='bottom',
             fontdict={'size':8})
 
-    akfigs.plot_cities(ax, 'scalaska',
-        text_kwargs=dict(
-            fontdict = {'size': 7, 'color': 'blue', 'fontweight': 'bold'}),
-        marker_kwargs=dict(
-            marker='*', markersize=2, color='black', alpha=0.9))
+#    akfigs.plot_cities(ax, 'scalaska',
+#        text_kwargs=dict(
+#            fontdict = {'size': 7, 'color': 'blue', 'fontweight': 'bold'}),
+#        marker_kwargs=dict(
+#            marker='*', markersize=2, color='black', alpha=0.9))
 
     # Add graticules
     if True:

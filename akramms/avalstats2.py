@@ -243,6 +243,7 @@ def stats_by_combos(akdf0, ress=[100,1000,10000]):
 
     makefile = make.Makefile()
     xdir = expmod.root_dir / 'stats'
+    os.makedirs(xdir, exist_ok=True)
     with ioutil.TmpDir(xdir) as tdir:
         for akdf1 in avalquery.consolidate_by_forest(expmod, akdf0):
             # Change For/NoFor to All

@@ -466,7 +466,7 @@ def downscale_sx3_with_lapse(sx3_files, geo_nc, distance_from_coastA_tif, dem_ti
 
 
 
-def downscale_acsnow_with_sclapse(snow_tif, geo_nc, dem_tif, ofname, debug=True):
+def downscale_acsnow_with_sclapse(snow_tif, geo_nc, dem_tif, ofname, debug=True, debug_dir=config.HARNESS / 'debug'):
     """Downscale algo for South Central Alaska run (aksc)
     snow_tif: Snow for one return period
         Eg: acsnow_agg3_4km_1940_2023_300.tif
@@ -475,7 +475,7 @@ def downscale_acsnow_with_sclapse(snow_tif, geo_nc, dem_tif, ofname, debug=True)
     ofname:
         Name of the output file
     """
-    debug_dir = config.HARNESS / 'debug'
+#    debug_dir = config.HARNESS / 'debug'
     os.makedirs(debug_dir, exist_ok=True)
 
     print('snow_tif ', snow_tif)
@@ -520,6 +520,7 @@ def downscale_acsnow_with_sclapse(snow_tif, geo_nc, dem_tif, ofname, debug=True)
     lapseA[mask_out] = np.nan
 
 
+    gdalutil.write_raster(debug_dir / 'lapseA0.tif', gridA, lapseA, acsnowA_nd, type=gdal.GDT_Float32)
     gdalutil.write_raster(debug_dir / 'slopeA.tif', gridA, slopeA, acsnowA_nd, type=gdal.GDT_Float32)
     gdalutil.write_raster(debug_dir / 'wrfdemA.tif', gridA, wrfdemA, acsnowA_nd, type=gdal.GDT_Float32)
 
