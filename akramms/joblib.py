@@ -186,6 +186,8 @@ def add_id_status(akdf0, update=True, dry_run=False):
         Must all have the same combo (scenedir)
     """
 
+    akdf_orig = akdf0
+
 #    print('add_id_status called with len(akdf0) = ', len(akdf0))
 
     # Make it idempotent
@@ -300,6 +302,9 @@ def add_id_status(akdf0, update=True, dry_run=False):
     if update:
         archive.archive_ids(akdf0, dry_run=dry_run)
 
+    akdf0.attrs.update(akdf_orig.attrs)
+#    print('akdf_orig ndiscard ', akdf_orig.attrs['ndiscard'])
+#    print('akdf0 ndiscard ', akdf0.attrs['ndiscard'])
     return akdf0
 # --------------------------------------------------------
 _include_statuses = {JobStatus.NOINPUT, JobStatus.INCOMPLETE, JobStatus.TODO, JobStatus.INPROCESS, JobStatus.OVERRUN, JobStatus.FAILED}
@@ -377,7 +382,8 @@ def submit_jobs(akdf, **kwargs):
 
     akdf = add_id_status(akdf)
 
-    if len(akdf) == 0:
+    if len(akdf) + akdf.attrs['ndiscard'] == 0:
+#    if len(akdf) == 0:
         raise ValueError('Submitting empty dataframe is suspicious (pre-collation)!')
 
     # Only submit jobs that are ready to go and not in process or completed or something.
