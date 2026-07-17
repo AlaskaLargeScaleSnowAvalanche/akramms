@@ -122,6 +122,12 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
         keep = ((df['Mean_DEM'] >= config.elevation_cutoff) & (df['area_m2'] >= config.area_cutoff))
         df =  df[keep]
 
+        # Remove PRAs with NaN snow.  This happens in (idom, jdom) =
+        # (56,60): There is just one island, and apparently it is not
+        # in the domain of the ERA5 downscaling.
+        df = df.dropna(subset=['sx3'])
+
+
         # Clip to the non-margin part of the local grid (subdomain)
         gridI,dem_mask,_ = gdalutil.read_raster(dem_mask_tif)
         if len(df) > 0:

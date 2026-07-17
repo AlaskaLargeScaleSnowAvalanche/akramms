@@ -154,6 +154,12 @@ def read_reldom(relfname, **kwargs):
 _post_cat_bounds = (0.,5000.,25000.,60000.,1e10)    # Dummy value at end
 _pra_sizes = ('T', 'S', 'M', 'L')
 
+def _do_pra_size(x):
+    ix = bisect.bisect(_post_cat_bounds, x) - 1
+    if (ix < 0) or (ix >= len(_pra_sizes)):
+        raise IndexError(f'Tuple index out of range: {ix} (x = {x})')
+    return _pra_sizes[ix - 1]
+
 def add_pra_size(reldf):
     """
     reldf:
@@ -167,8 +173,8 @@ def add_pra_size(reldf):
             vol_col = name
             break
 
-    pra_size = reldf[vol_col].map(
-        lambda x: _pra_sizes[bisect.bisect(_post_cat_bounds, x) - 1])
+    print(reldf.iloc[0])
+    pra_size = reldf[vol_col].map(_do_pra_size)
     reldf['pra_size'] = pra_size.astype('string')
     return reldf
 # -----------------------------------------------------------

@@ -318,6 +318,7 @@ def resolve_id(akdf, realized=True, stage='out', status_col=False, filter_geom=F
         return akdf
 
     orows = list()
+    ndiscard = 0
 
     akdf = akdf.reset_index(drop=True)
     for tup in akdf.itertuples(index=False):
