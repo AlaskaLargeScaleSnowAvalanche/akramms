@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 import akfigs
 from uafgi.util import gdalutil,cptutil,ioutil,cartopyutil,nlcdcodes
-import akramms.experiment.aksc5 as expmod    # Using old simulations for now
+import akramms.experiment.aksc5c as expmod
 # \caption{Elevation data from Juneau area}
 
 # Line2D Properties: https://matplotlib.org/stable/api/_as_gen/matplotlib.lines.Line2D.html#matplotlib.lines.Line2D

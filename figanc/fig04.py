@@ -5,7 +5,7 @@ import cartopy.io.img_tiles
 from osgeo import gdal
 from akramms import config
 import matplotlib.pyplot as plt
-import akramms.experiment.aksc5 as expmod
+import akramms.experiment.aksc5c as expmod
 from akfigs import *
 from uafgi.util import gdalutil,cptutil,ioutil,cartopyutil
 import shapely.geometry.multipolygon
