@@ -13,7 +13,10 @@ static PyArrayObject *np_new_1d(npy_intp shape0, int typenum)
 {
     PyArray_Descr *tdescr = PyArray_DescrFromType(typenum);
     npy_intp dims[] = {shape0};
-    npy_intp strides[] = {tdescr->elsize};
+//    npy_intp strides[] = {tdescr->elsize};    // numpy 1
+    npy_intp strides[] = {PyDataType_ELSIZE(tdescr)};    // numpy 1 & 2
+
+
     return (PyArrayObject*) PyArray_NewFromDescr(&PyArray_Type, 
         tdescr, 1,    // rank 1
         dims, strides,
