@@ -348,7 +348,7 @@ def resolve_id(akdf, realized=True, stage='out', status_col=False, filter_geom=F
             if tup.scenetype == 'x':
                 df = shputil.read_df_noshapes(tup.releasefile, read_shapes=False)
                 ids = df['Id'].tolist()
-#                print(f'Reading releasefile {tup.releasefile}: {len(ids)}')
+#                #print(f'Reading releasefile {tup.releasefile}: {len(ids)}')
             else:
                 ids = None    # No releasefile for archive
 
