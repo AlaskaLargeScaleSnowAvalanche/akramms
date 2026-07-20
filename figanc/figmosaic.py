@@ -13,6 +13,7 @@ from uafgi.util import gdalutil,cptutil,ioutil,cartopyutil,gisutil
 import matplotlib.colors
 import geopandas
 # \caption{Elevation data from Juneau area}
+from akramms.util import resultutil
 
 #pub_dir = expmod.dir.parents[0] / (expmod.dir.parts[-1] + '_publish')
 pub_dir = expmod.root_dir / 'publish'
@@ -40,7 +41,7 @@ def colorbar():
 
 def doplot(section, xdata_dir, ofname, map_extent=None, xyres=10, vminmax=None, cpt='palettes/WhiteBlueGreenYellowRed.cpt', ncpt=14, cbar_fname=None, delta_extent=None):
 
-    xyres = 1000
+    xyres = 500
 
 
     map_crs = cartopy.crs.epsg(3338)    # Alaska Albers
@@ -51,6 +52,15 @@ def doplot(section, xdata_dir, ofname, map_extent=None, xyres=10, vminmax=None, 
 
     tiledf = expmod.gridD.intersecting_tiles(map_poly)
 
+
+    dem_grid, dem_data, dem_nd = resultutil.read_subraster(
+        expmod.gridD, expmod.dir / 'dem',
+        f'{expmod.name}_dem_{{idom:03d}}_{{jdom:03d}}.tif', map_extent,
+        xRes=xyres, yRes=xyres, resampleAlg='cubic')
+
+
+    gdalutil.write_raster('x.tif', dem_grid, dem_data, dem_nd)
+    sys.exit(0)
 
 
     # Resample DEM to 100m resolution

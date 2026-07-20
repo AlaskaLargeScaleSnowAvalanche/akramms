@@ -1,7 +1,10 @@
+import os
+from osgeo import gdal
 import shapely.geometry
+from uafgi.util import gdalutil
 
 
-def read_subraster(gridD, raster_dir, name_pattern, extent):
+def read_subraster(gridD, raster_dir, name_pattern, extent, xyres=None):
 
     """
     extent: xxyy
@@ -9,6 +12,9 @@ def read_subraster(gridD, raster_dir, name_pattern, extent):
     name_pattern: str
         Pattern for filenames found in raster_dir
         Must have {idom} and {jdom} as format fiels
+
+    kwargs:
+        For gdal.Warp
 
     Returns: grid_info, data, nodata_value
     """
@@ -26,12 +32,16 @@ def read_subraster(gridD, raster_dir, name_pattern, extent):
         if name in all_names:
             vrt_files.append(str(raster_dir / name))
 
+    print('VRT Files:')
+    for x in vrt_files:
+        print('   ', x)
+
     raster_vrt = "/vsimem/raster.vrt"
     #options = gdal.BuildVRTOptions(resampleAlg="bilinear")
     vrt_ds = gdal.BuildVRT(raster_vrt, vrt_files)   #, options=options)
-    srs = vrt_ds.GetSpatialRef()
 
     # Warp into our extracted in-memory raster
     # srs = osr.SpatialReference(wkt=expmod.wkt)
-    mem_ds = gdal.Warp('', vrt_ds, dstSRS=srs, format='VRT')
+    kwargs.update((('dstSRS', vrt.GetSpatialRef()), ('foramt', 'VRT')))
+    mem_ds = gdal.Warp('', vrt_ds, **kwargs)
     return gdalutil.read_ds(mem_ds)
