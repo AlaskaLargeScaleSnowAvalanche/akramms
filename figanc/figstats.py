@@ -73,7 +73,7 @@ def _main(tdir):
             nrows=1,ncols=1,
             subplot_kw={'projection': map_crs},
             figsize=(4.,4.))
-        ax.set_extent(map_extent, crs=map_crs)
+        ax.set_extent(map_extent.xxyy, crs=map_crs)
 
         shade = cartopyutil.plot_hillshade(
             ax, dem_data,
@@ -140,7 +140,7 @@ def _main(tdir):
     #    with akfigs.TrimmedPdf(ofname) as tname:
     #        fig.savefig(tname, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off'
 
-        with akfigs.TrimmedPng(ofname) as tname:
+        with akfigs.TrimmedPdf(ofname) as tname:
             fig.savefig(tname, dpi=2000, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
 
 
@@ -227,22 +227,22 @@ def _main(tdir):
     # Plot the differences
     ticks = [-20, 0, 20]
     ticklabels = ['-20%', '0', '20%']
-    plot_fig(stat_grid, data[('300', 'past', 'extentfull')] - data[('30', 'past', 'extentfull')], diff_cmap, -20, 20, 'stats_past_300-30.png', ticks, ticklabels)
-    plot_fig(stat_grid, data[('300', 'fut', 'extentfull')] - data[('30', 'fut', 'extentfull')], diff_cmap, -20, 20, 'stats_fut_300-30.png', ticks, ticklabels)
+    plot_fig(stat_grid, data[('300', 'past', 'extentfull')] - data[('30', 'past', 'extentfull')], diff_cmap, -20, 20, 'stats_past_300-30.pdf', ticks, ticklabels)
+    plot_fig(stat_grid, data[('300', 'fut', 'extentfull')] - data[('30', 'fut', 'extentfull')], diff_cmap, -20, 20, 'stats_fut_300-30.pdf', ticks, ticklabels)
 
 #    ticks = [-10, 0, 10]
 #    ticklabels = ['-10%', '0', '10%']
     ticks = [0]
     ticklabels = ['0']
-    plot_fig(stat_grid, data[('30', 'fut', 'extentfull')] - data[('30', 'past', 'extentfull')], diff_cmap, -8, 8, 'stats_fut-past_30.png', ticks, ticklabels)
-    plot_fig(stat_grid, data[('300', 'fut', 'extentfull')] - data[('300', 'past', 'extentfull')], diff_cmap, -8, 8, 'stats_fut-past_300.png', ticks, ticklabels)
+    plot_fig(stat_grid, data[('30', 'fut', 'extentfull')] - data[('30', 'past', 'extentfull')], diff_cmap, -8, 8, 'stats_fut-past_30.pdf', ticks, ticklabels)
+    plot_fig(stat_grid, data[('300', 'fut', 'extentfull')] - data[('300', 'past', 'extentfull')], diff_cmap, -8, 8, 'stats_fut-past_300.pdf', ticks, ticklabels)
 
     # Snow difference
-    plot_fig(stat_grid, data[('30', 'fut', 'snowfull')] - data[('30', 'past', 'snowfull')], diff_cmap_snow, -100, 100, 'snow_fut-past.png', [0], ['0'])
+    plot_fig(stat_grid, data[('30', 'fut', 'snowfull')] - data[('30', 'past', 'snowfull')], diff_cmap_snow, -100, 100, 'snow_fut-past.pdf', [0], ['0'])
 
     # Baseline
-    plot_fig(stat_grid, data[('30', 'past', 'extent040')], abs_cmap, 0., 100, 'stats_past_30_extent040_baseline.png', [0,20,40,60,80,100], ['0%', '20', '40', '60', '80', '100%'])
-    plot_fig(stat_grid, data[('30', 'past', 'extent160')], abs_cmap, 0., 100, 'stats_past_30_extent160_baseline.png', [0,20,40,60,80,100], ['0%', '20', '40', '60', '80', '100%'])
+    plot_fig(stat_grid, data[('30', 'past', 'extent040')], abs_cmap, 0., 100, 'stats_past_30_extent040_baseline.pdf', [0,20,40,60,80,100], ['0%', '20', '40', '60', '80', '100%'])
+    plot_fig(stat_grid, data[('30', 'past', 'extent160')], abs_cmap, 0., 100, 'stats_past_30_extent160_baseline.pdf', [0,20,40,60,80,100], ['0%', '20', '40', '60', '80', '100%'])
 
 
 

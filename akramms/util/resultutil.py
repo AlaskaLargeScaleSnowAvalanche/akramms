@@ -4,10 +4,10 @@ import shapely.geometry
 from uafgi.util import gdalutil
 
 
-def read_subraster(gridD, raster_dir, name_pattern, extent, xyres=None):
+def read_subraster(gridD, raster_dir, name_pattern, extent, **kwargs):
 
     """
-    extent: xxyy
+    extent: gisutil.Extent
         
     name_pattern: str
         Pattern for filenames found in raster_dir
@@ -19,7 +19,7 @@ def read_subraster(gridD, raster_dir, name_pattern, extent, xyres=None):
     Returns: grid_info, data, nodata_value
     """
 
-    poly = shapely.geometry.box(extent[0], extent[2], extent[1], extent[3])    #xyxy
+    poly = shapely.geometry.box(*extent.xyxy)    # xyxy
     tiledf = gridD.intersecting_tiles(poly)
 
     # Files available in raster_dir
@@ -42,6 +42,10 @@ def read_subraster(gridD, raster_dir, name_pattern, extent, xyres=None):
 
     # Warp into our extracted in-memory raster
     # srs = osr.SpatialReference(wkt=expmod.wkt)
-    kwargs.update((('dstSRS', vrt.GetSpatialRef()), ('foramt', 'VRT')))
+    kwargs.update((
+        ('dstSRS', vrt_ds.GetSpatialRef()), 
+        ('outputBounds', extent.xyxy),
+        ('format', 'VRT')))
+    print('kwargs ', kwargs)
     mem_ds = gdal.Warp('', vrt_ds, **kwargs)
     return gdalutil.read_ds(mem_ds)

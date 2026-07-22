@@ -83,14 +83,14 @@ def map_crs():
     bb = crs.bounds
 #    crs.bounds = (bb[0], bb[1]+100*1000, bb[2]-100*1000, bb[3])
     crs.bounds = (bb[0], bb[1]+300*1000, -1000, bb[3])
-    print('bounds ', crs.bounds)
+#    print('map_crs set bounds to bounds ', crs.bounds)
     return crs
 
-allalaska_map_extent = (-820*1000, 1900*1000, 0*1000, 2400*1000)
+allalaska_map_extent = gisutil.Extent(-820*1000, 1900*1000, 0*1000, 2400*1000, order='xxyy')
 #sealaska_map_extent = ((320-180)*1000, 1670*1000, 300*1000, (1425+230)*1000)    # xmin, xmax, ymin, ymax; ymin in South
-anchorage_map_extent = (210000-5000, 300000+5000, 1200000-5000, 1320000+5000)    # xmin, xmax, ymin, ymax; ymin in South
+anchorage_map_extent = gisutil.Extent(210000-5000, 300000+5000, 1200000-5000, 1320000+5000, order='xxyy')    # xmin, xmax, ymin, ymax; ymin in South
 
-scalaska_map_extent = (-820*1000, 1900*1000, 0*1000, 2400*1000)
+scalaska_map_extent = gisutil.Extent(-820*1000, 1900*1000, 0*1000, 2400*1000, order='xxyy')
 
 
 #(214750-15000, 300200+5000, 1199835-5000, 1320230+5000,)
