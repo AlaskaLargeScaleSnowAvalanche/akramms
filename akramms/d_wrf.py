@@ -142,7 +142,6 @@ def r_agg3_one(dt0, dt1, olabel, res=4, dataset='era5'):
 
 def agg3(dt0, dt1, res=4, dataset='era5'):
 
-
     # Split up range into 1-year segments
     year = dt0.year
     dates = [dt0 + datetime.timedelta(days=x) for x in range((dt1-dt0).days)]
@@ -151,6 +150,8 @@ def agg3(dt0, dt1, res=4, dataset='era5'):
     df['year'] = df.date.apply(lambda date: date.year)
     bounds = [(year, df.date.iloc[0]) for year,df in df.groupby('year')] + [(None, dt1)]
     ranges = [(b0[0], b0[1], b1[1]) for b0,b1 in zip(bounds[:-1], bounds[1:])]
+    print('ranges ', ranges)
+    sys.exit(0)
 
     makefile = make.Makefile()
     for res in (4,1.33):
