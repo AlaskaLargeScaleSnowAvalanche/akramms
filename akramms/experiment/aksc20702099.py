@@ -68,14 +68,15 @@ experiment_region_shp = f'/vsizip/{experiment_region_zip}/Alaska_1%3A250%2C000.s
 
 # Schema of top-level tuple describing a single trial.
 combo_schema = schema.Schema({
-    'snow_dataset': schemautil.EnumField(
-        {'fut', 'ccsm', 'cfsr', 'gfdl'},
-        "Available WRF Dataset to use in obtaining snow data"),
-    'era': schemautil.EnumField({'past','future'},
-        "First year of snow dataset to accumulate over"),
-    'downscale_algo': schemautil.EnumField(
-        {'select', 'lapse', 'sclapse'},    # lapse=SE Alaska; sclapse=SC Alaska.  Input & procedures are different.
-        "Algorithm to use downscaling snow from WRF to RAMMS grid"),
+#    'snow_dataset': schemautil.EnumField(
+#        {'fut', 'ccsm', 'cfsr', 'gfdl'},
+#        {'
+#        "Available WRF Dataset to use in obtaining snow data"),
+#    'era': schemautil.EnumField({'past','future'},
+#        "First year of snow dataset to accumulate over"),
+#    'downscale_algo': schemautil.EnumField(
+#        {'select', 'lapse', 'sclapse'},    # lapse=SE Alaska; sclapse=SC Alaska.  Input & procedures are different.
+#        "Algorithm to use downscaling snow from WRF to RAMMS grid"),
     'forest': schemautil.EnumField(    # REQUIRED key for stdmosaic; see mosaic.py
         {'', 'For', 'NoFor'},    # Blank string in EnumField allows for wildcard forest in mosaic plotting
         "Use the forest file or not"),
@@ -98,7 +99,7 @@ class Combo(_Combo):
     def __repr__(self):
         return f'{self.base_str()}-{self.idom:03d}-{self.jdom:03d}'
 
-def snowfile(snow_dataset, era, downscale_algo, return_period, idom, jdom):
+def snowfile(return_period, idom, jdom):
     """Creates the name of a snow file.
     idom,jdom:
         may be '*' to allow for wildcards and globbing."""
@@ -106,13 +107,11 @@ def snowfile(snow_dataset, era, downscale_algo, return_period, idom, jdom):
     sidom = idom if isinstance(idom,str) else f'{idom:03d}'
     sjdom = jdom if isinstance(jdom,str) else f'{jdom:03d}'
     ofname = os.path.join(dir, 'snow',
-        f'{name}_{snow_dataset}_{era}_{downscale_algo}_{return_period:03d}_{sidom}_{sjdom}.tif')
+        f'{name}_{return_period:03d}_{sidom}_{sjdom}.tif')
     return pathlib.Path(ofname)
 
 def combo_to_snowfile_args(combo):
     return (
-        combo.snow_dataset,
-        combo.era, combo.downscale_algo,
         combo.return_period, combo.idom, combo.jdom)
 
 
@@ -126,7 +125,7 @@ _root_dir = {
 def combo_to_scenedir(combo, scenetype='x'):
     root_dir, stype = _root_dir[scenetype]
 
-    trial_name = f'{name}-{combo.snow_dataset}-{combo.era}-{combo.downscale_algo}-{combo.forest}-{combo.return_period}'
+    trial_name = f'{name}-{combo.forest}-{combo.return_period}'
     scene_name = f'{stype}-{combo.idom:03d}-{combo.jdom:03d}'    # Underscores would confuse things
 
     ret = root_dir / 'db' / trial_name / scene_name
@@ -171,16 +170,9 @@ def add_combo(makefile, combo):
         exp_mod, combo.idom, combo.jdom)).outputs[0]
 
     # Snow downscaling
-    if combo.downscale_algo == 'sclapse':
-        sx3I_tif = makefile.add(r_experiment.r_scsnow(
-            exp_mod, combo.snow_dataset,
-            combo.era, combo.idom, combo.jdom, combo.return_period)).outputs[0]
-    else:
-        if combo.downscale_algo == 'lapse':
-            makefile.add(r_experiment.r_dfcA(exp_mod))
-        sx3I_tif = makefile.add(r_experiment.r_snow(
-            exp_mod, combo.snow_dataset, combo.downscale_algo,
-            combo.era, combo.idom, combo.jdom)).outputs[0]
+    sx3I_tif = makefile.add(r_experiment.r_scsnow(
+        exp_mod, combo.snow_dataset,
+        combo.era, combo.idom, combo.jdom, combo.return_period)).outputs[0]
 
     # Convert Combo to a scene_dir / scen_args
     scene_dir = os.path.join(exp_mod.dir, combo_to_scenedir(combo))
@@ -463,7 +455,7 @@ def one():
     return_period = 30
 #    forest = 'NoFor'
     for forest in ('NoFor','For'):
-        yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
+        yield Combo(forest, return_period, idom, jdom)
 
 def anchorage_tiles():
     tiles = [(84,41), (85,41)]    #Priority tiles where we have info
@@ -477,15 +469,15 @@ def anchorage_tiles():
 
 def anchorage():
     """Municipality of Anchorage"""
-    snow = 'fut'
-    downscale_algo = 'sclapse'
-    era = 'past'
+#    snow = 'fut'
+#    downscale_algo = 'sclapse'
+#    era = 'past'
 
     for idom,jdom in anchorage_tiles():
 #        for return_period in (30,):    # DEBUG
         for return_period in (10,30,100,300):
             for forest in ('NoFor','For'):
-                yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
+                yield Combo(forest, return_period, idom, jdom)
 
 
 
@@ -500,7 +492,7 @@ def talkeena():
         for return_period in (30,):    # DEBUG
 #        for return_period in (10,30,100,300):
             for forest in ('NoFor','For'):
-                yield Combo(snow, era, downscale_algo, forest, return_period, idom, jdom)
+                yield Combo(forest, return_period, idom, jdom)
 
 
 
