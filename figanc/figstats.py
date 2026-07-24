@@ -11,6 +11,7 @@ import akramms.experiment.aksc5cfut4
 from uafgi.util import wrfutil,cartopyutil,gisutil,gdalutil,cptutil
 import akfigs
 import shapely.geometry
+from akramms.util import resultutil
 
 #tif_dir = pathlib.Path('/Users/eafischer2/tmp/maps/tif')
 
@@ -50,23 +51,29 @@ _prefix = {
     'aksc5cfut4': ('aksc5cfut4-fut-past', 'fut'),
 }
 
-def _main(tdir):
+def main():
 
-    # Read the DEM
-    dem_tif_lr = akfigs.resample_lr(
-        expmod, expmod.anchorage_tiles(), tdir,
-        vars=['dem'])
-    dem_grid, dem_data, dem_nd = gdalutil.read_raster(dem_tif_lr)
+    map_crs = akfigs.map_crs()
+    map_extent = akfigs.anchorage_map_extent
+    xyres = 60
+
+    tdir = pathlib.Path('./figstats_data')
+    os.makedirs(tdir, exist_ok=True)
+
+    expmod = akramms.experiment.aksc5c
+    dem_grid, dem_data, dem_nd = gdalutil.cache_raster(
+        tdir / f'Anchorage_dem.tif', lambda: resultutil.read_subraster(
+        expmod.gridD, expmod.dir / 'dem',
+        f'{expmod.name}_dem_{{idom:03d}}_{{jdom:03d}}.tif',
+        map_extent, xRes=xyres, yRes=xyres, resampleAlg='cubic'))
 
 
     def plot_fig(stat_grid, stat_data, cmap, vmin, vmax, ofname, ticks, ticklabels):
         if os.path.isfile(ofname):
             return
-        map_crs = akfigs.map_crs()
 
         # map_extent = (320*1000, 1500*1000, 700*1000, 1445*1000)    # xmin, xmax, ymin, ymax; ymin in South
         # map_extent = akfigs.sealaska_map_extent
-        map_extent = akfigs.anchorage_map_extent
         print('map_extent ', map_extent)
 
         fig,ax = plt.subplots(
@@ -85,12 +92,26 @@ def _main(tdir):
         # --------------------------------------------------------
         # Add a statistic
 
-        # Land mask controls transparency
+#        # Land mask controls transparency
+#        expmod = akramms.experiment.aksc5c
+#        land_grid, land_data, land_nd = gdalutil.cache_raster(
+#            tdir / f'Anchorage_land.tif', lambda: resultutil.read_subraster(
+#            expmod.gridD, expmod.dir / 'landcover',
+#            f'{expmod.name}_landcover_{{idom:03d}}_{{jdom:03d}}.tif',
+#            map_extent, xRes=xyres, yRes=xyres, resampleAlg='average'))
+#        land_data[land_data == land_nd] = 0
+
+
         tif_dir = expmod.root_dir / 'stats' / 'tif'
-        land_tif = tif_dir / f's{sres}' / f'{expmod.name}-ccsm-past-sclapse-All-30-fhcfull-s{sres}.tif'
+        land_tif = tif_dir / f's{sres}' / f'{expmod.name}-fut-past-sclapse-All-30-fhcfull-s{sres}.tif'
     #f'fhcfull-s{sres}.tif'
         land_grid, land_data, land_nd = gdalutil.read_raster(land_tif)
-        land_data[land_data == land_nd] = 0
+
+
+#        tif_dir = expmod.root_dir / 'stats' / 'tif'
+#        land_tif = tif_dir / f's{sres}' / f'{expmod.name}-fut-past-sclapse-All-30-fhcfull-s{sres}.tif'
+#    #f'fhcfull-s{sres}.tif'
+#        land_grid, land_data, land_nd = gdalutil.read_raster(land_tif)
 
     #    cmap,_,_ = cptutil.read_cpt('palettes/WhiteBlueGreenYellowRed.cpt')
     #    stat_data[land_data == 0] = np.nan
@@ -178,6 +199,7 @@ def _main(tdir):
                 stat_data[stat_data == stat_nd] = np.nan
                 if var.startswith('extent'):
                     stat_data *= 100.    # Convert to percent
+                print('Read stat_data with shape ', stat_data.shape)
                 data[(return_period,years, var)] = stat_data
 
 

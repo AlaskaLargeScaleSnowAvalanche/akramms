@@ -32,7 +32,7 @@ def read_subraster(gridD, raster_dir, name_pattern, extent, **kwargs):
         if name in all_names:
             vrt_files.append(str(raster_dir / name))
 
-    print('VRT Files:')
+    print('VRT Files: ', raster_dir)
     for x in vrt_files:
         print('   ', x)
 

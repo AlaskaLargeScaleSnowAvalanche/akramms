@@ -91,7 +91,7 @@ def main():
     # Set up map to show South Central Alaska
     map_crs = akfigs.map_crs()
     mb = shapely.from_wkt('POLYGON ((-74568.1507070947 1607941.62451704,978745.51811548 1636969.95397279,991186.230739369 1048109.55644205,-49686.7254593174 1031521.9396102,-74568.1507070947 1607941.62451704))').bounds    # (minx, miny, maxx, maxy)
-    map_extent = (mb[0], mb[2], mb[1], mb[3]) # xmin, xmax, ymin, ymax; ymin in South  (Same as fig04)
+    map_extent = gisutil.Extent(mb[0], mb[2], mb[1], mb[3], order='xxyy') # xmin, xmax, ymin, ymax; ymin in South  (Same as fig04)
 
     fig,ax = plt.subplots(
         nrows=1,ncols=1,
@@ -99,7 +99,7 @@ def main():
         figsize=(4,3))
 #        figsize=(8.5,3.5))
 
-    ax.set_extent(map_extent, map_crs)
+    ax.set_extent(map_extent.xxyy, map_crs)
 
     diff_data = fut_data - past_data
     print('vmin vmax ', np.min(diff_data), np.max(diff_data))

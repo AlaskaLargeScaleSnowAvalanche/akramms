@@ -279,7 +279,7 @@ def r_scsnow(exp_mod, snow_dataset, era, idom, jdom, return_period):
     if snow_dataset == 'ccsm':
         ifname = config.roots.join('HARNESS', 'outputs', 'wrf_era5_agg3', f'acsnow_agg3_4km_1940_2023_{return_period:03d}.tif')
     else:
-        ifname = config.roots.join('HARNESS', 'outputs', 'wrf_fut_agg3', f'acsnow_agg3_4km_1979_2100_{return_period:03d}.tif')
+        ifname = config.roots.join('HARNESS', 'outputs', 'wrf_fut_agg3', f'acsnow_agg3_4km_2070_2099_{return_period:03d}.tif')
 
     domains_margin_shp = os.path.join(exp_mod.dir, f'{exp_mod.name}_domains_margin.shp')
     dem_tif = r_ifsar(exp_mod, idom, jdom).outputs[0]

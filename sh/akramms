@@ -1350,7 +1350,8 @@ def fitreturnperiods(args):
 
     makefile = make.Makefile()
 
-    for year0,year1 in [(1979,2008), (2009,2038), (2039,2068), (2069,2098)]:
+#    for year0,year1 in [(1979,2008), (2009,2038), (2039,2068), (2069,2098)]:
+    for year0,year1 in [(2070, 2099)]:
 
         rule = r_fitreturnperiods.r_fits(ifname, 'acsnow_agg3_4km', year0, year1)
         fname_fit = rule.outputs[0]
