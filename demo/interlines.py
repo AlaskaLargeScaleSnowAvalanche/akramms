@@ -10,7 +10,7 @@ def norm2(x0,y0,x1,y1):
     yy = y1-y0
     return np.sqrt(xx*xx + yy*yy)
 
-def _one_axis_crossings(x0, y0, x1, y1, dij, xycols):
+def axis_crossings(x0, y0, x1, y1, xycols):
 
     # x coordinates crossed by the line
     x_crossings_x = np.arange(np.ceil(x0), x1 + epsilon)
@@ -21,49 +21,92 @@ def _one_axis_crossings(x0, y0, x1, y1, dij, xycols):
 
     # t = distance along the line
     x_crossings_t = norm2(x0, y0, x_crossings_x, x_crossings_y)
-#    xx = x_crossings_x - x0
-#    yy = x_crossings_y - y0
-#    x_crossings_t = np.sqrt((xx * xx) + (yy * yy))
 
-    df = pd.DataFrame({'t': x_crossings_t, dij[0]: 1, dij[1]: 0, xycols[0]: x_crossings_x, xycols[1]: x_crossings_y})
-#    df.loc[dij[0],0] = np.floor(x0).astype(int)
-    print(df)
+    df = pd.DataFrame({'t': x_crossings_t, xycols[0]: x_crossings_x, xycols[1]: x_crossings_y})
+#    print(df)
     return df
 
 
-def axis_crossings(x0, y0, x1, y1):
+def pixel_crossings(x0, y0, x1, y1):
     if x1 > x0:
-        dfx = _one_axis_crossings(x0, y0, x1, y1, ['di', 'dj'], ['x', 'y'])
+        dfx = axis_crossings(x0, y0, x1, y1, ['x', 'y'])
     if y1 > y0:
-        dfy = _one_axis_crossings(y0, x0, y1, x1, ['dj', 'di'], ['y', 'x'])
+        dfy = axis_crossings(y0, x0, y1, x1, ['y', 'x'])
 
     # Beginning and ending points
     dfbe = pd.DataFrame([
-        (0, 0, 0, x0, y0),
-        (norm2(x0,y0,x1,y1), 0, 0, x1, y1),
-        ], columns=['t', 'di', 'dj', 'x', 'y'])
+        (0, x0, y0),
+        (norm2(x0,y0,x1,y1), x1, y1),
+        ], columns=['t', 'x', 'y'])
 
     df = pd.concat([dfx, dfy, dfbe]).sort_values(['t']).reset_index(drop=True)
-    print('AA2')
     print(df)
-    df = df.groupby('t', as_index=False).agg({'di': 'sum', 'dj': 'sum', 'x': 'first', 'y': 'first'})    # Drop / sum duplicates
+    df = df.groupby('t', as_index=False).agg({'x': 'first', 'y': 'first'})    # Drop / sum duplicates
 
-    df.iloc[0, df.columns.get_loc('di')] = np.floor(x0).astype(int)
-    df.iloc[0, df.columns.get_loc('dj')] = np.floor(y0).astype(int)
-
-
-    df['i'] = df.di.cumsum()
-    df['j'] = df.dj.cumsum()
-
+#    df['i'] = df.x.map(int)
+#    df['j'] = df.y.map(int)
+    df['len'] = -df.t.diff(periods=-1)
+    df = df[:-1]    # Drop last row, it is just endpoint of last segment
     print(df)
+
+# ------------------------------------------------------------------------------
+def iterate_ls(ls):
+    """
+    ls:
+        LineString or MultiLineString
+    yields:
+        x0,y0,x1,y1
+    """
+    if isinstance(shapely.geometry.LineString):
+        for p0,p1 in zip(line.coords[:-1], line.coords[1:]):
+            yield p0[0], p0[1], p1[0], p1[1]
+    elif isinstance(shapely.geometry.MultiLineStinrg):
+        for part in multi_line.geoms:
+            for p0, p1 in zip(part.coords[:-1], part.coords[1:]):
+                yield p0[0], p0[1], p1[0], p1[1]
+    else:
+        raise TypeError(f'I do not know how to iterate over {ls}')
+
+def integrate_linestrings(lss, val_grid, val_data, val_raster):
+    """
+    lss: [Shapely LineString, ...]
+    tile_grid:
+        The grid defining the current tile (no margin)
+    """
+    dfs = list()
+    bbox = val_grid.bounding_box()
+
+    lss_clipped = [shapely.intersection(ls, bbox) for ls in lss]
+    for lsix,ls in enumerate(lss_clipped):
+        for xyxy in iterate_ls(ls):
+TODO: We need a geotransform to convert tile grid into our simplified raster
+            df = pixel_crossings(xyxy)
+            df['lsix'] = lsix
+            dfs.append(df)
+
+    df = pd.concat(dfs)
+
+    # Select out raster values and multiply by len for integration
+    ii = df.x.map(int)
+    jj = df.y.map(int)
+    vals = val_data[ii, jj]
+    df['vallen'] = vals * df.len
+
+    # Sum by linestring
+    dfs = df[['lsix', 'vallen']].groupby('lsix').sum()
+    print(dfs)
+    return dfs
+
 
 def main():
 
     # WLOG, x(t) and y(t) must be increasing functions
-    x0,y0 = 5.1,11
-    x1,y1 = 8.1,14
+#    x0,y0 = 5.1,11
+#    x1,y1 = 8.1,14
+    x0,y0 = 1.1,1
+    x1,y1 = 4.1,4
 
-    df = axis_crossings(x0,y0,x1,y1)
+    df = pixel_crossings(x0,y0,x1,y1)
     print(df)
 
 
