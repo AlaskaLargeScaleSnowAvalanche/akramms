@@ -4,12 +4,14 @@ import numpy as np
 import shapely
 import akfigs
 import matplotlib.pyplot as plt
+import matplotlib.patheffects
 
 import akramms.experiment.aksc5c as expmod
 from akramms import downscale_snow,config
 from uafgi.util import wrfutil,cartopyutil,cptutil,gdalutil,gisutil
 
 from osgeo import gdal
+from akramms.util import resultutil
 
 
 
@@ -34,8 +36,9 @@ def read_and_align(path, srs, width, height, GT):
 def main():
 
     past_tif = config.HARNESS / 'outputs/wrf_era5_agg3/acsnow_agg3_4km_1940_2023_030.tif'
-    fut_tifs = [config.HARNESS / 'outputs/wrf_fut_agg3' / x \
-        for x in ('acsnow_agg3_4km_2039_2068_030.tif', 'acsnow_agg3_4km_2069_2098_030.tif')]
+#    fut_tifs = [config.HARNESS / 'outputs/wrf_fut_agg3' / x \
+#        for x in ('acsnow_agg3_4km_2039_2068_030.tif', 'acsnow_agg3_4km_2069_2098_030.tif')]
+    fut_tifs = [config.HARNESS / 'outputs/wrf_fut_agg3' / 'acsnow_agg3_4km_2070_2099_030.tif']
 
 
     # Regrid to a common grid
@@ -90,8 +93,13 @@ def main():
     # Set up map to show South Central Alaska
     # Set up map to show South Central Alaska
     map_crs = akfigs.map_crs()
-    mb = shapely.from_wkt('POLYGON ((-74568.1507070947 1607941.62451704,978745.51811548 1636969.95397279,991186.230739369 1048109.55644205,-49686.7254593174 1031521.9396102,-74568.1507070947 1607941.62451704))').bounds    # (minx, miny, maxx, maxy)
-    map_extent = gisutil.Extent(mb[0], mb[2], mb[1], mb[3], order='xxyy') # xmin, xmax, ymin, ymax; ymin in South  (Same as fig04)
+#    mb = shapely.from_wkt('POLYGON ((-74568.1507070947 1607941.62451704,978745.51811548 1636969.95397279,991186.230739369 1048109.55644205,-49686.7254593174 1031521.9396102,-74568.1507070947 1607941.62451704))').bounds    # (minx, miny, maxx, maxy)
+#    map_extent = gisutil.Extent(mb[0], mb[2], mb[1], mb[3], order='xxyy') # xmin, xmax, ymin, ymax; ymin in South  (Same as fig04)
+
+    # Modified from anchorage_map_extent
+    map_extent = gisutil.Extent(210000-5000, 300000+5000 + 100000, 1200000-5000, 1320000+5000, order='xxyy')    # xmin, xmax, ymin, ymax; ymin in South
+
+
 
     fig,ax = plt.subplots(
         nrows=1,ncols=1,
@@ -106,10 +114,31 @@ def main():
 
     cmap,_,_ = cptutil.read_cpt('palettes/seismic.cpt', reverse=False)
     fut_crs = cartopyutil.crs(fut_grid.wkt)
+
+    dem_grid, dem_data, dem_nd = gdalutil.cache_raster(
+        'figsnowdiff_dem.tif', lambda: resultutil.read_subraster(
+        expmod.gridD, expmod.dir / 'dem',
+        f'{expmod.name}_dem_{{idom:03d}}_{{jdom:03d}}.tif',
+        map_extent, xRes=60, yRes=60, resampleAlg='cubic'))
+
+    shade = cartopyutil.plot_hillshade(
+        ax, dem_data,
+        transform=map_crs, extent=map_extent, alpha=1.0)
+
+
     pcm = ax.pcolormesh(
         fut_grid.centersx, fut_grid.centersy, diff_data,
         rasterized=True,
-        transform=fut_crs, cmap=cmap, vmin=-250, vmax=250)#)#, cmap=cmap, vmin=, vmax=)
+        transform=fut_crs, cmap=cmap, vmin=-250, vmax=250, alpha=0.6)
+
+
+    akfigs.plot_cities(ax, 'anchorage', only={'Anchorage'},
+        text_kwargs=dict(
+            fontdict = {'size': 7, 'color': 'black', 'fontweight': 'bold',
+#            'alpha': 0.8,
+            'path_effects': [matplotlib.patheffects.withStroke(linewidth=2, foreground="white")]}),
+        marker_kwargs=dict(
+            marker='*', markersize=2, color='black', alpha=0.9))
 
     finish_plot(fig, ax, 'snow_fut-past_sc.pdf')
 

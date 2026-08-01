@@ -68,9 +68,10 @@ def main():
         map_extent, xRes=xyres, yRes=xyres, resampleAlg='cubic'))
 
 
+    # ------------------------------------------------------------
     def plot_fig(stat_grid, stat_data, cmap, vmin, vmax, ofname, ticks, ticklabels):
-        if os.path.isfile(ofname):
-            return
+#        if os.path.isfile(ofname):
+#            return
 
         # map_extent = (320*1000, 1500*1000, 700*1000, 1445*1000)    # xmin, xmax, ymin, ymax; ymin in South
         # map_extent = akfigs.sealaska_map_extent
@@ -126,7 +127,7 @@ def main():
         print('vmin vmax ', _vmin, _vmax)
         pcm_stat = ax.pcolormesh(
             stat_grid.centersx, stat_grid.centersy, stat_data,
-            alpha=0.5,
+            alpha=0.9,
             #alpha=0.5, rasterized=True,
             rasterized=True,
             transform=map_crs, cmap=cmap, vmin=vmin, vmax=vmax)
@@ -181,6 +182,7 @@ def main():
         with akfigs.TrimmedPdf(ofname_cbar) as tname:
                 fig.savefig(tname, bbox_inches='tight', pad_inches=0.5, dpi=200)   # Hi-res version; add margin so text is not cut off
 
+    # ------------------------------------------------------------
 
 
 

@@ -1084,6 +1084,49 @@ def _extent(args):
         run=True, ncpu=config.ncpu_archive)
 
 
+
+@subcommand(args=[
+    argument('spec', nargs='*', help='Items to feed to avalanche spec parser.'),
+])
+def roadcover(args):
+    from uafgi.util import ioutil
+    from akramms import roadcover
+    from akramms.file_info import JobStatus
+    from akramms import resolve
+    from akramms import joblib
+
+    # Identify combos
+    parseds = akramms.parse.parse_args(args.spec)
+    akdf = resolve.resolve_to(parseds, 'combo', realized=True, scenetypes={'arc'})
+
+    if len(akdf) == 0:
+        print('No combos at all!')
+        return
+
+    exp = akdf.exp.iloc[0]
+    expmod = akramms.parse.load_expmod(exp)    # Always works
+    akdf = joblib.add_combo_quickstatus(expmod, akdf, mtime=False)
+    akdf = akdf[akdf.combo_quickstatus == JobStatus.EXTENT]
+
+    if len(akdf) == 0:
+        print('No remaining combos to calculate road cover on!')
+        return
+
+    expset = _get_expset(akdf.iloc[0])
+    makefile = make.Makefile()
+    for index,row in akdf.iterrows():
+        rule = roadcover.r_roadcover(expmod, row['combo'])
+        if os.path.exists(rule.inputs[0]):
+            makefile.add(rule)
+
+    _tmp = expmod.root_dir / 'tmp'
+    os.makedirs(_tmp, exist_ok=True)
+    makefile.generate(expmod.root_dir / f'{exp}_{expset}_roadcover.mk',
+        tdir_fn = lambda: ioutil.TmpDir(_tmp),
+        run=True, ncpu=config.ncpu_archive)
+
+
+
 @subcommand(args=[
     argument('spec', nargs='*', help='Items to feed to avalanche spec parser.'),
 #    argument('-s', '--save', help='Name of query file to write to'),
