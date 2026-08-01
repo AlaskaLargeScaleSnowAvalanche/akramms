@@ -67,6 +67,21 @@ def iterate_ls(ls):
     else:
         raise TypeError(f'I do not know how to iterate over {ls}')
 
+def _make_positive(x0, x1):
+    if x1 > x0:
+        return x0, x1, False
+    else:
+        return x1, x0, True
+
+def transform_xyxy(x0,y0,x1,y1):
+    """Makes xyxy have positive slope and going to the right.  Shares
+    which dimensions had to be flipped to do so."""
+
+    x0, x1, flipx = _make_positive(x0, x1)
+    y0, y1, flipy = _make_positive(y0, y1)
+    return (x0,y0,x1,y1), (flipx, flipy)
+
+
 def integrate_linestrings(lss, val_grid, val_data, val_raster):
     """
     lss: [Shapely LineString, ...]
@@ -79,9 +94,17 @@ def integrate_linestrings(lss, val_grid, val_data, val_raster):
     lss_clipped = [shapely.intersection(ls, bbox) for ls in lss]
     for lsix,ls in enumerate(lss_clipped):
         for xyxy in iterate_ls(ls):
-TODO: We need a geotransform to convert tile grid into our simplified raster
-            df = pixel_crossings(xyxy)
-            df['lsix'] = lsix
+            # Flip line segment to slope-positive
+            xyxy1,flips = transform_xyxy(*xyxy)
+            df = pixel_crossings(xyxy1)
+
+            # Account for the flip(s) in the answer
+            if flips[0]:
+                df['x'] = df.x.map(lambda x: val_grid.nx - x)
+            if flips[1]:
+                df['y'] = df.y.map(lambda y: val_grid.ny - y)
+
+            df['lsix'] = lsix    # Line segment index
             dfs.append(df)
 
     df = pd.concat(dfs)
