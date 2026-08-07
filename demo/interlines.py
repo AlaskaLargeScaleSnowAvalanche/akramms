@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 import geopandas
 import shapely
-import math
 import shapely.geometry
 from uafgi.util import shapelyutil
 import gzip,pickle
@@ -115,16 +114,17 @@ def iterate_ls(ls):
         raise TypeError(f'I do not know how to iterate over {ls}')
 
 
-def integrate_linestrings(lss, val_grid, val_data):
+def linestrings_crossings(lss, val_grid, val_data):
     """
-    lss: [Shapely LineString, ...]
+    lss: Serieds[Shapely LineString, ...]
+        Column from geo dataframe (with index)
     tile_grid:
         The grid defining the current tile (no margin)
     """
 
-    # DEBUG
-    lengths = [ls.length for ls in lss]
-    print('========= lengths ', lengths)
+#    # DEBUG
+#    lengths = [ls.length for ls in lss]
+#    print('========= lengths ', lengths)
 
     # Convert to ij coordinates (ir, jr) are real numbers
     dfs = list()
@@ -132,36 +132,93 @@ def integrate_linestrings(lss, val_grid, val_data):
     bbox = shapely.affinity.affine_transform(val_grid.bounding_box(), geoinv_affine)
     bbox = shapely.orient_polygons(bbox, exterior_cw=False)     # Might be needed...
 
-    lss = [shapely.affinity.affine_transform(ls, geoinv_affine) for ls in lss]
+    # Clip to bounding box
+    lss = lss.map(lambda ls: shapely.intersection(ls, bbox))
 
-    lss_clipped = [shapely.intersection(ls, bbox) for ls in lss]
-
-    for lsix,ls in enumerate(lss_clipped):
-#        print('AA1 ', lsix, ls, ls.bounds)
-#        print('========== length ', ls.length)
+    # Consider each segment
+    for lsix,ls in lss.items():    # ix = Index value
         for xyxy in iterate_ls(ls):
             # Flip line segment to slope-positive
             df = pixel_crossings(val_grid, *xyxy)
-
-
-            df['lsix'] = lsix    # Line segment index
+            df['lsix'] = lsix
             dfs.append(df)
 
     df = pd.concat(dfs)
 
     # Select out raster values and multiply by len for integration
-    ii = df.x.map(int)
-    jj = df.y.map(int)
-#    print(df)
-#    print(list(zip(ii,jj)))
-    vals = val_data[ii, jj]
-    df['vallen'] = vals * df.len
-    df['vallen'] = df.len    # DEBUG
+    df['i'] = df.x.map(int)
+    df['j'] = df.y.map(int)
 
-    # Sum by linestring
-    dfs = df[['lsix', 'vallen']].groupby('lsix').sum()
-#    print(dfs)
-    return dfs
+    return df
+# ---------------------------------------------------------------------
+
+
+def _calc_integrations(df1):
+    total_len = df1.len.sum()    # Divide by this when computing means...
+    return pd.Series({
+        'max_velocity': df1.max_velocity.max(),
+        'length': df1.len.sum(),
+        'mean_deposition': (df1.len * df1.deposition).sum() / total_len,
+        'max_deposition': df1.deposition.max(),
+    })    
+
+def r_integrate(expmod, combo):
+    ifname = expmod.root_dir / f'roadcover/{expmod.name}-{combo.base_str()}/{expmod.name}-{repr(combo)}-roadcover.pik.gz'
+    ofname = expmod.root_dir / f'roadcover/{expmod.name}-{combo.base_str()}/{expmod.name}-{repr(combo)}-roadstats.shp'
+
+
+    vnames = ['max_velocity', 'deposition']
+    val_tifs = [
+        expmod.root_dir / 'publish' / f'{expmod.name}-{repr(combo)}' / vname / f'{expmod.name}-{repr(combo)}-F-{vname}.tif'
+        for vname in vnames]
+
+
+    def action(tdir):
+
+
+        # Read road segments that intersect with one or more avalanches
+        with gzip.open(ifname) as fin:
+            rdf = pickle.load(fin)
+
+        # Read raster to integrate over
+#        val_grid, val_data, val_nd = gdalutil.read_raster(val_tif)
+        val_grid, _, _ = gdalutil.read_raster(val_tifs[0], False)
+
+        # Clip to within the margin
+        bbox = val_grid.bounding_box()
+        rdf['geometry'] = [shapely.intersection(ls, bbox) for ls in rdf.geometry]
+
+
+        # Group together by Route_ID
+        # (Because one road segment can intersect multiple avalanche extents)
+        rows = list()
+        for Route_ID, xdf in rdf.groupby('Route_ID'):
+            ls = shapely.unary_union(xdf.geometry)
+            Avalanche_Ids = tuple(xdf.Id)    # AKRAMMS avlanache IDs for this combo
+            rows.append((Route_ID, ls))
+        rdf = geopandas.GeoDataFrame(rows, columns=('Route_ID', 'geometry'), geometry='geometry', crs=expmod.wkt)
+
+        # Find line segment crossings, raster coordinates and lengths
+        ijdf = linestrings_crossings(rdf.geometry, val_grid, val_data)
+
+        # =============== Compute functions on rasters
+        cols = dict()
+
+        # Load rasters to integrate over
+        for vname,ifname in zip(vnames, val_tifs):
+            val_grid, val_data, val_nd = gdalutil.read_raster(ifname)
+            ijdf[vname] = val_data[ijdf.i, ijdf.j]
+
+        # Do the integration
+        statsdf = ijdf.groupby('Route_ID').apply(_calc_integration, include_groups=False)
+        statsdf = statsdf.merge(rdf, on='Route_ID')
+        statsdf = geopandas.GeoDataFrame(statsdf, crs=expmod.wkt)
+
+        # Write it out
+        statsdf.to_file(ofname)    # Implied driver='ERSI Shapefile'
+
+    return make.Rule(action, [ifname] + _vnames, [ofname])
+
 
 
 def main():
@@ -178,8 +235,23 @@ def main():
     with gzip.open(ifname) as fin:
         rdf = pickle.load(fin)
     rdf = rdf.sort_values('Id')
-    print(rdf)
-#    print(rdf.iloc[0])
+    print(rdf[['Id', 'Route_ID']])
+    print(rdf.iloc[0])
+    return
+
+
+    # Clip to within the margin
+    bbox = val_grid.bounding_box()
+    rdf['geometry'] = [shapely.intersection(ls, bbox) for ls in rdf.geometry]
+
+
+    rows = list()
+    for Route_ID, xdf in rdf.groupby('Route_ID'):
+        ls = shapely.unary_union(xdf.geometry)
+        Avalanche_Ids = tuple(xdf.Id)    # AKRAMMS avlanache IDs for this combo
+        rows.append((Route_ID, ls))
+
+
 
     print(sum(x.length for x in rdf.geometry))
     ls = shapely.unary_union(rdf.geometry)
@@ -193,11 +265,13 @@ def main():
 #        print(tup.geometry)
 #        print(combo.idom,combo.jdom)
     if True:
-        ls = shapely.unary_union(rdf.geometry)
+#        lss = [shapely.unary_union(rdf.geometry)]
+        lss = list(rdf.geometry)
+        lss = [shapely.force_2d(ls) for ls in lss]
 
         val_tif = expmod.root_dir / 'publish.v6/aksc5-ccsm-past-sclapse-All-300/max_pressure' / f'aksc5-ccsm-past-sclapse-All-300-{combo.idom:03d}-{combo.jdom:03d}-F-max_pressure.tif'
         val_grid, val_data, val_nd = gdalutil.read_raster(val_tif)
-        dfs = integrate_linestrings([shapely.force_2d(ls)], val_grid, val_data)
+        dfs = integrate_linestrings(lss, val_grid, val_data)
         print('=========== len = ', dfs.vallen[0])
 #        print(tup)
 
