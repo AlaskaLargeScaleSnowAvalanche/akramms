@@ -1,16 +1,28 @@
 import numpy as np
 import pandas as pd
 import geopandas
+import shapely
+import math
 import shapely.geometry
+from uafgi.util import shapelyutil
+import gzip,pickle
+import shapely.affinity
 
 epsilon = 1e-14
 
-def norm2(x0,y0,x1,y1):
-    xx = x1-x0
-    yy = y1-y0
-    return np.sqrt(xx*xx + yy*yy)
+class ScaledNorm:
+    """Computes L2 norms for values in pixel coordinates, but outputs
+    lengths in geographic coordinates"""
+    def __init__(self, dx, dy):
+        self.dx2 = dx*dx
+        self.dy2 = dy*dy
 
-def axis_crossings(x0, y0, x1, y1, xycols):
+    def __call__(self, x0,y0,x1,y1):
+        xx = x1-x0
+        yy = y1-y0
+        return np.sqrt(xx * xx * self.dx2 + yy * yy * self.dy2)
+
+def axis_crossings(x0, y0, x1, y1, xycols, norm_fn):
 
     # x coordinates crossed by the line
     x_crossings_x = np.arange(np.ceil(x0), x1 + epsilon)
@@ -20,89 +32,117 @@ def axis_crossings(x0, y0, x1, y1, xycols):
     x_crossings_y = m * (x_crossings_x - x0) + y0
 
     # t = distance along the line
-    x_crossings_t = norm2(x0, y0, x_crossings_x, x_crossings_y)
+    x_crossings_t = norm_fn(x0, y0, x_crossings_x, x_crossings_y)
 
     df = pd.DataFrame({'t': x_crossings_t, xycols[0]: x_crossings_x, xycols[1]: x_crossings_y})
 #    print(df)
     return df
 
 
-def pixel_crossings(x0, y0, x1, y1):
+def _make_positive(nx, x0, x1):
     if x1 > x0:
-        dfx = axis_crossings(x0, y0, x1, y1, ['x', 'y'])
-    if y1 > y0:
-        dfy = axis_crossings(y0, x0, y1, x1, ['y', 'x'])
+        return x0, x1, False
+    else:
+        return nx-x0, nx-x1, True
+
+
+def pixel_crossings(val_grid, x0, y0, x1, y1, drop_end=True):
+    """drop_end:
+        If True, drop the last point in the dataframe.
+        This results in one line per line segment, but without
+        explicit record of the ending point.
+    """
+#    print('***** pixel_crossings ', x0, y0, x1, y1)
+    x0, x1, flipx = _make_positive(val_grid.nx, x0, x1)
+    y0, y1, flipy = _make_positive(val_grid.ny, y0, y1)
+#    print('***** pixel_crossings ', x0, y0, x1, y1)
+
+
+    normxy = ScaledNorm(val_grid.dx, val_grid.dy)
+    if x1 != x0:
+        dfx = axis_crossings(x0, y0, x1, y1, ['x', 'y'], normxy)
+    if y1 != y0:
+        normyx = ScaledNorm(val_grid.dy, val_grid.dx)
+        dfy = axis_crossings(y0, x0, y1, x1, ['y', 'x'], normyx)
 
     # Beginning and ending points
     dfbe = pd.DataFrame([
         (0, x0, y0),
-        (norm2(x0,y0,x1,y1), x1, y1),
+        (normxy(x0,y0,x1,y1), x1, y1),
         ], columns=['t', 'x', 'y'])
 
     df = pd.concat([dfx, dfy, dfbe]).sort_values(['t']).reset_index(drop=True)
-    print(df)
     df = df.groupby('t', as_index=False).agg({'x': 'first', 'y': 'first'})    # Drop / sum duplicates
 
-#    df['i'] = df.x.map(int)
-#    df['j'] = df.y.map(int)
     df['len'] = -df.t.diff(periods=-1)
-    df = df[:-1]    # Drop last row, it is just endpoint of last segment
-    print(df)
+
+    # Account for the flip(s) in the answer
+    if flipx:
+        df['x'] = df.x.map(lambda x: val_grid.nx - x)
+    df['i'] = df.x.map(int)
+    if flipx:
+         df['i'] = df.i.shift(-1, fill_value=-1)
+
+    if flipy:
+        df['y'] = df.y.map(lambda y: val_grid.ny - y)
+    df['j'] = df.y.map(int)
+    if flipy:
+         df['j'] = df.j.shift(-1, fill_value=-1)
+
+
+    # Remove end point, so dataframe is number of segments
+    if drop_end:
+        df = df.iloc[:-1]
+    return df
 
 # ------------------------------------------------------------------------------
 def iterate_ls(ls):
+
     """
     ls:
         LineString or MultiLineString
     yields:
         x0,y0,x1,y1
     """
-    if isinstance(shapely.geometry.LineString):
-        for p0,p1 in zip(line.coords[:-1], line.coords[1:]):
+    if isinstance(ls, shapely.geometry.LineString):
+        for p0,p1 in zip(ls.coords[:-1], ls.coords[1:]):
             yield p0[0], p0[1], p1[0], p1[1]
-    elif isinstance(shapely.geometry.MultiLineStinrg):
-        for part in multi_line.geoms:
+    elif isinstance(ls, shapely.geometry.MultiLineString):
+        for part in ls.geoms:
             for p0, p1 in zip(part.coords[:-1], part.coords[1:]):
                 yield p0[0], p0[1], p1[0], p1[1]
     else:
         raise TypeError(f'I do not know how to iterate over {ls}')
 
-def _make_positive(x0, x1):
-    if x1 > x0:
-        return x0, x1, False
-    else:
-        return x1, x0, True
 
-def transform_xyxy(x0,y0,x1,y1):
-    """Makes xyxy have positive slope and going to the right.  Shares
-    which dimensions had to be flipped to do so."""
-
-    x0, x1, flipx = _make_positive(x0, x1)
-    y0, y1, flipy = _make_positive(y0, y1)
-    return (x0,y0,x1,y1), (flipx, flipy)
-
-
-def integrate_linestrings(lss, val_grid, val_data, val_raster):
+def integrate_linestrings(lss, val_grid, val_data):
     """
     lss: [Shapely LineString, ...]
     tile_grid:
         The grid defining the current tile (no margin)
     """
+
+    # DEBUG
+    lengths = [ls.length for ls in lss]
+    print('========= lengths ', lengths)
+
+    # Convert to ij coordinates (ir, jr) are real numbers
     dfs = list()
-    bbox = val_grid.bounding_box()
+    geoinv_affine = shapelyutil.to_affine(val_grid.geoinv)
+    bbox = shapely.affinity.affine_transform(val_grid.bounding_box(), geoinv_affine)
+    bbox = shapely.orient_polygons(bbox, exterior_cw=False)     # Might be needed...
+
+    lss = [shapely.affinity.affine_transform(ls, geoinv_affine) for ls in lss]
 
     lss_clipped = [shapely.intersection(ls, bbox) for ls in lss]
+
     for lsix,ls in enumerate(lss_clipped):
+#        print('AA1 ', lsix, ls, ls.bounds)
+#        print('========== length ', ls.length)
         for xyxy in iterate_ls(ls):
             # Flip line segment to slope-positive
-            xyxy1,flips = transform_xyxy(*xyxy)
-            df = pixel_crossings(xyxy1)
+            df = pixel_crossings(val_grid, *xyxy)
 
-            # Account for the flip(s) in the answer
-            if flips[0]:
-                df['x'] = df.x.map(lambda x: val_grid.nx - x)
-            if flips[1]:
-                df['y'] = df.y.map(lambda y: val_grid.ny - y)
 
             df['lsix'] = lsix    # Line segment index
             dfs.append(df)
@@ -112,16 +152,59 @@ def integrate_linestrings(lss, val_grid, val_data, val_raster):
     # Select out raster values and multiply by len for integration
     ii = df.x.map(int)
     jj = df.y.map(int)
+#    print(df)
+#    print(list(zip(ii,jj)))
     vals = val_data[ii, jj]
     df['vallen'] = vals * df.len
+    df['vallen'] = df.len    # DEBUG
 
     # Sum by linestring
     dfs = df[['lsix', 'vallen']].groupby('lsix').sum()
-    print(dfs)
+#    print(dfs)
     return dfs
 
 
 def main():
+    import akramms.experiment.aksc5 as expmod
+    from uafgi.util import gdalutil
+
+#    rdf = geopandas.read_file(expmod.root_dir / 'roadcover' / f'{expmod.name}_roadcover.gpkg')
+#    print(rdf)
+
+    combo = expmod.Combo('ccsm', 'past', 'sclapse', 'NoFor', 30, 91, 41)
+
+    ifname = f'/home/efischer/prj/aksc5/roadcover/aksc5-ccsm-past-sclapse-NoFor-30/{expmod.name}-{repr(combo)}-roadcover.pik.gz'
+
+    with gzip.open(ifname) as fin:
+        rdf = pickle.load(fin)
+    rdf = rdf.sort_values('Id')
+    print(rdf)
+#    print(rdf.iloc[0])
+
+    print(sum(x.length for x in rdf.geometry))
+    ls = shapely.unary_union(rdf.geometry)
+    print(ls.length)
+#    print(rdf)
+#    return
+
+
+#    for tup in rdf.itertuples(index=False):
+#        print(tup)
+#        print(tup.geometry)
+#        print(combo.idom,combo.jdom)
+    if True:
+        ls = shapely.unary_union(rdf.geometry)
+
+        val_tif = expmod.root_dir / 'publish.v6/aksc5-ccsm-past-sclapse-All-300/max_pressure' / f'aksc5-ccsm-past-sclapse-All-300-{combo.idom:03d}-{combo.jdom:03d}-F-max_pressure.tif'
+        val_grid, val_data, val_nd = gdalutil.read_raster(val_tif)
+        dfs = integrate_linestrings([shapely.force_2d(ls)], val_grid, val_data)
+        print('=========== len = ', dfs.vallen[0])
+#        print(tup)
+
+
+#        break
+
+    return
 
     # WLOG, x(t) and y(t) must be increasing functions
 #    x0,y0 = 5.1,11
@@ -132,59 +215,6 @@ def main():
     df = pixel_crossings(x0,y0,x1,y1)
     print(df)
 
-
-
-def mainx():
-
-    nx = 10
-    ny = 10
-
-    # TODO: Clip to overall box before beginning, then scale to pixel size = 1
-    # (This only works for dx = dy, which is OK)
-    # TODO: Account for horizontal or vertical lines
-
-    # WLOG, x(t) and y(t) must be increasing functions
-    x0,y0 = 0.2,0
-    x1,y1 = 3,3
-
-
-    # x coordinates crossed by the line
-    x_crossings_x = np.array(np.arange(np.ceil(x0), x1 + epsilon))
-
-    # (x-x0) = my (y - y0)
-    m = (y1-y0) / (x1-x0)    # slope
-    x_crossings_y = m * (x_crossings_x - x0) + y0
-
-    # t = distance along the line
-    xx = x_crossings_x - x0
-    yy = x_crossings_y - x0
-    x_crossings_t = np.sqrt((xx * xx) + (yy * yy))
-
-
-
-    print(x_crossings_t)
-
-
-
-
-    print(list(zip(x_crossings_x, x_crossings_y)))
-    return
-
-
-
-
-
-
-    y_crossings_y = np.array(np.arange(np.ceil(y0), y1 + epsilon))
-
-
-    print(x_crossings)
-    print(y_crossings)
-
-    
-
-    # y = my x + bx
-    m = (y1-y0) / (x1-x0)
 
 
 
