@@ -1119,6 +1119,8 @@ def roadcover(args):
         rule = roadcover.r_roadcover(expmod, row['combo'])
         if os.path.exists(rule.inputs[0]):
             makefile.add(rule)
+            rule = roadcover.r_integrate(expmod, row['combo'])
+            makefile.add(rule)
 
     _tmp = expmod.root_dir / 'tmp'
     os.makedirs(_tmp, exist_ok=True)
