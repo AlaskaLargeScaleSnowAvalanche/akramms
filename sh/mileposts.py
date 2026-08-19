@@ -108,6 +108,8 @@ def iterate_ls(ls):
 # Route_Na_1                             Denali Highway
 # geometry      POINT (297206.68099999987 1492396.7533)
 
+M_IN_MI = (5280*.3048)
+
 def main():
 
     mpdf = geopandas.read_file(config.HARNESS / 'data/fischer' / 'Mileposts_AKDOT_-4629016772512910170.zip')
@@ -115,77 +117,70 @@ def main():
     rdf = geopandas.read_file(config.HARNESS / 'data/fischer' / 'Roads_AKDOT_6350608895875630378.zip')
     rdf["geometry"] = rdf["geometry"].map(shapely.force_2d)
 
+#    print('All route names: ', set(rdf.Route_Name))
+#    rdf = rdf[rdf.Route_Name == 'Seward Highway']
 
 
-
-    for Route_ID,rdf1 in rdf.groupby('Route_ID'):
-        mpdf1 = mpdf[mpdf.Route_ID == Route_ID]
+    nomps = list()
+    route_names = list()
+    segdfs = list()
+    route_ids = list()
+    ix=0
+    for tup in rdf.itertuples(index=False):
+        mpdf1 = mpdf[mpdf.Route_ID == tup.Route_ID]
         if len(mpdf1) == 0:
+            nomps.append(True)
             continue
+        nomps.append(False)
+        route_names.append(tup.Route_Name)
+        route_ids.append(tup.Route_ID)
+        print(tup)
 
-        print('====================== Route_ID ', Route_ID)
-        assert len(rdf1) == 1
-        rec = rdf1.iloc[0]
-#        print(rec)
-
-        road = rec.geometry
-#        print('================== Road')
-#        print('road len ', road.length)
-#        print(road)
-#        print(list(road.coords))
-
-        mileposts = list(mpdf1.geometry)
-#        print('================== Mileposts')
-#        print(list(mileposts))
-
-#        print('mileposts ', mileposts)
+        road = tup.geometry
 
         # 2. Project and sort milepost dists along the line
         # Include 0.0 (start of line) and road.length (end of line) as bounds
-        mpdf1['dist'] = mpdf1.geometry.map(lambda mp: road.project(mp))
-        mpdf1 = mpdf1.sort_values(by='dist')
-#        print(mpdf1.dist)
-        mpdf1['dist'] = mpdf1.dist.map(lambda x: x/(5280*.3048))
-        mpdf1 = mpdf1[['Milepost_N', 'MPT', 'dist']]
+        mpdf1 = mpdf1[['Milepost_N', 'MPT']].sort_values(by='MPT')
 
 
-        rows = list()
+
         mpt0 = [BEGIN] + list(mpdf1.MPT)
-        mpt1 = list(mpdf1.MPT) + [rec.geometry.length / (5280*.3048)]
+        mpt1 = list(mpdf1.MPT) + [tup.geometry.length / M_IN_MI]
+        
         milepost0 = [None] + list(mpdf1.Milepost_N)
         milepost1 = list(mpdf1.Milepost_N) + [None]
-        roadseg = [shapely.ops.substring(rec.geometry, low, high) for low,high in zip(mpt0, mpt1)]
+        mprange = list(zip(milepost0, milepost1))
+        roadseg = [shapely.ops.substring(tup.geometry, low * M_IN_MI, high * M_IN_MI) for low,high in zip(mpt0, mpt1)]
+        centroid = [shapely.centroid(x) for x in roadseg]
         p0 = [shapely.get_point(ls, 0) for ls in roadseg]
         p1 = [shapely.get_point(ls, -1) for ls in roadseg]
 
+        segdf0 = geopandas.GeoDataFrame({'Route_ID': tup.Route_ID, 'Route_Name': tup.Route_Name, 'Route_Na_3': tup.Route_Na_3, 'mprange': mprange, 'roadseg': roadseg}, geometry=centroid, crs=rdf.crs)
+        print(segdf0)
+        segdfs.append(segdf0)
+
+#        ix += 1
+#        if ix > 5:
+#            break
+    print([type(x) for x in segdfs])
+    segdf = pd.concat(segdfs, ignore_index=True)
+    print(segdf)
+    print(type(segdf))
+
+#    nomps.extend([False] * (len(rdf) - len(nomps)))    # DEBUG
+    nompdf = rdf.loc[nomps]
+#    print('Route Names ', route_names)
+#    nompdf = rdf[rdf.Route_Name.isin(set(route_names)) & ~rdf.Route_ID.isin(route_ids)]
+    print('xxxxxxxxxx ', type(nompdf))
+    xdf = segdf[['Route_ID', 'Route_Name', 'mprange', 'roadseg', 'geometry']]
+    print(xdf)
+    nompdf = nompdf.sjoin_nearest(xdf, distance_col='distance', exclusive=True)
+#    nompdf = nompdf[['Route_ID_left', 'Route_ID_right', 'Route_Na_3', 'mprange', 'distance']].sort_values(by='distance')
+#    pd.set_option('display.max_rows', None)
+#    print(nompdf)
+    nompdf.to_pickle('nompdf.pik')
 
 
-#        rdf2 = geopandas.GeoDataFrame({'Route_ID': Route_ID, 'Route_Name': rec.Route_Name, 'milepost0': milepost0, 'milepost1': milepost1, 'mpt0': mpt0, 'mpt1': mpt1, 'p0': p0, 'p1': p1}, geometry=roadseg, crs=rdf1.crs)
-
-        rdf2 = geopandas.GeoDataFrame({'Route_ID': Route_ID, 'Route_Name': rec.Route_Name, 'Route_Na_3': rec.Route_Na_3, 'milepost0': milepost0, 'milepost1': milepost1, 'mpt0': mpt0, 'mpt1': mpt1}, geometry=roadseg, crs=rdf1.crs)
-#        rdf2['Route_ID'] = Route_ID
-
-
-        print(rdf2)
-#        for mpt in zip(
-
-
-#        print(mpdf1)
-
-#        mpdf1['dist'] = [road.project(mp) for mp in mpdf1.geometry]
-#        dists = sorted(list(set(dists))) # Remove duplicates and sort
-#        print(dists)
-#        print('road len ', road.length)
-
-#        # 3. Create segments between each adjacent pair of dists
-#        segments = []
-#        for i in range(len(dists) - 1):
-#            seg = shapely.ops.substring(road, dists[i], dists[i + 1])
-#            if not seg.is_empty:
-#                segments.append(seg)
-#
-               
-#        return
 
 def main2():
     print(config.HARNESS)
