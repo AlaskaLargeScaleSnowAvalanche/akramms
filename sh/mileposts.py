@@ -110,6 +110,11 @@ def iterate_ls(ls):
 
 M_IN_MI = (5280*.3048)
 
+#class Route_ID(typing.NamedTuple):
+#    Route_ID: str
+#    maindf: geopandas.GeoDataFrame
+##    offdf: geopandas.GeoDataFrame
+
 def main():
 
     mpdf = geopandas.read_file(config.HARNESS / 'data/fischer' / 'Mileposts_AKDOT_-4629016772512910170.zip')
@@ -121,20 +126,13 @@ def main():
 #    rdf = rdf[rdf.Route_Name == 'Seward Highway']
 
 
-    nomps = list()
-    route_names = list()
-    segdfs = list()
-    route_ids = list()
+    # Segment "main" highways, i.e. those with mileposts
+    maindfs = list()
     ix=0
     for tup in rdf.itertuples(index=False):
         mpdf1 = mpdf[mpdf.Route_ID == tup.Route_ID]
         if len(mpdf1) == 0:
-            nomps.append(True)
             continue
-        nomps.append(False)
-        route_names.append(tup.Route_Name)
-        route_ids.append(tup.Route_ID)
-        print(tup)
 
         road = tup.geometry
 
@@ -155,31 +153,26 @@ def main():
         p0 = [shapely.get_point(ls, 0) for ls in roadseg]
         p1 = [shapely.get_point(ls, -1) for ls in roadseg]
 
-        segdf0 = geopandas.GeoDataFrame({'Route_ID': tup.Route_ID, 'Route_Name': tup.Route_Name, 'Route_Na_3': tup.Route_Na_3, 'mprange': mprange, 'roadseg': roadseg}, geometry=centroid, crs=rdf.crs)
-        print(segdf0)
-        segdfs.append(segdf0)
+        segdf0 = geopandas.GeoDataFrame({'Route_Name': tup.Route_Name, 'Route_ID': tup.Route_ID, 'Route_Na_3': tup.Route_Na_3, 'mprange': mprange, 'roadseg': roadseg}, geometry=centroid, crs=rdf.crs)
 
-#        ix += 1
-#        if ix > 5:
-#            break
-    print([type(x) for x in segdfs])
-    segdf = pd.concat(segdfs, ignore_index=True)
-    print(segdf)
-    print(type(segdf))
+        maindfs.append(segdf0)
+    maindf = pd.concat(maindfs)
 
-#    nomps.extend([False] * (len(rdf) - len(nomps)))    # DEBUG
-    nompdf = rdf.loc[nomps]
-#    print('Route Names ', route_names)
-#    nompdf = rdf[rdf.Route_Name.isin(set(route_names)) & ~rdf.Route_ID.isin(route_ids)]
-    print('xxxxxxxxxx ', type(nompdf))
-    xdf = segdf[['Route_ID', 'Route_Name', 'mprange', 'roadseg', 'geometry']]
-    print(xdf)
-    nompdf = nompdf.sjoin_nearest(xdf, distance_col='distance', exclusive=True)
-#    nompdf = nompdf[['Route_ID_left', 'Route_ID_right', 'Route_Na_3', 'mprange', 'distance']].sort_values(by='distance')
-#    pd.set_option('display.max_rows', None)
-#    print(nompdf)
-    nompdf.to_pickle('nompdf.pik')
 
+    # Match off-route segments for Route_IDs not yet processed
+    rdf = rdf[~rdf.Route_ID.isin(maindf.Route_ID)]
+    offdfs = list()
+    for Route_Name,maindf1 in maindf.groupby('Route_Name'):
+        offdf = rdf[rdf.Route_Name == Route_Name]
+        offdf = offdf.sjoin_nearest(maindf1, distance_col='distance', exclusive=True)
+        offdfs.append(offdf)
+    offdf = pd.concat(offdfs)
+
+    # Leftover roads
+    leftoverdf = rdf[~offdf.Route_ID.isin(maindf.Route_ID)]
+
+    with open('mileposts.pik', 'wb') as out:
+        pickle.dump({'maindf': maindf, 'offdf': offdf, 'leftoverdf': leftoverdf})
 
 
 def main2():
