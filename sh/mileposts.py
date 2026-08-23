@@ -1,4 +1,4 @@
-import statistics,math
+import statistics,math,pickle
 from osgeo import ogr,gdal
 import shapely
 from akramms import config
@@ -115,7 +115,7 @@ M_IN_MI = (5280*.3048)
 #    maindf: geopandas.GeoDataFrame
 ##    offdf: geopandas.GeoDataFrame
 
-def main():
+def compute_mileposts():
 
     mpdf = geopandas.read_file(config.HARNESS / 'data/fischer' / 'Mileposts_AKDOT_-4629016772512910170.zip')
     mpdf["geometry"] = mpdf["geometry"].map(shapely.force_2d)
@@ -124,6 +124,8 @@ def main():
 
 #    print('All route names: ', set(rdf.Route_Name))
 #    rdf = rdf[rdf.Route_Name == 'Seward Highway']
+
+#    rdf = rdf.head(100)    # DEBUG
 
 
     # Segment "main" highways, i.e. those with mileposts
@@ -134,6 +136,7 @@ def main():
         if len(mpdf1) == 0:
             continue
 
+        print(f'======== {tup.Route_Name} - {tup.Route_ID}')
         road = tup.geometry
 
         # 2. Project and sort milepost dists along the line
@@ -163,77 +166,94 @@ def main():
     rdf = rdf[~rdf.Route_ID.isin(maindf.Route_ID)]
     offdfs = list()
     for Route_Name,maindf1 in maindf.groupby('Route_Name'):
+        print(f'======== {Route_Name}')
         offdf = rdf[rdf.Route_Name == Route_Name]
         offdf = offdf.sjoin_nearest(maindf1, distance_col='distance', exclusive=True)
         offdfs.append(offdf)
     offdf = pd.concat(offdfs)
 
     # Leftover roads
-    leftoverdf = rdf[~offdf.Route_ID.isin(maindf.Route_ID)]
+    leftoverdf = rdf[~rdf.Route_ID.isin(offdf.Route_ID_left)]
 
-    with open('mileposts.pik', 'wb') as out:
-        pickle.dump({'maindf': maindf, 'offdf': offdf, 'leftoverdf': leftoverdf})
+    ofname = config.HARNESS / 'data/fischer' / 'mileposts.pik'
+    with open(ofname, 'wb') as out:
+        pickle.dump({'maindf': maindf, 'offdf': offdf, 'leftoverdf': leftoverdf}, out)
 
+def  main():
+    ifname = config.HARNESS / 'data/fischer' / 'mileposts.pik'
+    with open(ifname, 'rb') as fin:
+        dd = pickle.load(fin)
 
-def main2():
-    print(config.HARNESS)
+    dfs = list()
 
-    mpdf = geopandas.read_file(config.HARNESS / 'data/fischer' / 'Mileposts_AKDOT_-4629016772512910170.zip')
-    mpdf["geometry"] = mpdf["geometry"].map(shapely.force_2d)
-#    print(mpdf)
-#    print(mpdf.iloc[0])
-#    print(mpdf.crs)
-
-
-#    rdf = geopandas.read_file(config.HARNESS / 'data/fischer' / 'NTAD_North_American_Rail_Network_Lines_278491609840284355.zip')
-
-    rdf = geopandas.read_file(config.HARNESS / 'data/fischer' / 'Roads_AKDOT_6350608895875630378.zip')
-    rdf["geometry"] = rdf["geometry"].map(shapely.force_2d)
-
-    print(rdf)
-    print(rdf.iloc[0])
-    print(rdf.crs)
-
-    rdf['len'] = rdf.geometry.map(shapely.length)
-    rdf = rdf[['Route_ID', 'Route_Name', 'Route_Na_2', 'Seg_Length', 'len', 'geometry']]
-    conv = 5280*.3048    # Convert miles to meters
-    print(conv*rdf.Seg_Length.min(), conv*rdf.Seg_Length.mean(), conv*rdf.Seg_Length.max())
-    print(rdf.len.min(), rdf.len.mean(), rdf.len.max())
-
-
-
-#    print(rdf[rdf.len > 100000])
-
-    rdf = rdf[rdf.Route_Name == 'Seward Highway']
-
-    rdf = rdf[['Route_ID', 'Route_Na_2', 'len']].sort_values(by=['len'])
-    pd.set_option('display.max_columns', None)
-    print(rdf)
-
-    return
+    # Main highways with mileposts
+    df0 = df = dd['maindf']
+    is_highway = df0.Route_Name.str.contains('Highway')
+#    print(df.columns)
+    mprange = df.mprange
+    df = df[['Route_ID', 'Route_Na_3', 'roadseg', 'Route_Name']]
+    df = df.rename(columns={'Route_Na_3': 'Route_Name', 'roadseg': 'geometry', 'Route_Name': 'Main_Route_Name'})
+    df['mp0'] = mprange.map(lambda x: x[0])
+    df['mp1'] = mprange.map(lambda x: x[1])
+#    df.loc[~is_highway, 'mp0'] = None
+#    df.loc[~is_highway, 'mp1'] = None
+    df.loc[is_highway, 'type'] = 'highway'    # Highway with mileposts
+    df.loc[~is_highway, 'type'] = 'regional'    # Highway with mileposts
+    df = geopandas.GeoDataFrame(df, geometry=df.geometry, crs=dd['leftoverdf'].crs)
+    print(type(df))
+    print(df.columns)
+    dfs.append(df)
 
 
+    # Access roads related to main highways
+    df = dd['offdf']
+    df0 = df
+#    print(df.columns)
+    df = df[['Route_ID_left', 'Route_Na_3_left', 'Route_Name_right', 'geometry']]
+    df = df.rename(columns={
+        'Route_ID_left': 'Route_ID',
+        'Route_Na_3_left': 'Route_Name',
+        'Route_Name_right': 'Main_Route_Name'})
+    is_highway = df.Main_Route_Name.str.contains('Highway')
+    df['mp0'] = df0.mprange.map(lambda x: x[0])
+    df['mp1'] = df0.mprange.map(lambda x: x[1])
+    df['type'] = 'access'    # Access roads / ramps / etc associated with main highways
+    df.loc[~is_highway, 'type'] = 'local'
+    df.loc[~is_highway, 'mp0'] = None
+    df.loc[~is_highway, 'mp1'] = None
 
+    print(type(df))
+    print(df.columns)
+    print('xxxxxxxxx ', df.geometry.name)
+    dfs.append(df)
 
+    # Stuff without mile markers
+    df = dd['leftoverdf']
+    df = df[['Route_ID', 'Route_Na_3', 'geometry']]
+    df = df.rename(columns={
+        'Route_Na_3': 'Route_Name'})
+    df['Main_Route_Name'] = None
+    df['mp0'] = None
+    df['mp1'] = None
+    df['type'] = 'secondary'
+    print(type(df))
+    print(df.columns)
+    dfs.append(df)
 
-
-
-    mpdf = mpdf[mpdf.Route_ID.isin(rdf.Route_ID)]
-
+    mpdf = pd.concat(dfs)
+    mpdf.set_crs(epsg=3338)
+    print(mpdf.columns)
     print(mpdf)
 
-    minseg = 1e9
-    maxseg = 0
+    ofname = config.HARNESS / 'data/fischer' / 'mileposts1.gpkg'
+    mpdf.to_file(ofname, driver="GPKG")
 
-    seglens = list()
-    for tup in rdf.itertuples(index=False):
-        for p0,p1 in iterate_ls(tup.geometry):
-#        for xx in iterate_ls(tup.geometry):
-#            print('xxxxxxxxxxx ', xx)
-            seglens.append(math.dist(p0,p1))
+#    offdf = offdf.rename(columns={'Route_ID_left': 'Route_ID'})
+#    offdf[['index', 'Route_ID_left', 'mprange', 'Route_Na_3', 
 
-    print(min(seglens), max(seglens), statistics.mean(seglens))
-
-
+#Route_ID
+#Route_Na_3
+#Main_Route_ID
+#mprange
 
 main()
