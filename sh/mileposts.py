@@ -1,10 +1,11 @@
-import statistics,math,pickle
+import statistics,math,pickle,gzip
 from osgeo import ogr,gdal
 import shapely
 from akramms import config
 import geopandas
 import pandas as pd
-
+from akramms.experiment import aksc5
+from uafgi.util import shapelyutil
 
 BEGIN = 0.0    # Begin sentinel marker 
 END = 9999.0    # End sentinel marker for road
@@ -179,7 +180,7 @@ def compute_mileposts():
     with open(ofname, 'wb') as out:
         pickle.dump({'maindf': maindf, 'offdf': offdf, 'leftoverdf': leftoverdf}, out)
 
-def  main():
+def  assemble_mileposts():
     ifname = config.HARNESS / 'data/fischer' / 'mileposts.pik'
     with open(ifname, 'rb') as fin:
         dd = pickle.load(fin)
@@ -245,15 +246,56 @@ def  main():
     print(mpdf.columns)
     print(mpdf)
 
+
+    # Identify ijdom gridcell intersections
+    lsdf = lineintegral.linestrings_crossings(roaddf.geometry, expmod.gridD)
+
     ofname = config.HARNESS / 'data/fischer' / 'mileposts1.gpkg'
     mpdf.to_file(ofname, driver="GPKG")
 
-#    offdf = offdf.rename(columns={'Route_ID_left': 'Route_ID'})
-#    offdf[['index', 'Route_ID_left', 'mprange', 'Route_Na_3', 
+# -----------------------------------------------------------
+def all_coords(geom):
+    """Recursively extract all coordinate tuples from any Shapely geometry."""
+    
+    if geom.is_empty:
+        return []
+        
+    # Handle geometry collections and multi-geometries
+    if geom.geom_type.startswith('Multi') or geom.geom_type == 'GeometryCollection':
+        coords = []
+        for part in geom.geoms:
+            coords.extend(all_coords(part))
+        return coords
+            
+    # Handle LineString, LinearRing, and Point
+    elif hasattr(geom, 'coords'):
+        return geom.coords
+        
+    return coords
 
-#Route_ID
-#Route_Na_3
-#Main_Route_ID
-#mprange
 
-main()
+def add_ijdoms():
+    import akramms.experiment.aksc5 as expmod    # Any experiment will do
+
+    ifname = config.HARNESS / 'data/fischer' / 'mileposts1.gpkg'
+    roaddf = geopandas.read_file(ifname)
+
+    geoinv_affine = shapelyutil.to_affine(expmod.gridD.geoinv)
+    ijdomss = list()
+    for ix,tup in enumerate(roaddf.itertuples(index=False)):
+        if ix % 100 == 0:
+            print(f'ijdoms {ix} of {len(roaddf)}')
+        points = shapely.geometry.MultiPoint(all_coords(tup.geometry))
+        ijpoints = shapely.affinity.affine_transform(points, geoinv_affine)
+        ijdoms = sorted(set((int(ij.x), int(ij.y)) for ij in ijpoints.geoms))
+        ijdomss.append(ijdoms)
+    roaddf['ijdoms'] = ijdomss
+    print(roaddf)
+
+    ofname = config.HARNESS / 'data/fischer' / 'mileposts2.pik.gz'
+    with gzip.open(ofname, 'wb') as out:
+        pickle.dump(roaddf, out)
+
+
+add_ijdoms()
+
