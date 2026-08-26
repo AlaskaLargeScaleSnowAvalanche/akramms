@@ -1129,7 +1129,7 @@ def roadcover(args):
 #
         makefile.add(rule)
 
-        break
+#        break    # DEBUG
 
     _tmp = expmod.root_dir / 'tmp'
     os.makedirs(_tmp, exist_ok=True)
