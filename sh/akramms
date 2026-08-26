@@ -1115,20 +1115,19 @@ def roadcover(args):
 
     expset = _get_expset(akdf.iloc[0])
     makefile = make.Makefile()
-    akdf['combo_base'] = akdf.combo.map(lambda combo: combo[:-2])
 
-    for combo_base,akdf1 in akdf.groupby('combo_base'):
-
-        rule = roadcover.r_roadcover(expmod, list(akdf1.combo))
-        if not os.path.exists(rule.inputs[0]):
-            continue
+    akdf['acombo'] = akdf.combo.map(lambda combo: combo._replace(forest='All', idom=-1, jdom=-1))
+    for acombo,akdf1 in akdf.groupby('acombo'):
+        rule = roadcover.r_roadcover(expmod, acombo, list(akdf1.combo))
+#        if not os.path.exists(rule.inputs[0]):
+#            continue
         makefile.add(rule)
 
-#        rule = roadcover.r_integrate(expmod, row['combo'])
+        rule = roadcover.r_integrate(expmod, acombo, rule.outputs[0])
 #        if not os.path.exists(rule.inputs[1]):
 #            continue
 #
-#        makefile.add(rule)
+        makefile.add(rule)
 
         break
 
