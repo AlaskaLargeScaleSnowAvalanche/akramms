@@ -1,11 +1,11 @@
 import os,pickle,gzip,shutil,zipfile,functools,subprocess
+from osgeo import gdal
 import numpy as np
 import pandas as pd
 import geopandas
 import shapely
 from uafgi.util import make,gdalutil,lineintegral,shapelyutil
 from akramms import config
-#from akramms.experiment import aksc5 as expmod
 
 """Analyze Extent IDs that overlap roads."""
 
@@ -30,12 +30,7 @@ def r_roadcover(expmod, acombo, combos):
         print(f'BEGIN r_roadcover with {len(combos)} combos')
 
         # Roads with Mileposts
-#        roaddf = geopandas.read_file(mileposts_gpkg)
         roaddf = load_road_segments()
-
-
-#        roaddf = roaddf[roaddf.Route_ID == '4441092X000']    # THane Road (Juneau)
-        roaddf = roaddf[roaddf.Seg_ID==3627]    # THane Road (Juneau)   DEBUG
 
         idfs = list()
         for ix,(combo,ifname) in enumerate(zip(combos,ifnames)):
@@ -64,7 +59,8 @@ def r_roadcover(expmod, acombo, combos):
         tmp_fname = f'{str(ofname)}.tmp'
         idf = pd.concat(idfs)
         idf['ijdoms'] = idf.ijdoms.map(repr)
-        idf.to_file(tmp_fname, driver="GPKG")
+        idf.to_file(tmp_fname, driver="GPKG", crs=f'EPSG:{expmod.epsg}', engine='fiona')
+
 #        with gzip.open(tmp_fname, 'wb') as out:
 #            pickle.dump(pd.concat(idfs), out, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -102,22 +98,22 @@ def _calc_integrations(df1):
     total_len = df1.len.sum()    # Divide by this when computing means...
     return pd.Series({
         'max_velocity': df1.max_velocity.max(),
-        'interaction_length': total_len,
-        'mean_deposition': (df1.len * df1.deposition).sum() / total_len,
+        'max_pressure': df1.max_pressure.max(),
+        'max_height': df1.max_height.max(),
+        'affected_length': total_len,
+#        'mean_deposition': (df1.len * df1.deposition).sum() / total_len,
         'max_deposition': df1.deposition.max(),
 #        'naval': (df1.naval.min(), df1.naval.max()),
     })    
 
 def _final_sum(df1):
-#    print('dddddddddddf1 ')
-#    print(df1)
-    total_length = df1.interaction_length.sum()    # Divide by this when computing means...
-#    print('ddddddddddddddddddddd ', (df1.interaction_length * df1.mean_deposition).sum() / total_length, total_length, list(df1.interaction_length))
-
+    total_length = df1.affected_length.sum()    # Divide by this when computing means...
     return pd.Series({
         'max_velocity': df1.max_velocity.max(),
-        'interaction_length': total_length,
-        'mean_deposition': (df1.interaction_length * df1.mean_deposition).sum() / total_length,
+        'max_pressure': df1.max_pressure.max(),
+        'max_height': df1.max_height.max(),
+        'affected_length': total_length,
+#        'mean_deposition': (df1.affected_length * df1.mean_deposition).sum() / total_length,
         'max_deposition': df1.max_deposition.max(),
         'naval': df1.iloc[0].naval,
         'geometry': df1.iloc[0].geometry,
@@ -148,18 +144,12 @@ def r_integrate(expmod, acombo, ifname):
         The combo to compute this for.
     """
 
-#    ifname = expmod.root_dir / f'roadcover/{expmod.name}-{combo.base_str()}-roadcover.pik.gz'
-#    ofname_base = expmod.root_dir / f'roadcover/{expmod.name}-{combo.base_str()}/{expmod.name}-{repr(combo)}-roadstats'
-#    ofname = str(ofname_base) + '.shp.zip'
-
     ifname = expmod.root_dir / f'roadcover/{expmod.name}-{acombo.base_str()}-roadcover.gpkg'
-
     ofname = expmod.root_dir / 'roadcover' / f'{expmod.name}-{acombo.base_str()}-roadstats.gpkg'
 
 
-
     # Variables to read
-    vnames = ['max_velocity', 'deposition']
+    vnames = ['max_velocity', 'max_pressure', 'max_height', 'deposition']
 
 
     def action(tdir):
@@ -174,28 +164,15 @@ def r_integrate(expmod, acombo, ifname):
         print('=============== geo1')
         print(rdf0.geometry)
 
-#        # Get the grid for this tile
-#        row = rdf0.iloc[0]
-#        combo0 = expmod.combo(**{key: row[key] for key in expmod.combo_keys})
-#        grid, _, _ = gdalutil.read_raster(val_tifs[0], False)
-#
-#        # Clip to within the margin
-#        bbox = grid.bounding_box()
-#        print('bbox ', bbox)
-#        rdf0['geometry'] = [shapely.intersection(ls, bbox) for ls in rdf0.geometry]
-#        print('geo2 ', rdf0.geometry)
-
         # -------------------------------------------------
         # Group linestrings together by Seg_ID
         # (Because one road segment can intersect multiple avalanche extents)
         rows = list()
         for Seg_ID, xdf in rdf0.groupby('Seg_ID'):
             # Join all avalanches on this segment into one (Multi?)LineString
-            ls = shapely.union_all(xdf.geometry, grid_size=.000000001)
-            ls = shapely.ops.linemerge(ls)
-
-
-#            ls = shapely.unary_union(xdf.geometry)
+            ls = shapely.union_all(xdf.geometry, grid_size=.001)
+            if not isinstance(ls, shapely.geometry.linestring.LineString):
+                ls = shapely.ops.linemerge(ls)
 
             # ijdoms depends on Seg_ID, they will all be the same, choose the first
             ijdoms = xdf.iloc[0].ijdoms
@@ -206,31 +183,15 @@ def r_integrate(expmod, acombo, ifname):
         # Make a single ijdom per column
         rdf = rdf.explode('ijdoms', ignore_index=True).rename(columns={'ijdoms':'ijdom'})
 
-#        df = rdf.groupby(['Seg_ID', 'ijdom']).size().reset_index()
-#        print(df.groupby('Seg_ID').size().sort_values())
-#        return
-#        rdf = rdf[rdf.Seg_ID == 27849]    # DEBUG
-#        rdf = rdf[rdf.Seg_ID == 17823]    # DEBUG
-#        rdf = rdf[rdf.Route_ID == '4441092X000']    # THane Road (Juneau)
-#        print(rdf)
-#        return
-
         # ------------------------------------------------
         # Process by tile
         statsdfs = list()
-#        print(rdf.iloc[0])
         for (idom, jdom), xdf in rdf.groupby('ijdom'):
-#            print('===================================== AA1 ', idom, jdom, len(xdf))
-#            print(xdf)
-
-            # Load rasters to integrate over
-
 
             # Find line segment crossings, raster coordinates and lengths
             ifname1 = _raster_fname(expmod, acombo._replace(idom=idom, jdom=jdom), vnames[0])
             grid, _, _ = gdalutil.read_raster(ifname1, data=False)
             ijdf = lineintegral.linestrings_crossings(xdf.set_index('Seg_ID').geometry, grid, index_col_name='Seg_ID')
-
             if len(ijdf) > 0:
                 # =============== Compute functions on rasters
                 cols = dict()
@@ -240,22 +201,10 @@ def r_integrate(expmod, acombo, ifname):
                     rfname = _raster_fname(expmod, acombo._replace(idom=idom, jdom=jdom), vname)
                     print('Integrating over ', rfname)
                     grid, val_data, val_nd = gdalutil.read_raster(rfname)
-                    ijdf[vname] = val_data[ijdf.i, ijdf.j]
+                    ijdf[vname] = val_data[ijdf.j, ijdf.i]
 
                 # Do the integration
-# #               print(ijdf)
-# #               print(ijdf.columns)
                 statsdf = ijdf.groupby('Seg_ID').apply(_calc_integrations) # Newer Pythons, include_groups=False)
-#                print('===================== ijdf')
-#                print(ijdf)
-#                print(ijdf.index)
-##                print('===================== statsdf')
-##                print(statsdf)
-##                print(statsdf.index)
-##                print('===================== xdf')
-##                print(xdf)
-##                print(xdf.index)
-###                print(xdf.loc['Seg_ID', statsdf.iloc[0].Seg_ID])
 
                 statsdf = statsdf.merge(xdf, on=['Seg_ID'])
                 statsdf = geopandas.GeoDataFrame(statsdf, crs=expmod.wkt)
@@ -264,22 +213,13 @@ def r_integrate(expmod, acombo, ifname):
 
                 # Remove GeometryCollection by removing points
                 statsdf.geometry = statsdf.geometry.map(_remove_points)
-
                 statsdfs.append(statsdf)
 
-#                print('===================== statsdf1')
                 # naval here is the number of avalanches interacted
                 # with for the entire Seg_ID, not just for this
                 # (idom,jdom)
 
-#                print(statsdf)
-#                print(statsdf.index)
-#                print(statsdf.iloc[0])
-##                return
-
         statsdf = pd.concat(statsdfs)
-
-        statsdf = statsdf[(statsdf.max_velocity != 0) | (statsdf.max_deposition != 0)]
 
         print('=================== Final1 statsdf')
         print(statsdf)
@@ -289,53 +229,16 @@ def r_integrate(expmod, acombo, ifname):
         mpdf = load_road_segments()
         statsdf = statsdf.merge(mpdf[['Seg_ID', 'Route_ID', 'Route_Name', 'Main_Route_Name', 'mp0', 'mp1', 'type', 'seglen']], on='Seg_ID', how='left')
 
-#        print(mpdf.iloc[0])
-#        return
-
         print('=================== Final2 statsdf')
         print(statsdf)
         print(statsdf.iloc[0])
 
-
-
-#            else:
-#                statsdf = geopandas.GeoDataFrame([], columns=('Seg_ID', 'max_velocity', 'length', 'mean_deposition', 'max_deposition', 'geometry'))
-#
-#
-#
-#        else:
-#            statsdf = geopandas.GeoDataFrame([], columns=('Seg_ID', 'max_velocity', 'length', 'mean_deposition', 'max_deposition', 'geometry'))
-
         print('Writing ', ofname)
-        statsdf.set_crs(epsg=3338)
-        statsdf.to_file(str(ofname), driver='GPKG', crs='EPSG:3338', engine='fiona')
+        statsdf.set_crs(epsg=expmod.epsg)
+        statsdf.to_file(str(ofname), driver='GPKG', crs=f'EPSG:{expmod.epsg}', engine='fiona')
 
 
         cmd = ['ogr2ogr', '-f', 'CSV', ofname.with_suffix('.csv'), ofname]
         subprocess.run(cmd, check=True)
-#ogr2ogr -f "CSV" aksc5-ccsm-past-sclapse-All-30-roadstats.csv aksc5-ccsm-past-sclapse-All-30-roadstats.gpkg 
-
-
-#        # Write shapefile to a directory
-#        tdir = ofname_base.with_suffix('.tmp')
-#        shutil.rmtree(tdir, ignore_errors=True)
-#        os.makedirs(tdir, exist_ok=True)
-#        statsdf.to_file(str(tdir / (ofname_base.parts[-1] + '.shp')))#, driver="ESRI Shapefile")
-#
-#        # Zip it up
-#        tmp_zip = ofname_base.with_suffix('.zip.tmp')
-#        with zipfile.ZipFile(tmp_zip, 'w', zipfile.ZIP_DEFLATED) as ozip:
-#            for name in os.listdir(tdir):
-#                ozip.write(tdir / name, name)
-#
-#        os.rename(tmp_zip, ofname)    # Atomic
-#
-#        # Clean up
-#        shutil.rmtree(tdir, ignore_errors=True)
-#        try:
-#            os.remove(tmp_zip)
-#        except FileNotFoundError:
-#            pass
-##        tmp_zip.unlink(missing_ok=True)
 
     return make.Rule(action, [ifname], [ofname, ofname.with_suffix('.csv')])

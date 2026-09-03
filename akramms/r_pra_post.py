@@ -152,9 +152,6 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
             # For more info see chunk.py and d8graph.cpp
             df = df[df.dom.notna()]
 
-        # Drop PRAs we've decided to drop
-#$$$$$$$
-
         # Write out one top-level shapefile per pra_size
         os.makedirs(scene_dir / 'RELEASE', exist_ok=True)
         os.makedirs(scene_dir / 'DOMAIN', exist_ok=True)
