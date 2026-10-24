@@ -196,6 +196,7 @@ def main():
 
 
 def plot_fig(stat_grid, stat_data, cmap, vmin, vmax, ofname, ticks, ticklabels):
+    print(f'=============== plot_fig: {ofname}')
     if os.path.isfile(ofname):
         return
     tif_dir = expmod.root_dir / 'stats' / 'tif'

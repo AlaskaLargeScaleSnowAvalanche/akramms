@@ -86,7 +86,7 @@ def plot_fig(stat_grid, stat_data, fhc_data, cmap, vmin, vmax, ofname, ticks, ti
     # Write it out
     ofname = pathlib.Path(ofname)
     with akfigs.TrimmedPng(ofname) as tname:
-        fig.savefig(tname, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
+        fig.savefig(tname, dpi=300, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
 #        fig.savefig(tname, dpi=300, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
 #        fig.savefig(tname, bbox_inches='tight', pad_inches=0.5)   # Hi-res version; add margin so text is not cut off
 
@@ -227,8 +227,8 @@ def main2():
             map_extent = delta_extent
         else:
             tile_grid = expmod.gridD.sub(idom, jdom, 100, 100, margin=False)
-            map_extent = tile_grid.extent(order='xxyy')    # INCUDES margin
-            map_extent = [a+b for a,b in zip(map_extent, delta_extent)]
+            map_extent = tile_grid.extent()    # INCUDES margin
+            map_extent = [a+b for a,b in zip(map_extent.xxyy, delta_extent)]
 
 
         # Main Map
