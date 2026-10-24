@@ -6,7 +6,10 @@ import akfigs
 import matplotlib.pyplot as plt
 import matplotlib.patheffects
 
-import akramms.experiment.aksc5c as expmod
+import akramms.experiment.aksc5 as expmod
+#import akramms.experiment.aksc5c as expmod
+#from akramms.experiment import aksc5
+
 from akramms import downscale_snow,config
 from uafgi.util import wrfutil,cartopyutil,cptutil,gdalutil,gisutil
 
@@ -25,10 +28,15 @@ def read_and_align(path, srs, width, height, GT):
     minY = maxY + (height * yres) # GT[5] is usually negative
 
     ds0 = gdal.Open(path)
+    GT0 = list(ds0.GetGeoTransform())
+#    print(f'{path}: GT0 = ', GT0)
+    print('read_and_algin width height = ', width, height)
+
     ds1 = gdal.Warp(
         '', ds0, format='MEM',
         xRes=xres, yRes=yres, width=width, height=height, outputBounds=[minX, minY, maxX, maxY],
         dstSRS=srs,
+#        resampleAlg='average')
         resampleAlg='nearest')
     return gdalutil.read_ds(ds1)
 
@@ -41,22 +49,37 @@ def main():
     fut_tifs = [config.HARNESS / 'outputs/wrf_fut_agg3' / 'acsnow_agg3_4km_2070_2099_030.tif']
 
 
+#    print(past_tif)
+#    print(fut_tifs[0])
+#    return
+
+
     # Regrid to a common grid
     ref_ds = gdal.Open(past_tif)
-    GT = list(ref_ds.GetGeoTransform())
-    GT[1] = 0.5 * GT[1]    # Cells are offset by 1/2 gridcell between the past and future
-    GT[5] = 0.5 * GT[5]
-    align_kwargs = (ref_ds.GetProjection(), ref_ds.RasterXSize*2, ref_ds.RasterYSize*2, GT)
+    GT0 = ref_ds.GetGeoTransform()
+    GT = list(GT0)
+    GT[1] = np.round(GT[1])    # Round to 2000
+    GT[5] = np.round(GT[5])
+    factor = 10
+    factor_inv = 1.0/factor
+    print(f'Dest GT = ', GT)
+    align_args = (ref_ds.GetProjection(), ref_ds.RasterXSize*factor, ref_ds.RasterYSize*factor, GT)
 
   
-    past_grid,past_data,past_nd = read_and_align(past_tif, *align_kwargs)
+    print('past GT ', ref_ds.GetGeoTransform())
+    past_grid,past_data,past_nd = read_and_align(past_tif, *align_args)
     print('past_data ', past_data.shape)
 
+#    fut_grid,_,fut_nd = gdalutil.read_raster(fut_tifs[0], data=False)
+#    print('future GT ', fut_grid.geotransform)
 
     # Average together the futures
-    fut_grid,fut_data,fut_nd = read_and_align(fut_tifs[0], *align_kwargs)
+    fut_grid,fut_data,fut_nd = read_and_align(fut_tifs[0], *align_args)
+    print('future shapes ', fut_grid.centersy.shape, fut_grid.centersx.shape, fut_data.shape)
+#    raise ValueError(17)
+
     for fut_tif in fut_tifs[1:]:
-        _,x_data,_ = read_and_align(fut_tif, *align_kwargs)
+        _,x_data,_ = read_and_align(fut_tif, *align_args)
         fut_data += x_data
     fut_data *= 1. / len(fut_tifs)
 
@@ -110,6 +133,8 @@ def main():
     ax.set_extent(map_extent.xxyy, map_crs)
 
     diff_data = fut_data - past_data
+#    diff_data = fut_data
+#    diff_data = -past_data
     print('vmin vmax ', np.min(diff_data), np.max(diff_data))
 
     cmap,_,_ = cptutil.read_cpt('palettes/seismic.cpt', reverse=False)
@@ -126,6 +151,8 @@ def main():
         transform=map_crs, extent=map_extent, alpha=1.0)
 
 
+#    print('diff_data.shape ', diff_data.shape)
+#    print('fut_grid.shape ', fut_grid.centersx.shape, fut_grid.centersy.shape)
     pcm = ax.pcolormesh(
         fut_grid.centersx, fut_grid.centersy, diff_data,
         rasterized=True,
