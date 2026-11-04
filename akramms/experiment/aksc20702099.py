@@ -95,7 +95,7 @@ combo_keys = list(combo_schema.schema.keys())
 _Combo = collections.namedtuple('Combo', combo_keys)
 class Combo(_Combo):
     def base_str(self):
-        return f'{self.snow_dataset}-{self.era}-{self.downscale_algo}-{self.forest}-{self.return_period}'
+        return f'{self.forest}-{self.return_period}'
     def __repr__(self):
         return f'{self.base_str()}-{self.idom:03d}-{self.jdom:03d}'
 
@@ -170,9 +170,10 @@ def add_combo(makefile, combo):
         exp_mod, combo.idom, combo.jdom)).outputs[0]
 
     # Snow downscaling
+    snow_fname = config.HARNESS / 'outputs/wrf_fut_agg3' / f'acsnow_agg3_4km_2070_2099_{combo.return_period:03d}.tif'
     sx3I_tif = makefile.add(r_experiment.r_scsnow(
-        exp_mod, combo.snow_dataset,
-        combo.era, combo.idom, combo.jdom, combo.return_period)).outputs[0]
+        exp_mod, snow_fname,
+        combo.idom, combo.jdom, combo.return_period)).outputs[0]
 
     # Convert Combo to a scene_dir / scen_args
     scene_dir = os.path.join(exp_mod.dir, combo_to_scenedir(combo))

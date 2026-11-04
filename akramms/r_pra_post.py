@@ -92,7 +92,6 @@ def pra_post_rule(scene_dir, scene_args, dem_filled_file, return_period, For, sn
     inputs.append(snowI_tif)
 
     def action(tdir):
-
         degree = np.pi / 180.
         name = scene_args['name']
         resolution = scene_args['resolution']

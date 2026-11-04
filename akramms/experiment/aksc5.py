@@ -100,15 +100,18 @@ class Combo(_Combo):
     def __repr__(self):
         return f'{self.base_str()}-{self.idom:03d}-{self.jdom:03d}'
 
-def snowfile(snow_dataset, era, downscale_algo, return_period, idom, jdom):
+def snowfile(return_period, idom, jdom):
     """Creates the name of a snow file.
     idom,jdom:
         may be '*' to allow for wildcards and globbing."""
 
     sidom = idom if isinstance(idom,str) else f'{idom:03d}'
     sjdom = jdom if isinstance(jdom,str) else f'{jdom:03d}'
-    ofname = os.path.join(dir, 'snow',
-        f'{name}_{snow_dataset}_{era}_{downscale_algo}_{return_period:03d}_{sidom}_{sjdom}.tif')
+
+    ofname = dir / 'snow' / f'aksc5_ccsm_past_sclapse__{return_period:03d}_{sidom}_{sjdom}.tif'
+
+#    ofname = os.path.join(dir, 'snow',
+#        f'{name}_{snow_dataset}_{era}_{downscale_algo}_{return_period:03d}_{sidom}_{sjdom}.tif')
     return pathlib.Path(ofname)
 
 def combo_to_snowfile_args(combo):
@@ -174,13 +177,14 @@ def add_combo(makefile, combo):
 
     # Snow downscaling
     if combo.downscale_algo == 'sclapse':
+        snow_fname = config.HARNESS / 'outputs/wrf_era5_agg3' / f'acsnow_agg3_4km_1940_2023_{combo.return_period:03d}.tif'
         sx3I_tif = makefile.add(r_experiment.r_scsnow(
-            exp_mod, combo.snow_dataset,
-            combo.era, combo.idom, combo.jdom, combo.return_period)).outputs[0]
+            exp_mod, snow_fname, combo.idom, combo.jdom, combo.return_period)).outputs[0]
     else:
         if combo.downscale_algo == 'lapse':
             makefile.add(r_experiment.r_dfcA(exp_mod))
-        sx3I_tif = makefile.add(r_experiment.r_snow(
+            snow_fname = config.HARNESS / 'outputs/wrf_fut_agg3' / f'acsnow_agg3_4km_2070_2099_{combo.return_period:03d}.tif'
+            sx3I_tif = makefile.add(r_experiment.r_snow(
             exp_mod, combo.snow_dataset, combo.downscale_algo,
             combo.era, combo.idom, combo.jdom)).outputs[0]
 
