@@ -8,10 +8,12 @@ URL_TPL = 'https://mesonet.agron.iastate.edu/cgi-bin/request/coop.py?network={ne
 
 def main():
     makefile = make.Makefile()
-    for year in range(1940,2026):
-        rule = d_mesonet.r_download_year(year, network='AKCLIMATE')
-        print(rule)
-        makefile.add(rule)
+#    for year in range(1940,2026):
+    for year in range(2002, 2023):
+        for month in range(1,13):
+            rule = d_mesonet.r_download_month(year, month, network='AKCLIMATE')
+            print(rule)
+            makefile.add(rule)
     makefile.generate('download_akclimate.mk', run=True, ncpu=1)
 
 
